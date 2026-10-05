@@ -24,8 +24,8 @@ fn assert_normalized(z: DoubleWord, context: &str) {
     );
 }
 
-/// `|computed - exact| · denominator ≤ bound · |exact| · denominator`, the
-/// relative error test with the bound's denominator cleared.
+/// `|computed - exact| · denominator ≤ bound · |exact|`: the relative error
+/// test against `bound / denominator`, with the denominator cleared.
 fn assert_within(
     computed: &Exact,
     exact: &Exact,
@@ -35,7 +35,7 @@ fn assert_within(
 ) {
     let error = (computed - exact).abs();
     assert!(
-        &error * denominator <= &(bound * &exact.abs()) * denominator,
+        &error * denominator <= bound * &exact.abs(),
         "{context}: relative error exceeds the proved bound"
     );
 }
