@@ -1,8 +1,15 @@
 (** The axiom audit: every theorem the library relies on, and what it assumes.
-    Section hypotheses (an exact 2Prod, the precision bound, the double-word
+    Section hypotheses (an exact product, the precision bound, the double-word
     inputs) are arguments of these theorems, not axioms; only global axioms are
-    listed. scripts/check_formal.sh requires them to be among
-    formal/axioms.expected. *)
+    listed. scripts/check_formal.sh requires them to be exactly
+    formal/axioms.expected:
+    - Coq's classical reals: [sig_not_dec], [sig_forall_dec],
+      [functional_extensionality_dep], [classic].
+    - [TwoProd] (DWTimesFP.v), which the vendored development declares with
+      [Parameter] inside a section, making it a global axiom. It is an
+      uninterpreted constant of the inhabited type [R -> R -> R * R], so it
+      can't make the logic inconsistent, and every theorem that uses it
+      also assumes [TwoProd = Fast2Mult]: in effect it is a parameter. *)
 
 From Double Require Import DWPlus DWTimesFP DWTimesDW DWDivFP DWDivDW.
 Require Import TwoProdBinary64.
