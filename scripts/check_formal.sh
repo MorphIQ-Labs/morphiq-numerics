@@ -28,7 +28,7 @@ trap 'rm -rf "$work"' EXIT
 cp -r formal/double-word formal/two-prod formal/binary64 formal/audit "$work/"
 (cd "$work/double-word" && coq_makefile -f _CoqProject -o Makefile && make -j"$(nproc)")
 (cd "$work/two-prod" && coqc TwoProdBinary64.v)
-(cd "$work/binary64" && for proof in Binary64Add Instances; do
+(cd "$work/binary64" && for proof in Binary64Add Instances Binary64Mul; do
   coqc -R ../double-word Double -R . Binary64 -R ../two-prod "" "$proof.v" || exit 1
 done)
 

@@ -104,9 +104,20 @@ exact result is zero.
   are proved in binary64 itself, with gradual underflow, so subnormal words,
   intermediates and results are covered. The magnitude limit only excludes
   overflow, and is argued below rather than machine-checked.
-- **`mul_f64`, `mul`, `div_f64`, `div`:** the bounds are proved for an unbounded
-  exponent range. They hold in binary64 whenever every operation of the
-  algorithm returns what it would there:
+- **`mul_f64`, `mul`:** proved in binary64, with gradual underflow, when:
+  - the leading words' product (`x_hi · y`, or `x_hi · y_hi`) is zero or at
+    least `2^−969` in magnitude, which is `two_prod`'s domain;
+  - every product of a leading and a trailing word (`x_lo · y`, or
+    `x_hi · y_lo` and `x_lo · y_hi`) is zero or at least `2^−1022`;
+  - for overflow (argued below), `|x_hi|` and `|y|` (`|y_hi|`) are at most
+    `2^996`, as `two_prod` needs, and the leading words' product is below
+    `2^1022`.
+
+  Every nonzero word between `2^−484` and `2^484` in magnitude meets all of
+  these.
+- **`div_f64`, `div`:** the bounds are proved for an unbounded exponent range.
+  They hold in binary64 whenever every operation of the algorithm returns what
+  it would there:
   - no intermediate overflows;
   - no rounded product or quotient is subnormal;
   - each exact product is within `two_prod`'s domain.
@@ -129,6 +140,12 @@ both below `2^1021` in magnitude:
 Every other operand in `add_f64` and `add` is a rounding error or a trailing word,
 at most `2^970`, or a leading word within a few ulps of `s`. No operation's
 result reaches the overflow threshold `2^1024 − 2^970`.
+
+**Why the products' limits exclude overflow (argued).** `two_prod` needs its
+operands at most `2^996` (the split multiplies by `2^27 + 1`) and its product
+below `2^1023`. Every other product, a trailing word times a word, is at most
+`2^−53` times the leading product. The sums then stay within a few ulps of that
+product, so a leading product below `2^1022` keeps every result finite.
 
 ## Machine-checked proofs
 
@@ -159,6 +176,18 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
   - `add_f64_bound`: `2u²`;
   - `add_bound` and `sub_bound`: `3u²/(1 − 4u)`, which is at most
     `3u² + 13u³`.
+- **The multiplicative bounds in binary64.** `formal/binary64/Binary64Mul.v`
+  defines `two_prod`, `mul_f64` and `mul` as the Rust computes them in the
+  binary64 model, and proves them equal, step by step, to the unbounded-model
+  algorithms on the domain above:
+  - each product rounds alike in both models when it is zero or at least
+    `2^−1022`;
+  - on its domain, Dekker's `two_prod` returns `RN(a·b)` and the exact error
+    (`two_prod_exact`), which is what `Fast2Mult` returns in the unbounded
+    model.
+
+  So the instances' bounds hold in binary64: `mul_f64_bound`, `3/2·u² + 4u³`,
+  and `mul_bound`, `< 5u²`.
 - **`two_prod`'s exactness.** `formal/two-prod/TwoProdBinary64.v` proves
   `two_prod_exact`: for binary64 with ties-to-even, `a · b = p + e` on the
   domain above.
@@ -170,11 +199,9 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
   until the proofs are rerun and the manifest is updated with them.
 
 **What is argued, not machine-checked:**
-- **The models agree for the multiplicative operations:** binary64 coincides with
-  the unbounded-exponent model when no product or quotient rounds a subnormal and
-  each exact product is within `two_prod`'s domain. There, `two_prod` (Dekker's
-  algorithm, `two_prod_exact`) returns what `Fast2Mult` returns in the unbounded
-  model.
+- **The models agree for the divisions:** binary64 coincides with the
+  unbounded-exponent model when no product or quotient rounds a subnormal and
+  each exact product is within `two_prod`'s domain.
 - **No overflow:** Flocq's models have no overflow. The input limits that exclude
   it are argued (see Domain above).
 - **The transcription:** each Rust function is the Coq definition operation for
@@ -185,8 +212,8 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
 |---|---|---|
 | `add_f64` | `DWPlusFP` (`DWPlus.v`); `add_f64` (`Binary64Add.v`) | `DWPlusFP_bound`, `2u²`; in binary64, `add_f64_bound` |
 | `add`, `sub` | `AccurateDWPlusDW` (`DWPlus.v`); `add`, `sub` (`Binary64Add.v`) | `DWPlusDW_relerr_bound`, `3u²/(1 − 4u)`; in binary64, `add_bound`, `sub_bound` |
-| `mul_f64` | `DWTimesFP` (`DWTimesFP.v`) | `DWTimesFP_correct`, `3/2·u² + 4u³`; instance `mul_f64_bound` |
-| `mul` | `DWTimesDW1` (`DWTimesDW.v`) | `DWTimesDW1_correct_even`, `< 5u²` under ties-to-even; instance `mul_bound` |
+| `mul_f64` | `DWTimesFP` (`DWTimesFP.v`) | `DWTimesFP_correct`, `3/2·u² + 4u³`; instance `mul_f64_bound`; in binary64, `Binary64Mul.mul_f64_bound` |
+| `mul` | `DWTimesDW1` (`DWTimesDW.v`) | `DWTimesDW1_correct_even`, `< 5u²` under ties-to-even; instance `mul_bound`; in binary64, `Binary64Mul.mul_bound` |
 | `div_f64` | `DWDivFP3` (`DWDivFP.v`) | `DWDFP3_correct`, `3u²` (`dh`, `dt` exact); instance `div_f64_bound` |
 | `div` | `DWDivDW2` (`DWDivDW.v`) | `DWDDW_correct`, `15u² + 56u³` (`pih` exact); instance `div_bound` |
 | `two_prod` | `Dekker` (Flocq), via `TwoProdBinary64.v` | `two_prod_exact` |
@@ -209,6 +236,9 @@ arithmetic with the library.
 - **Each double-word operation:** 100,000 random double-word operands, checked
   against its bound with the bound's denominator cleared, and checked to return
   a double-word number.
+- **The multiplicative operations at the bottom of their domain:** 100,000
+  cases with leading-word products from `2^−969` and trailing-word products from
+  `2^−1022`, including the `2^−969` edge.
 - **The additive operations at both ends of their domain:**
   - 100,000 cases at the bottom of the range, with subnormal trailing words,
     subnormal `y`, and sums that cancel into the subnormal range;
