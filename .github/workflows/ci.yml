@@ -209,3 +209,19 @@ jobs:
         if: matrix.target == 'thumbv7em-none-eabihf'
         run: sudo apt-get install --yes --no-install-recommends qemu-system-arm
       - run: ./scripts/check_digest_target.sh ${{ matrix.target }}
+
+  # Machine-checked proofs, bound to the source they describe: the double-word
+  # error bounds and two_prod's exactness (docs/double-word.md). The Coq image
+  # is pinned by digest; Flocq and math-comp versions are pinned in the script.
+  formal:
+    name: formal (coq)
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, msrv, no-std]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Proofs build, are bound to the source, and assume only the expected axioms
+        run: |
+          docker run --rm -v "$PWD:/w:ro" -w /w \
+            coqorg/coq@sha256:6113894351967e84f6eca8bd584abbea2c8b97621bb1a0aa9cf7b1d24e7f49ef \
+            bash -c 'opam update --quiet >/dev/null 2>&1 || true; ./scripts/check_formal.sh'

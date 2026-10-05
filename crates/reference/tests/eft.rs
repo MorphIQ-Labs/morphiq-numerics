@@ -66,7 +66,7 @@ fn two_prod_is_exact_across_its_domain() {
     while checked < 200_000 {
         let ea = i64::try_from(words.next_word() % 2018).unwrap() - 1022;
         let eb = i64::try_from(words.next_word() % 2018).unwrap() - 1022;
-        if !(-970..=1021).contains(&(ea + eb)) {
+        if !(-969..=1021).contains(&(ea + eb)) {
             continue;
         }
         assert_exact_product(words.with_exponent(ea), words.with_exponent(eb));
@@ -77,11 +77,12 @@ fn two_prod_is_exact_across_its_domain() {
 #[test]
 fn two_prod_is_exact_at_the_edges_of_its_domain() {
     let mut words = Words::new(0x6a09_e667_f3bc_c909);
-    // e_a + e_b at both ends, with the largest and smallest significands.
+    // e_a + e_b at both ends of the proved domain, with the largest and smallest
+    // significands.
     for (ea, eb) in [
-        (-1022, 52),
-        (52, -1022),
-        (-485, -485),
+        (-1022, 53),
+        (53, -1022),
+        (-485, -484),
         (995, 26),
         (510, 511),
     ] {
@@ -101,6 +102,10 @@ fn two_prod_is_exact_at_the_edges_of_its_domain() {
     let limit = f64::from_bits((996 + 1023) << 52);
     assert_exact_product(limit, 0.75);
     assert_exact_product(-limit, f64::from_bits((25 + 1023) << 52 | ((1 << 52) - 1)));
+    // Subnormal operands, which the proved domain admits.
+    let subnormal = f64::from_bits(0x0000_0000_0123_4567);
+    assert_exact_product(subnormal, f64::from_bits((100 + 1023) << 52) * 1.75);
+    assert_exact_product(-f64::from_bits(1), f64::from_bits((994 + 1023) << 52));
     assert_exact_product(0.0, -3.5);
     assert_exact_product(-0.0, 0.0);
 }

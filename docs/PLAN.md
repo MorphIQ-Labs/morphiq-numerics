@@ -194,7 +194,7 @@ scripts/                   gate logic that CI and contributors run identically
 | | Milestone | Exit criterion |
 |---|---|---|
 | M0 | Repository, governance, CI skeleton, rulesets | This PR; then required checks enabled |
-| M1 | Error-free transforms, double-word, ULP utilities; integer streams | Bit-exact against MPFR; proofs for the EFT bounds; determinism digest on all targets |
+| M1 | Error-free transforms, double-word, ULP utilities; integer streams | Bit-exact against MPFR; proofs for the EFT bounds; determinism digest on all targets. **Met:** exact integer-arithmetic oracle (stronger than MPFR for exact operations), Coq proofs bound in `formal/`, digest on seven targets |
 | M2 | `exp`, `expm1`, `exp2`, `ln`, `ln_1p`, `log2`, `log10` | Correctly rounded over the whole domain; worst cases tested; certificates bound |
 | M3 | `sin`, `cos`, `sincos`, `tan` (Payne–Hanek for large arguments) | As M2 |
 | M4 | Box–Muller normal stream on M2/M3 | Bit-exact against an independent reference implementation of the specification |
