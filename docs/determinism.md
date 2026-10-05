@@ -7,7 +7,7 @@ fixed corpus, compared with the value committed in
 
 ## The corpus
 
-`crates/reference/src/determinism.rs` builds the corpus from integers only (a
+`crates/digest/src/lib.rs` builds the corpus from integers only (a
 seeded xorshift and literal bit patterns), so the inputs are identical
 everywhere. Each section is labelled in the hash, so an output can't move between
 functions unnoticed.
@@ -24,14 +24,20 @@ functions unnoticed.
 The test `every_output_matches_the_committed_digest` runs:
 - in the `test` job on x86-64 Linux, aarch64 Linux, aarch64 macOS and x86-64
   Windows;
-- in the `digest` job on x86-64 Linux with musl (`x86_64-unknown-linux-musl`) and
-  on WebAssembly (`wasm32-wasip1`, under the wasmtime pinned in
-  `.cargo/wasmtime-version` and checked against `.cargo/wasmtime-sha256`).
+- in the `digest` job:
+  - on x86-64 Linux with musl (`x86_64-unknown-linux-musl`);
+  - on WebAssembly (`wasm32-wasip1`, under the wasmtime pinned in
+    `.cargo/wasmtime-version` and checked against `.cargo/wasmtime-sha256`);
+  - on bare metal (`thumbv7em-none-eabihf`), from reset on QEMU's `mps2-an386`
+    Cortex-M4F. That FPU is single-precision only, so every binary64 operation
+    there runs in the compiler's software floating point: a different arithmetic
+    path that must still give the same bits.
+
+The corpus lives in the `no_std`, allocation-free `crates/digest`, so every
+target computes the same one. `crates/digest-embedded` runs it on bare metal,
+printing over semihosting and exiting with the comparison's status.
 
 `scripts/check_digest_target.sh TARGET` runs the same check locally.
-
-Not yet checked: a `no_std` embedded target, which the plan also lists. It needs
-the digest computed in a `no_std` binary under system emulation.
 
 ## Changing it
 
