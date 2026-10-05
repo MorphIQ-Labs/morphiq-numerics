@@ -21,12 +21,17 @@ functions unnoticed.
 
 ## Where it is checked
 
-The test `every_output_matches_the_committed_digest` runs in the `test` job on
-x86-64 Linux, aarch64 Linux, aarch64 macOS and x86-64 Windows.
+The test `every_output_matches_the_committed_digest` runs:
+- in the `test` job on x86-64 Linux, aarch64 Linux, aarch64 macOS and x86-64
+  Windows;
+- in the `digest` job on x86-64 Linux with musl (`x86_64-unknown-linux-musl`) and
+  on WebAssembly (`wasm32-wasip1`, under the wasmtime pinned in
+  `.cargo/wasmtime-version` and checked against `.cargo/wasmtime-sha256`).
 
-Not yet checked: musl, `wasm32` and a `no_std` embedded target, which the plan
-also lists. Each needs a CI job of its own, added as a required check in the
-same change.
+`scripts/check_digest_target.sh TARGET` runs the same check locally.
+
+Not yet checked: a `no_std` embedded target, which the plan also lists. It needs
+the digest computed in a `no_std` binary under system emulation.
 
 ## Changing it
 

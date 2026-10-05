@@ -182,3 +182,27 @@ jobs:
         with:
           shared-key: test-${{ matrix.os }}
       - run: cargo test --locked --workspace --all-features
+
+  # The determinism digest on targets beyond the test hosts: musl's libc and
+  # WebAssembly, where a platform libm differs most. Each runs the reference
+  # suite, digest included (docs/determinism.md); gate logic lives in scripts/.
+  digest:
+    name: digest (${{ matrix.target }})
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, msrv, no-std]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-unknown-linux-musl, wasm32-wasip1]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: digest-${{ matrix.target }}
+      - name: Pinned wasmtime
+        if: matrix.target == 'wasm32-wasip1'
+        run: |
+          ./scripts/install_wasmtime.sh "$RUNNER_TEMP/wasmtime"
+          echo "$RUNNER_TEMP/wasmtime/bin" >> "$GITHUB_PATH"
+      - run: ./scripts/check_digest_target.sh ${{ matrix.target }}
