@@ -220,10 +220,22 @@ round-to-nearest-even, without fused multiply-add contraction, as the language
 specifies. The determinism digest checks bit-identical results on every
 supported target.
 
-**What is argued, not machine-checked:**
-- **The transcription:** each Rust function is the Coq definition operation for
-  operation. Where the paper proves an operation exact, the Coq definition leaves
-  it unrounded and the Rust rounds it, which gives the same value.
+**What is cross-checked, not proved: the transcription.** Each Rust function is
+meant to be its Coq definition operation for operation. Where the paper proves an
+operation exact, the unbounded-model definition leaves it unrounded and the Rust
+rounds it; the binary64 and IEEE 754 definitions round it as the Rust does, and
+the proofs show that gives the same value. The IEEE 754 definitions are
+extracted to OCaml (`formal/extraction`), and the gate runs them on a corpus the
+Rust library writes (`crosscheck-corpus` in `crates/reference`), requiring
+identical bits for every result; any NaN matches any NaN, since IEEE 754 leaves
+NaN payloads to the implementation. The corpus has 4,000 cases per function,
+covering the proved domains, subnormals, signed zeros and overflow.
+- **It can fail:** a reassociated sum in `mul`, `add`, `div_f64` or `div`
+  changes between 56 and 410 of the corpus's results. Reordering `two_prod`'s
+  middle partial products changes none, correctly: on its domain every partial
+  sum is exact.
+- **It isn't a proof:** a transcription error that changes no corpus result
+  would pass.
 
 | Rust | Coq definition | Theorem |
 |---|---|---|
