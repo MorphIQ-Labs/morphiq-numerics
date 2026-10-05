@@ -84,6 +84,32 @@ Definition mul (xh xl yh yl : R) : R * R :=
 Lemma dw_fmt xh xl : double_word prec ne xh xl -> fmtX xh /\ fmtX xl.
 Proof. now intros [[Fh Fl] _]. Qed.
 
+(** On its domain, mul_f64 is DWTimesFP in the unbounded model, step by step. *)
+Lemma mul_f64_eq xh xl y :
+  fmtF xh -> fmtF xl -> fmtF y ->
+  in_two_prod_domain xh y -> normal_or_zero (xl * y) ->
+  mul_f64 xh xl y = DWTimesFP prec ne xh xl y.
+Proof.
+  intros Fxh Fxl Fy Dh Dl.
+  unfold mul_f64, DWTimesFP. rewrite TwoProd_Fast2Mult.
+  rewrite (two_prod_eq xh y Fxh Fy Dh).
+  assert (Fch : fmtF (fst (Fast2Mult prec ne xh y)))
+    by (rewrite <- (two_prod_eq xh y Fxh Fy Dh); apply two_prod_fmt).
+  assert (Fcl1 : fmtF (snd (Fast2Mult prec ne xh y)))
+    by (rewrite <- (two_prod_eq xh y Fxh Fy Dh); apply two_prod_fmt).
+  destruct (Fast2Mult prec ne xh y) as [ch cl1]. cbn [fst snd] in Fch, Fcl1 |- *.
+  rewrite (normal_round _ Dl).
+  assert (Fcl2 : fmtF (rndX (xl * y))) by (rewrite <- (normal_round _ Dl); apply fmtF_rnd).
+  rewrite (fast_two_sum_eq _ _ Fch Fcl2).
+  destruct (fast_two_sum_fmt _ _ Fch Fcl2) as [Fth Ftl1].
+  destruct (F2Sum.Fast2Sum prec ne ch (rndX (xl * y))) as [th tl1].
+  cbn [fst snd] in Fth, Ftl1 |- *.
+  rewrite (sum_round _ _ Ftl1 Fcl1).
+  assert (Ftl2 : fmtF (rndX (tl1 + cl1))) by (rewrite <- (sum_round _ _ Ftl1 Fcl1); apply fmtF_rnd).
+  rewrite (fast_two_sum_eq _ _ Fth Ftl2).
+  now destruct (F2Sum.Fast2Sum prec ne th (rndX (tl1 + cl1))).
+Qed.
+
 Theorem mul_f64_bound xh xl y :
   fmtF xh -> fmtF xl -> fmtF y -> xh = rndF (xh + xl) ->
   in_two_prod_domain xh y -> normal_or_zero (xl * y) ->
@@ -92,25 +118,8 @@ Theorem mul_f64_bound xh xl y :
   Rabs ((zh + zl - xy) / xy) <= 3 / 2 * bpow radix2 (- prec) ^ 2 + 4 * bpow radix2 (- prec) ^ 3.
 Proof.
   intros Fxh Fxl Fy E Dh Dl.
-  pose proof (Instances.mul_f64_bound xh xl y (dw_of_binary64 xh xl Fxh Fxl E) (fmtF_fmtX y Fy)) as B.
-  unfold mul_f64.
-  rewrite (two_prod_eq xh y Fxh Fy Dh).
-  rewrite (normal_round _ Dl).
-  assert (Fch : fmtF (fst (Fast2Mult prec ne xh y)))
-    by (rewrite <- (two_prod_eq xh y Fxh Fy Dh); apply two_prod_fmt).
-  assert (Fcl1 : fmtF (snd (Fast2Mult prec ne xh y)))
-    by (rewrite <- (two_prod_eq xh y Fxh Fy Dh); apply two_prod_fmt).
-  assert (Fcl2 : fmtF (rndX (xl * y))) by (rewrite <- (normal_round _ Dl); apply fmtF_rnd).
-  destruct (Fast2Mult prec ne xh y) as [ch cl1] eqn:C. cbn [fst snd] in Fch, Fcl1.
-  unfold DWTimesFP in B. rewrite TwoProd_Fast2Mult, C in B. cbn [fst snd] in B.
-  rewrite (fast_two_sum_eq _ _ Fch Fcl2).
-  destruct (fast_two_sum_fmt _ _ Fch Fcl2) as [Fth Ftl1].
-  set (T := F2Sum.Fast2Sum prec ne ch (rndX (xl * y))) in *.
-  destruct T as [th tl1]. cbn [fst snd] in Fth, Ftl1.
-  rewrite (sum_round _ _ Ftl1 Fcl1).
-  assert (Ftl2 : fmtF (rndX (tl1 + cl1))) by (rewrite <- (sum_round _ _ Ftl1 Fcl1); apply fmtF_rnd).
-  rewrite (fast_two_sum_eq _ _ Fth Ftl2).
-  exact B.
+  rewrite (mul_f64_eq xh xl y Fxh Fxl Fy Dh Dl).
+  exact (Instances.mul_f64_bound xh xl y (dw_of_binary64 xh xl Fxh Fxl E) (fmtF_fmtX y Fy)).
 Qed.
 
 Theorem mul_bound xh xl yh yl :

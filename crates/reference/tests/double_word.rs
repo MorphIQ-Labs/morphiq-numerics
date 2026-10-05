@@ -263,6 +263,46 @@ fn multiplicative_operations_keep_their_bounds_at_the_bottom_of_their_domain() {
     }
 }
 
+/// A double-word number whose words are zero or have exponents in
+/// `[low, high]`: the leading word's exponent is drawn from that range, and
+/// a trailing word that would fall below `2^low` is zero.
+fn ranged_double_word(words: &mut Words, low: i64, high: i64) -> DoubleWord {
+    let span = u64::try_from(high - low + 1).unwrap();
+    let e = low + i64::try_from(words.next_word() % span).unwrap();
+    if e - 57 >= low {
+        double_word(words, e)
+    } else {
+        DoubleWord::from_parts(words.with_exponent(e), 0.0).unwrap()
+    }
+}
+
+/// The divisions across their binary64 domain (`formal/binary64/Binary64Div.v`):
+/// for `L, H ≥ 0` with `2L + 2H ≤ 917`, every nonzero word `w` of `x` and `y`
+/// has `2^-L ≤ |w| < 2^H`. Each corner of that region is sampled.
+#[test]
+fn divisions_keep_their_bounds_across_their_binary64_domain() {
+    let mut words = Words::new(0x0d17_1d00_0d17_1d00);
+    let div_f64_bound = &Exact::integer(3) * &u(2);
+    let div_bound = &(&Exact::integer(15) * &u(2)) + &(&Exact::integer(56) * &u(3));
+    for (l, h) in [(458, 0), (229, 229), (0, 458)] {
+        for _ in 0..SAMPLES / 3 {
+            // Exponents in [-L, H - 1] give 2^-L ≤ |w| < 2^H.
+            let x = ranged_double_word(&mut words, -l, h - 1);
+            let y = ranged_double_word(&mut words, -l, h - 1);
+            let f = y.hi();
+            let z = x.div_f64(f);
+            assert_normalized(z, "div_f64");
+            // |z - x/y| ≤ B|x/y|  ⇔  |z·y - x| ≤ B|x|, since y ≠ 0.
+            let residual = (&(&value(z) * &Exact::of(f)) - &value(x)).abs();
+            assert!(residual <= &div_f64_bound * &value(x).abs(), "div_f64");
+            let z = x.div(y);
+            assert_normalized(z, "div");
+            let residual = (&(&value(z) * &value(y)) - &value(x)).abs();
+            assert!(residual <= &div_bound * &value(x).abs(), "div");
+        }
+    }
+}
+
 #[test]
 fn mul_f64_is_within_one_and_a_half_u_squared_plus_four_u_cubed() {
     let mut words = Words::new(0x5555_aaaa_3333_cccc);
