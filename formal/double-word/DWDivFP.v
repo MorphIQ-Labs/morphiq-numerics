@@ -85,11 +85,12 @@ Notation F2P_error a b  :=  (snd (Fast2Mult a b)).
 
 
 Hypothesis Fast2Mult_correct: 
-  forall a b, a * b =  F2P_prod a b +  F2P_error a b.
+  forall a b, format a -> format b -> a * b =  F2P_prod a b +  F2P_error a b.
 
 Notation F2P_errorE := (F2P_errorE Fast2Mult_correct).
 
 
+Local Notation TwoProd := (TwoProd p choice).
 Hypothesis TwoProdE : TwoProd = Fast2Mult. (* or Dekker's algorithm *)
 
 
@@ -972,7 +973,7 @@ rewrite /DWDivFP2 TwoProdE /= -/th.
 set  pih := rnd_p (th * y).
 set pil := rnd_p(th *y - pih).
 have pihlE : th * y = pih + pil.
-  by rewrite [in LHS]Fast2Mult_correct /= /pil /pih.
+  by rewrite [in LHS](Fast2Mult_correct (generic_format_round _ _ _ _) Fy) /= /pil /pih.
 set dh := xh -pih.
 set dl := rnd_p (xl - pil).
 set d := rnd_p (dh + dl).
@@ -1743,11 +1744,12 @@ Notation F2P_error a b  :=  (snd (Fast2Mult a b)).
 
 
 Hypothesis Fast2Mult_correct: 
-  forall a b, a * b =  F2P_prod a b +  F2P_error a b.
+  forall a b, format a -> format b -> a * b =  F2P_prod a b +  F2P_error a b.
 
 Notation F2P_errorE := (F2P_errorE Fast2Mult_correct).
 
 
+Local Notation TwoProd := (TwoProd p choice).
 Hypothesis TwoProdE : TwoProd = Fast2Mult. (* or Dekker's algorithm *)
 
 
@@ -2149,7 +2151,7 @@ rewrite /DWDivFP3 TwoProdE /= -/th.
 set  pih := rnd_p (th * y).
 set pil := rnd_p(th *y - pih).
 have pihlE : th * y = pih + pil.
-  by rewrite [in LHS]Fast2Mult_correct /= /pil /pih.
+  by rewrite [in LHS](Fast2Mult_correct (generic_format_round _ _ _ _) Fy) /= /pil /pih.
 set dh := xh -pih.
 
 have Fdh: format dh.

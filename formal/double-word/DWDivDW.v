@@ -61,11 +61,12 @@ Notation F2P_error a b  :=  (snd (Fast2Mult a b)).
 
 
 Hypothesis Fast2Mult_correct: 
-  forall a b, a * b =  F2P_prod a b +  F2P_error a b.
+  forall a b, format a -> format b -> a * b =  F2P_prod a b +  F2P_error a b.
 
 Notation F2P_errorE := (F2P_errorE Fast2Mult_correct).
 
 
+Local Notation TwoProd := (TwoProd p choice).
 Hypothesis TwoProdE : TwoProd = Fast2Mult. (* or Dekker's algorithm *)
 
 Notation DWTimesFP := (DWTimesFP p choice).
@@ -552,7 +553,7 @@ Qed.
 (* to move *)
 Fact  DWTimesFP_0_r xh xl : DWTimesFP xh xl 0 = (0, 0).
 Proof.
-by rewrite /DWTimesFP TwoProdE  F2P_errorE /=
+by rewrite /DWTimesFP TwoProdE /=
           !(Rmult_0_r, round_0, Rminus_0_r, Rplus_0_r).
 Qed.
 

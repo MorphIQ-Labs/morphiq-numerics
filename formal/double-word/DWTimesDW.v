@@ -108,11 +108,12 @@ Notation F2P_prod a b  :=  (fst (Fast2Mult a b)).
 Notation F2P_error a b  :=  (snd (Fast2Mult a b)).
 
 Hypothesis Fast2Mult_correct: 
-  forall a b, a * b =  F2P_prod a b +  F2P_error a b.
+  forall a b, format a -> format b -> a * b =  F2P_prod a b +  F2P_error a b.
 
 Notation F2P_errorE := (F2P_errorE Fast2Mult_correct).
 
 
+Local Notation TwoProd := (TwoProd p choice).
 Hypothesis TwoProdE : TwoProd = Fast2Mult. (* or Dekker's algorithm *)
 
 
@@ -3950,11 +3951,12 @@ Notation F2P_prod a b  :=  (fst (Fast2Mult a b)).
 Notation F2P_error a b  :=  (snd (Fast2Mult a b)).
 
 Hypothesis Fast2Mult_correct: 
-  forall a b, a * b =  F2P_prod a b +  F2P_error a b.
+  forall a b, format a -> format b -> a * b =  F2P_prod a b +  F2P_error a b.
 
 Notation F2P_errorE := (F2P_errorE Fast2Mult_correct).
 
 
+Local Notation TwoProd := (TwoProd p choice).
 Hypothesis TwoProdE : TwoProd = Fast2Mult. (* or Dekker's algorithm *)
 
 
@@ -4618,11 +4620,12 @@ Notation F2P_prod a b  :=  (fst (Fast2Mult a b)).
 Notation F2P_error a b  :=  (snd (Fast2Mult a b)).
 
 Hypothesis Fast2Mult_correct: 
-  forall a b, a * b =  F2P_prod a b +  F2P_error a b.
+  forall a b, format a -> format b -> a * b =  F2P_prod a b +  F2P_error a b.
 
 Notation F2P_errorE := (F2P_errorE Fast2Mult_correct).
 
 
+Local Notation TwoProd := (TwoProd p choice).
 Hypothesis TwoProdE : TwoProd = Fast2Mult. (* or Dekker's algorithm *)
 
 

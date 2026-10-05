@@ -137,10 +137,20 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
 
 **What is machine-checked:**
 - **The double-word bounds.** `formal/double-word` is Muller and Rideau's Coq
-  development, vendored unchanged under its MIT license (`PROVENANCE.md` there),
-  which builds with no admitted goal. It proves each bound in the table above in
-  Flocq's unbounded-exponent model, given an exact 2Prod (its `F2Mult_correct`
-  hypothesis).
+  development, vendored under its MIT license, which builds with no admitted
+  goal. It proves each bound in the table above in Flocq's unbounded-exponent
+  model.
+  - **Two patches.** As distributed, the multiplicative theorems assumed an
+    exact product for *all real* arguments, which is false, and that an
+    uninterpreted axiom `TwoProd` equals `Fast2Mult`, which can't be proved.
+    So they applied to nothing. The premise now covers binary64 arguments only,
+    the only case the proofs use, and `TwoProd` is defined as `Fast2Mult`.
+    `PROVENANCE.md` there records both patches.
+  - **Instances.** `formal/binary64/Instances.v` instantiates the four
+    multiplicative theorems at precision 53, ties-to-even, with every premise
+    discharged. The exact product is `fast2mult_exact`, from Flocq's
+    `mult_error_FLX`. They are `mul_f64_bound`, `mul_bound`, `div_f64_bound`
+    and `div_bound`.
 - **The additive bounds in binary64.** `formal/binary64/Binary64Add.v` defines
   `two_sum`, `fast_two_sum`, `add_f64`, `add` and `sub` in Flocq's binary64
   model (precision 53, minimum exponent −1074, ties-to-even, gradual
@@ -151,15 +161,10 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
     `3u² + 13u³`.
 - **`two_prod`'s exactness.** `formal/two-prod/TwoProdBinary64.v` proves
   `two_prod_exact`: for binary64 with ties-to-even, `a · b = p + e` on the
-  domain above. That discharges the 2Prod hypothesis, and the theorem rests
-  only on Coq's four classical-reals axioms.
+  domain above.
 - **The axiom audit.** The gate requires the global axioms of every relied-on
-  theorem (`formal/audit/Audit.v`) to be exactly `formal/axioms.expected`:
-  - the four classical-reals axioms;
-  - `TwoProd`, an uninterpreted constant the vendored development declares
-    with `Parameter`. The multiplicative theorems use it, always alongside a
-    hypothesis that it equals `Fast2Mult`, so it acts as a parameter and adds
-    no inconsistency.
+  theorem (`formal/audit/Audit.v`) to be exactly `formal/axioms.expected`: Coq's
+  four classical-reals axioms.
 - **The binding.** `formal/binding.sha256` binds the proofs to `eft.rs` and
   `double_word.rs` by hash. Editing either source, or a proof, fails the lane
   until the proofs are rerun and the manifest is updated with them.
@@ -167,7 +172,9 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
 **What is argued, not machine-checked:**
 - **The models agree for the multiplicative operations:** binary64 coincides with
   the unbounded-exponent model when no product or quotient rounds a subnormal and
-  each exact product is within `two_prod`'s domain.
+  each exact product is within `two_prod`'s domain. There, `two_prod` (Dekker's
+  algorithm, `two_prod_exact`) returns what `Fast2Mult` returns in the unbounded
+  model.
 - **No overflow:** Flocq's models have no overflow. The input limits that exclude
   it are argued (see Domain above).
 - **The transcription:** each Rust function is the Coq definition operation for
@@ -178,10 +185,10 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
 |---|---|---|
 | `add_f64` | `DWPlusFP` (`DWPlus.v`); `add_f64` (`Binary64Add.v`) | `DWPlusFP_bound`, `2u²`; in binary64, `add_f64_bound` |
 | `add`, `sub` | `AccurateDWPlusDW` (`DWPlus.v`); `add`, `sub` (`Binary64Add.v`) | `DWPlusDW_relerr_bound`, `3u²/(1 − 4u)`; in binary64, `add_bound`, `sub_bound` |
-| `mul_f64` | `DWTimesFP` (`DWTimesFP.v`) | `DWTimesFP_correct`, `3/2·u² + 4u³` |
-| `mul` | `DWTimesDW1` (`DWTimesDW.v`) | `DWTimesDW1_correct_even`, `< 5u²` under ties-to-even |
-| `div_f64` | `DWDivFP3` (`DWDivFP.v`) | `DWDFP3_correct`, `3u²` (`dh`, `dt` exact) |
-| `div` | `DWDivDW2` (`DWDivDW.v`) | `DWDDW_correct`, `15u² + 56u³` (`pih` exact) |
+| `mul_f64` | `DWTimesFP` (`DWTimesFP.v`) | `DWTimesFP_correct`, `3/2·u² + 4u³`; instance `mul_f64_bound` |
+| `mul` | `DWTimesDW1` (`DWTimesDW.v`) | `DWTimesDW1_correct_even`, `< 5u²` under ties-to-even; instance `mul_bound` |
+| `div_f64` | `DWDivFP3` (`DWDivFP.v`) | `DWDFP3_correct`, `3u²` (`dh`, `dt` exact); instance `div_f64_bound` |
+| `div` | `DWDivDW2` (`DWDivDW.v`) | `DWDDW_correct`, `15u² + 56u³` (`pih` exact); instance `div_bound` |
 | `two_prod` | `Dekker` (Flocq), via `TwoProdBinary64.v` | `two_prod_exact` |
 
 ## Checked by
