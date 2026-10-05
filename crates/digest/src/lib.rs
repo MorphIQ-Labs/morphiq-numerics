@@ -12,6 +12,7 @@
 use morphiq_numerics::double_word::DoubleWord;
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::random::{SplitMix64, Xoshiro256PlusPlus, unit_closed_open, unit_open};
+use morphiq_numerics::reduce::{dot, dot2, max_abs, sum, sum_squares, sum_squares2, sum2};
 use morphiq_numerics::ulp::{ordered_bits, ulp, ulps_between};
 use sha2::{Digest, Sha256};
 
@@ -160,6 +161,31 @@ pub fn corpus_digest() -> [u8; 32] {
         }
         r.double_word(DoubleWord::product(f, x.hi()));
     }
+
+    r.label("reduce");
+    // Slices of every length up to 32 on a fixed stack buffer, with mixed
+    // signs and exponents so the sums cancel, plus a NaN for max_abs.
+    for len in 0..=32 {
+        let mut x = [0.0; 32];
+        let mut y = [0.0; 32];
+        for (a, b) in x.iter_mut().zip(y.iter_mut()).take(len) {
+            *a = normal_in(&mut words, -100, 100);
+            *b = normal_in(&mut words, -100, 100);
+        }
+        let (x, y) = (&x[..len], &y[..len]);
+        for v in [
+            sum(x),
+            sum2(x),
+            dot(x, y),
+            dot2(x, y),
+            sum_squares(x),
+            sum_squares2(x),
+            max_abs(x),
+        ] {
+            r.f64(v);
+        }
+    }
+    r.f64(max_abs(&[1.0, f64::NAN, 2.0]));
 
     r.label("random");
     for seed in [0, 1, u64::MAX, 0x9e37_79b9_7f4a_7c15] {

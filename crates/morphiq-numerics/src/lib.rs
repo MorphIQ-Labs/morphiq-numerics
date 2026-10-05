@@ -9,6 +9,8 @@
 //!   relative error bounds;
 //! - [`random`]: seeded SplitMix64 and xoshiro256++ streams, with exact
 //!   unit uniforms;
+//! - [`reduce`]: sums, dot products and sums of squares in a specified order,
+//!   with compensated variants as accurate as twice the working precision;
 //! - [`ulp`]: units in the last place, and distances measured in them.
 //!
 //! The crate is `no_std`, has no dependencies and never calls a platform
@@ -21,4 +23,5 @@
 pub mod double_word;
 pub mod eft;
 pub mod random;
+pub mod reduce;
 pub mod ulp;

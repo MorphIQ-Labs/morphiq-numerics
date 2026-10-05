@@ -96,6 +96,7 @@ that implements the same specification.
 |---|---|
 | Error-free transforms | `two_sum`, `fast_two_sum`, `two_prod`, a double-word (`f64 + f64`) type with documented bounds |
 | ULP utilities | `ulp`, `next_up`/`next_down` (core), ordered-bits distance |
+| Reductions | `sum`, `dot`, `sum_squares` in a specified order; compensated `sum2`, `dot2`, `sum_squares2`; `max_abs` |
 | Elementary | `exp`, `expm1`, `exp2`, `ln`, `ln_1p`, `log2`, `log10`, `sin`, `cos`, `sincos`, `tan` |
 | Seeded streams | `SplitMix64`, `Xoshiro256PlusPlus` (`jump`, `long_jump`), open/closed unit uniforms, Box–Muller normal pairs |
 | Normal family | `erf`, `erfc`, `erfcx`, `norm_pdf`, `norm_cdf`, `norm_ccdf`, `log_norm_cdf`, `norm_inv` |
