@@ -1,0 +1,18 @@
+[package]
+name = "morphiq-numerics-reference"
+description = "Test oracles for morphiq-numerics: exact integer arithmetic and fixture loaders. Never published."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+morphiq-numerics = { path = "../morphiq-numerics" }
+num-bigint.workspace = true
+num-traits.workspace = true
