@@ -14,6 +14,7 @@ const SPLITTER: f64 = 134_217_729.0;
 /// Knuth and Møller's 2Sum, operation for operation as Joldes, Muller and
 /// Popescu (2017) state it in Algorithm 2.
 #[must_use]
+#[inline]
 pub const fn two_sum(a: f64, b: f64) -> (f64, f64) {
     let s = a + b;
     let a_prime = s - b;
@@ -31,6 +32,7 @@ pub const fn two_sum(a: f64, b: f64) -> (f64, f64) {
 /// Algorithm 1. Outside its precondition `t` need not be the exact error; use
 /// [`two_sum`] there.
 #[must_use]
+#[inline]
 pub const fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
     let s = a + b;
     let z = s - a;
@@ -43,6 +45,7 @@ pub const fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
 /// Veltkamp's splitting as Dekker (1971) gives it in (6.1), with `c = 2^27 + 1`
 /// from (6.2) and the tail from (5.6). Exact for normal `x` with `|x| ≤ 2^996`,
 /// where `x · c` neither overflows nor rounds in the subnormal range.
+#[inline]
 const fn split(x: f64) -> (f64, f64) {
     let p = x * SPLITTER;
     let q = x - p;
@@ -69,6 +72,7 @@ const fn split(x: f64) -> (f64, f64) {
 /// Outside that domain the result is finite or infinite as the arithmetic
 /// produces it, but `p + e = a · b` isn't claimed.
 #[must_use]
+#[inline]
 pub const fn two_prod(a: f64, b: f64) -> (f64, f64) {
     let p = a * b;
     let (a_head, a_tail) = split(a);

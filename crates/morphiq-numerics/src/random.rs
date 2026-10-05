@@ -26,11 +26,13 @@ pub struct SplitMix64 {
 impl SplitMix64 {
     /// The stream starting from `seed`.
     #[must_use]
+    #[inline]
     pub const fn new(seed: u64) -> Self {
         Self { state: seed }
     }
 
     /// The next 64-bit word: advance the Weyl sequence, then mix.
+    #[inline]
     pub const fn next_u64(&mut self) -> u64 {
         self.state = self.state.wrapping_add(GOLDEN_GAMMA);
         let mut z = self.state;
@@ -76,6 +78,7 @@ impl Xoshiro256PlusPlus {
     /// SplitMix64's mixer is a bijection and four consecutive Weyl terms are
     /// distinct.
     #[must_use]
+    #[inline]
     pub const fn new(seed: u64) -> Self {
         let mut seeder = SplitMix64::new(seed);
         Self {
@@ -90,6 +93,7 @@ impl Xoshiro256PlusPlus {
 
     /// The generator with state `s`, or `None` if `s` is all zero.
     #[must_use]
+    #[inline]
     pub const fn from_state(s: [u64; 4]) -> Option<Self> {
         if s[0] | s[1] | s[2] | s[3] == 0 {
             None
@@ -100,12 +104,14 @@ impl Xoshiro256PlusPlus {
 
     /// The current state.
     #[must_use]
+    #[inline]
     pub const fn state(&self) -> [u64; 4] {
         self.s
     }
 
     /// The next 64-bit word: the `++` scrambler on the current state, then one
     /// step of the linear engine (Figure 4).
+    #[inline]
     pub const fn next_u64(&mut self) -> u64 {
         let s = &mut self.s;
         let result = s[0].wrapping_add(s[3]).rotate_left(23).wrapping_add(s[0]);
@@ -120,11 +126,13 @@ impl Xoshiro256PlusPlus {
     }
 
     /// Advance the state by `2^128` steps.
+    #[inline]
     pub const fn jump(&mut self) {
         self.apply(&JUMP);
     }
 
     /// Advance the state by `2^192` steps.
+    #[inline]
     pub const fn long_jump(&mut self) {
         self.apply(&LONG_JUMP);
     }
@@ -132,6 +140,7 @@ impl Xoshiro256PlusPlus {
     /// Replace the state `s` by `J(M) s`, where `M` is the engine's transition
     /// and `J` the polynomial with coefficients `polynomial`: the sum of
     /// `M^i s` over the set coefficients `i`, in order of increasing `i`.
+    #[inline]
     const fn apply(&mut self, polynomial: &[u64; 4]) {
         let mut sum = [0_u64; 4];
         let mut word = 0;
@@ -156,6 +165,7 @@ impl Xoshiro256PlusPlus {
 /// The uniform on `[0, 1)` from a 64-bit word: its top 53 bits `k`, as
 /// `k · 2^-53`, exactly (Steele, Lea and Flood 2014, Figure 17, `nextDouble`).
 #[must_use]
+#[inline]
 pub const fn unit_closed_open(word: u64) -> f64 {
     (word >> 11) as f64 * f64::from_bits((1023 - 53) << 52)
 }
@@ -167,6 +177,7 @@ pub const fn unit_closed_open(word: u64) -> f64 {
 /// `1/2`. Every value is representable, since `2m + 1 < 2^53`. This mapping is
 /// this crate's specification (see `docs/random.md`).
 #[must_use]
+#[inline]
 pub const fn unit_open(word: u64) -> f64 {
     ((word >> 12) * 2 + 1) as f64 * f64::from_bits((1023 - 53) << 52)
 }
