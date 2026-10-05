@@ -7,6 +7,8 @@
 //!   numbers with its exact rounding error;
 //! - [`double_word`]: double-word (`f64 + f64`) arithmetic with proved
 //!   relative error bounds;
+//! - [`random`]: seeded SplitMix64 and xoshiro256++ streams, with exact
+//!   unit uniforms;
 //! - [`ulp`]: units in the last place, and distances measured in them.
 //!
 //! The crate is `no_std`, has no dependencies and never calls a platform
@@ -18,4 +20,5 @@
 
 pub mod double_word;
 pub mod eft;
+pub mod random;
 pub mod ulp;
