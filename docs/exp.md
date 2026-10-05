@@ -108,8 +108,8 @@ double-word operations,** so the only new error analysis is the polynomial's.
 2. `P = DoubleWord(r_hi, r_lo).add_f64(q)`: `e^r − 1`. The terms `q` omits by using
    `r_hi` for `r` are below `|r_lo|·|r| ≤ 2^−70`.
 3. `E = DoubleWord::from_f64(1.0).add(P)`: `e^r`.
-4. `Y = T_j.mul(E)`, where `T_j` is a double-word table entry, `T_j` rounded to
-   double-word (*generated*, error below `2^−106`).
+4. `Y = T_j.mul(E)`, where `T_j` is a double-word table entry, `2^(j/128)` rounded
+   to double-word (*generated* as encodings `T_BITS`, error below `2^−107`).
 
 **Fast-path error bound `ε₁`:** the relative error of `Y` against `T_j·e^r`. It
 combines four terms:
