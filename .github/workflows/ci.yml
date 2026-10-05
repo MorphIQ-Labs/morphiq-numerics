@@ -145,6 +145,14 @@ jobs:
 
   # rust-toolchain.toml pins the development toolchain. Select the declared
   # minimum explicitly so this job cannot silently build with the newer pin.
+  generators:
+    name: check / generators
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Every committed fixture matches a fresh run of its generator
+        run: ./scripts/check_generators.sh
+
   msrv:
     name: check / msrv
     runs-on: ubuntu-24.04
@@ -168,7 +176,7 @@ jobs:
 
   test:
     name: test (${{ matrix.os }})
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, msrv, no-std]
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
     # Skipped checks (commit-convention, secret-scan on push) still let this run.
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     strategy:
@@ -188,7 +196,7 @@ jobs:
   # suite, digest included (docs/determinism.md); gate logic lives in scripts/.
   digest:
     name: digest (${{ matrix.target }})
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, msrv, no-std]
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     strategy:
       fail-fast: false
@@ -215,7 +223,7 @@ jobs:
   # is pinned by digest; Flocq and math-comp versions are pinned in the script.
   formal:
     name: formal (coq)
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, msrv, no-std]
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-24.04
     steps:

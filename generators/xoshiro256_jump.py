@@ -14,10 +14,18 @@ Berlekamp-Massey over 512 terms. The paper states the engine's period is
 has p as its minimal polynomial; the script checks the degree.
 
 Prints the coefficients of x^(2^128) mod p (jump) and x^(2^192) mod p
-(long_jump) as four 64-bit words each, word i holding coefficients 64i..64i+63.
+(long_jump) as four 64-bit words each, word i holding coefficients 64i..64i+63,
+the form crates/morphiq-numerics/src/random.rs embeds, and writes them to
+crates/reference/fixtures/xoshiro256_jump.json, against which
+crates/reference/tests/random.rs checks the crate's jumps. With --check, fails
+if the committed fixture differs from a fresh generation.
 Pure Python, no third-party package.
 """
+import json
+import pathlib
 import sys
+
+OUTPUT = pathlib.Path(__file__).resolve().parents[1] / 'crates/reference/fixtures/xoshiro256_jump.json'
 
 MASK = (1 << 64) - 1
 A, B = 17, 45
@@ -99,8 +107,20 @@ def main():
     if degree != 256:
         sys.exit(f'minimal polynomial has degree {degree}, expected 256')
     p = reverse(connection, degree)
-    for name, k in (('JUMP', 128), ('LONG_JUMP', 192)):
-        print(name, ' '.join(f'0x{w:016x}' for w in words(x_to_two_to_the(k, p, degree))))
+    polynomials = {name: words(x_to_two_to_the(k, p, degree))
+                   for name, k in (('jump', 128), ('long_jump', 192))}
+    data = json.dumps({
+        'generator': 'generators/xoshiro256_jump.py',
+        'sources': ['Blackman and Vigna, ACM TOMS 47(4), 2021, Figure 4, Table 2'],
+        **{name: [f'{w:016x}' for w in ws] for name, ws in polynomials.items()},
+    }, indent=1) + '\n'
+    if '--check' in sys.argv[1:]:
+        if OUTPUT.read_text() != data:
+            sys.exit(f'{OUTPUT} differs from a fresh generation')
+        return
+    for name, ws in polynomials.items():
+        print(name.upper(), ' '.join(f'0x{w:016x}' for w in ws))
+    OUTPUT.write_text(data)
 
 
 if __name__ == '__main__':

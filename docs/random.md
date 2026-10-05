@@ -75,6 +75,9 @@ engine alone:
    functional has minimal polynomial `p`; the script checks the degree is 256.
 3. `x^(2^128)` and `x^(2^192)` are reduced modulo `p` by repeated squaring.
 
+It prints the coefficient words `random.rs` embeds and writes them to
+`crates/reference/fixtures/xoshiro256_jump.json`.
+
 ## Unit uniforms
 
 | Function | Interval | Map | Source |
@@ -96,12 +99,17 @@ That is why the open map uses 52.
   (including 0, `2^64 − 1` and `GOLDEN_GAMMA`). The fixture comes from
   `generators/random_streams_reference.py`, a separate Python implementation of
   the same definitions in unbounded integers masked to 64 bits.
-  `--check` regenerates it.
 - **Jumps:**
   - the test builds `M` column by column, as the engine's image of each unit
     state, and checks it reproduces one step on random states;
   - it then raises `M` to `2^128` and `2^192` by repeated squaring and checks that
-    `jump` and `long_jump` produce `M^(2^128) s` and `M^(2^192) s`.
+    `jump` and `long_jump` produce `M^(2^128) s` and `M^(2^192) s`;
+  - separately, it evaluates the generated polynomials, `J(M) s` as the xor of
+    the states `M^i s` whose coefficient is set, and checks the jumps match them.
+    So the embedded constants are the generator's.
+- **Generator replay:** `scripts/check_generators.sh` (the `check / generators`
+  CI job) reruns every generator with `--check`, and requires each committed
+  fixture to match a fresh generation byte for byte.
 
   That verifies the generated polynomials independently of the generator.
 - **Seeding:** never the all-zero state over 10,002 seeds; `from_state` refuses
