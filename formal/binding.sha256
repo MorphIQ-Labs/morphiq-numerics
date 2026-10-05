@@ -1,4 +1,4 @@
-f0cc452af137cfcc5526a613ce0e0399bd7712a5553926c837b2a687f7e6f788  crates/morphiq-numerics/src/eft.rs
+7f76107eac8501ca2efa886993c783a32b5b7c1a2afd948760f442022ac820c9  crates/morphiq-numerics/src/eft.rs
 842fdede9d7c4602cb44860bbcf09df70cc0ed9a2366e71c8fb01a7a0d160d76  crates/morphiq-numerics/src/double_word.rs
 3cf6b7ed297000422d70f1aadda475e0e36df9e5d3c7f012e957531d4fd9e5c7  formal/two-prod/TwoProdBinary64.v
 f51ad509cf2103c6d3a55cff2bdf53861c97ecd63b400a9860763d33a3936101  formal/audit/Audit.v

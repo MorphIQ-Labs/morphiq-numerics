@@ -71,8 +71,10 @@ const fn split(x: f64) -> (f64, f64) {
 ///   conditions keep every intermediate below `2^1024`, so binary64 agrees with
 ///   it (`docs/double-word.md`).
 ///
-/// Outside that domain the result is finite or infinite as the arithmetic
-/// produces it, but `p + e = a · b` isn't claimed.
+/// These conditions are sufficient, not necessary: they are the proof's
+/// hypotheses, not the boundary of exactness. Below `2^-969`, or beyond the
+/// magnitude limits, `p + e = a · b` is neither claimed nor ruled out; the result
+/// is whatever the arithmetic produces.
 #[must_use]
 #[inline]
 pub const fn two_prod(a: f64, b: f64) -> (f64, f64) {

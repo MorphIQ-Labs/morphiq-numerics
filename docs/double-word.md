@@ -66,8 +66,13 @@ splitting.
   - `|x·c| ≤ 2^996·(2^27 + 1) < 2^1024` for the split;
   - the partial products and sums are at most `|a · b|·(1 + 2^−26)² < 2^1024`.
 
-Outside this domain `two_prod` returns what the arithmetic produces, and exactness
-isn't claimed.
+These conditions are sufficient, not necessary: `2^−969` is the theorem's
+hypothesis, not the boundary of exactness. Outside the domain, exactness is
+neither claimed nor ruled out; `two_prod` returns what the arithmetic produces.
+In particular, an earlier hand derivation of this domain included products in
+`[2^−970, 2^−969)` and excluded subnormal operands. No proof covers that range, so
+it isn't claimed. The proved domain admits subnormal operands, so they are
+covered.
 
 ## Double-word numbers
 
@@ -143,8 +148,9 @@ arithmetic with the library.
 - **Fast2Sum:** 200,000 pairs with `e_a ≥ e_b`.
 - **2Prod:**
   - 200,000 normal pairs across the whole domain;
-  - every edge of the domain (`e_a + e_b = −970` and `1021`, `|x| = 2^996`),
+  - every edge of the domain (`e_a + e_b = −969` and `1021`, `|x| = 2^996`),
     with all-ones and power-of-two significands;
+  - subnormal operands, which the proved domain admits;
   - a split tie;
   - zeros.
 - **Each double-word operation:** 100,000 random double-word operands, checked
