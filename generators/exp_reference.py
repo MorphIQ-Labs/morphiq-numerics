@@ -32,52 +32,15 @@ The cases:
 import json
 import math
 import pathlib
-import struct
 import sys
 
 import mpmath
 from mpmath import iv
 
+from oracle import (bisect, check_worst_case, correctly_rounded, from_bits,
+                    splitmix64, to_bits)
+
 OUTPUT = pathlib.Path(__file__).resolve().parents[1] / 'crates/reference/fixtures/exp.json'
-MASK = (1 << 64) - 1
-GOLDEN_GAMMA = 0x9E3779B97F4A7C15
-
-
-def to_bits(x):
-    return struct.unpack('<Q', struct.pack('<d', x))[0]
-
-
-def from_bits(b):
-    return struct.unpack('<d', struct.pack('<Q', b))[0]
-
-
-def round_binary64(man, exp):
-    """man * 2^exp, man > 0, rounded to nearest-even binary64."""
-    e = man.bit_length() - 1 + exp
-    if e < -1076:
-        # Below 2^-1076, under half the least subnormal: rounds to +0.
-        return 0.0
-    q = max(e - 52, -1074)
-    shift = q - exp
-    if shift <= 0:
-        m = man << -shift
-    else:
-        m, rem = man >> shift, man & ((1 << shift) - 1)
-        half = 1 << (shift - 1)
-        if rem > half or (rem == half and m & 1):
-            m += 1
-    if m.bit_length() + q > 1024:
-        return math.inf
-    return math.ldexp(m, q)
-
-
-def round_endpoint(raw):
-    """An interval endpoint, mpmath's raw (sign, man, exp, bc) tuple, which is
-    exact, rounded to nearest-even binary64. (Converting an endpoint to an mpf
-    would round it to the global context's precision.)"""
-    sign, man, exp, _ = raw
-    assert sign == 0 and man > 0, 'exp is positive and finite here'
-    return round_binary64(int(man), int(exp))
 
 
 def exp_rn(x):
@@ -88,39 +51,7 @@ def exp_rn(x):
         return math.inf
     if x == -math.inf or x == 0.0:
         return 0.0 if x == -math.inf else 1.0
-    prec = 128
-    while True:
-        iv.prec = prec
-        y = iv.exp(iv.mpf(x))
-        lo, hi = (round_endpoint(end) for end in y._mpi_)
-        if to_bits(lo) == to_bits(hi):
-            return lo
-        prec *= 2
-        if prec > 1 << 14:
-            sys.exit(f'exp({x!r}) did not settle by {prec} bits')
-
-
-def binary_digits(v, count):
-    """The first `count` significant binary digits of a positive mpf, and the
-    exponent of the leading one, computed with 4 * count bits."""
-    with mpmath.workprec(4 * count + 64):
-        e = int(mpmath.floor(mpmath.log(v, 2)))
-        scaled = v / mpmath.mpf(2) ** e
-        while scaled >= 2:
-            scaled, e = scaled / 2, e + 1
-        while scaled < 1:
-            scaled, e = scaled * 2, e - 1
-        digits = int(mpmath.floor(scaled * mpmath.mpf(2) ** (count - 1)))
-    return format(digits, 'b'), e
-
-
-def from_binary(sign, digits, exp2):
-    """sign * (digits read as a binary fraction 1.xxx or an integer.xxx) * 2^exp2."""
-    whole, frac = digits.split('.')
-    man = int(whole + frac, 2)
-    x = math.ldexp(man, exp2 - len(frac))
-    assert x * 2.0 ** (len(frac) - exp2) == man, 'not exactly representable'
-    return -x if sign < 0 else x
+    return correctly_rounded(iv.exp, x)
 
 
 # Lefevre & Muller, Table 4: (sign, input digits, input exponent, the digits of
@@ -144,29 +75,7 @@ TABLE_4 = [
 
 
 def table_4_cases():
-    cases = []
-    for sign, digits, exp2, image, after in TABLE_4:
-        x = from_binary(sign, digits, exp2)
-        expected = image.replace('.', '') + after
-        with mpmath.workprec(4 * len(expected) + 64):
-            got, _ = binary_digits(mpmath.exp(mpmath.mpf(x)), len(expected))
-        if got != expected:
-            sys.exit(f'Table 4 entry {digits} x 2^{exp2}: exp(x) has digits\n{got}\nnot\n{expected}')
-        cases.append(('worst case', x))
-    return cases
-
-
-def bisect(lo, hi, predicate):
-    """For encodings lo < hi with predicate false at lo and true at hi, the
-    first encoding where it is true."""
-    assert not predicate(lo) and predicate(hi)
-    while hi - lo > 1:
-        mid = (lo + hi) // 2
-        if predicate(mid):
-            hi = mid
-        else:
-            lo = mid
-    return hi
+    return [('worst case', check_worst_case(mpmath.exp, *entry, 'Table 4')) for entry in TABLE_4]
 
 
 def thresholds():
@@ -196,16 +105,6 @@ def thresholds():
     if found['least negative x rounding to 1'] != -(2.0 ** -54):
         sys.exit(f"exp(-e) = 1 ends at {found['least negative x rounding to 1']!r}, not -2^-54")
     return found
-
-
-def splitmix64(seed):
-    state = seed
-    while True:
-        state = (state + GOLDEN_GAMMA) & MASK
-        z = state
-        z = ((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9) & MASK
-        z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & MASK
-        yield z ^ (z >> 31)
 
 
 def random_cases():
