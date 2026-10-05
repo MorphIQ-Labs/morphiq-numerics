@@ -1,0 +1,6 @@
+# Secret scanning (gitleaks) for this repository: the default rules. Add an
+# allowlist entry only for a fixture that is credential-shaped by design, by
+# value rather than by file, and say why.
+
+[extend]
+useDefault = true

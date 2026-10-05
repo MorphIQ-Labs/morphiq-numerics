@@ -1,0 +1,184 @@
+# morphiq-numerics CI: formatting, lints (including the platform-libm ban),
+# documentation, dependency advisories and licenses, the MSRV, the no_std and
+# wasm builds, and the test suite on every tier-1 host.
+#
+# Stages, as `needs`: check -> test. Every job is a required status check in
+# the "Main branch protection" ruleset; GitHub reports a job skipped behind a
+# failed stage as passing, so the failed job itself must be required. A job is
+# added to the ruleset in the same change that adds it here.
+#
+# The toolchain comes from rust-toolchain.toml. Third-party actions are pinned
+# to full commit SHAs; the comment names the release. Tool versions come from
+# .cargo/*-version.
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "3"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  commit-convention:
+    name: check / commit-convention
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Pull request title is a conventional commit
+        # The title arrives through the environment, never interpolated into
+        # the script, so a crafted title cannot inject shell.
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          types='build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test'
+          if printf '%s' "$TITLE" | grep -qE "^($types)(\([a-z0-9._/-]+\))?!?: .+"; then
+            printf 'conventional title: %s\n' "$TITLE"
+          else
+            printf 'Pull request title is not a conventional commit: %s\n' "$TITLE" >&2
+            exit 1
+          fi
+
+  repository-hygiene:
+    name: check / repository-hygiene
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: No generated or ignored files are tracked
+        run: |
+          tracked_ignored="$(git ls-files -ci --exclude-standard)"
+          if [ -n "$tracked_ignored" ]; then
+            printf 'Generated or ignored files are tracked:\n%s\n' "$tracked_ignored" >&2
+            exit 1
+          fi
+      - name: The library crate ships the root license texts, unchanged
+        # crates.io packages each crate alone, so the license texts are copied
+        # into the crate directory; this keeps the copies identical.
+        run: |
+          for license in LICENSE-MIT LICENSE-APACHE; do
+            cmp "$license" "crates/morphiq-numerics/$license"
+          done
+      - name: The library takes no dependencies
+        # Target independence and clean provenance rest on the library being
+        # self-contained; a dependency needs a decision recorded in AGENTS.md.
+        run: |
+          if awk '/^\[(build-|dev-)?dependencies/{f=1;next} /^\[/{f=0} f && NF && !/^#/' crates/morphiq-numerics/Cargo.toml | grep -q .; then
+            echo 'crates/morphiq-numerics declares a dependency' >&2
+            exit 1
+          fi
+
+  secret-scan:
+    name: check / secret-scan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: gitleaks over the pull request's commits
+        # The container is pinned by digest (gitleaks v8.30.1).
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo:ro" \
+            zricethezav/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            git /repo --config /repo/.gitleaks.toml --redact --no-banner \
+            --log-opts="$BASE..HEAD"
+
+  fmt:
+    name: check / fmt
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: check / clippy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: workspace
+      - run: rustc --version
+      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - run: cargo doc --locked --workspace --all-features --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  # Runs on pull requests and on main, so a newly published advisory blocks
+  # the next change and withdraws a just-merged revision from release.
+  audit:
+    name: check / audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: tools
+      - run: cargo install --locked --no-default-features cargo-audit --version "$(cat .cargo/audit-version)"
+      - run: ./scripts/check_advisories.sh
+
+  # The graph may ship under MIT OR Apache-2.0 only while every dependency is
+  # permissively licensed; deny.toml is that allowlist.
+  licenses:
+    name: check / licenses
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: tools
+      - run: cargo install --locked cargo-deny --version "$(cat .cargo/deny-version)"
+      - run: cargo deny --locked check licenses
+
+  # rust-toolchain.toml pins the development toolchain. Select the declared
+  # minimum explicitly so this job cannot silently build with the newer pin.
+  msrv:
+    name: check / msrv
+    runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: "1.89.0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup toolchain install 1.89.0 --profile minimal
+      - run: rustc --version && cargo --version
+      - run: cargo check --locked --workspace --all-features --all-targets
+
+  # The library builds without std or an allocator, and for wasm: the targets
+  # on which a platform libm is least available and most likely to differ.
+  no-std:
+    name: check / no-std
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: cargo build --locked -p morphiq-numerics --target thumbv7em-none-eabihf
+      - run: cargo build --locked -p morphiq-numerics --target wasm32-unknown-unknown
+
+  test:
+    name: test (${{ matrix.os }})
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, msrv, no-std]
+    # Skipped checks (commit-convention, secret-scan on push) still let this run.
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: test-${{ matrix.os }}
+      - run: cargo test --locked --workspace --all-features

@@ -1,0 +1,6 @@
+# Pinned here rather than in a CI image tag, so local builds and CI agree.
+# The library's MSRV is `rust-version` in Cargo.toml, checked by the msrv job.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]
+targets = ["thumbv7em-none-eabihf", "wasm32-unknown-unknown"]

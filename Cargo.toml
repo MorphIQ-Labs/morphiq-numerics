@@ -1,0 +1,24 @@
+[workspace]
+resolver = "3"
+members = ["crates/morphiq-numerics"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+# The library's MSRV, checked by the `msrv` CI job.
+rust-version = "1.89"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/MorphIQ-Labs/morphiq-numerics"
+authors = ["MorphIQ Labs"]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+# clippy.toml lists the platform transcendentals; nothing in this workspace
+# may call them, tests included (the oracles are external).
+disallowed_methods = "deny"
+
+[profile.release]
+codegen-units = 1
