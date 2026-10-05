@@ -64,9 +64,11 @@ fn two_prod_is_exact_across_its_domain() {
     let mut words = Words::new(0xd1b5_4a32_d192_ed03);
     let mut checked = 0;
     while checked < 200_000 {
-        let ea = i64::try_from(words.next_word() % 2018).unwrap() - 1022;
-        let eb = i64::try_from(words.next_word() % 2018).unwrap() - 1022;
-        if !(-969..=1021).contains(&(ea + eb)) {
+        // Exponents up to 993 keep |a|, |b| ≤ 2^994; a sum up to 1018 keeps the
+        // magnitudes' exponents within 1020.
+        let ea = i64::try_from(words.next_word() % 2016).unwrap() - 1022;
+        let eb = i64::try_from(words.next_word() % 2016).unwrap() - 1022;
+        if !(-969..=1018).contains(&(ea + eb)) {
             continue;
         }
         assert_exact_product(words.with_exponent(ea), words.with_exponent(eb));
@@ -83,8 +85,8 @@ fn two_prod_is_exact_at_the_edges_of_its_domain() {
         (-1022, 53),
         (53, -1022),
         (-485, -484),
-        (995, 26),
-        (510, 511),
+        (993, 25),
+        (509, 509),
     ] {
         let all_ones =
             |e: i64| f64::from_bits(u64::try_from(e + 1023).unwrap() << 52 | ((1 << 52) - 1));
@@ -98,8 +100,8 @@ fn two_prod_is_exact_at_the_edges_of_its_domain() {
             assert_exact_product(a, b);
         }
     }
-    // The splitting's largest admissible magnitude.
-    let limit = f64::from_bits((996 + 1023) << 52);
+    // The splitting's largest admissible magnitude, 2^994.
+    let limit = f64::from_bits((994 + 1023) << 52);
     assert_exact_product(limit, 0.75);
     assert_exact_product(-limit, f64::from_bits((25 + 1023) << 52 | ((1 << 52) - 1)));
     // Subnormal operands, which the proved domain admits.

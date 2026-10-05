@@ -12,20 +12,23 @@
 //! Each bound is for a nonzero exact result.
 //!
 //! - [`add_f64`](DoubleWord::add_f64), [`add`](DoubleWord::add) and
-//!   [`sub`](DoubleWord::sub) keep their bounds for every input whose
-//!   leading words are below `2^1021` in magnitude. They are proved in binary64
-//!   with gradual underflow, so subnormal words and results are covered. The
-//!   magnitude limit excludes overflow, which is argued rather than proved.
+//!   [`sub`](DoubleWord::sub) keep their bounds for every input whose words
+//!   are at most `2^1018` (`add_f64`) or `2^1016` (`add`, `sub`) in magnitude.
+//!   Subnormal words and results are covered, and the limit excludes overflow.
 //! - [`mul_f64`](DoubleWord::mul_f64) and [`mul`](DoubleWord::mul) are proved
 //!   in binary64 when the leading words' product is zero or at least
 //!   `2^-969` (within [`two_prod`]'s domain), and every product of a leading
 //!   and a trailing word is zero or at least `2^-1022`. Every nonzero word
-//!   between `2^-484` and `2^484` in magnitude meets this, and also excludes
-//!   overflow, which is argued rather than proved.
+//!   between `2^-484` and `2^484` in magnitude meets this; overflow is excluded
+//!   for every word at most `2^508`.
 //! - [`div_f64`](DoubleWord::div_f64) and [`div`](DoubleWord::div) are proved
 //!   in binary64 when, for some `L, H ≥ 0` with `2L + 2H ≤ 917`, every nonzero
 //!   word `w` of both operands has `2^-L ≤ |w| < 2^H`: for example, every
-//!   nonzero word between `2^-229` and `2^229` in magnitude.
+//!   nonzero word between `2^-229` and `2^229` in magnitude. That also excludes
+//!   overflow.
+//!
+//! Each statement is a theorem about the algorithm in IEEE 754 binary64
+//! arithmetic (`formal/binary64/IEEE64*.v`).
 
 use crate::eft::{fast_two_sum, two_prod, two_sum};
 

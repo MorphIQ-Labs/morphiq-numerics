@@ -27,8 +27,8 @@ round-to-nearest, ties-to-even.
 
 | Function | Algorithm | Exact when |
 |---|---|---|
-| `two_sum(a, b)` | 2Sum (Knuth, Møller): Joldes et al. Algorithm 2 | the sum doesn't overflow |
-| `fast_two_sum(a, b)` | Fast2Sum (Dekker): Joldes et al. Algorithm 1 | additionally `a = 0`, `b = 0`, or `e_a ≥ e_b` (`\|a\| ≥ \|b\|` suffices) |
+| `two_sum(a, b)` | 2Sum (Knuth, Møller): Joldes et al. Algorithm 2 | `\|a\|, \|b\| ≤ 2^1020` |
+| `fast_two_sum(a, b)` | Fast2Sum (Dekker): Joldes et al. Algorithm 1 | `\|a\|, \|b\| ≤ 2^1021`, and `a = 0`, `e_a ≥ e_b`, or `\|a\| ≥ \|b\|` |
 | `two_prod(a, b)` | Veltkamp's product on Dekker's splitting | the domain below |
 
 Each returns `(r, e)` with `r` the rounded result and `r + e` the exact sum or
@@ -36,7 +36,7 @@ product.
 
 Addition can't underflow inexactly: every sum of two binary64 numbers is a
 multiple of `2^−1074`, so a subnormal sum is exact. So 2Sum and Fast2Sum need
-only the absence of overflow.
+only magnitude limits, which exclude overflow.
 
 ### `two_prod` without a fused multiply-add
 
@@ -51,8 +51,8 @@ splitting.
   guarantee that.
 
 **Domain.** `two_prod(a, b)` is exact when `a · b = 0` or
-`|a · b| ≥ 2^−969`, provided no operation overflows, which holds when
-`|a|, |b| ≤ 2^996` and `|a · b| < 2^1023`.
+`|a · b| ≥ 2^−969`, and `|a| ≤ 2^e_a`, `|b| ≤ 2^e_b` for some
+`e_a, e_b ≤ 994` with `e_a + e_b ≤ 1020`, which excludes overflow.
 
 - **Underflow:** machine-checked. This is Flocq's `Dekker` theorem (Boldo's
   formalization, `Flocq.Pff.Pff2Flocq`), whose algorithm is exactly this one:
@@ -61,10 +61,11 @@ splitting.
   precision 53, minimum exponent −1074) with ties-to-even in
   `formal/two-prod/TwoProdBinary64.v`. Its hypothesis
   `|a · b| ≥ 2^(emin + 2·prec − 1) = 2^−969` covers subnormal operands.
-- **Overflow:** argued, not checked. Flocq's model has gradual underflow and no
-  overflow, so binary64 agrees with it as long as no operation overflows:
-  - `|x·c| ≤ 2^996·(2^27 + 1) < 2^1024` for the split;
-  - the partial products and sums are at most `|a · b|·(1 + 2^−26)² < 2^1024`.
+- **Overflow:** machine-checked in Flocq's IEEE 754 model (`two_prod_ieee`,
+  `formal/binary64/IEEE64Eft.v`). The split's operand times `2^27 + 1` is at
+  most `2^(e + 29)`, and its head, the operand rounded to 26 bits, is at most
+  `2^e`. So the partial products and their sums are at most
+  `10·2^(e_a + e_b) < 2^1024`.
 
 These conditions are sufficient, not necessary: `2^−969` is the theorem's
 hypothesis, not the boundary of exactness. Outside the domain, exactness is
@@ -99,19 +100,16 @@ pairs:
 **Domain.** Each bound is for a nonzero exact result; it says nothing when the
 exact result is zero.
 
-- **`add_f64`, `add`, `sub`:** every pair of double-word inputs with
-  `|x_hi| < 2^1021` and `|y| < 2^1021` (`|y_hi|` for `add` and `sub`). The bounds
-  are proved in binary64 itself, with gradual underflow, so subnormal words,
-  intermediates and results are covered. The magnitude limit only excludes
-  overflow, and is argued below rather than machine-checked.
+- **`add_f64`, `add`, `sub`:** every word at most `2^1018` in magnitude for
+  `add_f64`, `2^1016` for `add` and `sub`. The bounds are proved in binary64
+  itself, with gradual underflow, so subnormal words, intermediates and results
+  are covered. The magnitude limit excludes overflow.
 - **`mul_f64`, `mul`:** proved in binary64, with gradual underflow, when:
   - the leading words' product (`x_hi · y`, or `x_hi · y_hi`) is zero or at
     least `2^−969` in magnitude, which is `two_prod`'s domain;
   - every product of a leading and a trailing word (`x_lo · y`, or
     `x_hi · y_lo` and `x_lo · y_hi`) is zero or at least `2^−1022`;
-  - for overflow (argued below), `|x_hi|` and `|y|` (`|y_hi|`) are at most
-    `2^996`, as `two_prod` needs, and the leading words' product is below
-    `2^1022`.
+  - every word is at most `2^508` in magnitude, which excludes overflow.
 
   Every nonzero word between `2^−484` and `2^484` in magnitude meets all of
   these.
@@ -119,8 +117,7 @@ exact result is zero.
   some `L, H ≥ 0` with `2L + 2H ≤ 917`, every nonzero word `w` of `x` and `y`
   has `2^−L ≤ |w| < 2^H`, and the divisor's leading word is nonzero. For
   example, every nonzero word between `2^−229` and `2^229` in magnitude. The
-  same limits keep every quotient below `2^(L+H) ≤ 2^458`, far from overflow
-  (argued below).
+  same limits exclude overflow.
 
 **Why the additive operations can't underflow wrongly.** Every rounding in 2Sum,
 Fast2Sum, `add_f64` and `add` rounds a sum or difference of two binary64 numbers.
@@ -128,18 +125,6 @@ Above `2^−1022` binary64 rounds such a value as the unbounded model does. Belo
 it, the exact value is a multiple of `2^−1074` and so a binary64 number, which
 both models return unchanged. So the binary64 computation is the unbounded one,
 step by step.
-
-**Why `2^1021` excludes overflow (argued).** Write `a`, `b` for 2Sum's operands,
-both below `2^1021` in magnitude:
-- `|s| ≤ 2^1022`;
-- `a' = RN(s − b)`, and `s − b` is `a` plus the sum's rounding error, so
-  `|a'| ≤ 2^1021`;
-- then `|b'| ≤ |s| + |a'| < 2^1023`, `|δa| ≤ 2^1022` and `|δb| ≤ 2^1023`;
-- their sum is below `1.5 · 2^1023`.
-
-Every other operand in `add_f64` and `add` is a rounding error or a trailing word,
-at most `2^970`, or a leading word within a few ulps of `s`. No operation's
-result reaches the overflow threshold `2^1024 − 2^970`.
 
 **Why the divisions can't underflow wrongly.** Each rounds two quotients,
 `x_hi / y` and `d / y`, where `d` is the remainder. The first is at least
@@ -150,11 +135,20 @@ and `d / y` is at least `2^(−2L−2H−105) ≥ 2^−1022`. The differences th
 algorithms round, `x_hi − π_hi` and its successor, are exact
 (`xhmpih_exact`, `div_error_FLX`, `Algo15_P`).
 
-**Why the products' limits exclude overflow (argued).** `two_prod` needs its
-operands at most `2^996` (the split multiplies by `2^27 + 1`) and its product
-below `2^1023`. Every other product, a trailing word times a word, is at most
-`2^−53` times the leading product. The sums then stay within a few ulps of that
-product, so a leading product below `2^1022` keeps every result finite.
+**Why no operation overflows.** Flocq's IEEE 754 model (`IEEE754.Binary`) has
+overflow, infinities and NaNs. Its `Bplus`, `Bminus`, `Bmult` and `Bdiv` return
+the binary64-model rounding, and a finite value, whenever that rounding is below
+`2^1024` in magnitude. A bound `|v| ≤ k·2^e`, with `k·2^e` representable, survives
+each rounding, so bounds propagate through every operation:
+- sums add their operands' bounds, and products multiply them;
+- a quotient by a divisor at least `2^−L` is at most `2^L` times its dividend's
+  bound;
+- the split's head is its operand rounded to 26 bits (Flocq's `Veltkamp`), so it
+  is no larger than the operand's power-of-two bound.
+
+On the domains above every bound stays below `2^1024`. For example, `add`'s
+largest is `232·2^1016`. So no operation overflows, and each algorithm returns
+its binary64-model value.
 
 ## Machine-checked proofs
 
@@ -202,6 +196,15 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
   unbounded-model algorithms on the domain above. It uses the granularity
   lemmas of `formal/binary64/Grid.v` for the remainder's quotient. So
   `div_f64_bound` (`3u²`) and `div_bound` (`15u² + 56u³`) hold in binary64.
+- **No overflow, in IEEE 754 arithmetic.** `formal/binary64/IEEE64*.v` define
+  every algorithm with Flocq's IEEE 754 binary64 operations (`b64_plus`,
+  `b64_minus`, `b64_mult`, `b64_div` at round-to-nearest-even), operation for
+  operation as the Rust writes it, and prove that on the domains above every
+  result is finite and equal to the binary64-model value, so the bounds hold:
+  - `add_f64_ieee`, `add_ieee`, `sub_ieee` (`IEEE64Add.v`);
+  - `mul_f64_ieee`, `mul_ieee` (`IEEE64Mul.v`);
+  - `div_f64_ieee`, `div_ieee` (`IEEE64Div.v`);
+  - `two_sum_ieee`, `fast_two_sum_ieee`, `two_prod_ieee` (`IEEE64Eft.v`).
 - **`two_prod`'s exactness.** `formal/two-prod/TwoProdBinary64.v` proves
   `two_prod_exact`: for binary64 with ties-to-even, `a · b = p + e` on the
   domain above.
@@ -212,22 +215,27 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
   `double_word.rs` by hash. Editing either source, or a proof, fails the lane
   until the proofs are rerun and the manifest is updated with them.
 
+**What is assumed:** Rust's `f64` arithmetic is IEEE 754 binary64 with
+round-to-nearest-even, without fused multiply-add contraction, as the language
+specifies. The determinism digest checks bit-identical results on every
+supported target.
+
 **What is argued, not machine-checked:**
-- **No overflow:** Flocq's models have no overflow. The input limits that exclude
-  it are argued (see Domain above).
 - **The transcription:** each Rust function is the Coq definition operation for
   operation. Where the paper proves an operation exact, the Coq definition leaves
   it unrounded and the Rust rounds it, which gives the same value.
 
 | Rust | Coq definition | Theorem |
 |---|---|---|
-| `add_f64` | `DWPlusFP` (`DWPlus.v`); `add_f64` (`Binary64Add.v`) | `DWPlusFP_bound`, `2u²`; in binary64, `add_f64_bound` |
-| `add`, `sub` | `AccurateDWPlusDW` (`DWPlus.v`); `add`, `sub` (`Binary64Add.v`) | `DWPlusDW_relerr_bound`, `3u²/(1 − 4u)`; in binary64, `add_bound`, `sub_bound` |
-| `mul_f64` | `DWTimesFP` (`DWTimesFP.v`) | `DWTimesFP_correct`, `3/2·u² + 4u³`; instance `mul_f64_bound`; in binary64, `Binary64Mul.mul_f64_bound` |
-| `mul` | `DWTimesDW1` (`DWTimesDW.v`) | `DWTimesDW1_correct_even`, `< 5u²` under ties-to-even; instance `mul_bound`; in binary64, `Binary64Mul.mul_bound` |
-| `div_f64` | `DWDivFP3` (`DWDivFP.v`) | `DWDFP3_correct`, `3u²` (`dh`, `dt` exact); instance `div_f64_bound`; in binary64, `Binary64Div.div_f64_bound` |
-| `div` | `DWDivDW2` (`DWDivDW.v`) | `DWDDW_correct`, `15u² + 56u³` (`pih` exact); instance `div_bound`; in binary64, `Binary64Div.div_bound` |
-| `two_prod` | `Dekker` (Flocq), via `TwoProdBinary64.v` | `two_prod_exact` |
+| `add_f64` | `DWPlusFP` (`DWPlus.v`); `add_f64` (`Binary64Add.v`) | `DWPlusFP_bound`, `2u²`; in binary64, `add_f64_bound`; in IEEE 754, `add_f64_ieee` |
+| `add`, `sub` | `AccurateDWPlusDW` (`DWPlus.v`); `add`, `sub` (`Binary64Add.v`) | `DWPlusDW_relerr_bound`, `3u²/(1 − 4u)`; in binary64, `add_bound`, `sub_bound`; in IEEE 754, `add_ieee`, `sub_ieee` |
+| `mul_f64` | `DWTimesFP` (`DWTimesFP.v`) | `DWTimesFP_correct`, `3/2·u² + 4u³`; instance `mul_f64_bound`; in binary64, `Binary64Mul.mul_f64_bound`; in IEEE 754, `mul_f64_ieee` |
+| `mul` | `DWTimesDW1` (`DWTimesDW.v`) | `DWTimesDW1_correct_even`, `< 5u²` under ties-to-even; instance `mul_bound`; in binary64, `Binary64Mul.mul_bound`; in IEEE 754, `mul_ieee` |
+| `div_f64` | `DWDivFP3` (`DWDivFP.v`) | `DWDFP3_correct`, `3u²` (`dh`, `dt` exact); instance `div_f64_bound`; in binary64, `Binary64Div.div_f64_bound`; in IEEE 754, `div_f64_ieee` |
+| `div` | `DWDivDW2` (`DWDivDW.v`) | `DWDDW_correct`, `15u² + 56u³` (`pih` exact); instance `div_bound`; in binary64, `Binary64Div.div_bound`; in IEEE 754, `div_ieee` |
+| `two_prod` | `Dekker` (Flocq), via `TwoProdBinary64.v`; `two_prod64` (`IEEE64Mul.v`) | `two_prod_exact`; in IEEE 754, `two_prod_ieee` |
+| `two_sum` | `TwoSum` (`DWPlus.v`); `two_sum64` (`IEEE64Add.v`) | `TwoSum_correct`; in IEEE 754, `two_sum_ieee` |
+| `fast_two_sum` | `Fast2Sum` (`F2SumFLX.v`); `fast_two_sum64` (`IEEE64Add.v`) | `F2Sum_correct_abs`, `F2Sum_correct_cexp`; in IEEE 754, `fast_two_sum_ieee` |
 
 ## Checked by
 
@@ -239,14 +247,16 @@ arithmetic with the library.
 - **Fast2Sum:** 200,000 pairs with `e_a ≥ e_b`.
 - **2Prod:**
   - 200,000 normal pairs across the whole domain;
-  - every edge of the domain (`e_a + e_b = −969` and `1021`, `|x| = 2^996`),
-    with all-ones and power-of-two significands;
+  - every edge of the domain (exponent sums `−969` and `1018`, magnitudes up
+    to `2^994`), with all-ones and power-of-two significands;
   - subnormal operands, which the proved domain admits;
   - a split tie;
   - zeros.
 - **Each double-word operation:** 100,000 random double-word operands, checked
   against its bound with the bound's denominator cleared, and checked to return
   a double-word number.
+- **The products at the top of their domain:** 100,000 cases with words just
+  below `2^508`, checked finite and within bound.
 - **The multiplicative operations at the bottom of their domain:** 100,000
   cases with leading-word products from `2^−969` and trailing-word products from
   `2^−1022`, including the `2^−969` edge.
@@ -255,8 +265,8 @@ arithmetic with the library.
 - **The additive operations at both ends of their domain:**
   - 100,000 cases at the bottom of the range, with subnormal trailing words,
     subnormal `y`, and sums that cancel into the subnormal range;
-  - 100,000 cases with leading words just below `2^1021`, checked finite and
-    within bound.
+  - 100,000 cases with words just below `2^1018` (`add_f64`) and `2^1016`
+    (`add`, `sub`), checked finite and within bound.
 - **Published worst cases:**
   - DWPlusFP reaches above `1.99u²` on Joldes et al.'s example after Theorem 2.2.
   - AccurateDWPlusDW reaches above `2.99u²` on Muller and Rideau's Property 2.1.
