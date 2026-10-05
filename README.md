@@ -5,9 +5,10 @@ elementary functions, seeded random streams and the normal family. Every
 function is derived from first principles, with machine-checked error
 bounds.
 
-> **Status: pre-release (milestone M0).** The library crate has no public
-> API yet. The [project plan](docs/PLAN.md) describes what release 0.1 will
-> contain and how it is built and verified.
+> **Status: pre-release (milestone M1).** The library provides ULP
+> utilities so far; nothing is published yet. The
+> [project plan](docs/PLAN.md) describes what release 0.1 will contain and how
+> it is built and verified.
 
 ## Why
 
