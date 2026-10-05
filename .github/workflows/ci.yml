@@ -222,7 +222,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Write the cross-check corpus from the Rust library
-        run: cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
+        # target/ doesn't exist on a fresh checkout, and the shell opens the
+        # redirect before cargo creates it.
+        run: |
+          mkdir -p target
+          cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
       - name: Proofs build, are bound to the source, assume only the expected axioms, and match the Rust bit for bit
         run: |
           docker run --rm -v "$PWD:/w:ro" -w /w \
