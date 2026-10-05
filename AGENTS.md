@@ -45,6 +45,7 @@ cargo build -p morphiq-numerics --locked --target thumbv7em-none-eabihf   # no_s
 ./scripts/check_generators.sh
 cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
 # then, in the pinned Coq image (see the formal job): ./scripts/check_formal.sh target/crosscheck.txt
+# and, in the pinned Debian image (see the certificates job): ./scripts/check_certificates.sh
 cargo deny --locked check licenses
 ```
 

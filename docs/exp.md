@@ -1,12 +1,13 @@
 # `exp`: correctly rounded exponential (derivation, draft for review)
 
-> **Status: design under review.** This document is the derivation the kernel is
-> written from. Under the [provenance policy](PROVENANCE.md#ai-assisted-contributions),
-> the kernel is written by a person from this document. It lands in the same pull
-> request as the kernel, so the document never describes code that doesn't exist.
-> Each numbered **decision** below is a design choice open to review. Each value
-> marked *generated* or *certified* comes from a committed generator or
-> certificate, never typed in by hand.
+> **Status: derivation complete, waiting for the kernel.** This document is the
+> derivation the kernel is written from. Every bound below is certified, and
+> every constant generated, by the artifacts in §7. Under the
+> [provenance policy](PROVENANCE.md#ai-assisted-contributions), the kernel is
+> written by a person from this document, in the same pull request, so the
+> document never describes code that doesn't exist. Each numbered **decision**
+> is a design choice open to review, and one argument is marked for a second
+> reader (§2).
 
 `exp(x)` returns `e^x` rounded to nearest, ties to even, for every binary64 `x`.
 Subnormal results are rounded once. Here `u = 2^−53`, `RN` is round-to-nearest-even,
@@ -85,10 +86,13 @@ fast path.
      Then `r` is the double-word `(r_hi, r_lo)`:
      ```
      (s, t) = two_sum(r1, −p2)
-     r_lo   = t − e2 − RN(n·L3)
-     (r_hi, r_lo) = fast_two_sum(s, r_lo)
+     rr     = RN(RN(t − e2) − RN(n·L3))
+     (r_hi, r_lo) = two_sum(s, rr)
      ```
-     Its absolute error is below `2^−90` (*certified*, §7).
+     `two_sum`, not `fast_two_sum`, for the last step: `|s| ≥ |rr|` isn't
+     guaranteed when `r` is tiny. The absolute error
+     `|r_hi + r_lo − (x − n·L)|` is below `2^−113` (*certified*:
+     `formal/exp/reduction.g`), and `|r_lo| ≤ 2^−62`.
    - **Accurate path:** `r1`, `p2`, `e2`, `(p3, e3) = two_prod(n, L3)` and
      `RN(n·L4)` are summed in 128-bit arithmetic (§5).
 
@@ -105,21 +109,26 @@ double-word operations,** so the only new error analysis is the polynomial's.
      `e^r − 1 − r − r²/2` on `|r| ≤ 0.0027077` (*generated*).
    - The approximation error `|e^r − 1 − r − q*(r)|` is certified with Sollya's
      `supnorm`: below `2^−77.2` (*generated*; target `2^−72`).
-2. `P = DoubleWord(r_hi, r_lo).add_f64(q)`: `e^r − 1`. The terms `q` omits by using
-   `r_hi` for `r` are below `|r_lo|·|r| ≤ 2^−70`.
+   - The evaluation error `|q − Q(r_hi)|`, against the same polynomial evaluated
+     exactly, is below `2^−70` (*certified*: `formal/exp/poly.g`).
+2. `P = DoubleWord(r_hi, r_lo).add_f64(q)`: `e^r − 1`. The polynomial is evaluated
+   at `r_hi`, not the exact `r`; the difference `|Q(r) − Q(r_hi)|` is below
+   `0x1.9p−71 ≈ 2^−70.4` (*certified*: `formal/exp/mvt.g`).
 3. `E = DoubleWord::from_f64(1.0).add(P)`: `e^r`.
 4. `Y = T_j.mul(E)`, where `T_j` is a double-word table entry, `2^(j/128)` rounded
    to double-word (*generated* as encodings `T_BITS`, error below `2^−107`).
 
-**Fast-path error bound `ε₁`:** the relative error of `Y` against `T_j·e^r`. It
-combines four terms:
-- the polynomial's approximation and evaluation error (Gappa, *certified*);
-- the reduction error;
-- the double-word bounds (`2u²`, `3u²/(1 − 4u)`, `5u²`);
+**Fast-path error bound: `ε₁ = 2^−69`** (*certified*: `formal/exp/fast.g` proves
+`2^−69.17`). It is the relative error of `Y` against `T_j·e^r`, composed from:
+- the reduction error, the polynomial's evaluation error and `Q(r) − Q(r_hi)`
+  (the certificates above);
+- the approximation error (Sollya);
+- the double-word operations' bounds (`2u²`, `3u²/(1 − 4u)`, `5u²`, machine-checked
+  in [double-word.md](double-word.md));
 - the table's error.
 
-Target: `ε₁ ≤ 2^−66`. That lets about 99.9% of arguments return from the fast
-path; the measured rate is to be reported.
+At that bound the rounding test (§5) should send roughly one argument in 2^15 to
+the accurate path; the kernel's tests will measure and report the rate.
 
 **Decision 3: the fast path doesn't handle results that may be subnormal**
 (`k < −1021`). They go straight to the accurate path, which rounds once. Scaling
@@ -134,14 +143,27 @@ between `y_hi` and its neighbours.
 
 **Decision 4: the test, with the crate's exact `ulp`:**
 ```
-g = ulp(y_hi), halved when y_hi is a power of two and y_lo < 0
-return y_hi · 2^k   if   |y_lo| + ε₁'·|y_hi|  <  g / 2
+g = ulp(y_hi), halved when y_hi is a power of two     (the smaller gap)
+return y_hi · 2^k   if   RN(|y_lo| + RN(EPS · |y_hi|))  <  g / 2
 otherwise take the accurate path
 ```
-Here `ε₁' = ε₁·(1 + 2^−50)` absorbs the rounding of `|y_hi|·ε₁'` and of the
-sum. The comparison is then conservative.
-- **To prove:** that the test never returns a wrongly rounded value. This is a
-  two-line argument from the double-word property; Gappa will check the margin.
+with `EPS = ε₁·(1 + 2^−50) = 2^−69·(1 + 2^−50)`, a binary64 constant.
+
+**Proof.** Let `Z = T_j·e^r`, the exact value `Y` approximates, with
+`|Y − Z| ≤ ε₁·|Z|`. `Z` isn't a breakpoint: `e^x` is transcendental for `x ≠ 0`
+(Lindemann), and `x = 0` never reaches this point (§1).
+1. **The computed comparison implies the exact one.**
+   - `g/2` is a power of two, so representable, and `RN` is monotone. So
+     `RN(a) < g/2` implies `a < g/2`.
+   - `RN(v) ≥ v·(1 − u)` for positive normal `v`, and `EPS·(1 − u) ≥ ε₁·(1 + 2^−52)`.
+   - So the test passing implies `|y_lo| + ε₁·(1 + 2^−52)·|y_hi| < g/2`.
+2. **That puts `Z` within `y_hi`'s rounding interval.**
+   - `|Y| ≤ |y_hi|·(1 + 2^−53)`, so `|Z − Y| ≤ ε₁|Y|/(1 − ε₁) ≤ ε₁·(1 + 2^−52)·|y_hi|`.
+   - Then `|Z − y_hi| ≤ |y_lo| + |Z − Y| < g/2`.
+   - Both of `y_hi`'s half-gaps are at least `g/2`, so `Z` lies strictly inside
+     the set of reals that round to `y_hi`, and `RN(Z) = y_hi`.
+
+Scaling by `2^k` is exact (below), so the returned value is `RN(e^x)`.
 
 **Scaling:** `y_hi · 2^k` is exact for `k ≥ −1021`. For `k = 1024`, where `Y < 1`
 near overflow, it's applied as `(y_hi · 2^(k−1)) · 2`.
@@ -152,18 +174,26 @@ near overflow, it's applied as `(y_hi · 2^(k−1)) · 2`.
 - **Why not triple-word:** Fabiano, Muller and Picot's triple-word algorithms
   assume a fused multiply-add, which `core` doesn't offer. Their bounds don't
   hold verbatim without one.
-- **The type:** a private type `Q128 = (m: u128, e: i32)`, with value `m·2^e` and
-  `m` normalized (top bit set), and truncating operations:
-  - multiplication keeps the high 128 bits of the 256-bit product;
-  - addition aligns, then truncates;
-  - each operation's relative error is below `2^−126`.
-
-  It is deterministic on every target and uses only integer instructions.
+- **The type:** a private sign-magnitude type `Q128 = (sign, m: u128, e: i32)`,
+  with value `±m·2^e`, and `m` normalized (top bit set) or zero. It is
+  deterministic on every target and uses only integer instructions.
+- **Its contract,** which the certificates assume and its tests must check:
+  - **Multiplication:** the exact product, truncated toward zero to 128 bits.
+    Relative error in `[−2^−127, 0]`.
+  - **Addition:** absolute error at most `2^−126·max(|a|, |b|)`. That allows the
+    simple implementation, truncating the smaller operand to the larger's
+    128-bit grid while aligning, then the sum. An absolute bound stays valid
+    where terms cancel, as in step 1 below.
+  - **Conversion** from binary64, and **rounding** to binary64
+    (nearest-even, subnormals included): exact, in integer arithmetic.
 
 **General case** (`|x| ≥ 2^−30`):
 1. `r = r1 − p2 − e2 − p3 − e3 − RN(n·L4)`, each binary64 term converted exactly
-   to `Q128` and summed. The terms decrease in magnitude, so the absolute error
-   is below `2^−130`.
+   to `Q128` and summed left to right.
+   - Five additions, each within `2^−126` of operands below `2^−8.48`, so the
+     absolute error is below `2^−131`.
+   - The neglected tail, `n·(L − L1 − L2 − L3)` beyond `RN(n·L4)`, is below
+     `2^−187`.
 2. `e^r` by its Taylor series to degree 12, in Horner form:
    `1 + r(1 + r/2(1 + r/3(… (1 + r/12))))`, with `1/k` as `Q128` constants
    (*generated*). Truncation: `|r|^13/13! < 2^−143`.
@@ -172,38 +202,68 @@ near overflow, it's applied as `(y_hi · 2^(k−1)) · 2`.
 4. The result is `Y·2^k` rounded to binary64 directly from `(m, e + k)` in
    integer arithmetic, including subnormals: one rounding.
 
-Total error below `2^−118` (*certified*), against `2^−113` needed (§2).
+**Total.** The 128-bit evaluation of `T_j` times the series is within `2^−124`
+relative error of the exact `T_j` times the series at the computed `r`
+(*certified*: `formal/exp/accurate_level_01.g` to `_12.g`, one per Horner level,
+and `accurate_y.g`).
+- The error of `r` adds below `2^−131·1.003/0.997 < 2^−130.9`.
+- The series' truncation adds below `2^−143`.
+
+So the total relative error is below `2^−123.9`. A relative error `ε` is a
+mantissa distance below `2ε` ([LM] footnote 10), so the result is within
+`2^−122.9` mantissa distance, against `2^−113` needed (§2). Rounding the 128-bit
+result once therefore rounds `e^x` correctly.
 
 **Small arguments** (`2^−54 ≤ |x| < 2^−30`), which need `2^−158`:
 1. `(h, l) = two_sum(1, x)`, exactly `1 + x`.
-2. `d = e^x − 1 − x = x²/2 + x³/6 + x⁴/24 + x⁵/120` in `Q128`.
-   - `|d| ≤ 2^−61`, so the relative error `2^−123` is below `2^−184` absolute.
+2. `d = e^x − 1 − x ≈ (x·x·k2)·(1 + (x·k3)·(1 + (x·k4)·(1 + x·k5)))` in `Q128`,
+   with `k_i = 1/i`.
+   - Its relative error against the same expression evaluated exactly is below
+     `2^−122` (*certified*: `formal/exp/small.g`). With `|d| ≤ 2^−61`, that's
+     below `2^−183` absolute.
    - Truncating after `x⁵`: `|x|^6/720 < 2^−189`.
-3. `w = l + d` in `Q128`: `|w| ≤ ulp(h)/2 + 2^−61`, with absolute error below
-   `2^−176`.
+3. `w = l + d` in `Q128`: `|l| ≤ ulp(h)/2 ≤ 2^−53` and `|d| ≤ 2^−61`, so the
+   addition contract gives absolute error below `2^−179`. The total is below
+   `2^−178`.
 4. `RN(h + w)`: `h` if `|w|` is below half the gap on `w`'s side of `h`;
    otherwise `h`'s neighbour on that side.
-   - [LM] guarantees `e^x` is at least `2^−158` from the breakpoint, and the
-     error is below `2^−176`. So the comparison decides correctly, and no tie
-     can occur.
+   - [LM] guarantees `e^x` is at least `2^−158` from the breakpoint in mantissa
+     distance, which is at least `2^−159` absolute here, and the error is below
+     `2^−178`. So the comparison, done exactly in integer arithmetic, decides
+     correctly, and no tie can occur.
 
 ## 7. Certificates and generators
 
-In this draft so far: `generators/exp_constants.py` and `generators/exp_poly.sollya` (with its output `generators/exp_poly.out`), which write `crates/morphiq-numerics/src/exp/tables.rs`. That file isn't compiled until the kernel declares `mod tables`. The Gappa certificates follow.
-
-
 | Artifact | Tool | Establishes |
 |---|---|---|
-| `generators/exp_constants.py` | mpmath, pinned | `INV_L`, `L1`–`L4`, `T_j` (double-word and `Q128`), `1/k` in `Q128`: each with its error |
-| `generators/exp_poly.sollya` | Sollya 8.0, pinned image | `c3`–`c6` (`fpminimax`) and the approximation error (`supnorm`) |
-| `formal/exp/fast.gappa` | Gappa 1.4.1, pinned image | the polynomial's evaluation error and the reduction error; with the double-word bounds, `ε₁` |
-| `formal/exp/accurate.gappa` | Gappa | the accurate path's total error |
-| `formal/exp/test.gappa` | Gappa | the rounding test's margin (§5) |
+| `generators/exp_constants.py` | mpmath 1.4.1 | writes `crates/morphiq-numerics/src/exp/tables.rs`: `INV_L`, `L1`–`L4`, `T_j` (double-word and `Q128`), `1/k` in `Q128`, each checked against its bound |
+| `generators/exp_poly.sollya` | Sollya 8.0 | `c3`–`c6` (`fpminimax`) and the approximation error (`supnorm`), in `generators/exp_poly.out` |
+| `formal/exp/reduction.g` | Gappa 1.4.1 | the fast path's reduced argument, within `2^−113` |
+| `formal/exp/poly.g` | Gappa | the polynomial's evaluation error, below `2^−70` |
+| `formal/exp/mvt.g` | Gappa | `Q(r) − Q(r_hi)`, below `0x1.9p−71` |
+| `formal/exp/fast.g` | Gappa | `ε₁ ≤ 2^−69` |
+| `formal/exp/accurate_level_*.g`, `accurate_y.g` | Gappa | the accurate path's series and result, within `2^−124` |
+| `formal/exp/small.g` | Gappa | the small-argument path's `d`, within `2^−122` relative |
+| `generators/exp_accurate_certificates.py` | Python | writes the per-level certificates, with their bounds |
 
-Each certificate is bound by hash to the source it describes
-([double-word.md](double-word.md#machine-checked-proofs) describes the binding).
+**Gates:**
+- **Certificates:** `scripts/check_certificates.sh`, the `certificates (sollya, gappa)`
+  job, runs in a Debian image pinned by digest, with Sollya and Gappa pinned by
+  package version. It checks that `formal/exp/binding.sha256` matches, that the
+  Sollya script reproduces its output exactly, and that every certificate proves
+  its goal.
+- **Replay:** `scripts/check_generators.sh` replays the Python generators.
+
+**The binding:** it covers this document, the constants, the Sollya script and
+output, and every certificate. Editing any of them fails the gate until the
+certificates are rerun and the manifest is updated. When the kernel lands, the
+binding gains the kernel's source.
+
+`tables.rs` isn't compiled until the kernel declares `mod tables`.
 
 ## 8. Checked by (when the kernel lands)
+
+The kernel's tests, written with it:
 
 - Bit-exact agreement with `crates/reference/fixtures/exp.json`, 4,030 cases:
   - the published worst cases;
@@ -212,4 +272,5 @@ Each certificate is bound by hash to the source it describes
   - random arguments.
 - The determinism digest on every target.
 - The fast path's pass rate, measured and reported.
+- The `Q128` type against its contract, in exact integer arithmetic.
 - Exhaustive checks of chosen sub-intervals against the oracle (scheduled).
