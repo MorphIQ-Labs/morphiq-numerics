@@ -27,12 +27,14 @@ pub struct DoubleWord {
 impl DoubleWord {
     /// `x` as a double-word number, `x + 0`.
     #[must_use]
+    #[inline]
     pub const fn from_f64(x: f64) -> Self {
         Self { hi: x, lo: 0.0 }
     }
 
     /// The exact sum `a + b`, by [`two_sum`].
     #[must_use]
+    #[inline]
     pub const fn sum(a: f64, b: f64) -> Self {
         let (hi, lo) = two_sum(a, b);
         Self { hi, lo }
@@ -40,6 +42,7 @@ impl DoubleWord {
 
     /// The exact product `a · b`, by [`two_prod`], within its domain.
     #[must_use]
+    #[inline]
     pub const fn product(a: f64, b: f64) -> Self {
         let (hi, lo) = two_prod(a, b);
         Self { hi, lo }
@@ -47,24 +50,28 @@ impl DoubleWord {
 
     /// `hi + lo` as a double-word number, or `None` unless `hi = RN(hi + lo)`.
     #[must_use]
+    #[inline]
     pub fn from_parts(hi: f64, lo: f64) -> Option<Self> {
         (hi + lo == hi && hi.is_finite() && lo.is_finite()).then_some(Self { hi, lo })
     }
 
     /// The leading word, `RN(hi + lo)`: the value rounded to binary64.
     #[must_use]
+    #[inline]
     pub const fn hi(self) -> f64 {
         self.hi
     }
 
     /// The trailing word, `hi + lo - RN(hi + lo)`.
     #[must_use]
+    #[inline]
     pub const fn lo(self) -> f64 {
         self.lo
     }
 
     /// `-(hi + lo)`, exactly.
     #[must_use]
+    #[inline]
     pub const fn neg(self) -> Self {
         Self {
             hi: -self.hi,
@@ -77,6 +84,7 @@ impl DoubleWord {
     /// DWPlusFP: Joldes et al. 2017, Algorithm 4; bound proved in Muller and
     /// Rideau 2022, Table 1.
     #[must_use]
+    #[inline]
     pub const fn add_f64(self, y: f64) -> Self {
         let (s_hi, s_lo) = two_sum(self.hi, y);
         let v = self.lo + s_lo;
@@ -91,6 +99,7 @@ impl DoubleWord {
     /// Muller and Rideau 2022, Table 1, and shown asymptotically optimal
     /// there (Property 2.1).
     #[must_use]
+    #[inline]
     pub const fn add(self, other: Self) -> Self {
         let (s_hi, s_lo) = two_sum(self.hi, other.hi);
         let (t_hi, t_lo) = two_sum(self.lo, other.lo);
@@ -104,6 +113,7 @@ impl DoubleWord {
     /// `(x_hi + x_lo) - (y_hi + y_lo)`: [`add`](Self::add) of the exact
     /// negation, with the same bound.
     #[must_use]
+    #[inline]
     pub const fn sub(self, other: Self) -> Self {
         self.add(other.neg())
     }
@@ -113,6 +123,7 @@ impl DoubleWord {
     /// DWTimesFP1: Joldes et al. 2017, Algorithm 7; bound proved in Muller
     /// and Rideau 2022, Table 1.
     #[must_use]
+    #[inline]
     pub const fn mul_f64(self, y: f64) -> Self {
         let (c_hi, c_lo1) = two_prod(self.hi, y);
         let c_lo2 = self.lo * y;
@@ -129,6 +140,7 @@ impl DoubleWord {
     /// Theorem 2.6, proves this bound under round-to-nearest ties-to-even,
     /// which binary64 arithmetic uses, improving the 7u² of the 2017 paper.
     #[must_use]
+    #[inline]
     pub const fn mul(self, other: Self) -> Self {
         let (c_hi, c_lo1) = two_prod(self.hi, other.hi);
         let t_lo1 = self.hi * other.lo;
@@ -145,6 +157,7 @@ impl DoubleWord {
     /// (Theorem 6.2) and in Muller and Rideau 2022, Table 1. Lines 3 and 4 are
     /// exact by the paper's Property 6.1 and the Sterbenz lemma.
     #[must_use]
+    #[inline]
     pub const fn div_f64(self, y: f64) -> Self {
         let t_hi = self.hi / y;
         let (pi_hi, pi_lo) = two_prod(t_hi, y);
@@ -164,6 +177,7 @@ impl DoubleWord {
     /// (Theorem 7.1) and in Muller and Rideau 2022, Table 1. Line 3 is exact
     /// by the Sterbenz lemma.
     #[must_use]
+    #[inline]
     pub const fn div(self, other: Self) -> Self {
         let t_hi = self.hi / other.hi;
         let r = other.mul_f64(t_hi);

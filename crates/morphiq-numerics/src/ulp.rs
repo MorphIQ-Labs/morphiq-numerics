@@ -22,6 +22,7 @@ const EXPONENT_MASK: u64 = 0x7ff;
 /// represents. It equals `x.abs().next_up() - x.abs()` for every finite `x`
 /// below the largest finite magnitude, where that difference is itself exact.
 #[must_use]
+#[inline]
 pub const fn ulp(x: f64) -> f64 {
     let biased = (x.to_bits() >> SIGNIFICAND_BITS) & EXPONENT_MASK;
     if biased == EXPONENT_MASK {
@@ -52,6 +53,7 @@ pub const fn ulp(x: f64) -> f64 {
 /// positions order NaNs consistently, but they don't measure a distance; see
 /// [`ulps_between`].
 #[must_use]
+#[inline]
 pub const fn ordered_bits(x: f64) -> i64 {
     let magnitude = (x.to_bits() & !(1 << 63)) as i64;
     if x.is_sign_negative() {
@@ -67,6 +69,7 @@ pub const fn ordered_bits(x: f64) -> i64 {
 /// It is `|ordered_bits(b) - ordered_bits(a)|`, so `±0` are zero steps
 /// apart, and the largest finite number is one step from `+∞`.
 #[must_use]
+#[inline]
 pub const fn ulps_between(a: f64, b: f64) -> Option<u64> {
     if a.is_nan() || b.is_nan() {
         None
