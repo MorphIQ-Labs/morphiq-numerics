@@ -31,9 +31,8 @@ that doesn't follow it is a defect, however well it tests.
   one needs its own recorded rights review and a decision in this file.
 - **Renaming, reordering or re-deriving an adapted algorithm** to present it
   as new. Citing a paper doesn't cancel having consulted an implementation.
-- **Code from MorphIQ Labs' private repositories** (for example FerroRisk's
-  numerics) without a provenance audit. Our own history isn't proof of
-  independent origin; FerroRisk's normal kernels follow Cody and AS241.
+- **Code from MorphIQ Labs' other repositories** without a provenance audit.
+  Our own history isn't proof of independent origin.
 
 ## Recording
 

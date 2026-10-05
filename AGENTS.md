@@ -6,7 +6,7 @@ This file is the repository's engineering contract for human and agent contribut
 
 ## Purpose and Architecture
 
-`morphiq-numerics` provides binary64 numerical primitives whose results are **correctly rounded** and **identical on every target**: elementary functions, seeded random streams and the normal family. It is the shared numerics substrate for MorphIQ Labs' engines (FerroWave, FerroRisk) and is published openly under MIT OR Apache-2.0. Read [the plan](docs/PLAN.md) and [the provenance policy](docs/PROVENANCE.md) before any change.
+`morphiq-numerics` provides binary64 numerical primitives whose results are **correctly rounded** and **identical on every target**: elementary functions, seeded random streams and the normal family. It is the shared numerics substrate for MorphIQ Labs' engines and is published openly under MIT OR Apache-2.0. Read [the plan](docs/PLAN.md) and [the provenance policy](docs/PROVENANCE.md) before any change.
 
 The repository is at milestone M0: governance, CI and an empty library crate. The library has no public API yet; documentation must not describe functions that are not in the source tree.
 

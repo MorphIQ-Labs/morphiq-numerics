@@ -2,23 +2,21 @@
 
 `morphiq-numerics` is a Rust library of binary64 numerical primitives whose
 results are **correctly rounded** and **identical on every target**. It exists
-because MorphIQ Labs' engines kept hitting the same defects:
+because numerical engines keep hitting the same defects:
 
 - **The platform libm leaks into seeded results.** Seeded results depend on
   the host's `ln`, `exp`, `sin` and `cos`. glibc, macOS libSystem and musl
   round these differently, so a seed reproduces only on the host that
-  recorded it. FerroWave's EEMD noise stream diverged by one ulp between macOS
-  and Linux. FerroRisk's seeded Monte Carlo, realized volatility and Heston
-  paths have the same dependence.
+  recorded it. A Box–Muller noise stream, for example, diverges by one ulp
+  between macOS and Linux.
 - **Faithful functions can't be checked bit for bit.** A function that is only
   faithfully rounded has no single right answer. An independent reference can
   then only be compared within a tolerance, and determinism has to be pinned
   from the implementation's own output instead of following from the
   specification.
-- **Borrowed provenance can't be redistributed.** Normal-family kernels
-  adapted from published code (AS241, Cody's CALERF, QD and the Cephes
-  polynomials) carry unresolved redistribution rights. morphiq-risk-ml found
-  this and chose to replace them.
+- **Borrowed provenance can't be redistributed.** Kernels adapted from
+  published code (AS241, Cody's CALERF, QD) carry unresolved redistribution
+  rights. morphiq-risk-ml found this and chose to replace them.
 
 A correctly rounded function has exactly one right answer: the binary64 value
 nearest the exact result. Any independent reference (MPFR, mpmath, another
@@ -144,7 +142,7 @@ deliverable as much as the code:
 | Reference tests | Bit-exact agreement with MPFR or mpmath on committed fixtures (random, near-boundary, worst-case and special inputs) | Every PR |
 | Determinism digest | Identical output hashes on x86-64 Linux, aarch64 Linux, aarch64 macOS, x86-64 Windows, musl, `wasm32` and a `no_std` embedded target | Every PR |
 | Generator replay | Committed coefficients and constants equal their regenerated values | Every PR |
-| Proof binding | Each Gappa, Sollya, Coq or Lean artifact is bound by hash to the source it describes, as in FerroWave's `binary64-production.sha256` manifest. An edit fails until the proof is rerun | Every PR |
+| Proof binding | Each Gappa, Sollya, Coq or Lean artifact is bound by hash to the source it describes in a committed manifest. An edit fails until the proof is rerun | Every PR |
 | Formal | Sollya approximation bounds, Gappa rounding bounds kernel-checked by Coq, and Lean for exact-real identities | Every PR to `main` |
 | Mutation | A required catalog of numerical faults, each with a named witness, plus a whole-crate inventory floor | Every PR to `main` |
 | Fuzzing | cargo-fuzz against MPFR on each function | Short budget per PR, long campaigns scheduled |
@@ -184,7 +182,7 @@ scripts/                   gate logic that CI and contributors run identically
   and is checked as a conventional commit. Branches are deleted after merge.
 - **Security:** secret scanning with push protection, private vulnerability
   reporting, Dependabot alerts, and third-party actions pinned to commit SHAs.
-- **Releases:** the same model as tollgate.
+- **Releases:** the MorphIQ Labs release model.
   - `prepare` opens the `chore/release` PR from conventional commits through
     the release GitHub App.
   - `tag` cuts `v{version}` when that PR lands.
@@ -205,19 +203,11 @@ scripts/                   gate logic that CI and contributors run identically
 
 ## Consumers and migration
 
-- **FerroWave:**
-  - Replace the interim `libm` crate in `transform/portable_rng.rs` and finance
-    calibration.
-  - Replace `statrs` for `erf_inv`, `erfc_inv` and `Normal::cdf`.
-  - `digamma` and `ln_gamma` move when they are provided.
-- **FerroRisk:** resolves ferro-risk #456 and #472–#475.
-  - The seeded local-vol Monte Carlo engine.
-  - Realized volatility and dispersion.
-  - Heston's `Complex::exp`.
-  - The portability gate.
-  - Its Cody- and AS241-derived normal kernels, and the Cephes-derived
-    trigonometric polynomials, are replaced by this crate's derivations rather
-    than moved here.
+- **MorphIQ Labs' Rust engines:** replace their platform-libm and
+  general-purpose special-function dependencies in seeded and reproducibility-
+  critical paths with pinned releases of this crate. Existing in-house kernels
+  are replaced by this crate's derivations, never moved here (see
+  [PROVENANCE.md](PROVENANCE.md)).
 - **morphiq-risk-ml (OCaml):** cannot link a Rust crate. Its #64 replacements
   can adopt this project's published derivations and generated coefficients
   (same license and owner), and each project serves as the other's
