@@ -28,7 +28,9 @@ trap 'rm -rf "$work"' EXIT
 cp -r formal/double-word formal/two-prod formal/binary64 formal/audit "$work/"
 (cd "$work/double-word" && coq_makefile -f _CoqProject -o Makefile && make -j"$(nproc)")
 (cd "$work/two-prod" && coqc TwoProdBinary64.v)
-(cd "$work/binary64" && coqc -R ../double-word Double -R . Binary64 Binary64Add.v)
+(cd "$work/binary64" && for proof in Binary64Add Instances; do
+  coqc -R ../double-word Double -R . Binary64 -R ../two-prod "" "$proof.v" || exit 1
+done)
 
 (cd "$work/audit" && coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" -R ../binary64 Binary64 Audit.v) > "$work/audit.log"
 # Each axiom entry starts unindented; its type follows on the same line or on

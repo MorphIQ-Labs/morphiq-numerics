@@ -147,10 +147,10 @@ Notation F2P_prod a b  :=  (fst (Fast2Mult a b)).
 Notation F2P_error a b  :=  (snd (Fast2Mult a b)).
 
 Hypothesis F2Mult_correct: 
-  forall a b, a * b =  F2P_prod a b +  F2P_error a b.
+  forall a b, format a -> format b -> a * b =  F2P_prod a b +  F2P_error a b.
 
-Fact  F2P_errorE a b: F2P_error a b =  a * b - rnd_p (a * b).
-Proof. rewrite {1}F2Mult_correct /=; ring. Qed.
+Fact  F2P_errorE a b (Fa : format a) (Fb : format b): F2P_error a b =  a * b - rnd_p (a * b).
+Proof. rewrite {1}(F2Mult_correct Fa Fb) /=; ring. Qed.
 
 Definition map_pair A B (f: A -> B) (p: A * A) := (f (fst p), f (snd p)).
 
@@ -203,7 +203,14 @@ Qed.
 
 
 
-Parameter TwoProd : R -> R -> R * R.
+(* morphiq-numerics: was [Parameter TwoProd : R -> R -> R * R], a global axiom
+   that no instance could satisfy. TwoProd is now Fast2Mult behind an opaque
+   proof, so it neither unfolds in these proofs nor needs an axiom. *)
+Lemma TwoProd_exists : { f : R -> R -> R * R | f = Fast2Mult }.
+Proof. by exists Fast2Mult. Qed.
+Definition TwoProd := proj1_sig TwoProd_exists.
+Lemma TwoProd_Fast2Mult : TwoProd = Fast2Mult.
+Proof. exact: (proj2_sig TwoProd_exists). Qed.
 
 Hypothesis TwoProdE : TwoProd = Fast2Mult. (* or Dekker's algorithm *)
 
@@ -616,7 +623,7 @@ have ch2: Rabs ch <= 2.
     apply:round_le; rewrite  /= IZR_Zpower_pos /=; lra.
     have cl1u: Rabs  cl1 <= u.
     have ->: cl1 = xh * y - rnd_p (xh * y)
-         by rewrite  {1}F2Mult_correct TwoProdE /=; ring.
+         by rewrite  {1}(F2Mult_correct (proj1 (proj1 DWx)) Fy) TwoProdE /=; ring.
   
   rewrite  -Ropp_minus_distr  Rabs_Ropp /u.
   have ->: pow (- p) = / 2 * pow (- p) * pow  1.
