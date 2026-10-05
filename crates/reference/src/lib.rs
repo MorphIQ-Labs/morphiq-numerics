@@ -5,8 +5,6 @@
 //! decided exactly rather than to a tolerance. It shares no arithmetic with
 //! the library.
 
-pub mod determinism;
-
 use core::cmp::Ordering;
 use core::ops::{Add, Mul, Neg, Sub};
 use num_bigint::BigInt;
@@ -152,36 +150,4 @@ impl Ord for Exact {
     }
 }
 
-/// A reproducible stream of 64-bit words (xorshift64), so test inputs need no
-/// platform function and no seed from the environment.
-#[derive(Clone, Debug)]
-pub struct Words(u64);
-
-impl Words {
-    /// A stream from a nonzero seed.
-    #[must_use]
-    pub const fn new(seed: u64) -> Self {
-        Self(seed)
-    }
-
-    /// The next word.
-    pub fn next_word(&mut self) -> u64 {
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 7;
-        self.0 ^= self.0 << 17;
-        self.0
-    }
-
-    /// A normal binary64 number with the given exponent (`2^e ≤ |x| < 2^(e+1)`),
-    /// a random significand and a random sign.
-    ///
-    /// # Panics
-    ///
-    /// If `e` is outside the normal exponent range.
-    pub fn with_exponent(&mut self, e: i64) -> f64 {
-        assert!((-1022..=1023).contains(&e));
-        let word = self.next_word();
-        let biased = u64::try_from(e + 1023).unwrap();
-        f64::from_bits((word & (1 << 63)) | (biased << 52) | (word >> 12))
-    }
-}
+pub use morphiq_numerics_digest::Words;

@@ -183,8 +183,8 @@ jobs:
           shared-key: test-${{ matrix.os }}
       - run: cargo test --locked --workspace --all-features
 
-  # The determinism digest on targets beyond the test hosts: musl's libc and
-  # WebAssembly, where a platform libm differs most. Each runs the reference
+  # The determinism digest on targets beyond the test hosts: musl's libc,
+  # WebAssembly and bare metal, where a platform libm differs most or is absent. Each runs the reference
   # suite, digest included (docs/determinism.md); gate logic lives in scripts/.
   digest:
     name: digest (${{ matrix.target }})
@@ -193,7 +193,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [x86_64-unknown-linux-musl, wasm32-wasip1]
+        target: [x86_64-unknown-linux-musl, wasm32-wasip1, thumbv7em-none-eabihf]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -205,4 +205,7 @@ jobs:
         run: |
           ./scripts/install_wasmtime.sh "$RUNNER_TEMP/wasmtime"
           echo "$RUNNER_TEMP/wasmtime/bin" >> "$GITHUB_PATH"
+      - name: QEMU for bare-metal Cortex-M4F
+        if: matrix.target == 'thumbv7em-none-eabihf'
+        run: sudo apt-get install --yes --no-install-recommends qemu-system-arm
       - run: ./scripts/check_digest_target.sh ${{ matrix.target }}

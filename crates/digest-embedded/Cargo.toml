@@ -1,0 +1,22 @@
+[package]
+name = "morphiq-numerics-digest-embedded"
+description = "Computes the determinism digest on a bare-metal Cortex-M4F under QEMU. Never published."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+morphiq-numerics-digest = { path = "../digest" }
+
+# Bare metal only: the reset handler (which enables the FPU for hard-float
+# targets), and semihosting for output, exit status and a panic that exits.
+[target.'cfg(target_os = "none")'.dependencies]
+cortex-m-rt = "0.7"
+semihosting = { version = "0.1", features = ["stdio", "panic-handler"] }
