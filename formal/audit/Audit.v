@@ -9,6 +9,7 @@
 From Double Require Import DWPlus DWTimesFP DWTimesDW DWDivFP DWDivDW.
 Require Import TwoProdBinary64.
 From Binary64 Require Binary64Add Instances Binary64Mul Binary64Div.
+From Binary64 Require IEEE64Add IEEE64Mul IEEE64Div IEEE64Eft.
 
 Print Assumptions DWPlusFP_correct.
 Print Assumptions DWPlusDW_relerr_bound.
@@ -28,3 +29,13 @@ Print Assumptions Binary64Mul.mul_f64_bound.
 Print Assumptions Binary64Mul.mul_bound.
 Print Assumptions Binary64Div.div_f64_bound.
 Print Assumptions Binary64Div.div_bound.
+Print Assumptions IEEE64Add.add_f64_ieee.
+Print Assumptions IEEE64Add.add_ieee.
+Print Assumptions IEEE64Add.sub_ieee.
+Print Assumptions IEEE64Mul.mul_f64_ieee.
+Print Assumptions IEEE64Mul.mul_ieee.
+Print Assumptions IEEE64Div.div_f64_ieee.
+Print Assumptions IEEE64Div.div_ieee.
+Print Assumptions IEEE64Eft.two_sum_ieee.
+Print Assumptions IEEE64Eft.fast_two_sum_ieee.
+Print Assumptions IEEE64Eft.two_prod_ieee.

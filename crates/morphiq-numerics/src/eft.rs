@@ -8,8 +8,9 @@
 /// split into 26 and 27 bits (Dekker 1971, (5.7) and (6.2)).
 const SPLITTER: f64 = 134_217_729.0;
 
-/// `(s, t)` with `s = RN(a + b)` and `s + t = a + b` exactly, for any finite
-/// `a` and `b` whose sum doesn't overflow.
+/// `(s, t)` with `s = RN(a + b)` and `s + t = a + b` exactly, for any `a` and
+/// `b` at most `2^1020` in magnitude, which excludes overflow
+/// (`two_sum_ieee`, `formal/binary64/IEEE64Eft.v`).
 ///
 /// Knuth and Møller's 2Sum, operation for operation as Joldes, Muller and
 /// Popescu (2017) state it in Algorithm 2.
@@ -25,8 +26,9 @@ pub const fn two_sum(a: f64, b: f64) -> (f64, f64) {
 }
 
 /// `(s, t)` with `s = RN(a + b)` and `s + t = a + b` exactly, provided
-/// `a = 0`, `b = 0`, or the exponent of `a` is at least that of `b`; `|a| ≥ |b|`
-/// suffices. The sum must not overflow.
+/// `a = 0`, `|a| ≥ |b|`, or the exponent of `a` is at least that of `b`, and
+/// `|a|, |b| ≤ 2^1021`, which excludes overflow (`fast_two_sum_ieee`,
+/// `formal/binary64/IEEE64Eft.v`).
 ///
 /// Dekker's Fast2Sum, as Joldes, Muller and Popescu (2017) state it in
 /// Algorithm 1. Outside its precondition `t` need not be the exact error; use
@@ -44,7 +46,7 @@ pub const fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
 ///
 /// Veltkamp's splitting as Dekker (1971) gives it in (6.1), with `c = 2^27 + 1`
 /// from (6.2) and the tail from (5.6). `x · c` can't overflow for
-/// `|x| ≤ 2^996`.
+/// `|x| ≤ 2^994`.
 #[inline]
 const fn split(x: f64) -> (f64, f64) {
     let p = x * SPLITTER;
@@ -61,15 +63,15 @@ const fn split(x: f64) -> (f64, f64) {
 ///
 /// # Domain
 ///
-/// Exact when `a · b = 0` or `|a · b| ≥ 2^-969`, provided no operation
-/// overflows, which holds when `|a|, |b| ≤ 2^996` and `|a · b| < 2^1023`.
+/// Exact when `a · b = 0` or `|a · b| ≥ 2^-969`, and `|a| ≤ 2^e_a`,
+/// `|b| ≤ 2^e_b` for some `e_a, e_b ≤ 994` with `e_a + e_b ≤ 1020`, which
+/// excludes overflow.
 ///
-/// - **Machine-checked:** the underflow condition is that of Flocq's `Dekker`
-///   theorem, instantiated for binary64 with ties-to-even in
+/// - **Underflow:** the condition is that of Flocq's `Dekker` theorem,
+///   instantiated for binary64 with ties-to-even in
 ///   `formal/two-prod/TwoProdBinary64.v`. It covers subnormal operands.
-/// - **Argued, not checked:** Flocq's model has no overflow. The magnitude
-///   conditions keep every intermediate below `2^1024`, so binary64 agrees with
-///   it (`docs/double-word.md`).
+/// - **Overflow:** machine-checked in Flocq's IEEE 754 model (`two_prod_ieee`,
+///   `formal/binary64/IEEE64Eft.v`).
 ///
 /// These conditions are sufficient, not necessary: they are the proof's
 /// hypotheses, not the boundary of exactness. Below `2^-969`, or beyond the

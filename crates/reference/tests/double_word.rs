@@ -172,19 +172,21 @@ fn additive_operations_keep_their_bounds_with_subnormal_words() {
     }
 }
 
-/// The additive operations at the top of their stated domain,
-/// `|x_hi|, |y_hi| < 2^1021`: no intermediate overflows, so every result is
-/// finite and within its bound.
+/// The additive operations at the top of their domain, every word at most
+/// `2^1018` for `add_f64` and `2^1016` for `add` and `sub`: no operation
+/// overflows (`formal/binary64/IEEE64Add.v`), so every result is finite and
+/// within its bound.
 #[test]
 fn additive_operations_keep_their_bounds_at_the_overflow_edge() {
     let mut words = Words::new(0x0ed6_e00e_d6e0_0001);
     let add_f64_bound = &u(2) + &u(2);
     let add_bound = &(&Exact::integer(3) * &u(2)) + &(&Exact::integer(13) * &u(3));
     for _ in 0..SAMPLES {
-        let x = double_word(&mut words, 1020);
         let k = i64::try_from(words.next_word() % 4).unwrap();
-        let y = double_word(&mut words, 1020 - k);
-        let f = y.hi();
+        let x = double_word(&mut words, 1017);
+        let f = words.with_exponent(1017 - k);
+        let a = double_word(&mut words, 1015);
+        let b = double_word(&mut words, 1015 - k);
         for (z, exact, bound, name) in [
             (
                 x.add_f64(f),
@@ -192,8 +194,8 @@ fn additive_operations_keep_their_bounds_at_the_overflow_edge() {
                 &add_f64_bound,
                 "add_f64",
             ),
-            (x.add(y), &value(x) + &value(y), &add_bound, "add"),
-            (x.sub(y), &value(x) - &value(y), &add_bound, "sub"),
+            (a.add(b), &value(a) + &value(b), &add_bound, "add"),
+            (a.sub(b), &value(a) - &value(b), &add_bound, "sub"),
         ] {
             assert!(
                 z.hi().is_finite() && z.lo().is_finite(),
@@ -204,6 +206,47 @@ fn additive_operations_keep_their_bounds_at_the_overflow_edge() {
                 assert_within(&value(z), &exact, bound, &Exact::integer(1), name);
             }
         }
+    }
+}
+
+/// The products at the top of their domain, every word below `2^508`: no
+/// operation overflows (`formal/binary64/IEEE64Mul.v`).
+#[test]
+fn multiplicative_operations_keep_their_bounds_at_the_overflow_edge() {
+    let mut words = Words::new(0x0508_0508_0508_0508);
+    // 1.5u² + 4u³ with its denominator 2 cleared, and 5u²/(1 + u)².
+    let mul_f64_bound = &(&Exact::integer(3) * &u(2)) + &(&Exact::integer(8) * &u(3));
+    let mul_bound = &Exact::integer(5) * &u(2);
+    let one_plus_u = &Exact::integer(1) + &u(1);
+    let mul_denominator = &one_plus_u * &one_plus_u;
+    for _ in 0..SAMPLES {
+        let k = i64::try_from(words.next_word() % 4).unwrap();
+        let x = double_word(&mut words, 507);
+        let y = double_word(&mut words, 507 - k);
+        let f = y.hi();
+        let z = x.mul_f64(f);
+        assert!(
+            z.hi().is_finite() && z.lo().is_finite(),
+            "mul_f64 overflowed"
+        );
+        assert_normalized(z, "mul_f64");
+        assert_within(
+            &value(z),
+            &(&value(x) * &Exact::of(f)),
+            &mul_f64_bound,
+            &Exact::integer(2),
+            "mul_f64",
+        );
+        let z = x.mul(y);
+        assert!(z.hi().is_finite() && z.lo().is_finite(), "mul overflowed");
+        assert_normalized(z, "mul");
+        assert_within(
+            &value(z),
+            &(&value(x) * &value(y)),
+            &mul_bound,
+            &mul_denominator,
+            "mul",
+        );
     }
 }
 
