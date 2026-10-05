@@ -16,11 +16,16 @@
 //!   leading words are below `2^1021` in magnitude. They are proved in binary64
 //!   with gradual underflow, so subnormal words and results are covered. The
 //!   magnitude limit excludes overflow, which is argued rather than proved.
-//! - The products and quotients are proved for an unbounded exponent range.
-//!   They hold in binary64 whenever every operation of the algorithm returns
-//!   what it would there: when no intermediate overflows, no rounded product or
-//!   quotient is subnormal, and each exact product is within [`two_prod`]'s
-//!   domain.
+//! - [`mul_f64`](DoubleWord::mul_f64) and [`mul`](DoubleWord::mul) are proved
+//!   in binary64 when the leading words' product is zero or at least
+//!   `2^-969` (within [`two_prod`]'s domain), and every product of a leading
+//!   and a trailing word is zero or at least `2^-1022`. Every nonzero word
+//!   between `2^-484` and `2^484` in magnitude meets this, and also excludes
+//!   overflow, which is argued rather than proved.
+//! - The quotients are proved for an unbounded exponent range. They hold in
+//!   binary64 whenever every operation of the algorithm returns what it would
+//!   there: when no intermediate overflows, no rounded product or quotient is
+//!   subnormal, and each exact product is within [`two_prod`]'s domain.
 
 use crate::eft::{fast_two_sum, two_prod, two_sum};
 

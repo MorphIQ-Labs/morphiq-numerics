@@ -207,6 +207,62 @@ fn additive_operations_keep_their_bounds_at_the_overflow_edge() {
     }
 }
 
+/// The multiplicative operations at the bottom of their binary64 domain
+/// (`formal/binary64/Binary64Mul.v`): leading-word products from `2^-969`
+/// (`two_prod`'s domain) and trailing-word products from `2^-1022`.
+///
+/// `double_word` draws a trailing word with exponent `e - 54 - k`, `k < 4`, so
+/// a leading exponent sum of at least `-965` puts every trailing-word product
+/// at `2^-1022` or above; the `-969` edge is checked with zero trailing words.
+#[test]
+fn multiplicative_operations_keep_their_bounds_at_the_bottom_of_their_domain() {
+    let mut words = Words::new(0x0b07_7041_d0a1_0b07);
+    // 1.5u² + 4u³ with its denominator 2 cleared, and 5u²/(1 + u)².
+    let mul_f64_bound = &(&Exact::integer(3) * &u(2)) + &(&Exact::integer(8) * &u(3));
+    let mul_bound = &Exact::integer(5) * &u(2);
+    let one_plus_u = &Exact::integer(1) + &u(1);
+    let mul_denominator = &one_plus_u * &one_plus_u;
+    for _ in 0..SAMPLES {
+        let ex = -600 + i64::try_from(words.next_word() % 200).unwrap();
+        let edge = words.next_word().is_multiple_of(16);
+        let sum = if edge {
+            -969
+        } else {
+            -965 + i64::try_from(words.next_word() % 66).unwrap()
+        };
+        let ey = sum - ex;
+        let (x, y) = if edge {
+            let hi = words.with_exponent(ex);
+            let other = words.with_exponent(ey);
+            (
+                DoubleWord::from_parts(hi, 0.0).unwrap(),
+                DoubleWord::from_parts(other, 0.0).unwrap(),
+            )
+        } else {
+            (double_word(&mut words, ex), double_word(&mut words, ey))
+        };
+        let f = y.hi();
+        let z = x.mul_f64(f);
+        assert_normalized(z, "mul_f64");
+        assert_within(
+            &value(z),
+            &(&value(x) * &Exact::of(f)),
+            &mul_f64_bound,
+            &Exact::integer(2),
+            "mul_f64",
+        );
+        let z = x.mul(y);
+        assert_normalized(z, "mul");
+        assert_within(
+            &value(z),
+            &(&value(x) * &value(y)),
+            &mul_bound,
+            &mul_denominator,
+            "mul",
+        );
+    }
+}
+
 #[test]
 fn mul_f64_is_within_one_and_a_half_u_squared_plus_four_u_cubed() {
     let mut words = Words::new(0x5555_aaaa_3333_cccc);
