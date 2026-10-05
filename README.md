@@ -5,8 +5,9 @@ elementary functions, seeded random streams and the normal family. Every
 function is derived from first principles, with machine-checked error
 bounds.
 
-> **Status: pre-release (milestone M1).** The library provides ULP
-> utilities so far; nothing is published yet. The
+> **Status: pre-release (milestone M1).** The library provides error-free
+> transforms, double-word arithmetic and ULP utilities so far; nothing is
+> published yet. The
 > [project plan](docs/PLAN.md) describes what release 0.1 will contain and how
 > it is built and verified.
 

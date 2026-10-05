@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/morphiq-numerics"]
+members = ["crates/morphiq-numerics", "crates/reference"]
 
 [workspace.package]
 version = "0.0.0"
@@ -10,6 +10,11 @@ rust-version = "1.89"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/MorphIQ-Labs/morphiq-numerics"
 authors = ["MorphIQ Labs"]
+
+# Test and tooling dependencies only; the library crate takes none.
+[workspace.dependencies]
+num-bigint = "0.4"
+num-traits = "0.2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
