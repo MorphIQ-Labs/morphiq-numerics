@@ -1,0 +1,18 @@
+{
+ "generator": "generators/xoshiro256_jump.py",
+ "sources": [
+  "Blackman and Vigna, ACM TOMS 47(4), 2021, Figure 4, Table 2"
+ ],
+ "jump": [
+  "180ec6d33cfd0aba",
+  "d5a61266f0c9392c",
+  "a9582618e03fc9aa",
+  "39abdc4529b1661c"
+ ],
+ "long_jump": [
+  "76e15d3efefdcbbf",
+  "c5004e441c522fb3",
+  "77710069854ee241",
+  "39109bb02acbe635"
+ ]
+}

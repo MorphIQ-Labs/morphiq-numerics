@@ -1,11 +1,13 @@
 //! The seeded streams against an independent implementation of their papers,
-//! and the jump functions against matrix exponentiation of the engine.
+//! and the jump functions against matrix exponentiation of the engine and
+//! against the generated jump polynomials.
 
 use morphiq_numerics::random::{SplitMix64, Xoshiro256PlusPlus, unit_closed_open, unit_open};
 use morphiq_numerics_reference::Words;
 use serde_json::Value;
 
 const FIXTURE: &str = include_str!("../fixtures/random_streams.json");
+const JUMP_FIXTURE: &str = include_str!("../fixtures/xoshiro256_jump.json");
 
 fn word(value: &Value) -> u64 {
     u64::from_str_radix(value.as_str().unwrap(), 16).unwrap()
@@ -147,6 +149,56 @@ fn long_jump_advances_two_to_the_192_steps() {
         let mut generator = Xoshiro256PlusPlus::from_state(s).unwrap();
         generator.long_jump();
         assert_eq!(generator.state(), m.apply(s));
+    }
+}
+
+/// `J(M) s` for the polynomial `J` with coefficient words `coefficients`
+/// (word `i` holds the coefficients of `x^(64i)` to `x^(64i + 63)`): the xor of
+/// the states `M^i s` whose coefficient is set, stepping the crate's engine.
+fn apply_polynomial(coefficients: [u64; 4], s: [u64; 4]) -> [u64; 4] {
+    let mut generator = Xoshiro256PlusPlus::from_state(s).unwrap();
+    let mut result = [0; 4];
+    for word in coefficients {
+        for bit in 0..64 {
+            if word >> bit & 1 == 1 {
+                for (r, x) in result.iter_mut().zip(generator.state()) {
+                    *r ^= x;
+                }
+            }
+            generator.next_u64();
+        }
+    }
+    result
+}
+
+/// The crate's jumps are the polynomials `generators/xoshiro256_jump.py`
+/// writes, so the embedded constants can't drift from their generator.
+#[test]
+fn jumps_apply_the_generated_polynomials() {
+    let fixture: Value = serde_json::from_str(JUMP_FIXTURE).unwrap();
+    let polynomial = |name: &str| -> [u64; 4] {
+        let words: Vec<u64> = fixture[name].as_array().unwrap().iter().map(word).collect();
+        words.try_into().unwrap()
+    };
+    let (jump, long_jump) = (polynomial("jump"), polynomial("long_jump"));
+    let mut words = Words::new(0x5eed_0000_0000_f1c7);
+    for _ in 0..8 {
+        let s = [
+            words.next_word(),
+            words.next_word(),
+            words.next_word(),
+            words.next_word(),
+        ];
+        let mut generator = Xoshiro256PlusPlus::from_state(s).unwrap();
+        generator.jump();
+        assert_eq!(generator.state(), apply_polynomial(jump, s), "jump");
+        let mut generator = Xoshiro256PlusPlus::from_state(s).unwrap();
+        generator.long_jump();
+        assert_eq!(
+            generator.state(),
+            apply_polynomial(long_jump, s),
+            "long_jump"
+        );
     }
 }
 
