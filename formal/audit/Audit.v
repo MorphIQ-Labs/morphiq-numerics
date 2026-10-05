@@ -8,7 +8,7 @@
 
 From Double Require Import DWPlus DWTimesFP DWTimesDW DWDivFP DWDivDW.
 Require Import TwoProdBinary64.
-From Binary64 Require Binary64Add Instances Binary64Mul.
+From Binary64 Require Binary64Add Instances Binary64Mul Binary64Div.
 
 Print Assumptions DWPlusFP_correct.
 Print Assumptions DWPlusDW_relerr_bound.
@@ -26,3 +26,5 @@ Print Assumptions Instances.div_f64_bound.
 Print Assumptions Instances.div_bound.
 Print Assumptions Binary64Mul.mul_f64_bound.
 Print Assumptions Binary64Mul.mul_bound.
+Print Assumptions Binary64Div.div_f64_bound.
+Print Assumptions Binary64Div.div_bound.

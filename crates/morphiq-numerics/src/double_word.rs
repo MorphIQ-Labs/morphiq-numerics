@@ -22,10 +22,10 @@
 //!   and a trailing word is zero or at least `2^-1022`. Every nonzero word
 //!   between `2^-484` and `2^484` in magnitude meets this, and also excludes
 //!   overflow, which is argued rather than proved.
-//! - The quotients are proved for an unbounded exponent range. They hold in
-//!   binary64 whenever every operation of the algorithm returns what it would
-//!   there: when no intermediate overflows, no rounded product or quotient is
-//!   subnormal, and each exact product is within [`two_prod`]'s domain.
+//! - [`div_f64`](DoubleWord::div_f64) and [`div`](DoubleWord::div) are proved
+//!   in binary64 when, for some `L, H ≥ 0` with `2L + 2H ≤ 917`, every nonzero
+//!   word `w` of both operands has `2^-L ≤ |w| < 2^H`: for example, every
+//!   nonzero word between `2^-229` and `2^229` in magnitude.
 
 use crate::eft::{fast_two_sum, two_prod, two_sum};
 
