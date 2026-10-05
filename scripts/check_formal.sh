@@ -8,15 +8,24 @@
 #      proof (formal/two-prod) and the binary64 bindings (formal/binary64) build.
 #   4. The global axioms the relied-on theorems (formal/audit/Audit.v) rest on
 #      are exactly those listed in formal/axioms.expected.
+#   5. The proved IEEE 754 definitions, extracted to OCaml (formal/extraction),
+#      reproduce the Rust library's results bit for bit on the cross-check
+#      corpus, the file given as the only argument. Write it first with
+#        cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
 #
 # Runs inside the pinned Coq image (see the formal job in .github/workflows/ci.yml),
 # which provides coqc, coq_makefile and opam; Flocq and math-comp are pinned here.
 set -eu
+if [ $# -ne 1 ]; then
+  echo "usage: $0 <cross-check corpus>" >&2
+  exit 2
+fi
+corpus=$(realpath "$1")
 cd "$(dirname "$0")/.."
 
 sha256sum --check --quiet formal/binding.sha256
 
-if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v formal/binary64/*.v; then
+if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v formal/binary64/*.v formal/extraction/*.v; then
   echo "a proof admits a goal" >&2
   exit 1
 fi
@@ -25,7 +34,7 @@ opam install --yes coq-flocq.3.4.3 coq-mathcomp-ssreflect.1.14.0 >/dev/null
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-cp -r formal/double-word formal/two-prod formal/binary64 formal/audit "$work/"
+cp -r formal/double-word formal/two-prod formal/binary64 formal/audit formal/extraction "$work/"
 (cd "$work/double-word" && coq_makefile -f _CoqProject -o Makefile && make -j"$(nproc)")
 (cd "$work/two-prod" && coqc TwoProdBinary64.v)
 (cd "$work/binary64" && for proof in Binary64Add Instances Binary64Mul Grid Binary64Div \
@@ -54,4 +63,8 @@ if [ "$reports" -ne "$(grep -c '^Print Assumptions' formal/audit/Audit.v)" ]; th
   echo "the audit reported on $reports theorems, not every one in formal/audit/Audit.v" >&2
   exit 1
 fi
+(cd "$work/extraction" \
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
+  && ocamlfind ocamlopt -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
+  && ./crosscheck "$corpus")
 echo "formal: OK"

@@ -220,8 +220,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Proofs build, are bound to the source, and assume only the expected axioms
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Write the cross-check corpus from the Rust library
+        # target/ doesn't exist on a fresh checkout, and the shell opens the
+        # redirect before cargo creates it.
+        run: |
+          mkdir -p target
+          cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
+      - name: Proofs build, are bound to the source, assume only the expected axioms, and match the Rust bit for bit
         run: |
           docker run --rm -v "$PWD:/w:ro" -w /w \
             coqorg/coq@sha256:6113894351967e84f6eca8bd584abbea2c8b97621bb1a0aa9cf7b1d24e7f49ef \
-            bash -c 'opam update --quiet >/dev/null 2>&1 || true; ./scripts/check_formal.sh'
+            bash -c 'opam update --quiet >/dev/null 2>&1 || true; ./scripts/check_formal.sh target/crosscheck.txt'
