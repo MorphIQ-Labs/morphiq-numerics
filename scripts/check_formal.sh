@@ -4,8 +4,8 @@
 #   1. formal/binding.sha256 matches: a change to a covered source or proof file
 #      fails until the proofs are rerun and the manifest is updated with them.
 #   2. No proof file admits a goal.
-#   3. The double-word development (formal/double-word) and the two_prod binding
-#      proof (formal/two-prod) build.
+#   3. The double-word development (formal/double-word), the two_prod binding
+#      proof (formal/two-prod) and the binary64 bindings (formal/binary64) build.
 #   4. Every theorem the library relies on (formal/audit/Audit.v) rests only on
 #      global axioms listed in formal/axioms.expected (Coq's classical reals).
 #
@@ -16,7 +16,7 @@ cd "$(dirname "$0")/.."
 
 sha256sum --check --quiet formal/binding.sha256
 
-if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v; then
+if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v formal/binary64/*.v; then
   echo "a proof admits a goal" >&2
   exit 1
 fi
@@ -25,11 +25,12 @@ opam install --yes coq-flocq.3.4.3 coq-mathcomp-ssreflect.1.14.0 >/dev/null
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-cp -r formal/double-word formal/two-prod formal/audit "$work/"
+cp -r formal/double-word formal/two-prod formal/binary64 formal/audit "$work/"
 (cd "$work/double-word" && coq_makefile -f _CoqProject -o Makefile && make -j"$(nproc)")
 (cd "$work/two-prod" && coqc TwoProdBinary64.v)
+(cd "$work/binary64" && coqc -R ../double-word Double -R . Binary64 Binary64Add.v)
 
-(cd "$work/audit" && coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" Audit.v) > "$work/audit.log"
+(cd "$work/audit" && coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" -R ../binary64 Binary64 Audit.v) > "$work/audit.log"
 grep -E '^[A-Za-z_][A-Za-z0-9_.]* :' "$work/audit.log" | sed 's/ :.*//' | sort -u > "$work/axioms"
 unexpected=$(sort -u formal/axioms.expected | comm -13 - "$work/axioms")
 if [ -n "$unexpected" ]; then

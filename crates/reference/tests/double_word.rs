@@ -109,6 +109,104 @@ fn add_is_within_three_u_squared_plus_thirteen_u_cubed() {
     }
 }
 
+/// A double-word number whose leading word has exponent `e` near the bottom
+/// of the range (`-1022 ≤ e ≤ -970`), so its trailing word, below half an
+/// ulp of the leading one, is subnormal or zero.
+fn subnormal_tailed(words: &mut Words, e: i64) -> DoubleWord {
+    let hi = words.with_exponent(e);
+    // Half an ulp of `hi` is `2^(e - 53)`, which is `2^(e + 1021)` subnormal
+    // steps; at `e = -1022` it is below the least subnormal, so `lo` is zero.
+    let below = 1_u64 << u32::try_from((e + 1021).max(0)).unwrap();
+    let lo = f64::from_bits(words.next_word() % below);
+    let lo = if words.next_word().is_multiple_of(2) {
+        lo
+    } else {
+        -lo
+    };
+    DoubleWord::from_parts(hi, lo).expect("a trailing word below half an ulp")
+}
+
+/// The additive operations at the bottom of the range, where their trailing
+/// words and intermediates are subnormal and sums cancel into the subnormal
+/// range. Their bounds are proved there with gradual underflow
+/// (`formal/binary64/Binary64Add.v`); the theorems exclude a zero sum.
+#[test]
+fn additive_operations_keep_their_bounds_with_subnormal_words() {
+    let mut words = Words::new(0x05ab_0b0e_5ab0_b0e5);
+    let add_f64_bound = &u(2) + &u(2);
+    let add_bound = &(&Exact::integer(3) * &u(2)) + &(&Exact::integer(13) * &u(3));
+    for _ in 0..SAMPLES {
+        let e = -1022 + i64::try_from(words.next_word() % 53).unwrap();
+        let x = subnormal_tailed(&mut words, e);
+        let near = subnormal_tailed(&mut words, e);
+        // Opposite leading words of equal exponent cancel into the subnormal
+        // range; a subnormal y exercises a subnormal operand directly.
+        let opposite = DoubleWord::from_parts(-near.hi().copysign(x.hi()), near.lo())
+            .expect("negating the leading word keeps a double-word number");
+        let y = if words.next_word().is_multiple_of(2) {
+            -near.hi().copysign(x.hi())
+        } else {
+            f64::from_bits(words.next_word() % (1 << 52))
+        };
+        let sum = &value(x) + &Exact::of(y);
+        if sum != Exact::integer(0) {
+            let z = x.add_f64(y);
+            assert_normalized(z, "add_f64");
+            assert_within(
+                &value(z),
+                &sum,
+                &add_f64_bound,
+                &Exact::integer(1),
+                "add_f64",
+            );
+        }
+        for (z, exact) in [
+            (x.add(opposite), &value(x) + &value(opposite)),
+            (x.sub(near), &value(x) - &value(near)),
+        ] {
+            if exact != Exact::integer(0) {
+                assert_normalized(z, "add");
+                assert_within(&value(z), &exact, &add_bound, &Exact::integer(1), "add");
+            }
+        }
+    }
+}
+
+/// The additive operations at the top of their stated domain,
+/// `|x_hi|, |y_hi| < 2^1021`: no intermediate overflows, so every result is
+/// finite and within its bound.
+#[test]
+fn additive_operations_keep_their_bounds_at_the_overflow_edge() {
+    let mut words = Words::new(0x0ed6_e00e_d6e0_0001);
+    let add_f64_bound = &u(2) + &u(2);
+    let add_bound = &(&Exact::integer(3) * &u(2)) + &(&Exact::integer(13) * &u(3));
+    for _ in 0..SAMPLES {
+        let x = double_word(&mut words, 1020);
+        let k = i64::try_from(words.next_word() % 4).unwrap();
+        let y = double_word(&mut words, 1020 - k);
+        let f = y.hi();
+        for (z, exact, bound, name) in [
+            (
+                x.add_f64(f),
+                &value(x) + &Exact::of(f),
+                &add_f64_bound,
+                "add_f64",
+            ),
+            (x.add(y), &value(x) + &value(y), &add_bound, "add"),
+            (x.sub(y), &value(x) - &value(y), &add_bound, "sub"),
+        ] {
+            assert!(
+                z.hi().is_finite() && z.lo().is_finite(),
+                "{name} overflowed"
+            );
+            if exact != Exact::integer(0) {
+                assert_normalized(z, name);
+                assert_within(&value(z), &exact, bound, &Exact::integer(1), name);
+            }
+        }
+    }
+}
+
 #[test]
 fn mul_f64_is_within_one_and_a_half_u_squared_plus_four_u_cubed() {
     let mut words = Words::new(0x5555_aaaa_3333_cccc);

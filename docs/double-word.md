@@ -96,11 +96,39 @@ pairs:
 12 and 18) aren't used, since `core` has no fused multiply-add, and Algorithm 5
 (the "sloppy" sum) has no relative bound.
 
-**Domain.** The bounds are proved (in Coq, see below) for an unbounded exponent range. They hold in
-binary64 whenever every operation of the algorithm returns what it would there:
-- no intermediate overflows;
-- no rounded intermediate is subnormal;
-- each exact product is within `two_prod`'s domain.
+**Domain.** Each bound is for a nonzero exact result; it says nothing when the
+exact result is zero.
+
+- **`add_f64`, `add`, `sub`:** every pair of double-word inputs with
+  `|x_hi| < 2^1021` and `|y| < 2^1021` (`|y_hi|` for `add` and `sub`). The bounds
+  are proved in binary64 itself, with gradual underflow, so subnormal words,
+  intermediates and results are covered. The magnitude limit only excludes
+  overflow, and is argued below rather than machine-checked.
+- **`mul_f64`, `mul`, `div_f64`, `div`:** the bounds are proved for an unbounded
+  exponent range. They hold in binary64 whenever every operation of the
+  algorithm returns what it would there:
+  - no intermediate overflows;
+  - no rounded product or quotient is subnormal;
+  - each exact product is within `two_prod`'s domain.
+
+**Why the additive operations can't underflow wrongly.** Every rounding in 2Sum,
+Fast2Sum, `add_f64` and `add` rounds a sum or difference of two binary64 numbers.
+Above `2^−1022` binary64 rounds such a value as the unbounded model does. Below
+it, the exact value is a multiple of `2^−1074` and so a binary64 number, which
+both models return unchanged. So the binary64 computation is the unbounded one,
+step by step.
+
+**Why `2^1021` excludes overflow (argued).** Write `a`, `b` for 2Sum's operands,
+both below `2^1021` in magnitude:
+- `|s| ≤ 2^1022`;
+- `a' = RN(s − b)`, and `s − b` is `a` plus the sum's rounding error, so
+  `|a'| ≤ 2^1021`;
+- then `|b'| ≤ |s| + |a'| < 2^1023`, `|δa| ≤ 2^1022` and `|δb| ≤ 2^1023`;
+- their sum is below `1.5 · 2^1023`.
+
+Every other operand in `add_f64` and `add` is a rounding error or a trailing word,
+at most `2^970`, or a leading word within a few ulps of `s`. No operation's
+result reaches the overflow threshold `2^1024 − 2^970`.
 
 ## Machine-checked proofs
 
@@ -113,6 +141,14 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
   which builds with no admitted goal. It proves each bound in the table above in
   Flocq's unbounded-exponent model, given an exact 2Prod (its `F2Mult_correct`
   hypothesis).
+- **The additive bounds in binary64.** `formal/binary64/Binary64Add.v` defines
+  `two_sum`, `fast_two_sum`, `add_f64`, `add` and `sub` in Flocq's binary64
+  model (precision 53, minimum exponent −1074, ties-to-even, gradual
+  underflow). It proves each equal, step by step, to its unbounded-model
+  counterpart on binary64 inputs. So the vendored bounds hold in binary64:
+  - `add_f64_bound`: `2u²`;
+  - `add_bound` and `sub_bound`: `3u²/(1 − 4u)`, which is at most
+    `3u² + 13u³`.
 - **`two_prod`'s exactness.** `formal/two-prod/TwoProdBinary64.v` proves
   `two_prod_exact`: for binary64 with ties-to-even, `a · b = p + e` on the
   domain above. That discharges the 2Prod hypothesis, and the theorem rests
@@ -122,16 +158,19 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
   until the proofs are rerun and the manifest is updated with them.
 
 **What is argued, not machine-checked:**
-- **The models agree:** binary64 coincides with the unbounded-exponent model when
-  no operation overflows or rounds a subnormal (the domain stated above).
+- **The models agree for the multiplicative operations:** binary64 coincides with
+  the unbounded-exponent model when no product or quotient rounds a subnormal and
+  each exact product is within `two_prod`'s domain.
+- **No overflow:** Flocq's models have no overflow. The input limits that exclude
+  it are argued (see Domain above).
 - **The transcription:** each Rust function is the Coq definition operation for
   operation. Where the paper proves an operation exact, the Coq definition leaves
   it unrounded and the Rust rounds it, which gives the same value.
 
 | Rust | Coq definition | Theorem |
 |---|---|---|
-| `add_f64` | `DWPlusFP` (`DWPlus.v`) | Muller–Rideau Table 1, `2u²` |
-| `add`, `sub` | `AccurateDWPlusDW` (`DWPlus.v`) | `3u² + 13u³` |
+| `add_f64` | `DWPlusFP` (`DWPlus.v`); `add_f64` (`Binary64Add.v`) | `DWPlusFP_bound`, `2u²`; in binary64, `add_f64_bound` |
+| `add`, `sub` | `AccurateDWPlusDW` (`DWPlus.v`); `add`, `sub` (`Binary64Add.v`) | `DWPlusDW_relerr_bound`, `3u²/(1 − 4u)`; in binary64, `add_bound`, `sub_bound` |
 | `mul_f64` | `DWTimesFP` (`DWTimesFP.v`) | `DWTimesFP_correct`, `3/2·u² + 4u³` |
 | `mul` | `DWTimesDW1` (`DWTimesDW.v`) | `DWTimesDW1_correct_even`, `< 5u²` under ties-to-even |
 | `div_f64` | `DWDivFP3` (`DWDivFP.v`) | `DWDFP3_correct`, `3u²` (`dh`, `dt` exact) |
@@ -156,6 +195,11 @@ arithmetic with the library.
 - **Each double-word operation:** 100,000 random double-word operands, checked
   against its bound with the bound's denominator cleared, and checked to return
   a double-word number.
+- **The additive operations at both ends of their domain:**
+  - 100,000 cases at the bottom of the range, with subnormal trailing words,
+    subnormal `y`, and sums that cancel into the subnormal range;
+  - 100,000 cases with leading words just below `2^1021`, checked finite and
+    within bound.
 - **Published worst cases:**
   - DWPlusFP reaches above `1.99u²` on Joldes et al.'s example after Theorem 2.2.
   - AccurateDWPlusDW reaches above `2.99u²` on Muller and Rideau's Property 2.1.
