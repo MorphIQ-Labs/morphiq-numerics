@@ -5,6 +5,8 @@
 //! decided exactly rather than to a tolerance. It shares no arithmetic with
 //! the library.
 
+pub mod determinism;
+
 use core::cmp::Ordering;
 use core::ops::{Add, Mul, Neg, Sub};
 use num_bigint::BigInt;

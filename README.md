@@ -30,7 +30,8 @@ reference, returns the same bits.
 - **Target-independent:**
   - `no_std`, with no dependencies and no platform libm;
   - error-free transforms that are exact with or without FMA;
-  - a determinism digest checked on every supported target.
+  - a determinism digest checked on every supported target
+    ([docs/determinism.md](docs/determinism.md)).
 - **Clean provenance:** algorithms come from mathematical definitions, and
   every constant from a versioned generator. No code is adapted from other
   implementations; see the [provenance policy](docs/PROVENANCE.md).

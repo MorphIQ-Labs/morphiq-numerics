@@ -16,6 +16,7 @@ authors = ["MorphIQ Labs"]
 num-bigint = "0.4"
 num-traits = "0.2"
 serde_json = "1.0"
+sha2 = "0.10"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
