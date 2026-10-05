@@ -34,6 +34,52 @@ that doesn't follow it is a defect, however well it tests.
 - **Code from MorphIQ Labs' other repositories** without a provenance audit.
   Our own history isn't proof of independent origin.
 
+## AI-assisted contributions
+
+A language model trained on public code may have seen any of the implementations
+listed above, and nobody can say which, which version, or what it retained. A
+model-assisted change therefore can't make the disclosure that [Recording](#recording)
+requires. Its rule depends on how much of the result the published mathematics
+determines.
+
+**May be model-assisted**, with the disclosure below:
+- derivation documents, which cite only published mathematics;
+- generators, test oracles and fixtures, proofs and certificates (Sollya, Gappa,
+  Coq, Lean), gates, CI and documentation;
+- library code for a **fully specified algorithm**, one whose cited source states
+  it operation by operation, so that the code adds nothing but names, types and
+  layout. Examples: the error-free transforms and published double-word
+  algorithms, and integer generators defined bit for bit by their papers. The
+  pull request cites the section of the source that determines each operation.
+
+**Must be written by a person**, from the function's derivation document: library
+code for any function whose implementation involves design choices the
+mathematics leaves open. These include:
+- argument reduction schemes;
+- table sizes and polynomial or rational degrees;
+- the fast path's working precision;
+- the rounding test;
+- the structure of the accurate path.
+
+The elementary functions, the normal family and the special functions are all in
+this class. The model may write their derivation documents, generators, tests and
+certificates, but not their library code.
+
+**During the work,** a model must not be given, or retrieve, the source of any
+implementation listed under [What may not be used](#what-may-not-be-used).
+
+**The pull request discloses:**
+- the tool and model used;
+- which files are model-assisted;
+- that no implementation was consulted during the work;
+- for model-assisted library code, the source sections that determine it.
+
+**Similarity gate.** Before the first function with open design choices lands, CI
+gains a gate comparing the library's source, token by token, against the
+implementations listed above. The comparison is mechanical, so nobody reads
+them. The gate runs on every pull request from then on, whoever wrote the
+change.
+
 ## Recording
 
 Each derivation document in `docs/` names the mathematics it uses (with

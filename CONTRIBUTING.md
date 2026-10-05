@@ -22,6 +22,10 @@ If you consulted another implementation while working on a function, say so in
 the pull request: which one, which version, and what you read. See
 [PROVENANCE.md](docs/PROVENANCE.md).
 
+If a language model assisted your change, its rules are in
+[AI-assisted contributions](docs/PROVENANCE.md#ai-assisted-contributions): what
+it may write, what a person must write, and what the pull request discloses.
+
 ## Running the gates locally
 
 ```sh
