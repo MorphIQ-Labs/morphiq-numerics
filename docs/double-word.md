@@ -152,7 +152,14 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
 - **`two_prod`'s exactness.** `formal/two-prod/TwoProdBinary64.v` proves
   `two_prod_exact`: for binary64 with ties-to-even, `a · b = p + e` on the
   domain above. That discharges the 2Prod hypothesis, and the theorem rests
-  only on Coq's four classical-reals axioms (`formal/axioms.expected`).
+  only on Coq's four classical-reals axioms.
+- **The axiom audit.** The gate requires the global axioms of every relied-on
+  theorem (`formal/audit/Audit.v`) to be exactly `formal/axioms.expected`:
+  - the four classical-reals axioms;
+  - `TwoProd`, an uninterpreted constant the vendored development declares
+    with `Parameter`. The multiplicative theorems use it, always alongside a
+    hypothesis that it equals `Fast2Mult`, so it acts as a parameter and adds
+    no inconsistency.
 - **The binding.** `formal/binding.sha256` binds the proofs to `eft.rs` and
   `double_word.rs` by hash. Editing either source, or a proof, fails the lane
   until the proofs are rerun and the manifest is updated with them.

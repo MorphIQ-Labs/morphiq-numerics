@@ -6,8 +6,8 @@
 #   2. No proof file admits a goal.
 #   3. The double-word development (formal/double-word), the two_prod binding
 #      proof (formal/two-prod) and the binary64 bindings (formal/binary64) build.
-#   4. Every theorem the library relies on (formal/audit/Audit.v) rests only on
-#      global axioms listed in formal/axioms.expected (Coq's classical reals).
+#   4. The global axioms the relied-on theorems (formal/audit/Audit.v) rest on
+#      are exactly those listed in formal/axioms.expected.
 #
 # Runs inside the pinned Coq image (see the formal job in .github/workflows/ci.yml),
 # which provides coqc, coq_makefile and opam; Flocq and math-comp are pinned here.
@@ -31,11 +31,15 @@ cp -r formal/double-word formal/two-prod formal/binary64 formal/audit "$work/"
 (cd "$work/binary64" && coqc -R ../double-word Double -R . Binary64 Binary64Add.v)
 
 (cd "$work/audit" && coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" -R ../binary64 Binary64 Audit.v) > "$work/audit.log"
-grep -E '^[A-Za-z_][A-Za-z0-9_.]* :' "$work/audit.log" | sed 's/ :.*//' | sort -u > "$work/axioms"
-unexpected=$(sort -u formal/axioms.expected | comm -13 - "$work/axioms")
-if [ -n "$unexpected" ]; then
-  echo "a relied-on theorem rests on axioms outside formal/axioms.expected:" >&2
-  echo "$unexpected" >&2
+# Each axiom entry starts unindented; its type follows on the same line or on
+# indented lines after it, depending on its length.
+grep -E '^[^[:space:]]' "$work/audit.log" \
+  | grep -v -E '^(Axioms:|Closed under the global context)' \
+  | sed 's/ :.*//' | sort -u > "$work/axioms"
+# Equality, not inclusion: an axiom the audit failed to parse fails here too.
+sort -u formal/axioms.expected > "$work/expected"
+if ! diff -u "$work/expected" "$work/axioms" >&2; then
+  echo "the relied-on theorems' axioms differ from formal/axioms.expected (- expected, + found)" >&2
   exit 1
 fi
 # One report per audited theorem, so a theorem the audit failed to reach fails here.
