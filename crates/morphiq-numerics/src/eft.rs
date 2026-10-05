@@ -43,8 +43,8 @@ pub const fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
 /// 26 significant bits and `tail` at most 26.
 ///
 /// Veltkamp's splitting as Dekker (1971) gives it in (6.1), with `c = 2^27 + 1`
-/// from (6.2) and the tail from (5.6). Exact for normal `x` with `|x| ≤ 2^996`,
-/// where `x · c` neither overflows nor rounds in the subnormal range.
+/// from (6.2) and the tail from (5.6). `x · c` can't overflow for
+/// `|x| ≤ 2^996`.
 #[inline]
 const fn split(x: f64) -> (f64, f64) {
     let p = x * SPLITTER;
@@ -61,13 +61,15 @@ const fn split(x: f64) -> (f64, f64) {
 ///
 /// # Domain
 ///
-/// Exact when `a` or `b` is zero, or when all of these hold, writing `e_x`
-/// for the exponent of `x` (`2^e_x ≤ |x| < 2^(e_x+1)`):
-/// - `a` and `b` are normal, with `|a|, |b| ≤ 2^996`, so the splitting
-///   neither overflows nor rounds in the subnormal range;
-/// - `e_a + e_b ≥ -970`: every intermediate is then a multiple of
-///   `2^(e_a+e_b-104) ≥ 2^-1074`, so gradual underflow loses no bit;
-/// - `e_a + e_b ≤ 1021`: `|a · b| < 2^1023`, so no intermediate overflows.
+/// Exact when `a · b = 0` or `|a · b| ≥ 2^-969`, provided no operation
+/// overflows, which holds when `|a|, |b| ≤ 2^996` and `|a · b| < 2^1023`.
+///
+/// - **Machine-checked:** the underflow condition is that of Flocq's `Dekker`
+///   theorem, instantiated for binary64 with ties-to-even in
+///   `formal/two-prod/TwoProdBinary64.v`. It covers subnormal operands.
+/// - **Argued, not checked:** Flocq's model has no overflow. The magnitude
+///   conditions keep every intermediate below `2^1024`, so binary64 agrees with
+///   it (`docs/double-word.md`).
 ///
 /// Outside that domain the result is finite or infinite as the arithmetic
 /// produces it, but `p + e = a · b` isn't claimed.

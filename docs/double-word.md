@@ -50,28 +50,21 @@ splitting.
   `RN(a·b)`, which double-word arithmetic requires. Dekker's own `mul12` doesn't
   guarantee that.
 
-Dekker proves exactness without overflow or underflow. In binary64 the result is
-exact when `a` or `b` is zero, or when all of these hold, writing `e_x` for the
-exponent of `x` (`2^e_x ≤ |x| < 2^(e_x+1)`):
+**Domain.** `two_prod(a, b)` is exact when `a · b = 0` or
+`|a · b| ≥ 2^−969`, provided no operation overflows, which holds when
+`|a|, |b| ≤ 2^996` and `|a · b| < 2^1023`.
 
-1. **`a` and `b` are normal, with `|a|, |b| ≤ 2^996`.**
-   - Then `|x·c| ≤ 2^996·(2^27 + 1) < 2^1024`, so the split's first product
-     doesn't overflow.
-   - Since `|x| ≥ 2^−1022`, `x·c` is normal, so its rounding is the one Dekker's
-     model performs.
-   - For a subnormal `x`, `x·c` can be subnormal and therefore exact, which isn't
-     the rounding the split depends on.
-2. **`e_a + e_b ≥ −970`.**
-   - Every head and tail of `x` is a multiple of `ulp(x) = 2^(e_x − 52)`, so
-     every partial product, `p`, and every intermediate sum is a multiple of
-     `2^(e_a + e_b − 104) ≥ 2^−1074`.
-   - Since Dekker's argument makes each of them exact with at most 53 significant
-     bits, the subnormal grid can represent each one.
-   - It also gives `|a·b| ≥ 2^−970`, so `p = RN(a·b)` is a normal rounding.
-   - This is the condition Joldes et al. state for the existence of the
-     product's error (`e_a + e_b ≥ e_min + p − 1`).
-3. **`e_a + e_b ≤ 1021`.** Then `|a·b| < 2^1023`, and the partial products, at
-   most `|a·b|·(1 + 2^−26)²`, stay below `2^1024`.
+- **Underflow:** machine-checked. This is Flocq's `Dekker` theorem (Boldo's
+  formalization, `Flocq.Pff.Pff2Flocq`), whose algorithm is exactly this one:
+  the same split with `s = 53 − ⌊53/2⌋ = 27`, the same rounded partial products,
+  and the same summation order. It is instantiated for binary64 (radix 2,
+  precision 53, minimum exponent −1074) with ties-to-even in
+  `formal/two-prod/TwoProdBinary64.v`. Its hypothesis
+  `|a · b| ≥ 2^(emin + 2·prec − 1) = 2^−969` covers subnormal operands.
+- **Overflow:** argued, not checked. Flocq's model has gradual underflow and no
+  overflow, so binary64 agrees with it as long as no operation overflows:
+  - `|x·c| ≤ 2^996·(2^27 + 1) < 2^1024` for the split;
+  - the partial products and sums are at most `|a · b|·(1 + 2^−26)² < 2^1024`.
 
 Outside this domain `two_prod` returns what the arithmetic produces, and exactness
 isn't claimed.
@@ -98,11 +91,47 @@ pairs:
 12 and 18) aren't used, since `core` has no fused multiply-add, and Algorithm 5
 (the "sloppy" sum) has no relative bound.
 
-**Domain.** The bounds are proved for an unbounded exponent range. They hold in
+**Domain.** The bounds are proved (in Coq, see below) for an unbounded exponent range. They hold in
 binary64 whenever every operation of the algorithm returns what it would there:
 - no intermediate overflows;
 - no rounded intermediate is subnormal;
 - each exact product is within `two_prod`'s domain.
+
+## Machine-checked proofs
+
+`scripts/check_formal.sh` (the `formal (coq)` CI job) checks these, on Coq 8.15.2
+with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
+
+**What is machine-checked:**
+- **The double-word bounds.** `formal/double-word` is Muller and Rideau's Coq
+  development, vendored unchanged under its MIT license (`PROVENANCE.md` there),
+  which builds with no admitted goal. It proves each bound in the table above in
+  Flocq's unbounded-exponent model, given an exact 2Prod (its `F2Mult_correct`
+  hypothesis).
+- **`two_prod`'s exactness.** `formal/two-prod/TwoProdBinary64.v` proves
+  `two_prod_exact`: for binary64 with ties-to-even, `a · b = p + e` on the
+  domain above. That discharges the 2Prod hypothesis, and the theorem rests
+  only on Coq's four classical-reals axioms (`formal/axioms.expected`).
+- **The binding.** `formal/binding.sha256` binds the proofs to `eft.rs` and
+  `double_word.rs` by hash. Editing either source, or a proof, fails the lane
+  until the proofs are rerun and the manifest is updated with them.
+
+**What is argued, not machine-checked:**
+- **The models agree:** binary64 coincides with the unbounded-exponent model when
+  no operation overflows or rounds a subnormal (the domain stated above).
+- **The transcription:** each Rust function is the Coq definition operation for
+  operation. Where the paper proves an operation exact, the Coq definition leaves
+  it unrounded and the Rust rounds it, which gives the same value.
+
+| Rust | Coq definition | Theorem |
+|---|---|---|
+| `add_f64` | `DWPlusFP` (`DWPlus.v`) | Muller–Rideau Table 1, `2u²` |
+| `add`, `sub` | `AccurateDWPlusDW` (`DWPlus.v`) | `3u² + 13u³` |
+| `mul_f64` | `DWTimesFP` (`DWTimesFP.v`) | `DWTimesFP_correct`, `3/2·u² + 4u³` |
+| `mul` | `DWTimesDW1` (`DWTimesDW.v`) | `DWTimesDW1_correct_even`, `< 5u²` under ties-to-even |
+| `div_f64` | `DWDivFP3` (`DWDivFP.v`) | `DWDFP3_correct`, `3u²` (`dh`, `dt` exact) |
+| `div` | `DWDivDW2` (`DWDivDW.v`) | `DWDDW_correct`, `15u² + 56u³` (`pih` exact) |
+| `two_prod` | `Dekker` (Flocq), via `TwoProdBinary64.v` | `two_prod_exact` |
 
 ## Checked by
 
