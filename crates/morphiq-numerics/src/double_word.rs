@@ -9,10 +9,18 @@
 //!
 //! # Domain
 //!
-//! The bounds are proved for an unbounded exponent range. They hold in
-//! binary64 whenever every operation of the algorithm returns what it would
-//! there: when no intermediate overflows, no rounded intermediate is
-//! subnormal, and each exact product is within [`two_prod`]'s domain.
+//! Each bound is for a nonzero exact result.
+//!
+//! - [`add_f64`](DoubleWord::add_f64), [`add`](DoubleWord::add) and
+//!   [`sub`](DoubleWord::sub) keep their bounds for every input whose
+//!   leading words are below `2^1021` in magnitude. They are proved in binary64
+//!   with gradual underflow, so subnormal words and results are covered. The
+//!   magnitude limit excludes overflow, which is argued rather than proved.
+//! - The products and quotients are proved for an unbounded exponent range.
+//!   They hold in binary64 whenever every operation of the algorithm returns
+//!   what it would there: when no intermediate overflows, no rounded product or
+//!   quotient is subnormal, and each exact product is within [`two_prod`]'s
+//!   domain.
 
 use crate::eft::{fast_two_sum, two_prod, two_sum};
 

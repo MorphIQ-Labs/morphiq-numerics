@@ -6,6 +6,7 @@
 
 From Double Require Import DWPlus DWTimesFP DWTimesDW DWDivFP DWDivDW.
 Require Import TwoProdBinary64.
+From Binary64 Require Binary64Add.
 
 Print Assumptions DWPlusFP_correct.
 Print Assumptions DWPlusDW_relerr_bound.
@@ -14,3 +15,6 @@ Print Assumptions DWTimesDW1_correct_even.
 Print Assumptions DWDFP3_correct.
 Print Assumptions DWDDW_correct.
 Print Assumptions two_prod_exact.
+Print Assumptions Binary64Add.add_f64_bound.
+Print Assumptions Binary64Add.add_bound.
+Print Assumptions Binary64Add.sub_bound.
