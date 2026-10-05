@@ -16,7 +16,7 @@ if [ ! -x "$venv/bin/python" ]; then
 fi
 "$venv/bin/python" -m pip install --quiet --require-hashes -r generators/requirements.txt
 
-generators="generators/random_streams_reference.py generators/xoshiro256_jump.py generators/exp_reference.py generators/ln_reference.py"
+generators="generators/random_streams_reference.py generators/xoshiro256_jump.py generators/exp_reference.py generators/ln_reference.py generators/exp_constants.py"
 for generator in $generators; do
   "$venv/bin/python" "$generator" --check
   echo "replayed: $generator"

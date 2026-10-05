@@ -122,8 +122,9 @@ deliverable as much as the code:
 4. **Rounding test.** Ziv's strategy: if the fast result's error interval
    doesn't straddle a rounding boundary, it's returned. Otherwise an
    accurate path is taken.
-5. **Accurate path.** A higher-precision evaluation (triple-word or a longer
-   expansion) whose error bound is proved small enough to decide every
+5. **Accurate path.** A higher-precision evaluation (128-bit integer
+   significand arithmetic, which needs no fused multiply-add; see
+   [exp.md](exp.md#6-accurate-path)) whose error bound is proved small enough to decide every
    remaining case. The bound comes from the published worst cases for
    correctly rounding that function in binary64 (Lefèvre & Muller's search
    method, and the published hardest-to-round tables). Those cases are cited,

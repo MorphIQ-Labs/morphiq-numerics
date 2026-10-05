@@ -1,0 +1,21 @@
+// The fast path's polynomial for exp (docs/exp.md, section 4):
+// q*(r) = r^2 * (1/2 + r*(c3 + r*(c4 + r*(c5 + r*c6)))) approximates
+// e^r - 1 - r on |r| <= A, with c3..c6 binary64 (fpminimax), and the
+// approximation error is bounded rigorously (supnorm).
+//
+// Run in the pinned image (scripts/check_certificates.sh); prints one line per
+// result, which generators/exp_constants.py reads.
+prec = 300;
+display = hexadecimal;
+A = 0.0027077;
+I = [-A; A];
+f = expm1(x) - x - x^2/2;
+p = fpminimax(f, [|3, 4, 5, 6|], [|D, D, D, D|], I, absolute);
+c3 = coeff(p, 3); c4 = coeff(p, 4); c5 = coeff(p, 5); c6 = coeff(p, 6);
+err = supnorm(p, f, I, absolute, 2^-30);
+print("c3", c3);
+print("c4", c4);
+print("c5", c5);
+print("c6", c6);
+print("error_bound", sup(err));
+quit;
