@@ -6,8 +6,7 @@
 > [provenance policy](PROVENANCE.md#ai-assisted-contributions), the kernels are
 > written by a person from this document, in the same pull request, so the
 > document never describes code that doesn't exist. Each numbered **decision**
-> is a design choice open to review. Two arguments are marked for a second
-> reader (§3, §7).
+> is a design choice open to review.
 
 `ln(x)` returns `ln x` rounded to nearest, ties to even, for every binary64 `x`.
 `ln_1p(x)` returns `ln(1 + x)`, without rounding `1 + x`. It is correctly rounded
@@ -112,19 +111,21 @@ assume that range (§4).
 - **B:** `E = 0` and `R[i] ≠ 1`. Then `|ln x| ≥ 0.003913` (`i = 126`).
 - **C:** `E ≠ 0`. Then `|ln x| ≥ 0.34646`.
 
-`generators/ln_constants.py` derives the ratios over every table interval and
-`E = ±1`:
+`generators/ln_constants.py` encloses the ratios in interval arithmetic
+(`mpmath.iv`, 128 bits, outward rounding):
+- over every table interval, closed and widened by `2^−52` on each side, which
+  covers `ln_1p`'s `y'` (§7);
+- over every exponent of the case, `−1,074 ≤ E ≤ 1,024`.
+
+Each expression uses `ln y` once, so its enclosure is tight. No monotonicity
+argument is needed.
 
 | Case | `\|E·ln 2 / ln x\|` | `\|−ln R[i] / ln x\|` | `\|ln(1 + z) / ln x\|` |
 |---|---|---|---|
 | B | 0 | ≤ 1.51475 | ≤ 0.51475 |
 | C | ≤ 2.00062 | ≤ 0.99205 | ≤ 0.01136 |
 
-Each ratio is monotone in `y` on an interval, since `ln y` has no zero inside one
-with `R[i] ≠ 1`. Each is also monotone in `|E|` for `|E| ≥ 1`. So the interval
-ends and `E = ±1` attain the bounds.
-- **Review point:** the monotonicity argument should be checked by a second
-  reader.
+Every certificate's hypotheses carry these bounds widened by at least 1%.
 
 ## 4. Fast path (after [DLM] §3.3)
 
@@ -272,12 +273,9 @@ The fast path is within `2^−64`, and the accurate path within `2^−123`.
     `|ln(1 + x)|`, that is below `524·2^−135`, carried by `accurate_sum_b.g` and
     `_c.g` (zero for `ln`).
   - `|z'| ≤ 2^−7 + 2^−52 < 0.0078126`, inside every certificate's range.
-  - `z'` differs from `h`'s own `z` by at most `2^−52`. That moves the case
-    ratios of §3 by under `2^−44` relative, inside the 1% margin each
-    certificate's hypotheses carry.
+  - `y' = (1 + x)·2^−E` lies within `2^−52` of `h`'s interval, so the case
+    ratios of §3, enclosed over the widened intervals, cover `ln_1p` directly.
   - Then §6 steps 2–4 run on `z'`, with total relative error below `2^−123`.
-- **Review point:** the ratio-margin argument should be checked by a second
-  reader.
 
 **The bound.**
 - When the rounding test passes, the result is `RN(ln(1 + x))` (§5).

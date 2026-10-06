@@ -18,10 +18,13 @@ checked against the bound docs/ln.md relies on.
   (LN2_HI has 42 significant bits; |E| <= 1074 in section 3); and ln 2 as a
   128-bit significand. LAMBDA bounds the relative error of E ln 2 as
   E * LN2_HI + RN(E * LN2_LO) (section 4).
-- The ratios of section 4: for each case of the reduction, the largest
-  |E ln 2|, |-ln R[i]| and |ln(1 + z)| over |ln x|, and the least |ln x|,
-  over every table interval and |E| >= 1. Each ratio is monotone in y on an
-  interval and in |E|, so the interval ends and E = +-1 attain it.
+- The ratios of section 3: for each case of the reduction, the largest
+  |E ln 2|, |-ln R[i]| and |ln(1 + z)| over |ln x|, and the least |ln x|.
+  Each is enclosed in interval arithmetic (mpmath.iv, 128 bits, outward
+  rounding) over every table interval, closed and widened by 2^-52 on each
+  side for ln_1p's y' (section 7), and every exponent E of the case, so no
+  monotonicity argument is needed. Each expression uses ln y once, so its
+  enclosure is tight.
 - DEGREE: the accurate path's series degree (section 6), the least d whose
   truncation |z|^d / (d + 1) is at most 2^-125, negligible next to Q128's own
   rounding (2^-127 per operation).
@@ -88,6 +91,47 @@ def read_poly():
     return [float.fromhex(values[f'c{k}']) for k in range(3, 10)], values['relative_error_bound']
 
 
+def ratios(r):
+    """The case ratios (section 3), enclosed rigorously: returns the upper
+    bounds of each |ratio| and the lower bound of |ln x|, by case."""
+    iv = mpmath.iv
+    iv.prec = 128
+    upper = lambda x: max(abs(mpmath.mp.make_mpf(x._mpi_[0])), abs(mpmath.mp.make_mpf(x._mpi_[1])))  # noqa: E731
+
+    def lower(x):
+        a, b = mpmath.mp.make_mpf(x._mpi_[0]), mpmath.mp.make_mpf(x._mpi_[1])
+        assert a > 0 or b < 0, 'ln x is bounded away from zero'
+        return min(abs(a), abs(b))
+
+    ln2 = iv.log(2)
+    widen = mpmath.mpf(2) ** -52
+    case_b = dict(k2=0, k3=0, lnx=mpmath.inf)
+    case_c = dict(k1=0, k2=0, k3=0, lnx=mpmath.inf)
+    for i in range(128):
+        lo = 1 + mpmath.mpf(i) / 128
+        hi = 1 + mpmath.mpf(i + 1) / 128
+        if i >= 53:
+            lo, hi = lo / 2, hi / 2
+        ly = iv.log(iv.mpf([lo - widen, hi + widen]))
+        n = -iv.log(r[i])
+        if r[i] != 1:
+            # Case B: E = 0. ln x = ln y; -ln R[i] / ln y, and ln(1 + z) / ln y = 1 - that.
+            case_b['k2'] = max(case_b['k2'], upper(n / ly))
+            case_b['k3'] = max(case_b['k3'], upper(1 - n / ly))
+            case_b['lnx'] = min(case_b['lnx'], lower(ly))
+        for e in range(-1074, 1025):
+            if e == 0:
+                continue
+            # Case C: ln x = E ln 2 + ln y, and ln(1 + z) = ln y + ln R[i].
+            el = e * ln2
+            d = el + ly
+            case_c['k1'] = max(case_c['k1'], upper(el / (el + ly)))
+            case_c['k2'] = max(case_c['k2'], upper(n / d))
+            case_c['k3'] = max(case_c['k3'], upper(1 - (el + n) / (el + ly)))
+            case_c['lnx'] = min(case_c['lnx'], lower(d))
+    return case_b, case_c
+
+
 def derive():
     """Every constant and every bound the tables and certificates rely on."""
     mpmath.mp.prec = PREC
@@ -141,26 +185,7 @@ def derive():
     lam = ln2_err + mpmath.mpf(2) ** -53 * abs(mpmath.mpf(ln2_lo)) / ln2
     assert lam < mpmath.mpf(2) ** -95
 
-    case_b = dict(k2=0, k3=0, lnx=mpmath.inf)
-    case_c = dict(k1=0, k2=0, k3=0, lnx=mpmath.inf)
-    for i in range(128):
-        lo = 1 + mpmath.mpf(i) / 128
-        hi = 1 + mpmath.mpf(i + 1) / 128
-        if i >= 53:
-            lo, hi = lo / 2, hi / 2
-        n = -mpmath.log(r[i])
-        for y in (lo, hi):
-            ly = mpmath.log(y)
-            if r[i] != 1:
-                case_b['k2'] = max(case_b['k2'], abs(n / ly))
-                case_b['k3'] = max(case_b['k3'], abs((ly - n) / ly))
-                case_b['lnx'] = min(case_b['lnx'], abs(ly))
-            for e in (1, -1):
-                lx = e * ln2 + ly
-                case_c['k1'] = max(case_c['k1'], abs(e * ln2 / lx))
-                case_c['k2'] = max(case_c['k2'], abs(n / lx))
-                case_c['k3'] = max(case_c['k3'], abs((ly - n) / lx))
-                case_c['lnx'] = min(case_c['lnx'], abs(lx))
+    case_b, case_c = ratios(r)
 
     poly, poly_bound = read_poly()
     return dict(
