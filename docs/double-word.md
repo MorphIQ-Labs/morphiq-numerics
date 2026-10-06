@@ -278,9 +278,10 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
 - **The axiom audit.** The gate requires the global axioms of every relied-on
   theorem (`formal/audit/Audit.v`) to be exactly `formal/axioms.expected`: Coq's
   four classical-reals axioms.
-- **The binding.** `formal/binding.sha256` binds the proofs to `eft.rs` and
-  `double_word.rs` by hash. Editing either source, or a proof, fails the lane
-  until the proofs are rerun and the manifest is updated with them.
+- **The binding.** `formal/binding.sha256` binds the proofs to `eft.rs`,
+  `double_word.rs` and the checked operations' hypotheses
+  (`double_word/checked.rs`) by hash. Editing any of them, or a proof, fails the
+  lane until the proofs are rerun and the manifest is updated with them.
 
 **What is assumed:** Rust's `f64` arithmetic is IEEE 754 binary64 with
 round-to-nearest-even, without fused multiply-add contraction, as the language
