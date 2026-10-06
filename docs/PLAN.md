@@ -34,7 +34,7 @@ lands.
 | Hosting | GitHub, `MorphIQ-Labs/morphiq-numerics`, public | 2026-10-05 |
 | License | MIT OR Apache-2.0 | 2026-10-05 |
 | Accuracy | Correctly rounded (round-to-nearest-even) for every elementary and normal-family function | 2026-10-05 |
-| Provenance | Own derivations from mathematical definitions; no adapted implementations ([PROVENANCE.md](PROVENANCE.md)) | 2026-10-05 |
+| Provenance | Code may come from anywhere if vendored here under a license compatible with MIT OR Apache-2.0; no copyleft or unclear-license code ([PROVENANCE.md](PROVENANCE.md)) | 2026-10-05 |
 | `no_std` | Default; `core` only, no allocation | 2026-10-05 |
 | First release scope | Elementary functions, seeded random streams, the normal family | 2026-10-05 |
 
@@ -207,9 +207,9 @@ scripts/                   gate logic that CI and contributors run identically
 
 - **MorphIQ Labs' Rust engines:** replace their platform-libm and
   general-purpose special-function dependencies in seeded and reproducibility-
-  critical paths with pinned releases of this crate. Existing in-house kernels
-  are replaced by this crate's derivations, never moved here (see
-  [PROVENANCE.md](PROVENANCE.md)).
+  critical paths with pinned releases of this crate. An existing in-house
+  kernel moves here only if its own origin passes
+  [PROVENANCE.md](PROVENANCE.md); one derived from Cephes doesn't.
 - **morphiq-risk-ml (OCaml):** cannot link a Rust crate. Its #64 replacements
   can adopt this project's published derivations and generated coefficients
   (same license and owner), and each project serves as the other's
@@ -238,6 +238,7 @@ Consumers take a pinned release, never a branch.
 - **Performance:** accurate paths are slow but rare. Fast-path rates are
   measured and reported per function, and callers that need throughput get the
   same results either way.
-- **Provenance discipline:** consulting a prior implementation contaminates a
-  derivation. The policy in [PROVENANCE.md](PROVENANCE.md) applies from the
+- **Provenance discipline:** copyleft or unclear-license code, or a derivation
+  written after reading it, can't ship here. Compatible code can, recorded with
+  its notices. The policy in [PROVENANCE.md](PROVENANCE.md) applies from the
   first commit.

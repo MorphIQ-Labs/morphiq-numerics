@@ -32,9 +32,11 @@ reference, returns the same bits.
   - error-free transforms that are exact with or without FMA;
   - a determinism digest checked on every supported target
     ([docs/determinism.md](docs/determinism.md)).
-- **Clean provenance:** algorithms come from mathematical definitions, and
-  every constant from a versioned generator. No code is adapted from other
-  implementations; see the [provenance policy](docs/PROVENANCE.md).
+- **Clean provenance:** everything here ships under MIT OR Apache-2.0 and
+  lives in this repository. Algorithms come from published mathematics, or from
+  vendored code under a compatible license with its notices kept, and every
+  constant from a versioned generator. No copyleft code; see the
+  [provenance policy](docs/PROVENANCE.md).
 - **Evidence:**
   - bit-exact tests against MPFR and mpmath;
   - Sollya and Gappa certificates checked by Coq, bound to the source they
