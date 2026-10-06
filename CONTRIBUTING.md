@@ -15,7 +15,7 @@ your first change.
 
 Everything here must be distributable under MIT OR Apache-2.0 and live in
 this repository. Code from another library is welcome under a compatible
-license (MIT, BSD, ISC, Zlib, Apache-2.0, BSL-1.0): vendor it, keep its
+license (MIT, BSD, ISC, Zlib, BSL-1.0; not Apache-2.0 alone): vendor it, keep its
 notices, and record it in `THIRD_PARTY_NOTICES.md`. Copyleft (GPL, LGPL, MPL,
 APSL) and unlicensed code can't come in.
 
