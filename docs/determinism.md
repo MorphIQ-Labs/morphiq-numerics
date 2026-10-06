@@ -17,6 +17,7 @@ functions unnoticed.
 | `ulp` | NaN, ±0, ±∞, ±max finite, every binade's least and greatest encoding, 20,000 random encodings | `ulp`, `ordered_bits`, and `ulps_between` of neighbours |
 | `eft` | 20,000 pairs with exponents in `[−500, 500]` | `two_sum`, `fast_two_sum` (larger operand first), `two_prod` |
 | `double_word` | 20,000 triples of double-word and binary64 operands | every double-word operation, and `DoubleWord::product` |
+| `double_word_checked` | 20,000 triples with exponents in `[−1020, 1020)`, past every operation's domain | every checked operation: the result's words, or a code for the error |
 | `reduce` | slices of every length from 0 to 32, exponents in `[−100, 100]`, mixed signs; one slice holding a NaN | `sum`, `sum2`, `dot`, `dot2`, `sum_squares`, `sum_squares2`, `max_abs` |
 | `random` | four seeds | 4,096 words of each stream, both uniforms of each SplitMix64 word, and a word after `jump` and after `long_jump` |
 

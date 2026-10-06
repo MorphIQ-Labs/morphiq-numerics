@@ -150,6 +150,73 @@ On the domains above every bound stays below `2^1024`. For example, `add`'s
 largest is `232·2^1016`. So no operation overflows, and each algorithm returns
 its binary64-model value.
 
+## Checked operations
+
+Each operation above, and the exact constructors `sum` and `product`, has a
+`checked_` form returning `Result<DoubleWord, CheckError>`. It returns the
+unchecked operation's result, bit for bit, exactly when the operands satisfy
+the hypotheses of that operation's IEEE 754 theorem. For such operands the
+theorem proves the result finite, a double-word number, and within the bound in
+the table.
+
+| Checked | Theorem | Hypotheses checked |
+|---|---|---|
+| `checked_sum(a, b)` | `two_sum_ieee` | `\|a\|, \|b\| ≤ 2^1020`; the result is exact |
+| `checked_product(a, b)` | `two_prod_ieee` | some `−537 ≤ e_a, e_b ≤ 994` with `e_a + e_b ≤ 1020` bound `\|a\|`, `\|b\|`; `a·b = 0` or `\|a·b\| ≥ 2^−969`; the result is exact |
+| `checked_add_f64` | `add_f64_ieee` | every word `≤ 2^1018` |
+| `checked_add`, `checked_sub` | `add_ieee`, `sub_ieee` | every word `≤ 2^1016`; the exact result nonzero |
+| `checked_mul_f64` | `mul_f64_ieee` | every word `≤ 2^508`; `x_hi·y` zero or `≥ 2^−969`; `x_lo·y` zero or `≥ 2^−1022` |
+| `checked_mul` | `mul_ieee` | every word `≤ 2^508`; `x_hi·y_hi` zero or `≥ 2^−969`; `x_hi·y_lo` and `x_lo·y_hi` each zero or `≥ 2^−1022` |
+| `checked_div_f64`, `checked_div` | `div_f64_ieee`, `div_ieee` | a nonzero divisor; some `L, H ≥ 0` with `2L + 2H ≤ 917` put every nonzero word in `[2^−L, 2^H)` |
+
+**Decided exactly.**
+- Magnitudes are compared with powers of two, which is exact.
+- A product's condition is decided on the significands in integer arithmetic,
+  never through the rounded product: a product just below `2^−969` can round to
+  it.
+- The existential conditions reduce to their least instances, since each is
+  monotone. The least exponents bounding `|a|` and `|b|` decide `product`'s,
+  and the least `L` and `H` covering the nonzero words decide the quotients'.
+
+**What an error means** (`CheckError`):
+- `InvalidOperand`: a word is infinite or NaN, or `hi ≠ RN(hi + lo)`. The input
+  isn't a double-word number.
+- `DivisionByZero`: the divisor is zero.
+- `OutsideProvenDomain(h)`: the operands are valid, but hypothesis `h` fails, so
+  the bound isn't proved for them. The hypotheses are sufficient, not
+  necessary: accuracy isn't ruled out, only not proved, and the unchecked
+  operation still returns what the arithmetic produces.
+  - `Magnitude` is the overflow guard.
+  - `ProductUnderflow` is the product conditions.
+  - `QuotientRange` is the quotients' exponent span.
+  - `ZeroResult` is described next.
+
+**Zero results.** The bounds are relative, so they say nothing when the exact
+result is zero. That happens exactly when:
+- for `add` and `sub`, one operand is the other's negation, word for word, since a
+  value has one double-word representation, `hi = RN(value)`;
+- for `add_f64`, `x_lo = 0` and `x_hi = −y`;
+- for the products, a leading word is zero;
+- for the quotients, the dividend's leading word is zero.
+
+The checked operation decides that exactly. It then admits the result only if
+it is zero, so a zero result is verified directly rather than claimed.
+
+**Bound to the proofs.** `crates/reference/tests/checked.rs` reads the theorem
+statements in `formal/binary64/` and fails if one no longer states a constant or
+predicate the checks use. It also tests the checks themselves:
+- against an independent oracle: each hypothesis written as the Coq statement
+  writes it, in exact rational arithmetic, with the existential conditions
+  searched;
+- at every boundary, with the representable values on either side;
+- with a product whose rounding reaches `2^−969` while the exact product stays
+  below it.
+
+**Cost.** Checking adds a few nanoseconds per operation. Measured informally on
+one Apple M1 Pro core, best of seven runs over 2·10^6 operands, it took
+`add` from 1.7 to 4.7 ns, `mul` from 2.0 to 9.2 ns and `div` from 3.4 to 11.4 ns.
+The checks allocate nothing and are `no_std`.
+
 ## Machine-checked proofs
 
 `scripts/check_formal.sh` (the `formal (coq)` CI job) checks these, on Coq 8.15.2
