@@ -18,8 +18,11 @@ tests.
 - **Third-party code under a compatible license,** vendored into this
   repository. A compatible license lets the code ship inside an MIT OR
   Apache-2.0 crate with no condition beyond keeping its notices: MIT,
-  BSD-2-Clause, BSD-3-Clause, ISC, Zlib, Apache-2.0 and BSL-1.0, and the Sun
-  notice of fdlibm-derived code.
+  BSD-2-Clause, BSD-3-Clause, ISC, Zlib and BSL-1.0, and the Sun notice of
+  fdlibm-derived code. Code under Apache-2.0 alone is not on the list. Its
+  conditions (marking changed files, carrying a NOTICE file, its patent terms)
+  would bind users who take this crate under MIT. Code offered under MIT OR
+  Apache-2.0 is taken under MIT.
   - Examples: musl, FreeBSD's msun (fdlibm), CORE-MATH, SLEEF, QD and
     Boost.Math, each under its own license.
   - It is recorded as [Recording](#recording) describes, its notices travel
