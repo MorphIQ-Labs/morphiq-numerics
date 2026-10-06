@@ -1,6 +1,6 @@
-# `sin`, `cos` and `sincos`
+# `sin`, `cos`, `sincos` and `tan`
 
-`morphiq_numerics::elementary::{sin, cos, sincos}` (`crates/morphiq-numerics/src/trig/`)
+`morphiq_numerics::elementary::{sin, cos, sincos, tan}` (`crates/morphiq-numerics/src/trig/`)
 follow this derivation:
 - an exact Payne–Hanek reduction, sized by a closest-approach bound derived
   here;
@@ -16,17 +16,22 @@ Every bound is certified (§7).
   `|x| ≤ 12867/8192`.
 - **Otherwise** within `(1/2 + 2^−144)` ulp.
 - **`sincos(x)`** returns exactly `(sin(x), cos(x))`.
+- **`tan`** is a quotient of the same `sin r` and `cos r`, with its own claims
+  (§8).
 
 ## Sources
 
 - **[LM]** V. Lefèvre, J.-M. Muller, "Worst cases for correct rounding of the
   elementary functions in double precision", revised 2003: Table 2 (small
-  arguments), Table 8 and Property 5 (`sin`), Table 10 (`cos`).
+  arguments), Table 8 and Property 5 (`sin`), Table 10 (`cos`), Table 12
+  (`tan`).
 - **[PH]** M. H. Payne, R. N. Hanek, "Radian reduction for trigonometric
   functions", *SIGNUM Newsletter* 18(1), 1983: the reduction's structure, keeping
   only the bits of `2/π` that matter.
 - **[K]** A. Ya. Khinchin, *Continued Fractions*, Theorem 17: best approximations,
   for the closest-approach bound.
+- **[DW]** [double-word.md](double-word.md): the double-word operations' proved
+  bounds.
 - **[ln]** [ln.md](ln.md) §5: the rounding test.
 
 ## 1. Specification
@@ -173,9 +178,10 @@ use, so its pair is theirs bit for bit.
 | `generators/trig_reduction.py` | the closest approach, `F`, `2/π` to 1,408 bits and `π/2` in `Q256` (`src/trig/reduction.rs`) |
 | `generators/trig_poly.sollya` (Sollya 8.0) | `Ps`, `Pc` and their bounds, in `generators/trig_poly.out` |
 | `generators/trig_constants.py` | `src/trig/tables.rs`: the table, the polynomials, the series factors and degrees; the enclosed ratios |
-| `generators/trig_certificates.py` | writes every certificate in `formal/trig` (55) |
-| `formal/trig/*` (Gappa 1.4.1, at 400 bits) | §4's tails, compositions and fast results; §5's levels and accurate results |
+| `generators/trig_certificates.py` | writes every certificate in `formal/trig` (61) |
+| `formal/trig/*` (Gappa 1.4.1, at 400 bits) | §4's tails, compositions and fast results; §5's levels and accurate results; §8's reciprocal and `tan` results |
 | `generators/sin_cos_reference.py` | the fixture: [LM] Tables 8 and 10, the small-argument thresholds, arguments near `k·π/2`, random arguments in every binade, 1,200 values to 256 bits, and 607 reductions |
+| `generators/tan_reference.py` | `tan`'s fixture: [LM] Table 12, the small-argument threshold, arguments near `k·π/2`, random arguments in every binade, and 1,200 values to 256 bits |
 
 The binding `formal/trig/binding.sha256` covers this document, the Sollya script
 and output, the generated tables and every certificate. It also covers the
@@ -184,9 +190,66 @@ source: `trig/mod.rs` and `q256.rs`.
 **Checked by:**
 - `crates/reference/tests/sin_cos.rs`: 4,066 cases, bit for bit, for `sin`,
   `cos` and both halves of `sincos`.
+- `crates/reference/tests/tan.rs`: 4,046 cases, bit for bit, for `tan`.
 - `src/trig/tests.rs`:
   - the reduction against its references;
   - every unrounded result within its bound;
   - the fast paths against the accurate paths, with the rates above.
-- `src/q256/tests.rs`: `Q256`'s contract.
-- The determinism digest's `sin_cos` section on every target.
+- `src/q256/tests.rs`: `Q256`'s contract and `recip`'s bound.
+- The determinism digest's `sin_cos` and `tan` sections on every target.
+
+## 8. `tan`
+
+| Input | `tan` |
+|---|---|
+| NaN, `±∞` | NaN |
+| `\|x\| ≤ 0x1.d12ed0af1a27ep−27` | `x`, exactly ([LM] Table 2's `1.817·2^−27`; *generated*) |
+| otherwise | below |
+
+**The threshold.** `RN(tan x) = x` while `x³/3` stays under half an ulp of `x`.
+That holds for every `x < 2^−27`. It fails inside `[2^−27, 2^−26)` and holds
+again on `[2^−26, 1.1447·2^−26)`, where the ulp doubles. So the set is not an
+interval, and `generators/tan_reference.py` bisects for its first edge inside
+`[2^−27, 2^−26)` (*generated*). Arguments in the second stretch take the
+general path, which returns `x` there too.
+
+**Reduction.** `tan` has period `π`, so with §3's `|x| = k·π/2 + r`, `tan |x|` is
+`tan r` for even `k` and `−cot r = −cos r/sin r` for odd `k`. `tan` is odd, so
+the sign comes from `x`. `sin r` and `cos r` are §4's and §5's, each relative to
+the exact `r`'s value, so their quotient is relative to `tan r` or `cot r`
+directly, with the reduction's error already inside. `|r| ≥ 2^−62` past `π/4`
+(§3), so the quotient stays far inside binary64's range.
+
+**Fast path.** `N.checked_div(D)` divides §4's double-words, `N` and `D` in the
+quadrant's order. The division is within `15u² + 56u³` [DW], so the quotient is
+within `2^−60` (*certified*: `formal/trig/fast_tan.g`). `checked_div` refuses
+operands outside its theorem's domain, and those arguments go to the accurate
+path; none of the 1,200 precise arguments does.
+
+**Decision 4: `Q256::recip`, by Newton's iteration.**
+- `y_0 = RN(1/RN(c))` is within `2^−51.98` (*certified*: `recip_0.g`).
+- Each step computes `y ← y + y·(1 − c·y)` in `Q256`, which squares the error
+  and adds `Q256`'s roundings.
+- Three steps reach `2^−252.66` (*certified*: `recip_1.g` to `recip_3.g`, each
+  from the last's bound). `src/q256/tests.rs` checks `|c·y − 1| ≤ 2^−252`
+  exactly.
+
+**Accurate path.** `N.mul(D.recip())` from §5's values is within `2^−196`
+(*certified*: `accurate_tan.g`).
+
+**Decision 5: `ε₁ = 2^−60`** in [ln] §5's test, with
+`EPS = 2^−60·(1 + 2^−50)`. `tan x` is transcendental for rational `x ≠ 0`
+(Lindemann), so it is never a breakpoint. The test sends about one argument in
+2^6.5 to the accurate path (measured: `1.09·10^−2`; the analytic rate is at most
+`2^−6`).
+
+**Claims:**
+- Correctly rounded for `|x| ≤ 1.817·2^−27`, by the threshold.
+- Correctly rounded for `2^−25 ≤ |x| ≤ arctan 2`. [LM] Table 12's worst cases
+  need relative error below `2^−123`, and the accurate path's `2^−196` is far
+  inside.
+- Elsewhere, when the test passes, the result is `RN(tan x)`. Otherwise it is
+  within `(1/2 + 2^−142)` ulp, and correctly rounded unless `tan x` lies within
+  mantissa distance `2^−195` of a breakpoint.
+- `1.817·2^−27 < |x| < 2^−25` is in that last case: [LM] covers neither side of
+  it with a worst case.

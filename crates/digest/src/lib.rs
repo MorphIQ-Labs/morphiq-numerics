@@ -11,7 +11,9 @@
 
 use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
-use morphiq_numerics::elementary::{cos, exp, exp2, expm1, ln, ln_1p, log2, log10, sin, sincos};
+use morphiq_numerics::elementary::{
+    cos, exp, exp2, expm1, ln, ln_1p, log2, log10, sin, sincos, tan,
+};
 use morphiq_numerics::random::{SplitMix64, Xoshiro256PlusPlus, unit_closed_open, unit_open};
 use morphiq_numerics::reduce::{dot, dot2, max_abs, sum, sum_squares, sum_squares2, sum2};
 use morphiq_numerics::ulp::{ordered_bits, ulp, ulps_between};
@@ -492,6 +494,40 @@ pub fn corpus_digest() -> [u8; 32] {
         #[allow(clippy::cast_precision_loss)] // a 53-bit integer
         let unit = (words.next_word() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
         sin_cos(&mut r, (2.0 * unit - 1.0) * core::f64::consts::TAU);
+    }
+
+    r.label("tan");
+    // Special values, docs/sin_cos.md §8's threshold with its neighbour and the
+    // edge where tan x = x returns, the binary64 numbers nearest π/2 and π
+    // (tan large and near zero), the closest approach, then every binade and
+    // [-π, π).
+    for bits in [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        0x3e4d_12ed_0af1_a27e,
+        0x3e4d_12ed_0af1_a27f,
+        0x3e50_0000_0000_0000,
+        0x3ff9_21fb_5444_2d18,
+        0x3ff9_21fb_5444_2d19,
+        0x4009_21fb_5444_2d18,
+        0x7506_ac5b_262c_a1ff,
+        0x7fef_ffff_ffff_ffff,
+    ] {
+        r.f64(tan(f64::from_bits(bits)));
+    }
+    for _ in 0..10_000 {
+        let word = words.next_word();
+        r.f64(tan(f64::from_bits(
+            (word % 0x7ff0_0000_0000_0000) | (word & (1 << 63)),
+        )));
+    }
+    for _ in 0..10_000 {
+        #[allow(clippy::cast_precision_loss)] // a 53-bit integer
+        let unit = (words.next_word() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+        r.f64(tan((2.0 * unit - 1.0) * core::f64::consts::PI));
     }
 
     r.label("random");

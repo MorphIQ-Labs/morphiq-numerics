@@ -197,3 +197,18 @@ fn cmp_abs_is_exact() {
         );
     }
 }
+
+#[test]
+fn recip_is_within_its_bound() {
+    let mut rng = SplitMix64::new(0x5132_3536_7265_6301);
+    for _ in 0..20_000 {
+        let c = random(&mut rng, 250);
+        let y = c.recip();
+        // |c y - 1| <= 2^-252 (formal/trig/recip_3.g), exactly.
+        let error = Exact::of_q256(c)
+            .mul(&Exact::of_q256(y))
+            .sub(&Exact::pow2(0))
+            .abs();
+        assert_ne!(error.cmp(&Exact::pow2(-252)), Ordering::Greater, "1/{c:?}");
+    }
+}

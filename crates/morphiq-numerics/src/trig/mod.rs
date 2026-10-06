@@ -70,6 +70,59 @@ pub fn cos(x: f64) -> f64 {
     Reduced::of(x).finish(Function::Cos)
 }
 
+/// The largest `x` with `RN(tan y) = y` for every `|y| ≤ x` (§8; the reference
+/// fixture's threshold, Lefèvre and Muller's Table 2 value `1.817·2^−27`).
+const TAN_IS_X: f64 = f64::from_bits(0x3e4d_12ed_0af1_a27e);
+/// `tan`'s rounding-test constant, `ε₁ = 2^−60` (§8).
+const EPS_TAN: f64 = f64::from_bits(0x3c30_0000_0000_0004);
+
+/// `tan x`: correctly rounded wherever Lefèvre and Muller's worst cases cover
+/// it (`|x| ≤ 1.817·2^−27` and `2^−25 ≤ |x| ≤ arctan 2`) and whenever the
+/// rounding test decides; otherwise within `(1/2 + 2^−142)` ulp (§8).
+///
+/// `tan(±0) = ±0`; `tan(±∞)` and `tan(NaN)` are NaN.
+#[must_use]
+pub fn tan(x: f64) -> f64 {
+    if !x.is_finite() {
+        return f64::NAN;
+    }
+    if x.abs() <= TAN_IS_X {
+        return x;
+    }
+    let reduced = Reduced::of(x);
+    if let Some(v) = tan_fast(&reduced).and_then(|y| decide_with(y, EPS_TAN)) {
+        return v;
+    }
+    tan_accurate(&reduced).to_f64()
+}
+
+/// `tan |x| = tan r` for even `k` and `−cot r` for odd `k` (§8): the quotient's
+/// numerator, denominator and sign.
+fn tan_parts<T: Copy>(reduced: &Reduced, s: T, c: T) -> (T, T, bool) {
+    let odd = reduced.k & 1 == 1;
+    let (num, den) = if odd { (c, s) } else { (s, c) };
+    (num, den, odd != reduced.negative)
+}
+
+/// §8: the fast `sin r` and `cos r` divided with `checked_div`, within
+/// `2^−60` of `tan x` (`formal/trig/fast_tan.g`); `None` outside the division's
+/// proved domain, which sends the argument to the accurate path.
+fn tan_fast(reduced: &Reduced) -> Option<DoubleWord> {
+    let (s, c) = fast(&reduced.r);
+    let (num, den, negate) = tan_parts(reduced, s, c);
+    let q = num.checked_div(den).ok()?;
+    Some(if negate { q.neg() } else { q })
+}
+
+/// §8: the accurate `sin r` and `cos r`, divided by `Q256::recip`, within
+/// `2^−196` of `tan x` (`formal/trig/accurate_tan.g`).
+fn tan_accurate(reduced: &Reduced) -> Q256 {
+    let (s, c) = accurate(reduced.r);
+    let (num, den, negate) = tan_parts(reduced, s, c);
+    let q = num.mul(den.recip());
+    if negate { q.neg() } else { q }
+}
+
 /// `(sin x, cos x)`, exactly the pair [`sin`] and [`cos`] return, with the
 /// reduction shared.
 #[must_use]

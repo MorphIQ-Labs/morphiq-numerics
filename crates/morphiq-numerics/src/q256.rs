@@ -292,6 +292,20 @@ impl Q256 {
         }
     }
 
+    /// `1/self` for a nonzero `self` whose magnitude is a normal binary64's,
+    /// within `2^−252` relatively: three Newton steps
+    /// `y ← y + y·(1 − self·y)` from `y_0 = RN(1/RN(self))`, each step squaring
+    /// the error, under this type's own rounding (certified:
+    /// `formal/trig/recip_0.g` to `recip_3.g`).
+    pub(crate) fn recip(self) -> Self {
+        let mut y = Self::from_f64(1.0 / self.to_f64());
+        for _ in 0..3 {
+            let error = Self::ONE.add(self.mul(y).neg());
+            y = y.add(y.mul(error));
+        }
+        y
+    }
+
     /// `self` rounded to binary64, to nearest with ties to even, subnormals
     /// included; `±∞` beyond the largest finite magnitude.
     pub(crate) fn to_f64(self) -> f64 {

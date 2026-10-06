@@ -26,7 +26,7 @@ fn the_reduction_is_within_its_bound_everywhere() {
     }
 }
 
-use super::{EPS, Function, Reduced, accurate, fast};
+use super::{EPS, EPS_TAN, Function, Reduced, accurate, fast, tan, tan_accurate, tan_fast};
 use crate::double_word::DoubleWord;
 use crate::ln::decide_with;
 use crate::q128::Q128;
@@ -135,4 +135,73 @@ fn fast_paths_agree_with_the_accurate_paths_and_mostly_decide() {
             "{name} miss rate {rate:e}"
         );
     }
+}
+
+#[test]
+fn every_unrounded_tan_is_within_its_certified_bound() {
+    let fixture = include_str!("../../../reference/fixtures/tan.json");
+    let cases = entries(fixture, &["precise"]);
+    assert_eq!(cases.len(), 1200);
+    for c in cases {
+        let x = word(c, "x");
+        let v = Exact::of_hex(field(c, "m"), field(c, "e").parse().unwrap());
+        let reference = if field(c, "negative") == "true" {
+            v.neg()
+        } else {
+            v
+        };
+        let reduced = Reduced::of(x);
+        // §8: 2^-60 and 2^-196.
+        let fast_value = tan_fast(&reduced).expect("inside the division's domain");
+        assert!(
+            double_word(fast_value).within(&reference, 1, 60),
+            "fast tan({x:e})"
+        );
+        assert!(
+            Exact::of_q256(tan_accurate(&reduced)).within(&reference, 1, 196),
+            "accurate tan({x:e})"
+        );
+    }
+}
+
+/// The analytic miss rate with `ε₁ = 2^−60`: at most `2^−6`.
+const ANALYTIC_TAN_MISS_RATE: f64 = 1.0 / 64.0;
+
+#[test]
+fn tan_fast_path_agrees_with_the_accurate_path_and_mostly_decides() {
+    let mut rng = SplitMix64::new(0x7461_6e70_6173_7301);
+    let (mut tried, mut missed) = (0u32, 0u32);
+    for n in 0..(1u32 << 16) {
+        let x = if n % 2 == 0 {
+            f64::from_bits(
+                0x3e60_0000_0000_0000
+                    + rng.next_u64() % (0x7fef_ffff_ffff_ffff - 0x3e60_0000_0000_0000),
+            )
+        } else {
+            #[allow(clippy::cast_precision_loss)]
+            let u = (rng.next_u64() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+            u * 8.0
+        };
+        if x <= f64::from_bits(0x3e60_0000_0000_0000) {
+            continue;
+        }
+        let reduced = Reduced::of(x);
+        tried += 1;
+        let accurate_value = tan_accurate(&reduced).to_f64();
+        match tan_fast(&reduced).and_then(|y| decide_with(y, EPS_TAN)) {
+            Some(v) => assert_eq!(v.to_bits(), accurate_value.to_bits(), "tan({x:e})"),
+            None => missed += 1,
+        }
+        assert_eq!(
+            tan(x).to_bits(),
+            tan(-x).to_bits() ^ (1 << 63),
+            "tan(-{x:e})"
+        );
+    }
+    let rate = f64::from(missed) / f64::from(tried);
+    std::eprintln!("tan fast path: {missed} of {tried} sent to the accurate path ({rate:.3e})");
+    assert!(
+        rate <= 4.0 * ANALYTIC_TAN_MISS_RATE,
+        "tan miss rate {rate:e}"
+    );
 }

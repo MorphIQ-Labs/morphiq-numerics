@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes the Gappa certificates of sin and cos (docs/sin_cos.md) into
+"""Writes the Gappa certificates of sin, cos and tan (docs/sin_cos.md) into
 formal/trig.
 
 No number in a certificate is typed by hand: the polynomials and their bounds
@@ -285,7 +285,78 @@ def generate():
     files.update(sin_levels)
     files.update(cos_levels)
     files.update(accurate(d, e_sin, e_cos))
+    recip_files, e_recip = recip()
+    files.update(recip_files)
+    files.update(tan(e_recip))
     return files
+
+
+def recip():
+    """Q256::recip (section 8): y_0 = RN(1/RN(c)), then three Newton steps
+    y <- y + y (1 - c y) under Q256's rounding, each bound from the last."""
+    u = Fraction(1, 2**53)
+    first = up((1 + u) / (1 - u) - 1)
+    files = {'recip_0.g': f'''# Q256::recip's first guess (docs/sin_cos.md, section 8): y_0 = RN(1/RN(c))
+# for c of a normal binary64's magnitude; c y_0 = (1 + d2)/(1 + d1), with d1, d2
+# the two roundings to nearest. Written by generators/trig_certificates.py.
+
+E = (1 + d2) / (1 + d1) - 1;
+
+{{ {sym('d1', '1b-53')} /\\ {sym('d2', '1b-53')} -> E in [-{first}, {first}] }}
+'''}
+    prev = first
+    for n in range(1, 4):
+        e = value(prev)
+        s1 = up(Fraction(1, 2**254) * (1 + e))
+        bound = up(e * LEVEL_U + e * e + (1 + e) * (value(s1) + (1 + e) * LEVEL_U)
+                   + (1 + e) * Fraction(1, 2**254))
+        files[f'recip_{n}.g'] = f'''# Q256::recip's Newton step {n} (docs/sin_cos.md, section 8), with c y = 1 + e,
+# |e| <= {prev} (formal/trig/recip_{n - 1}.g):
+#   p = c.mul(y)          truncated: (1 + e)(1 + m1)
+#   g = ONE.add(p.neg())  within 2^-254 max(1, |p|) <= 2^-254 (1 + |e|): s1
+#   q = y.mul(g)          truncated: (1 + m2)
+#   y' = y.add(q)         within 2^-254 max(|y|, |q|) = 2^-254 |y|: s2, relative to y
+# so c y' = (1 + e)(1 + g (1 + m2) + s2). Written by generators/trig_certificates.py.
+
+G = 1 - (1 + e) * (1 + m1) + s1;
+P = (1 + e) * (1 + G * (1 + m2) + s2);
+
+{{ {sym('e', prev)} /\\ m1 in [-1b-255, 0] /\\ m2 in [-1b-255, 0]
+  /\\ {sym('s1', s1)} /\\ {sym('s2', '1b-254')}
+  -> P - 1 in [-{bound}, {bound}] }}
+
+P - 1 -> -e * m2 - e * e * (1 + m2) + (1 + e) * (1 + m2) * (s1 - (1 + e) * m1) + (1 + e) * s2;
+'''
+        prev = bound
+    return files, value(prev)
+
+
+def tan(e_recip):
+    """tan from the sin r and cos r of sections 4 and 5 (section 8): each is
+    relative to the exact r's value, so their quotient is relative to tan r or
+    cot r directly."""
+    dw_div = up(Fraction(15, 2**106) + Fraction(56, 2**159))
+    fast = f'''# The fast tan (docs/sin_cos.md, section 8): N.checked_div(D), with N, D the
+# fast sin r and cos r in either order, each within {FAST} (formal/trig/fast_sin.g,
+# fast_cos.g), and the division within 15u^2 + 56u^3 (docs/double-word.md).
+# Written by generators/trig_certificates.py.
+
+Q = (1 + eN) / (1 + eD) * (1 + ed);
+
+{{ {sym('eN', FAST)} /\\ {sym('eD', FAST)} /\\ {sym('ed', dw_div)} -> Q - 1 in [-1b-60, 1b-60] }}
+'''
+    accurate = f'''# The accurate tan (docs/sin_cos.md, section 8): N.mul(D.recip()), with N, D the
+# accurate sin r and cos r in either order, each within 2^-198
+# (formal/trig/accurate_sin.g, accurate_cos.g); D.recip() is (1/D)(1 + er)
+# (formal/trig/recip_3.g); the product is truncated (m). Written by
+# generators/trig_certificates.py.
+
+Q = (1 + eN) / (1 + eD) * (1 + er) * (1 + m);
+
+{{ {sym('eN', '1b-198')} /\\ {sym('eD', '1b-198')} /\\ {sym('er', up(e_recip))} /\\ m in [-1b-255, 0]
+  -> Q - 1 in [-1b-196, 1b-196] }}
+'''
+    return {'fast_tan.g': fast, 'accurate_tan.g': accurate}
 
 
 def accurate(d, e_sin, e_cos):
