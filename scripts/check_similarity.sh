@@ -32,11 +32,12 @@ while IFS="$(printf '\t')" read -r name kind url ref pin paths license; do
       fi
       if printf '%s' "$ref" | grep -Eq '^[0-9a-f]{40}$'; then
         git -C "$dest" fetch -q --depth 1 --filter=blob:none origin "$ref"
+        target=FETCH_HEAD
       else
         git -C "$dest" fetch -q --depth 1 --filter=blob:none origin "refs/tags/$ref:refs/tags/$ref"
-        git -C "$dest" update-ref FETCH_HEAD "refs/tags/$ref^{commit}"
+        target="refs/tags/$ref^{commit}"
       fi
-      git -C "$dest" -c advice.detachedHead=false checkout -q FETCH_HEAD
+      git -C "$dest" -c advice.detachedHead=false checkout -q "$target"
       got=$(git -C "$dest" rev-parse 'HEAD^{commit}')
       if [ "$got" != "$pin" ]; then
         echo "corpus $name: $ref resolves to $got, not the pinned $pin" >&2
