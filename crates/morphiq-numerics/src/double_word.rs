@@ -29,8 +29,18 @@
 //!
 //! Each statement is a theorem about the algorithm in IEEE 754 binary64
 //! arithmetic (`formal/binary64/IEEE64*.v`).
+//!
+//! # Checked operations
+//!
+//! Each operation, and the exact constructors [`sum`](DoubleWord::sum) and
+//! [`product`](DoubleWord::product), has a `checked_` form that returns its
+//! result only when the operands meet that theorem's hypotheses, decided
+//! exactly, and says which failed otherwise ([`CheckError`]).
 
 use crate::eft::{fast_two_sum, two_prod, two_sum};
+
+mod checked;
+pub use checked::{CheckError, Hypothesis};
 
 /// An unevaluated sum `hi + lo` of two binary64 numbers with
 /// `hi = RN(hi + lo)`.

@@ -9,7 +9,7 @@
 
 #![no_std]
 
-use morphiq_numerics::double_word::DoubleWord;
+use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::random::{SplitMix64, Xoshiro256PlusPlus, unit_closed_open, unit_open};
 use morphiq_numerics::reduce::{dot, dot2, max_abs, sum, sum_squares, sum_squares2, sum2};
@@ -70,6 +70,24 @@ impl Recorder {
     fn double_word(&mut self, x: DoubleWord) {
         self.pair((x.hi(), x.lo()));
     }
+    /// A checked result: its words, or a code for the error.
+    fn checked(&mut self, z: Result<DoubleWord, CheckError>) {
+        let code = match z {
+            Ok(z) => {
+                self.double_word(z);
+                return;
+            }
+            Err(CheckError::InvalidOperand) => 1,
+            Err(CheckError::DivisionByZero) => 2,
+            Err(CheckError::OutsideProvenDomain(Hypothesis::Magnitude)) => 3,
+            Err(CheckError::OutsideProvenDomain(Hypothesis::ProductUnderflow)) => 4,
+            Err(CheckError::OutsideProvenDomain(Hypothesis::QuotientRange)) => 5,
+            Err(CheckError::OutsideProvenDomain(Hypothesis::ZeroResult)) => 6,
+            Err(_) => 7,
+        };
+        self.u64(code);
+    }
+
     /// A section label, so outputs can't shift between functions unnoticed.
     fn label(&mut self, name: &str) {
         self.0.update(name.as_bytes());
@@ -160,6 +178,39 @@ pub fn corpus_digest() -> [u8; 32] {
             r.double_word(z);
         }
         r.double_word(DoubleWord::product(f, x.hi()));
+    }
+
+    r.label("double_word_checked");
+    // Operands spanning every domain and past it, so each outcome occurs:
+    // the result's words, or a code for the reason it was refused.
+    for _ in 0..20_000 {
+        let mut exponent = || -> i64 {
+            let w = words.next_word();
+            i64::try_from(w % 2040).unwrap() - 1020
+        };
+        let (ex, ey, ef) = (exponent(), exponent(), exponent());
+        let x = DoubleWord::sum(
+            words.with_exponent(ex),
+            words.with_exponent((ex - 60).max(-1022)),
+        );
+        let y = DoubleWord::sum(
+            words.with_exponent(ey),
+            words.with_exponent((ey - 60).max(-1022)),
+        );
+        let f = words.with_exponent(ef);
+        for z in [
+            x.checked_add_f64(f),
+            x.checked_add(y),
+            x.checked_sub(y),
+            x.checked_mul_f64(f),
+            x.checked_mul(y),
+            x.checked_div_f64(f),
+            x.checked_div(y),
+            DoubleWord::checked_sum(x.hi(), f),
+            DoubleWord::checked_product(x.hi(), f),
+        ] {
+            r.checked(z);
+        }
     }
 
     r.label("reduce");
