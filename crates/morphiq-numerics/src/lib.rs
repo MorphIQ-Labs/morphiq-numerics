@@ -32,6 +32,8 @@ mod expm1;
 mod ln;
 mod log2;
 mod q128;
+mod q256;
+mod trig;
 pub mod random;
 pub mod reduce;
 #[cfg(test)]
