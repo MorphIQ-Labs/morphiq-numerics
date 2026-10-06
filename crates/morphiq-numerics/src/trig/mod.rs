@@ -5,12 +5,174 @@
 //! section numbers below refer to it.
 
 mod reduction;
+mod tables;
 
+use crate::double_word::DoubleWord;
+use crate::eft::two_prod;
+use crate::ln::decide_with;
 use crate::q256::Q256;
 use reduction::{FRACTION_BITS, HALF_PI, HALF_PI_EXPONENT, TWO_OVER_PI};
+use tables::{COS_STEPS, POLY_C, POLY_S, SIN_STEPS, TABLE};
 
 /// `RN(π/4)`, below `π/4`: up to it, `x` needs no reduction (§3).
 const QUARTER_PI: f64 = f64::from_bits(0x3fe9_21fb_5444_2d18);
+/// The largest `x` with `RN(sin x) = x` (§1; the reference fixture's threshold
+/// "largest x with sin(x) = x", [LM] Table 2's `1.4422·2^−26`).
+const SIN_IS_X: f64 = f64::from_bits(0x3e47_1374_4912_3ef6);
+/// `cos x` for `|x| < 2^−25` (§1): the largest `|x|` with
+/// `RN(cos x) = 1 − k·2^−53`, `k = 0..3`; beyond the last, `1 − 4·2^−53`.
+const COS_STEPS_SMALL: [f64; 4] = [
+    f64::from_bits(0x3e46_a09e_667f_3bcc),
+    f64::from_bits(0x3e53_988e_1409_212e),
+    f64::from_bits(0x3e59_4c58_3ada_5b52),
+    f64::from_bits(0x3e5d_eeea_1168_3f49),
+];
+/// `2^−25`.
+const COS_SMALL: f64 = f64::from_bits(0x3e60_0000_0000_0000);
+/// The rounding test's `EPS = ε₁·(1 + 2^−50)`, `ε₁ = 2^−62` (§6).
+const EPS: f64 = f64::from_bits(0x3c10_0000_0000_0004);
+/// `1.5 · 2^52`: adding and subtracting it rounds to the nearest integer.
+const SHIFTER: f64 = f64::from_bits(0x4338_0000_0000_0000);
+
+/// `sin x`: correctly rounded wherever [LM]'s worst cases cover it
+/// (`|x| ≤ 1.4422·2^−26` and `2^−24 ≤ |x| ≤ 2 + 4675/8192`) and whenever the
+/// rounding test decides; otherwise within `(1/2 + 2^−140)` ulp (§6).
+///
+/// `sin(±0) = ±0`; `sin(±∞)` and `sin(NaN)` are NaN.
+#[must_use]
+pub fn sin(x: f64) -> f64 {
+    if !x.is_finite() {
+        return f64::NAN;
+    }
+    if x.abs() <= SIN_IS_X {
+        return x;
+    }
+    let reduced = Reduced::of(x);
+    reduced.finish(Function::Sin)
+}
+
+/// `cos x`: correctly rounded wherever [LM]'s worst cases cover it
+/// (`|x| ≤ 12867/8192`) and whenever the rounding test decides; otherwise
+/// within `(1/2 + 2^−140)` ulp (§6).
+///
+/// `cos(±∞)` and `cos(NaN)` are NaN.
+#[must_use]
+pub fn cos(x: f64) -> f64 {
+    if !x.is_finite() {
+        return f64::NAN;
+    }
+    let a = x.abs();
+    if a < COS_SMALL {
+        let k = COS_STEPS_SMALL.iter().take_while(|&&t| a > t).count();
+        #[allow(clippy::cast_precision_loss)] // k <= 4
+        return 1.0 - k as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+    }
+    Reduced::of(x).finish(Function::Cos)
+}
+
+/// `(sin x, cos x)`, exactly the pair [`sin`] and [`cos`] return, with the
+/// reduction shared.
+#[must_use]
+pub fn sincos(x: f64) -> (f64, f64) {
+    if !x.is_finite() || x.abs() <= SIN_IS_X || x.abs() < COS_SMALL {
+        return (sin(x), cos(x));
+    }
+    let reduced = Reduced::of(x);
+    (reduced.finish(Function::Sin), reduced.finish(Function::Cos))
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Function {
+    Sin,
+    Cos,
+}
+
+/// `|x| = k·π/2 + r` and `x`'s sign (§3).
+struct Reduced {
+    negative: bool,
+    k: u32,
+    r: Q256,
+}
+
+impl Reduced {
+    fn of(x: f64) -> Self {
+        let (k, r) = reduce(x.abs());
+        Self {
+            negative: x < 0.0,
+            k,
+            r,
+        }
+    }
+
+    /// Which of `±sin r`, `±cos r` the function is, by `k` (§3): the
+    /// quadrant, then `sin`'s oddness.
+    fn select(&self, function: Function) -> (bool, bool) {
+        let shift = if function == Function::Cos { 1 } else { 0 };
+        let quadrant = (self.k + shift) & 3;
+        let use_cos = quadrant & 1 == 1;
+        let negate = (quadrant >= 2) != (function == Function::Sin && self.negative);
+        (use_cos, negate)
+    }
+
+    fn finish(&self, function: Function) -> f64 {
+        let (use_cos, negate) = self.select(function);
+        let (s, c) = fast(&self.r);
+        let y = if use_cos { c } else { s };
+        let y = if negate { y.neg() } else { y };
+        if let Some(v) = decide_with(y, EPS) {
+            return v;
+        }
+        let (s, c) = accurate(self.r);
+        let y = if use_cos { c } else { s };
+        (if negate { y.neg() } else { y }).to_f64()
+    }
+}
+
+/// §4: `(sin r, cos r)` as double-words, each within `2^−62`, by the table
+/// at `a = i/64` and polynomials in `t = r − a`.
+fn fast(r: &Q256) -> (DoubleWord, DoubleWord) {
+    let r_hi = r.to_f64();
+    let r_lo = r.add(Q256::from_f64(-r_hi)).to_f64();
+    let negative = r_hi < 0.0;
+    let (r_hi, r_lo) = if negative {
+        (-r_hi, -r_lo)
+    } else {
+        (r_hi, r_lo)
+    };
+    let i = (r_hi * 64.0 + SHIFTER) - SHIFTER;
+    // t = r − i/64: exact, by Sterbenz's lemma for i ≥ 1.
+    let t = DoubleWord::sum(r_hi - i * 0.015_625, r_lo);
+    let (t_hi, t_lo) = (t.hi(), t.lo());
+    let (u_hi, u_lo) = two_prod(t_hi, t_hi);
+    let [s0, s1, s2] = POLY_S;
+    let [c0, c1, c2] = POLY_C;
+    let ps = s0 + u_hi * (s1 + u_hi * s2);
+    let pc = c0 + u_hi * (c1 + u_hi * c2);
+    // sin t = t + t³·Ps(t²); cos t − 1 = −t²/2 + t⁴·Pc(t²).
+    let sin_t = t.add_f64((t_hi * u_hi) * ps);
+    let cos_t_m1 =
+        DoubleWord::sum(-0.5 * u_hi, -0.5 * u_lo).add_f64((u_hi * u_hi) * pc - t_hi * t_lo);
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // 0 <= i <= 50
+    let [(s_hi, s_lo), (c_hi, c_lo)] = TABLE[i as usize];
+    let s = DoubleWord::sum(f64::from_bits(s_hi), f64::from_bits(s_lo));
+    let c = DoubleWord::sum(f64::from_bits(c_hi), f64::from_bits(c_lo));
+    let sin = s.add(s.mul(cos_t_m1).add(c.mul(sin_t)));
+    let cos = c.add(c.mul(cos_t_m1).sub(s.mul(sin_t)));
+    (if negative { sin.neg() } else { sin }, cos)
+}
+
+/// §5: `(sin r, cos r)` in `Q256` from their series in `s = r²`.
+fn accurate(r: Q256) -> (Q256, Q256) {
+    let s = r.mul(r);
+    let series = |steps: &[([u64; 4], i32)]| {
+        let mut h = Q256::ONE;
+        for &(m, e) in steps.iter().rev() {
+            h = Q256::ONE.add(s.mul(Q256::new(false, m, e)).mul(h).neg());
+        }
+        h
+    };
+    (r.mul(series(&SIN_STEPS)), series(&COS_STEPS))
+}
 
 /// The 64 bits of 2/π of weights `2^−(end−63)` to `2^−end` (1-based, most
 /// significant first), as an integer; bits before the first are zero.
@@ -26,7 +188,12 @@ fn two_over_pi_bits(end: i32) -> u64 {
         if w == 0 && o < 63 {
             return here;
         }
-        return here | if o == 63 { 0 } else { TWO_OVER_PI[w - 1] << (o + 1) };
+        return here
+            | if o == 63 {
+                0
+            } else {
+                TWO_OVER_PI[w - 1] << (o + 1)
+            };
     }
     here | (TWO_OVER_PI[w - 1] << (o + 1))
 }
@@ -82,7 +249,8 @@ pub(crate) fn reduce(x: f64) -> (u32, Q256) {
     // k: bits F and F + 1. The fraction: bits below F.
     let (word, bit) = ((FRACTION_BITS / 64) as usize, FRACTION_BITS % 64);
     #[allow(clippy::cast_possible_truncation)]
-    let mut k = ((product[word] >> bit) | product.get(word + 1).map_or(0, |&h| h << (64 - bit))) as u32 & 3;
+    let mut k =
+        ((product[word] >> bit) | product.get(word + 1).map_or(0, |&h| h << (64 - bit))) as u32 & 3;
     let mut fraction = [0u64; 5];
     fraction[..word].copy_from_slice(&product[..word]);
     fraction[word] = product[word] & ((1 << bit) - 1);

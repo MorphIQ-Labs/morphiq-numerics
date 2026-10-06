@@ -13,7 +13,12 @@ fn negated(q: Q256) -> Q256 {
 /// A random normalized significand; one in eight carries a run of zeros or
 /// ones, where carries and cancellations happen.
 fn limbs(rng: &mut SplitMix64) -> [u64; 4] {
-    let mut m = [rng.next_u64(), rng.next_u64(), rng.next_u64(), rng.next_u64()];
+    let mut m = [
+        rng.next_u64(),
+        rng.next_u64(),
+        rng.next_u64(),
+        rng.next_u64(),
+    ];
     match rng.next_u64() % 8 {
         0 => m[1] = 0,
         1 => {
@@ -38,7 +43,12 @@ fn random(rng: &mut SplitMix64, range: i32) -> Q256 {
 fn new_and_from_f64_are_exact() {
     let mut rng = SplitMix64::new(0x5132_3536_6e65_7701);
     for _ in 0..5_000 {
-        let m = [rng.next_u64() >> (rng.next_u64() % 64), rng.next_u64() % 3, 0, 0];
+        let m = [
+            rng.next_u64() >> (rng.next_u64() % 64),
+            rng.next_u64() % 3,
+            0,
+            0,
+        ];
         let q = Q256::new(false, m, -100);
         assert!(q.m == [0; 4] || q.m[3] >> 63 == 1);
         let expected = Exact::of_q256(Q256 {

@@ -152,7 +152,7 @@ def precise_cases():
         entry = {'x': f'{to_bits(x):016x}'}
         for name, f in (('sin', iv.sin), ('cos', iv.cos)):
             negative, m, e = precise(f, x, bits=256)
-            entry[name] = {'negative': negative, 'm': f'{m:064x}', 'e': e}
+            entry.update({f'{name}_negative': negative, f'{name}_m': f'{m:064x}', f'{name}_e': e})
         out.append(entry)
     return out
 

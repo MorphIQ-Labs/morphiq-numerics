@@ -46,7 +46,11 @@ fn shl(m: &[u64; 4], s: u32) -> [u64; 4] {
         out[i] = if bits == 0 {
             lo
         } else {
-            let below = if i > words { m[i - words - 1] >> (64 - bits) } else { 0 };
+            let below = if i > words {
+                m[i - words - 1] >> (64 - bits)
+            } else {
+                0
+            };
             (lo << bits) | below
         };
     }
@@ -65,7 +69,11 @@ fn shr(m: &[u64; 4], s: u32) -> [u64; 4] {
         out[i] = if bits == 0 {
             hi
         } else {
-            let above = if i + words + 1 < 4 { m[i + words + 1] << (64 - bits) } else { 0 };
+            let above = if i + words + 1 < 4 {
+                m[i + words + 1] << (64 - bits)
+            } else {
+                0
+            };
             (hi >> bits) | above
         };
     }
@@ -155,7 +163,11 @@ impl Q256 {
         for (i, slot) in out.iter_mut().enumerate() {
             let lo = m.get(i + words).copied().unwrap_or(0);
             let hi = m.get(i + words + 1).copied().unwrap_or(0);
-            *slot = if shift == 0 { lo } else { (lo >> shift) | (hi << (64 - shift)) };
+            *slot = if shift == 0 {
+                lo
+            } else {
+                (lo >> shift) | (hi << (64 - shift))
+            };
         }
         Self::new(negative, out, e + drop)
     }
@@ -211,7 +223,8 @@ impl Q256 {
         for i in 0..4 {
             let mut carry = 0u128;
             for j in 0..4 {
-                let t = u128::from(self.m[i]) * u128::from(other.m[j]) + u128::from(p[i + j]) + carry;
+                let t =
+                    u128::from(self.m[i]) * u128::from(other.m[j]) + u128::from(p[i + j]) + carry;
                 #[allow(clippy::cast_possible_truncation)]
                 {
                     p[i + j] = t as u64;
@@ -231,7 +244,10 @@ impl Q256 {
         } else {
             let lo = [p[0], p[1], p[2], p[3]];
             let m = shl(&hi, 1);
-            ([m[0] | (lo[3] >> 63), m[1], m[2], m[3]], self.e + other.e + 255)
+            (
+                [m[0] | (lo[3] >> 63), m[1], m[2], m[3]],
+                self.e + other.e + 255,
+            )
         };
         Self {
             negative: self.negative != other.negative,
@@ -296,7 +312,11 @@ impl Q256 {
         let round_up = if shift > 256 {
             false // below half the least subnormal
         } else {
-            let rest = if shift == 256 { self.m } else { shl(&self.m, 256 - shift) };
+            let rest = if shift == 256 {
+                self.m
+            } else {
+                shl(&self.m, 256 - shift)
+            };
             // rest holds the discarded bits at the top: half is bit 255 alone.
             let half = [0, 0, 0, 1 << 63];
             match cmp(&rest, &half) {
