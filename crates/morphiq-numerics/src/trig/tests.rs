@@ -205,3 +205,67 @@ fn tan_fast_path_agrees_with_the_accurate_path_and_mostly_decides() {
         "tan miss rate {rate:e}"
     );
 }
+
+/// `r` rounds every value within `2^−198` relatively of `a`: both midpoints
+/// beside `r` lie farther from `a` than that.
+fn rounds_alike(a: &Exact, r: f64) -> bool {
+    let bound = a.abs().mul(&Exact::pow2(-198));
+    let r_exact = Exact::of_f64(r);
+    [
+        f64::from_bits(r.to_bits() - 1),
+        f64::from_bits(r.to_bits() + 1),
+    ]
+    .iter()
+    .all(|&n| {
+        let mid = r_exact.add(&Exact::of_f64(n)).mul(&Exact::pow2(-1));
+        a.sub(&mid).abs().cmp(&bound) == core::cmp::Ordering::Greater
+    })
+}
+
+/// `normal_pair` (`docs/random.md`) evaluates `sin` at `φ = RN(RN(2π)·m·2^−53)`
+/// for integer `m ≤ 2^50`. [LM] covers `φ ≤ 1.4422·2^−26` and `φ ≥ 2^−24`;
+/// every `φ` between is checked here: the fast path's rounding test decides
+/// it (§6), or the accurate path's `2^−198` enclosure rounds to one binary64.
+/// Either way `sin(φ)` is correctly rounded, by the certified bounds.
+#[test]
+fn sin_is_correctly_rounded_at_every_small_normal_pair_angle() {
+    const TAU: f64 = f64::from_bits(0x4019_21fb_5444_2d18);
+    let scale = f64::from_bits((1023 - 53) << 52);
+    let below = f64::from_bits(0x3e70_0000_0000_0000); // 2^-24
+    let phi = |m: u64| {
+        #[allow(clippy::cast_precision_loss)] // m < 2^30
+        let v = m as f64 * scale;
+        TAU * v
+    };
+    // The least m whose angle exceeds the threshold, by bisection: phi is
+    // nondecreasing in m.
+    let (mut lo, mut hi) = (0_u64, 1 << 30);
+    while hi - lo > 1 {
+        let mid = (lo + hi) / 2;
+        if phi(mid) <= super::SIN_IS_X {
+            lo = mid
+        } else {
+            hi = mid
+        }
+    }
+    let (mut checked, mut accurate_needed) = (0_u64, 0_u64);
+    let mut m = hi;
+    while phi(m) < below {
+        let x = phi(m);
+        let reduced = Reduced::of(x);
+        let (s, _) = fast(&reduced.r);
+        if decide_with(s, EPS).is_none() {
+            accurate_needed += 1;
+            // sin returns the accurate value rounded (Reduced::finish).
+            let (a, _) = accurate(reduced.r);
+            assert!(
+                rounds_alike(&Exact::of_q256(a), a.to_f64()),
+                "sin({x:e}) undecided"
+            );
+        }
+        checked += 1;
+        m += 1;
+    }
+    std::eprintln!("small sin angles: {checked} checked, {accurate_needed} by the accurate path");
+    assert_eq!(checked, 70_041_414);
+}

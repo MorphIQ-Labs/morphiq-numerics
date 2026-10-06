@@ -1,8 +1,9 @@
 (* Runs the extracted IEEE 754 definitions (Crosscheck.v) on the cross-check
    corpus and compares each result with the Rust library's, bit for bit.
 
-   Each corpus line is "op in... : out out", every value a binary64 as 16 hex
-   digits. Results must match exactly, except that any NaN matches any NaN:
+   Each corpus line is "op in... : out...", every value a binary64 as 16 hex
+   digits: two outputs for the double-word operations and transforms, one for
+   sqrt. Results must match exactly, except that any NaN matches any NaN:
    IEEE 754 leaves a NaN's payload to the implementation. Exits 1 on a
    mismatch or a malformed line. *)
 
@@ -34,21 +35,20 @@ let same a b = a = b || (is_nan a && is_nan b)
 
 let compute op ins =
   let z = List.map z_of_u64 ins in
-  let (h, l) =
-    match op, z with
-    | "two_sum", [a; b] -> x_two_sum a b
-    | "fast_two_sum", [a; b] -> x_fast_two_sum a b
-    | "two_prod", [a; b] -> x_two_prod a b
-    | "add_f64", [a; b; c] -> x_add_f64 a b c
-    | "add", [a; b; c; d] -> x_add a b c d
-    | "sub", [a; b; c; d] -> x_sub a b c d
-    | "mul_f64", [a; b; c] -> x_mul_f64 a b c
-    | "mul", [a; b; c; d] -> x_mul a b c d
-    | "div_f64", [a; b; c] -> x_div_f64 a b c
-    | "div", [a; b; c; d] -> x_div a b c d
-    | _ -> failwith ("unknown operation " ^ op)
-  in
-  (u64_of_z h, u64_of_z l)
+  let pair (h, l) = [u64_of_z h; u64_of_z l] in
+  match op, z with
+  | "two_sum", [a; b] -> pair (x_two_sum a b)
+  | "fast_two_sum", [a; b] -> pair (x_fast_two_sum a b)
+  | "two_prod", [a; b] -> pair (x_two_prod a b)
+  | "add_f64", [a; b; c] -> pair (x_add_f64 a b c)
+  | "add", [a; b; c; d] -> pair (x_add a b c d)
+  | "sub", [a; b; c; d] -> pair (x_sub a b c d)
+  | "mul_f64", [a; b; c] -> pair (x_mul_f64 a b c)
+  | "mul", [a; b; c; d] -> pair (x_mul a b c d)
+  | "div_f64", [a; b; c] -> pair (x_div_f64 a b c)
+  | "div", [a; b; c; d] -> pair (x_div a b c d)
+  | "sqrt", [a] -> [u64_of_z (x_sqrt a)]
+  | _ -> failwith ("unknown operation " ^ op)
 
 let hex s = Int64.of_string ("0x" ^ s)
 
@@ -63,13 +63,15 @@ let () =
        | [lhs; rhs] -> (
            let words s = List.filter (( <> ) "") (String.split_on_char ' ' s) in
            match words lhs, List.map hex (words rhs) with
-           | op :: ins, [rh; rl] ->
-               let (ch, cl) = compute op (List.map hex ins) in
-               if not (same ch rh && same cl rl) then begin
+           | op :: ins, (_ :: _ as rust) ->
+               let extracted = compute op (List.map hex ins) in
+               let show vs = String.concat " " (List.map (Printf.sprintf "%016Lx") vs) in
+               if List.length extracted <> List.length rust
+                  || not (List.for_all2 same extracted rust) then begin
                  incr failures;
                  if !failures <= 20 then
-                   Printf.eprintf "mismatch: %s: Rust %016Lx %016Lx, extracted %016Lx %016Lx\n"
-                     (String.trim lhs) rh rl ch cl
+                   Printf.eprintf "mismatch: %s: Rust %s, extracted %s\n"
+                     (String.trim lhs) (show rust) (show extracted)
                end
            | _ -> failwith ("malformed line " ^ string_of_int !lines))
        | _ -> failwith ("malformed line " ^ string_of_int !lines)
