@@ -543,10 +543,10 @@ pub fn corpus_digest() -> [u8; 32] {
     }
 
     r.label("normal_pair");
-    // Edge words (u1 at its ends and at 1/2; u2 at 0, the quarter turns and
-    // its greatest value), then 10,000 pairs of words.
+    // Edge words (u1 at its ends and at 1/2; u2 at 0, its greatest value and
+    // every octant boundary), then 10,000 pairs of words.
     for w1 in [0, u64::MAX, 1 << 63] {
-        for w2 in [0, u64::MAX, 1 << 62, 1 << 63, 3 << 62] {
+        for w2 in [0, u64::MAX].into_iter().chain((1..8).map(|o| o << 61)) {
             let (z0, z1) = normal_pair(w1, w2);
             r.f64(z0);
             r.f64(z1);

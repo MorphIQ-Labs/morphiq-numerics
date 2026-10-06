@@ -24,7 +24,7 @@ fn bits((z0, z1): (f64, f64)) -> (u64, u64) {
 fn normal_pair_matches_the_reference_on_edge_words() {
     let fixture: Value = serde_json::from_str(FIXTURE).unwrap();
     let edges = fixture["edges"].as_array().unwrap();
-    assert_eq!(edges.len(), 48);
+    assert_eq!(edges.len(), 96);
     for case in edges {
         let (w1, w2) = (hex(&case["w1"]), hex(&case["w2"]));
         assert_eq!(

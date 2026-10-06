@@ -185,17 +185,39 @@ pub const fn unit_open(word: u64) -> f64 {
 /// `RN(2π)`.
 const TAU: f64 = f64::from_bits(0x4019_21fb_5444_2d18);
 
+/// `(cos θ, sin θ)` for `θ = 2π·k·2^−53`, `0 ≤ k < 2^53`, by octant
+/// (`docs/random.md`): `k = o·2^50 + j`, and the angle evaluated is
+/// `φ = RN(RN(2π)·m·2^−53)` in `[0, π/4]`, with `m = j` in an even octant and
+/// `m = 2^50 − j` in an odd one, measured back from the octant's end. The
+/// octant then swaps and negates `cos φ` and `sin φ`, exactly.
+fn turn(k: u64) -> (f64, f64) {
+    let octant = k >> 50;
+    let j = k & ((1 << 50) - 1);
+    let m = if octant & 1 == 0 { j } else { (1 << 50) - j };
+    #[allow(clippy::cast_precision_loss)] // m <= 2^50
+    let (s, c) = crate::trig::sincos(TAU * (m as f64 * f64::from_bits((1023 - 53) << 52)));
+    // Octants 1, 2, 5 and 6 swap; 2 to 5 negate the cosine; 4 to 7 the sine.
+    let (cos, sin) = if (octant + 1) & 2 != 0 {
+        (s, c)
+    } else {
+        (c, s)
+    };
+    let cos = if (2..=5).contains(&octant) { -cos } else { cos };
+    let sin = if octant >= 4 { -sin } else { sin };
+    (cos, sin)
+}
+
 /// The Box–Muller pair from two 64-bit words (`docs/random.md`):
 ///
 /// ```text
-/// u1 = unit_open(w1),  u2 = unit_closed_open(w2)
-/// ρ  = sqrt(−2·ln u1),  θ = RN(RN(2π)·u2),  (s, c) = sincos(θ)
+/// u1 = unit_open(w1),  ρ = sqrt(−2·ln u1)
+/// k  = w2 ≫ 11,  (c, s) = (cos θ, sin θ) for θ = 2π·k·2^−53, by octant
 /// (RN(ρ·c), RN(ρ·s))
 /// ```
 ///
 /// Every step is exact or a correctly rounded function of its inputs ([`ln`],
-/// [`sqrt`], [`sincos`] and binary64 multiplication), so the pair is specified
-/// bit for bit. `−2·ln u1` is exact, and `u1 < 1` keeps `ρ > 0`.
+/// [`sqrt`], [`sincos`] on `[0, π/4]` and binary64 multiplication), so the pair
+/// is specified bit for bit. `−2·ln u1` is exact, and `u1 < 1` keeps `ρ > 0`.
 ///
 /// [`ln`]: crate::elementary::ln
 /// [`sqrt`]: crate::elementary::sqrt
@@ -203,7 +225,7 @@ const TAU: f64 = f64::from_bits(0x4019_21fb_5444_2d18);
 #[must_use]
 pub fn normal_pair(w1: u64, w2: u64) -> (f64, f64) {
     let rho = crate::elementary::sqrt(-2.0 * crate::ln::ln(unit_open(w1)));
-    let (s, c) = crate::trig::sincos(TAU * unit_closed_open(w2));
+    let (c, s) = turn(w2 >> 11);
     (rho * c, rho * s)
 }
 

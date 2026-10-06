@@ -2,10 +2,12 @@
 """Reference Box-Muller pairs: an implementation of the specification in
 docs/random.md separate from the Rust crate.
 
-  u1 = unit_open(w1) = (2 (w1 >> 12) + 1) 2^-53
-  u2 = unit_closed_open(w2) = (w2 >> 11) 2^-53
-  rho = RN(sqrt(-2 RN(ln u1))), theta = RN(RN(2 pi) u2)
-  (RN(rho RN(cos theta)), RN(rho RN(sin theta)))
+  u1 = unit_open(w1) = (2 (w1 >> 12) + 1) 2^-53, rho = RN(sqrt(-2 RN(ln u1)))
+  k = w2 >> 11 = o 2^50 + j, octant o in 0..7, 0 <= j < 2^50
+  m = j (o even) or 2^50 - j (o odd); phi = RN(RN(2 pi) m 2^-53) in [0, pi/4]
+  (cos theta, sin theta) for theta = o pi/4 + 2 pi j 2^-53, from
+    C = RN(cos phi), S = RN(sin phi) by the octant's identity (OCTANTS)
+  (RN(rho cos theta), RN(rho sin theta))
 
 ln, sqrt, sin and cos are correctly rounded by the interval oracle in
 generators/oracle; the words come from generators/random_streams_reference.py's
@@ -19,7 +21,7 @@ committed fixture differs from a fresh generation. Needs mpmath
 The cases:
 - the first 256 pairs of SplitMix64 and of xoshiro256++ from six seeds;
 - edge words: u1 at its least and greatest values and at 1/2, against u2 at 0,
-  at the quarter turns and their neighbours, and at its greatest value.
+  at every octant boundary and its neighbours, and at its greatest value.
 """
 import json
 import pathlib
@@ -41,15 +43,33 @@ def tau_rn():
         return float(2 * mpmath.pi)
 
 
+# theta = o pi/4 + t, t = 2 pi j 2^-53. In an even octant phi = t; in an odd
+# one phi = pi/4 - t, the distance to the octant's end. Each row is
+# (cos theta, sin theta) in terms of C = cos phi and S = sin phi.
+OCTANTS = [
+    lambda C, S: (C, S),     # theta = phi
+    lambda C, S: (S, C),     # theta = pi/2 - phi
+    lambda C, S: (-S, C),    # theta = pi/2 + phi
+    lambda C, S: (-C, S),    # theta = pi - phi
+    lambda C, S: (-C, -S),   # theta = pi + phi
+    lambda C, S: (-S, -C),   # theta = 3 pi/2 - phi
+    lambda C, S: (S, -C),    # theta = 3 pi/2 + phi
+    lambda C, S: (C, -S),    # theta = 2 pi - phi
+]
+
+
 def pair(w1, w2):
     u1 = (2 * (w1 >> 12) + 1) * 2.0 ** -53
-    u2 = (w2 >> 11) * 2.0 ** -53
     rho = correctly_rounded(iv.sqrt, -2.0 * correctly_rounded(iv.log, u1))
-    theta = tau_rn() * u2
-    if theta == 0.0:
-        s, c = 0.0, 1.0
+    k = w2 >> 11
+    o, j = divmod(k, 1 << 50)
+    m = j if o % 2 == 0 else (1 << 50) - j
+    phi = tau_rn() * (m * 2.0 ** -53)
+    if phi == 0.0:
+        C, S = 1.0, 0.0
     else:
-        s, c = correctly_rounded(iv.sin, theta), correctly_rounded(iv.cos, theta)
+        C, S = correctly_rounded(iv.cos, phi), correctly_rounded(iv.sin, phi)
+    c, s = OCTANTS[o](C, S)
     return rho * c, rho * s
 
 
@@ -65,8 +85,8 @@ def stream(words):
 def edge_cases():
     w1s = [0, MASK, 1 << 63, (1 << 63) - 1]
     w2s = [0, 1 << 11, MASK]
-    for quarter in (1, 2, 3):
-        w = quarter << 62
+    for octant in range(1, 8):
+        w = octant << 61
         w2s += [w - (1 << 11), w, w + (1 << 11)]
     return [entry(w1, w2) for w1 in w1s for w2 in w2s]
 

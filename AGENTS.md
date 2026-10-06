@@ -8,7 +8,7 @@ This file is the repository's engineering contract for human and agent contribut
 
 `morphiq-numerics` provides binary64 numerical primitives whose results are **correctly rounded** and **identical on every target**: elementary functions, seeded random streams and the normal family. It is the shared numerics substrate for MorphIQ Labs' engines and is published openly under MIT OR Apache-2.0. Read [the plan](docs/PLAN.md) and [the provenance policy](docs/PROVENANCE.md) before any change.
 
-Milestones M1 to M3 of the plan are complete; the repository is working through M4. The library's public API is what `crates/morphiq-numerics/src/lib.rs` lists, and each function's contract and derivation is a document in `docs/`; documentation must not describe functions that are not in the source tree.
+The library's public API is what `crates/morphiq-numerics/src/lib.rs` lists, and each function's contract and derivation is a document in `docs/`; documentation must not describe functions that are not in the source tree.
 
 - `crates/morphiq-numerics` is the published library. It is `#![no_std]`, has no dependencies, forbids `unsafe`, and never calls a platform math library. A `std` feature, if one is ever added, may only add conveniences, never a different numerical result.
 - Test oracles (MPFR, mpmath), generators, proofs and fuzzing live outside the published crate and are never its dependencies.
