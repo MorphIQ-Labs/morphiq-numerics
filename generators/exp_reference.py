@@ -26,8 +26,19 @@ The cases:
   result is exactly 1. Those last two are checked against the same paper's
   Table 2. Each threshold is recorded with its neighbour.
 - Special values: +-0, +-inf, a NaN, the extreme finite and subnormal inputs.
+- Regressions: -0.6, which a faithfully rounded exp returned 0.5006 ulp from
+  e^-0.6, on the wrong side of the rounding breakpoint.
 - 4,000 inputs from a SplitMix64 stream (Steele, Lea and Flood, OOPSLA 2014):
   across the whole domain, near zero, and in [-50, 50].
+- Near midpoints, constructed: for x = (2k+1) 2^-53, 1 + x is a midpoint of
+  binary64 above 1, and e^x = 1 + x + x^2/2 + ... lies within about
+  (2k+1)^2 2^-55 ulp of it; likewise below 1 with x = -(2k+1) 2^-54. Table 4's
+  cases are hard for the directed roundings only, so these are the inputs that
+  make the rounding test fail and decide the result on the accurate path.
+
+The "precise" section records, for 1,200 SplitMix64 inputs, e^x to 192 bits
+(oracle.precise): the reference for the unrounded fast and accurate results,
+checked against their certified error bounds.
 """
 import json
 import math
@@ -38,7 +49,7 @@ import mpmath
 from mpmath import iv
 
 from oracle import (bisect, check_worst_case, correctly_rounded, from_bits,
-                    splitmix64, to_bits)
+                    precise, splitmix64, to_bits)
 
 OUTPUT = pathlib.Path(__file__).resolve().parents[1] / 'crates/reference/fixtures/exp.json'
 
@@ -130,9 +141,39 @@ def special_cases():
     )]
 
 
+def near_midpoint_cases():
+    words = splitmix64(0x6578705F6D696431)
+    ks = list(range(32)) + [next(words) % (1 << 14) for _ in range(96)]
+    cases = []
+    for k in ks:
+        cases.append(('near midpoint', (2 * k + 1) * 2.0 ** -53))
+        if k:
+            cases.append(('near midpoint', -(2 * k + 1) * 2.0 ** -54))
+    return cases
+
+
+def precise_cases():
+    words = splitmix64(0x6578705F70726531)
+    unit = lambda: (next(words) >> 11) * 2.0 ** -53  # noqa: E731
+    xs = [-708.3 + unit() * 1418.0 for _ in range(600)]           # normal results
+    xs += [-745.13 + unit() * 36.7 for _ in range(300)]           # subnormal results
+    for _ in range(300):                                          # 2^-54 <= |x| < 2^-30
+        x = (1.0 + unit()) * 2.0 ** (-54 + next(words) % 24)
+        xs.append(-x if next(words) & 1 else x)
+    out = []
+    for x in xs:
+        _, m, e = precise(iv.exp, x)
+        out.append({'x': f'{to_bits(x):016x}', 'm': f'{m:048x}', 'e': e})
+    return out
+
+
+def regression_cases():
+    return [('regression', -0.6)]
+
+
 def document():
     found = thresholds()
-    cases = special_cases() + table_4_cases()
+    cases = special_cases() + regression_cases() + table_4_cases() + near_midpoint_cases()
     cases += [(f'threshold: {name}', x) for name, x in found.items()]
     cases += random_cases()
     return {
@@ -146,6 +187,7 @@ def document():
             'Steele, Lea and Flood, OOPSLA 2014, Figure 16 (the random inputs)',
         ],
         'thresholds': {name: f'{to_bits(x):016x}' for name, x in found.items()},
+        'precise': precise_cases(),
         'cases': [
             {'kind': kind, 'x': f'{to_bits(x):016x}', 'exp': f'{to_bits(exp_rn(x)):016x}'}
             for kind, x in cases

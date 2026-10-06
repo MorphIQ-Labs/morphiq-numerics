@@ -20,8 +20,16 @@
 
 #![no_std]
 
+#[cfg(test)]
+extern crate std;
+
 pub mod double_word;
 pub mod eft;
+pub mod elementary;
+mod exp;
+mod q128;
 pub mod random;
 pub mod reduce;
+#[cfg(test)]
+mod test_exact;
 pub mod ulp;

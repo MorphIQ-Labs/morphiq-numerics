@@ -1,13 +1,11 @@
-# `exp`: correctly rounded exponential (derivation, draft for review)
+# `exp`: correctly rounded exponential
 
-> **Status: derivation complete, waiting for the kernel.** This document is the
-> derivation the kernel is written from. Every bound below is certified, and
-> every constant generated, by the artifacts in §7. Under the
-> [provenance policy](PROVENANCE.md#ai-assisted-contributions), the kernel is
-> written by a person from this document, in the same pull request, so the
-> document never describes code that doesn't exist. Each numbered **decision**
-> is a design choice open to review, and one argument is marked for a second
-> reader (§2).
+`morphiq_numerics::elementary::exp` (`crates/morphiq-numerics/src/exp/`) follows
+this derivation step for step; its accurate path uses the `Q128` type of §6
+(`crates/morphiq-numerics/src/q128.rs`). Every bound below is certified, and
+every constant generated, by the artifacts in §7. Each numbered **decision** is
+a design choice open to review, and one argument is marked for a second reader
+(§2).
 
 `exp(x)` returns `e^x` rounded to nearest, ties to even, for every binary64 `x`.
 Subnormal results are rounded once. Here `u = 2^−53`, `RN` is round-to-nearest-even,
@@ -128,7 +126,7 @@ double-word operations,** so the only new error analysis is the polynomial's.
 - the table's error.
 
 At that bound the rounding test (§5) should send roughly one argument in 2^15 to
-the accurate path; the kernel's tests will measure and report the rate.
+the accurate path; measured, it sends one in 2^15.4 (§8).
 
 **Decision 3: the fast path doesn't handle results that may be subnormal**
 (`k < −1021`). They go straight to the accurate path, which rounds once. Scaling
@@ -255,22 +253,35 @@ result once therefore rounds `e^x` correctly.
 - **Replay:** `scripts/check_generators.sh` replays the Python generators.
 
 **The binding:** it covers this document, the constants, the Sollya script and
-output, and every certificate. Editing any of them fails the gate until the
-certificates are rerun and the manifest is updated. When the kernel lands, the
-binding gains the kernel's source.
+output, every certificate, and the kernel's source (`exp/mod.rs`, `q128.rs`).
+Editing any of them fails the gate until the certificates are rerun and the
+manifest is updated.
 
-`tables.rs` isn't compiled until the kernel declares `mod tables`.
+## 8. Checked by
 
-## 8. Checked by (when the kernel lands)
-
-The kernel's tests, written with it:
-
-- Bit-exact agreement with `crates/reference/fixtures/exp.json`, 4,030 cases:
-  - the published worst cases;
-  - every threshold and its neighbour;
-  - special values;
-  - random arguments.
-- The determinism digest on every target.
-- The fast path's pass rate, measured and reported.
-- The `Q128` type against its contract, in exact integer arithmetic.
+- **Bit-exact agreement** with `crates/reference/fixtures/exp.json`, 4,286 cases
+  (`crates/reference/tests/exp.rs`):
+  - [LM] Table 4's worst cases. They are hard for the directed roundings only:
+    each `e^x` lies within `2^−58` ulp of a binary64 number, but half an ulp
+    from every midpoint, so none reaches the accurate path;
+  - **near midpoints, constructed:** for `x = (2k+1)·2^−53`, `1 + x` is a
+    midpoint and `e^x` lies within about `(2k+1)²·2^−55` ulp of it (and below 1
+    with `x = −(2k+1)·2^−54`). These make the rounding test fail and decide the
+    result on the small-argument path;
+  - every threshold and its neighbour, special values, a regression (`−0.6`)
+    and random arguments.
+- **Every unrounded result within its certified bound,** against `e^x` to 192
+  bits for 1,200 arguments (the fixture's `precise` section), in exact
+  arithmetic (`src/exp/tests.rs`): the fast path's `Y` within `2^−69`, the
+  accurate path's `Q128` value within `2^−123.9`, and the small-argument path's
+  `h + w` within `2^−178`. This catches accuracy defects that no rounded result
+  shows.
+- **The fast path against the accurate path** on 2^20 arguments: equal whenever
+  the fast path returns. It sent 23 of 1,021,637 (`2^−15.4`) to the accurate
+  path, against the analytic `2^−15`; the test fails above four times that.
+- **The `Q128` contract,** in exact big-integer arithmetic (`src/q128/tests.rs`):
+  multiplication, addition, conversion and rounding, ties and subnormals
+  included.
+- **The determinism digest's `exp` section** on every target
+  ([determinism.md](determinism.md)).
 - Exhaustive checks of chosen sub-intervals against the oracle (scheduled).

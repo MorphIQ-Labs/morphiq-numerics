@@ -19,6 +19,7 @@ functions unnoticed.
 | `double_word` | 20,000 triples of double-word and binary64 operands | every double-word operation, and `DoubleWord::product` |
 | `double_word_checked` | 20,000 triples with exponents in `[−1020, 1020)`, past every operation's domain | every checked operation: the result's words, or a code for the error |
 | `reduce` | slices of every length from 0 to 32, exponents in `[−100, 100]`, mixed signs; one slice holding a NaN | `sum`, `sum2`, `dot`, `dot2`, `sum_squares`, `sum_squares2`, `max_abs` |
+| `exp` | NaN, ±∞, ±0, the extreme encodings, each threshold of [exp.md](exp.md) §1 with its neighbour; 20,000 arguments in `[−746, 710)`; 64 of each binade from `2^−60` to `2^−1`, both signs | `exp` |
 | `random` | four seeds | 4,096 words of each stream, both uniforms of each SplitMix64 word, and a word after `jump` and after `long_jump` |
 
 ## Where it is checked
