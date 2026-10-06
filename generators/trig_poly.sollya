@@ -1,0 +1,38 @@
+// The fast path's polynomials for sin and cos (docs/sin_cos.md, section 4):
+//   sin t = t + t^3 Ps(t^2),   cos t = 1 - t^2/2 + t^4 Pc(t^2),
+// with Ps and Pc in s = t^2, binary64 coefficients (fpminimax, relative), on
+// |t| <= T (0 <= s <= T^2).
+//
+// Each tail has a removable singularity at 0 in t, which supnorm can't
+// enclose, so it is written as its series in s and truncated after 21 terms:
+//   (sin t - t)/t^3 = sum_n (-1)^(n+1) s^n/(2n+3)!,
+//   (cos t - 1 + t^2/2)/t^4 = sum_n (-1)^n s^n/(2n+4)!.
+// Both alternate with decreasing terms on 0 <= s <= T^2 < 1, so the remainder
+// is below the first omitted term; relative to the tails, at least 1/6 - s/120
+// and 1/24 - s/720, it is printed as *_remainder_bound and added.
+//
+// Run in the pinned image (scripts/check_certificates.sh).
+prec = 300;
+display = hexadecimal;
+procedure fact(k) { var r, i; r = 1; for i from 2 to k do r = r * i; return r; };
+T = 0.0078126;
+S = [0; T^2];
+TS = 0;
+for n from 20 to 0 by -1 do TS = TS * x + (-1)^(n + 1) / fact(2 * n + 3);
+TC = 0;
+for n from 20 to 0 by -1 do TC = TC * x + (-1)^n / fact(2 * n + 4);
+ps = fpminimax(TS, 2, [|D, D, D|], S, relative);
+pc = fpminimax(TC, 2, [|D, D, D|], S, relative);
+rs = (T^2)^21 / fact(45) / (1/6 - T^2/120);
+rc = (T^2)^21 / fact(46) / (1/24 - T^2/720);
+print("s0", coeff(ps, 0));
+print("s1", coeff(ps, 1));
+print("s2", coeff(ps, 2));
+print("c0", coeff(pc, 0));
+print("c1", coeff(pc, 1));
+print("c2", coeff(pc, 2));
+print("sin_remainder_bound", round(rs, 24, RU));
+print("cos_remainder_bound", round(rc, 24, RU));
+print("sin_error_bound", round(sup(supnorm(ps, TS, S, relative, 2^-30)) + rs, 24, RU));
+print("cos_error_bound", round(sup(supnorm(pc, TC, S, relative, 2^-30)) + rc, 24, RU));
+quit;

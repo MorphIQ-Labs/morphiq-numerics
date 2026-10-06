@@ -1,0 +1,10 @@
+s0 -0x1.5555555555555p-3
+s1 0x1.11111110bb1a8p-7
+s2 -0x1.a0159d0d83966p-13
+c0 0x1.5555555555555p-5
+c1 -0x1.6c16c16b6b967p-10
+c2 0x1.a0115f5073e76p-16
+sin_remainder_bound 0x1.3b043cp-478
+cos_remainder_bound 0x1.b6489p-482
+sin_error_bound 0x1.000002p-54
+cos_error_bound 0x1.000002p-54

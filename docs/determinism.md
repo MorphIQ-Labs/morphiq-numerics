@@ -25,6 +25,8 @@ functions unnoticed.
 | `exp2` | NaN, ±∞, ±0, each threshold of [exp2.md](exp2.md) §1 with its neighbour; every integer from −1076 to 1025; 20,000 arguments in `[−1077, 1026)`; 64 of each binade from `2^−60` to `2^−1`, both signs | `exp2` |
 | `expm1` | NaN, ±∞, ±0, each threshold of [expm1.md](expm1.md) §1 with its neighbour, both sides of `±2^−5`; 20,000 arguments in `[−38, 710)`; 64 of each binade from `2^−60` to `2^−1`, both signs | `expm1` |
 | `log2`, `log10` | NaN, ±∞, ±0, −1, the extreme encodings, 1 and its neighbours; `10^n` for `0 ≤ n ≤ 22`; every power of two from `2^−1074` to `2^1023`; 20,000 positive encodings; 4,000 arguments in `[0.5, 2)` | `log2`, then `log10` |
+| `sin_cos` | NaN, ±∞, ±0, each small-argument threshold of [sin_cos.md](sin_cos.md) §1 with its neighbour, `RN(π/2)`, `RN(π)`, the closest approach to a multiple of `π/2`, the largest finite; 10,000 encodings across every binade, both signs; 10,000 arguments in `[−2π, 2π)` | `sin`, `cos`, and both halves of `sincos` |
+| `tan` | NaN, ±∞, ±0, [sin_cos.md](sin_cos.md) §8's threshold with its neighbour, `2^−26`, `RN(π/2)` and its successor, `RN(π)`, the closest approach to a multiple of `π/2`, the largest finite; 10,000 encodings across every binade, both signs; 10,000 arguments in `[−π, π)` | `tan` |
 | `random` | four seeds | 4,096 words of each stream, both uniforms of each SplitMix64 word, and a word after `jump` and after `long_jump` |
 
 ## Where it is checked

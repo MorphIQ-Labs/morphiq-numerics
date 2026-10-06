@@ -6,6 +6,7 @@
 //! generators write.
 
 use crate::q128::Q128;
+use crate::q256::Q256;
 use core::cmp::Ordering;
 use std::vec;
 use std::vec::Vec;
@@ -200,6 +201,17 @@ impl Exact {
     pub(crate) fn of(q: Q128) -> Self {
         let (negative, m, e) = q.parts();
         let magnitude = BigInt::from_u128(m);
+        Self {
+            mantissa: if negative { magnitude.neg() } else { magnitude },
+            exponent: i64::from(e),
+        }
+    }
+
+    pub(crate) fn of_q256(q: Q256) -> Self {
+        let (negative, m, e) = q.parts();
+        let magnitude = m.iter().rev().fold(BigInt::from_u128(0), |acc, &limb| {
+            acc.shl(64).add(&BigInt::from_u128(u128::from(limb)))
+        });
         Self {
             mantissa: if negative { magnitude.neg() } else { magnitude },
             exponent: i64::from(e),
