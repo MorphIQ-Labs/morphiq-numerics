@@ -80,6 +80,36 @@ implementations listed above. The comparison is mechanical, so nobody reads
 them. The gate runs on every pull request from then on, whoever wrote the
 change.
 
+The gate is `check / similarity` (`scripts/check_similarity.sh`,
+`crates/similarity`):
+- **What it scans:** every library source file except tests, generated files
+  and those `provenance/similarity/scope.tsv` lists. That file lists the fully
+  specified modules and the files that implement nothing. So a new kernel is
+  scanned by default.
+- **What it compares against:** the implementations of the functions in scope
+  (exp and log), pinned in `provenance/similarity/corpora.tsv`. A git corpus
+  is pinned by commit, a tarball by SHA-256. CI fetches them; a model never
+  retrieves them. A person sets a tarball's pin, and the gate fails while one
+  is missing. The list grows with the scope.
+- **How:** winnowing (Schleimer, Wilkerson and Aiken, 2003) over normalized
+  tokens. Comments, strings, declarations and types are dropped, and
+  identifiers and numbers are abstracted, so a renamed copy still matches.
+  - The parameters are Dolos's documented defaults, 23-token k-grams and a
+    17-k-gram window, not tuned here. So every shared run of 39 tokens or more
+    is found, and none shorter than 23 is reported.
+  - K-grams of shared mathematics are base code and never seed a match: the
+    fully specified modules and the canonical Horner forms.
+- **Its report** names our file and lines, the run's length and fingerprint,
+  and the corpus path matched. It never shows corpus text, so a model may read
+  it.
+- **A match** fails the gate. A person reviews it, then either the code
+  changes or the match is waived in `provenance/similarity/waivers.tsv`, by
+  fingerprint, with the reason. Editing the run voids the waiver.
+
+The gate detects copied token sequences, renamed or not. It can't detect a
+copy rewritten deliberately, which is why the rest of this section still
+applies.
+
 ## Recording
 
 Each derivation document in `docs/` names the mathematics it uses (with

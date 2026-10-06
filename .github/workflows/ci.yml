@@ -153,6 +153,20 @@ jobs:
       - name: Every committed fixture matches a fresh run of its generator
         run: ./scripts/check_generators.sh
 
+  # docs/PROVENANCE.md, "Similarity gate": the library's design-choice source
+  # against the pinned implementations it may not use. The report shows only
+  # our side.
+  similarity:
+    name: check / similarity
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: workspace
+      - name: No design-choice source matches a listed implementation
+        run: ./scripts/check_similarity.sh
+
   msrv:
     name: check / msrv
     runs-on: ubuntu-24.04
@@ -176,7 +190,7 @@ jobs:
 
   test:
     name: test (${{ matrix.os }})
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, similarity, msrv, no-std]
     # Skipped checks (commit-convention, secret-scan on push) still let this run.
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     strategy:
@@ -196,7 +210,7 @@ jobs:
   # suite, digest included (docs/determinism.md); gate logic lives in scripts/.
   digest:
     name: digest (${{ matrix.target }})
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, similarity, msrv, no-std]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     strategy:
       fail-fast: false
@@ -223,7 +237,7 @@ jobs:
   # is pinned by digest; Flocq and math-comp versions are pinned in the script.
   formal:
     name: formal (coq)
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, similarity, msrv, no-std]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-24.04
     steps:

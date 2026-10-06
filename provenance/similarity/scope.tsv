@@ -1,0 +1,17 @@
+# Library files the similarity gate does not scan. Every other .rs file under
+# crates/morphiq-numerics/src is scanned, except tests and files written by a
+# generator, so a new kernel is scanned by default.
+#
+# fully-specified: a published algorithm stated operation by operation, which
+#   the policy allows (docs/PROVENANCE.md, "May be model-assisted"). Its
+#   k-grams are base code: shared mathematics, never matched.
+# excluded: not an implementation of anything.
+#
+# kind	path	reason
+fully-specified	crates/morphiq-numerics/src/eft.rs	2Sum, Fast2Sum and Veltkamp's product, as Joldes, Muller and Popescu (2017) state them
+fully-specified	crates/morphiq-numerics/src/double_word.rs	Joldes, Muller and Popescu (2017), Algorithms 4, 6, 7, 10, 15 and 17
+fully-specified	crates/morphiq-numerics/src/double_word/checked.rs	the IEEE 754 theorems' hypotheses (formal/binary64)
+fully-specified	crates/morphiq-numerics/src/reduce.rs	Ogita, Rump and Oishi (2005), Algorithms 4.1 and 5.3
+fully-specified	crates/morphiq-numerics/src/random.rs	SplitMix64 and xoshiro256++, defined bit for bit by their papers
+fully-specified	crates/morphiq-numerics/src/ulp.rs	units in the last place, from the binary64 encoding
+excluded	crates/morphiq-numerics/src/lib.rs	module declarations

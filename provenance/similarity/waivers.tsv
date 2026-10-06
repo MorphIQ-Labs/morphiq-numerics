@@ -1,0 +1,5 @@
+# Matches reviewed by a person and accepted, each with the reason: shared
+# mathematics the base code misses, for example. A waiver names the run's
+# fingerprint, which changes with the code, so editing the run voids it.
+#
+# fingerprint	corpus	reviewer	reason

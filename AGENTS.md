@@ -43,6 +43,7 @@ cargo doc --workspace --all-features --no-deps --locked      # RUSTDOCFLAGS="-D 
 cargo build -p morphiq-numerics --locked --target thumbv7em-none-eabihf   # no_std
 ./scripts/check_advisories.sh
 ./scripts/check_generators.sh
+./scripts/check_similarity.sh      # fetches the pinned corpora; reports only our side
 cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
 # then, in the pinned Coq image (see the formal job): ./scripts/check_formal.sh target/crosscheck.txt
 cargo deny --locked check licenses

@@ -1,0 +1,21 @@
+# The implementations the similarity gate compares against (docs/PROVENANCE.md,
+# "What may not be used"), for the functions in scope: those implementing exp
+# and log in binary64. Each is fetched by scripts/check_similarity.sh, in CI,
+# and pinned: a git corpus by the commit its ref must resolve to, a tarball by
+# its SHA-256. A pin is set by a person who downloads the corpus; a model never
+# retrieves these sources (git ls-remote, which lists refs only, gave the
+# commits). The sparse paths are the math sources; "-" fetches everything.
+# Extend this list when the scope grows (the normal family: Netlib SPECFUN,
+# StatLib AS241).
+#
+# name	kind	url	ref	pin	paths	license
+glibc	git	https://sourceware.org/git/glibc.git	glibc-2.44	c3a3a9808ad3ab4a3336836833f83288b672ccbf	sysdeps/ieee754 math	LGPL-2.1-or-later
+musl	git	https://git.musl-libc.org/git/musl	v1.2.6	9fa28ece75d8a2191de7c5bb53bed224c5947417	src/math	MIT
+freebsd-msun	git	https://github.com/freebsd/freebsd-src	release/14.5.0	4099b5c828800776fda3eccd6537ceed638a2a8b	lib/msun	BSD (Sun fdlibm notice)
+apple-libm	git	https://github.com/apple-oss-distributions/Libm	Libm-2026	17a5f9daa3f5679f7536b26f133b40cc078753c3	-	APSL-2.0
+core-math	git	https://gitlab.inria.fr/core-math/core-math.git	e072473ef919f1884b8cd0ac96817f068df793f7	e072473ef919f1884b8cd0ac96817f068df793f7	src/binary64	MIT
+crlibm	git	https://github.com/taschini/crlibm	eb3063791aa75bc9705b49283bf14250465220a7	eb3063791aa75bc9705b49283bf14250465220a7	-	LGPL-2.1 (unofficial mirror of CRlibm 1.0beta4; no official repository exists)
+sleef	git	https://github.com/shibatch/sleef	3.9.0	906ca7512ee483296780a81a21b9ca715d40dfe1	src/libm	BSL-1.0
+boost-math	git	https://github.com/boostorg/math	boost-1.92.0	f12be767c04d9499aaa6f88b22d5f1b464c1c27a	include/boost/math/special_functions include/boost/math/tools	BSL-1.0
+cephes	tarball	https://www.netlib.org/cephes/double.tgz	-	unpinned	-	Cephes (no explicit license)
+qd	tarball	https://www.davidhbailey.com/dhbsoftware/qd-2.3.24.tar.gz	-	unpinned	-	BSD-3-Clause-LBNL

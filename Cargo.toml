@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/morphiq-numerics", "crates/digest", "crates/digest-embedded", "crates/reference"]
+members = ["crates/morphiq-numerics", "crates/digest", "crates/digest-embedded", "crates/reference", "crates/similarity"]
 
 [workspace.package]
 version = "0.0.0"
