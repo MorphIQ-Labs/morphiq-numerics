@@ -250,6 +250,7 @@ jobs:
         run: |
           mkdir -p target
           cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
+          MORPHIQ_Q_CORPUS="$PWD/target/q-crosscheck.txt" cargo test --locked -p morphiq-numerics --lib q_crosscheck -- --ignored
       - name: Write the Gappa certificates' Coq proofs
         # The certificates job's image and Gappa version. Gappa's proof search
         # can differ between hosts, so the proofs are written here and checked
@@ -262,4 +263,4 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/w:ro" -w /w \
             coqorg/coq@sha256:6113894351967e84f6eca8bd584abbea2c8b97621bb1a0aa9cf7b1d24e7f49ef \
-            bash -c 'opam update --quiet >/dev/null 2>&1 || true; ./scripts/check_formal.sh target/crosscheck.txt target/gappa-proofs'
+            bash -c 'opam update --quiet >/dev/null 2>&1 || true; ./scripts/check_formal.sh target/crosscheck.txt target/q-crosscheck.txt target/gappa-proofs'
