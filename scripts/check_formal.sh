@@ -38,7 +38,7 @@ cp -r formal/double-word formal/two-prod formal/binary64 formal/audit formal/ext
 (cd "$work/double-word" && coq_makefile -f _CoqProject -o Makefile && make -j"$(nproc)")
 (cd "$work/two-prod" && coqc TwoProdBinary64.v)
 (cd "$work/binary64" && for proof in Binary64Add Instances Binary64Mul Grid Binary64Div \
-    IEEE64 IEEE64Add IEEE64Mul IEEE64Div IEEE64Eft; do
+    IEEE64 IEEE64Add IEEE64Mul IEEE64Div IEEE64Eft IEEE64Sqrt; do
   coqc -R ../double-word Double -R . Binary64 -R ../two-prod "" "$proof.v" || exit 1
 done)
 

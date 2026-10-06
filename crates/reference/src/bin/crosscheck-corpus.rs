@@ -1,5 +1,6 @@
 //! Writes the cross-check corpus: each public double-word operation and
-//! error-free transform on reproducible inputs, with the library's results.
+//! error-free transform, and `sqrt`, on reproducible inputs, with the library's
+//! results.
 //!
 //! `scripts/check_formal.sh` runs the proved IEEE 754 definitions, extracted
 //! from Coq, on the same inputs and requires identical bits
@@ -7,12 +8,13 @@
 //! them, into overflow, subnormals, zeros and signed zeros: the Rust code and
 //! its Coq transcription must agree everywhere, not only where the bounds hold.
 //!
-//! Each line is `op in... : out out`, every value a binary64 as 16 hex digits.
+//! Each line is `op in... : out...`, every value a binary64 as 16 hex digits.
 
 use std::io::{BufWriter, Write};
 
 use morphiq_numerics::double_word::DoubleWord;
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
+use morphiq_numerics::elementary::sqrt;
 use morphiq_numerics_reference::Words;
 
 /// Cases per operation.
@@ -67,6 +69,10 @@ fn line(out: &mut impl Write, op: &str, ins: &[f64], (h, l): (f64, f64)) {
     writeln!(out, "{op} {} : {} {}", ins.join(" "), hex(h), hex(l)).expect("write");
 }
 
+fn line1(out: &mut impl Write, op: &str, x: f64, r: f64) {
+    writeln!(out, "{op} {} : {}", hex(x), hex(r)).expect("write");
+}
+
 fn pair(z: DoubleWord) -> (f64, f64) {
     (z.hi(), z.lo())
 }
@@ -92,6 +98,12 @@ fn main() {
         line(&mut out, "mul", &[xh, xl, yh, yl], pair(x.mul(y)));
         line(&mut out, "div_f64", &[xh, xl, f], pair(x.div_f64(f)));
         line(&mut out, "div", &[xh, xl, yh, yl], pair(x.div(y)));
+
+        // Every encoding: both signs, the subnormals, infinities and NaNs.
+        let any = f64::from_bits(words.next_word());
+        line1(&mut out, "sqrt", any, sqrt(any));
+        let positive = word(&mut words, low, high).abs();
+        line1(&mut out, "sqrt", positive, sqrt(positive));
     }
     out.flush().expect("flush");
 }

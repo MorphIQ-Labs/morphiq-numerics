@@ -7,8 +7,11 @@
 //!   numbers with its exact rounding error;
 //! - [`double_word`]: double-word (`f64 + f64`) arithmetic with proved
 //!   relative error bounds;
+//! - [`elementary`]: correctly rounded `exp`, `expm1`, `exp2`, `ln`, `ln_1p`,
+//!   `log2`, `log10`, `sin`, `cos`, `sincos`, `tan` and `sqrt`, each with its
+//!   stated domain of correct rounding;
 //! - [`random`]: seeded SplitMix64 and xoshiro256++ streams, with exact
-//!   unit uniforms;
+//!   unit uniforms and Box–Muller normal pairs;
 //! - [`reduce`]: sums, dot products and sums of squares in a specified order,
 //!   with compensated variants as accurate as twice the working precision;
 //! - [`ulp`]: units in the last place, and distances measured in them.
@@ -35,6 +38,7 @@ mod q128;
 mod q256;
 pub mod random;
 pub mod reduce;
+mod sqrt;
 #[cfg(test)]
 mod test_exact;
 mod trig;

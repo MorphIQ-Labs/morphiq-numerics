@@ -181,3 +181,48 @@ pub const fn unit_closed_open(word: u64) -> f64 {
 pub const fn unit_open(word: u64) -> f64 {
     ((word >> 12) * 2 + 1) as f64 * f64::from_bits((1023 - 53) << 52)
 }
+
+/// `RN(2π)`.
+const TAU: f64 = f64::from_bits(0x4019_21fb_5444_2d18);
+
+/// The Box–Muller pair from two 64-bit words (`docs/random.md`):
+///
+/// ```text
+/// u1 = unit_open(w1),  u2 = unit_closed_open(w2)
+/// ρ  = sqrt(−2·ln u1),  θ = RN(RN(2π)·u2),  (s, c) = sincos(θ)
+/// (RN(ρ·c), RN(ρ·s))
+/// ```
+///
+/// Every step is exact or a correctly rounded function of its inputs ([`ln`],
+/// [`sqrt`], [`sincos`] and binary64 multiplication), so the pair is specified
+/// bit for bit. `−2·ln u1` is exact, and `u1 < 1` keeps `ρ > 0`.
+///
+/// [`ln`]: crate::elementary::ln
+/// [`sqrt`]: crate::elementary::sqrt
+/// [`sincos`]: crate::elementary::sincos
+#[must_use]
+pub fn normal_pair(w1: u64, w2: u64) -> (f64, f64) {
+    let rho = crate::elementary::sqrt(-2.0 * crate::ln::ln(unit_open(w1)));
+    let (s, c) = crate::trig::sincos(TAU * unit_closed_open(w2));
+    (rho * c, rho * s)
+}
+
+impl SplitMix64 {
+    /// The next Box–Muller pair: [`normal_pair`] of the next two words.
+    #[must_use]
+    #[inline]
+    pub fn next_normal_pair(&mut self) -> (f64, f64) {
+        let w1 = self.next_u64();
+        normal_pair(w1, self.next_u64())
+    }
+}
+
+impl Xoshiro256PlusPlus {
+    /// The next Box–Muller pair: [`normal_pair`] of the next two words.
+    #[must_use]
+    #[inline]
+    pub fn next_normal_pair(&mut self) -> (f64, f64) {
+        let w1 = self.next_u64();
+        normal_pair(w1, self.next_u64())
+    }
+}

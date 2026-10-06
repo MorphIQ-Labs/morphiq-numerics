@@ -1,7 +1,8 @@
-# Seeded streams and unit uniforms
+# Seeded streams, unit uniforms and normal pairs
 
-`morphiq_numerics::random` provides integer streams specified bit for bit, and
-exact maps from a 64-bit word to a uniform binary64. A seed produces the same
+`morphiq_numerics::random` provides integer streams specified bit for bit,
+exact maps from a 64-bit word to a uniform binary64, and Box–Muller normal
+pairs defined through correctly rounded functions. A seed produces the same
 sequence on every target and in any implementation of the same specification,
 in any language.
 
@@ -14,6 +15,8 @@ in any language.
   *ACM TOMS* 47(4), 2021 (arXiv:1805.01407v3): Figure 4 (the xoshiro256 engine
   and its scramblers), Table 2 (`A = 17`, `B = 45`), Table 3 (`R = 23` for `++`),
   and §5 (seeding through SplitMix).
+- G. E. P. Box, M. E. Muller, "A note on the generation of random normal
+  deviates", *Annals of Mathematical Statistics* 29(2), 1958: the transform.
 
 ## `SplitMix64`
 
@@ -93,6 +96,47 @@ and they are symmetric: the complemented word gives exactly `1 − u`. The map
 `(m + ½)·2^−53` from 53 bits would need 54 significant bits and so would round.
 That is why the open map uses 52.
 
+## Box–Muller normal pairs
+
+**Specification.** `normal_pair(w1, w2)` maps two words to two independent
+standard normal deviates, by Box and Muller's transform:
+
+```text
+u1 = unit_open(w1)                 (0, 1): ln u1 is finite and negative
+u2 = unit_closed_open(w2)          [0, 1)
+ρ  = sqrt(−2·ln(u1))
+θ  = RN(RN(2π)·u2),  RN(2π) = 0x401921fb54442d18
+(s, c) = sincos(θ)
+result (RN(ρ·c), RN(ρ·s))
+```
+
+- `ln`, `sqrt` and `sincos` are this crate's correctly rounded functions
+  ([ln.md](ln.md), [sqrt.md](sqrt.md), [sin_cos.md](sin_cos.md)); the products
+  are binary64 multiplications, rounded to nearest. `−2·ln u1` is exact: a
+  power-of-two scaling of a number between `−36.8` and `−2^−53`.
+- `next_normal_pair()` on either stream is `normal_pair` of its next two words,
+  in order.
+
+**Why these choices.**
+- `u1` is the open uniform, so `ln u1` is never `−∞` or `0`, and `ρ` is never 0
+  or infinite. `ρ` lies in `[2^−26, 8.58]`.
+- `θ` is `RN(2π)·u2` rounded once, the transform's angle under one IEEE
+  operation. An implementation in any language reproduces it from the
+  constant's bits.
+- Neither product underflows. A binary64 `θ` in `[0, 2π)` comes no closer than
+  `2^−53.86` to a multiple of `π/2` (at `RN(π/2)`), so a nonzero `|cos θ|` or
+  `|sin θ|` is at least `2^−54`, and `ρ ≥ 2^−26`.
+
+**What is exact.** Each step is a correctly rounded function of exactly
+specified inputs, so the pair is specified bit for bit. The implementation meets
+the specification wherever its parts are correctly rounded:
+- `ln` everywhere ([ln.md](ln.md));
+- `sqrt` everywhere ([sqrt.md](sqrt.md));
+- `sin` and `cos` wherever [sin_cos.md](sin_cos.md) §6 proves it. Elsewhere in
+  `[0, 2π)` they are correctly rounded unless `sin θ` or `cos θ` lies within
+  mantissa distance `2^−197` of a rounding breakpoint. No such angle is known,
+  and none is excluded by a published search.
+
 ## Checked by
 
 - **Streams:** both reproduce, word for word, the first 64 outputs from six seeds
@@ -116,3 +160,11 @@ That is why the open map uses 52.
   zero.
 - **Uniforms:** exact at both ends and at `½`; `unit_open` is symmetric and never
   0 or 1 over 100,000 words.
+- **Normal pairs:** bit for bit against `generators/box_muller_reference.py`, a
+  separate Python implementation of the specification. It takes its words from
+  `random_streams_reference.py`'s streams and rounds `ln`, `sqrt`, `sin` and
+  `cos` with the mpmath interval oracle (`generators/oracle`). The fixture holds
+  48 edge pairs (`u1` at its ends and at `½`; `u2` at 0, at each quarter turn and
+  its neighbours, and at its greatest value) and the first 256 pairs of both
+  streams from six seeds (`crates/reference/tests/box_muller.rs`). The
+  determinism digest's `normal_pair` section runs on every target.

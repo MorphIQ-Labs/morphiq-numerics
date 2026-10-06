@@ -12,9 +12,11 @@
 use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::elementary::{
-    cos, exp, exp2, expm1, ln, ln_1p, log2, log10, sin, sincos, tan,
+    cos, exp, exp2, expm1, ln, ln_1p, log2, log10, sin, sincos, sqrt, tan,
 };
-use morphiq_numerics::random::{SplitMix64, Xoshiro256PlusPlus, unit_closed_open, unit_open};
+use morphiq_numerics::random::{
+    SplitMix64, Xoshiro256PlusPlus, normal_pair, unit_closed_open, unit_open,
+};
 use morphiq_numerics::reduce::{dot, dot2, max_abs, sum, sum_squares, sum_squares2, sum2};
 use morphiq_numerics::ulp::{ordered_bits, ulp, ulps_between};
 use sha2::{Digest, Sha256};
@@ -528,6 +530,32 @@ pub fn corpus_digest() -> [u8; 32] {
         #[allow(clippy::cast_precision_loss)] // a 53-bit integer
         let unit = (words.next_word() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
         r.f64(tan((2.0 * unit - 1.0) * core::f64::consts::PI));
+    }
+
+    r.label("sqrt");
+    // Every encoding (both signs, subnormals, infinities and NaNs), then
+    // positive arguments in every binade.
+    for _ in 0..10_000 {
+        r.f64(sqrt(f64::from_bits(words.next_word())));
+        r.f64(sqrt(f64::from_bits(
+            words.next_word() % 0x7ff0_0000_0000_0000,
+        )));
+    }
+
+    r.label("normal_pair");
+    // Edge words (u1 at its ends and at 1/2; u2 at 0, the quarter turns and
+    // its greatest value), then 10,000 pairs of words.
+    for w1 in [0, u64::MAX, 1 << 63] {
+        for w2 in [0, u64::MAX, 1 << 62, 1 << 63, 3 << 62] {
+            let (z0, z1) = normal_pair(w1, w2);
+            r.f64(z0);
+            r.f64(z1);
+        }
+    }
+    for _ in 0..10_000 {
+        let (z0, z1) = normal_pair(words.next_word(), words.next_word());
+        r.f64(z0);
+        r.f64(z1);
     }
 
     r.label("random");
