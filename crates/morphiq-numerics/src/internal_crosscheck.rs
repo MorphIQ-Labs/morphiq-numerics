@@ -1,16 +1,19 @@
-//! Writes the Q cross-check corpus: `Q128` and `Q256` operations on
-//! reproducible inputs, with this crate's results. `scripts/check_formal.sh`
-//! runs the proved transcriptions (`formal/q`, extracted by
-//! `formal/extraction/QCrosscheck.v`) on the same inputs and requires
+//! Writes the internal cross-check corpus: `Q128` and `Q256` operations and
+//! the rounding tests (`ln::decide_with`, `exp::decide_scaled`) on reproducible
+//! inputs, with this crate's results. `scripts/check_formal.sh`
+//! runs the proved transcriptions (`formal/q` and
+//! `formal/binary64/RoundingTest.v`, extracted by
+//! `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
 //! identical results, which ties the proofs to this code.
 //!
-//! Ignored by default; run with the output path in `MORPHIQ_Q_CORPUS`:
-//! `cargo test -p morphiq-numerics --lib q_crosscheck -- --ignored`.
+//! Ignored by default; run with the output path in `MORPHIQ_INTERNAL_CORPUS`:
+//! `cargo test -p morphiq-numerics --lib internal_crosscheck -- --ignored`.
 //!
 //! A value is written `n e k l1 .. lk`: its sign (0 or 1), its exponent in
 //! decimal, its limb count and its 64-bit limbs in hex, least significant
 //! first. Each line is `op args : result`.
 
+use crate::double_word::DoubleWord;
 use crate::q128::Q128;
 use crate::q256::Q256;
 use crate::random::SplitMix64;
@@ -76,13 +79,96 @@ fn r256(rng: &mut SplitMix64) -> Q256 {
     Q256::new(rng.next_u64() & 1 == 1, m, exponent(rng, 255))
 }
 
+/// The rounding tests' `EPS` constants, `ε₁·(1 + 2^−50)` for `ε₁` = `2^−69`
+/// (`exp`), `2^−63` (`ln`), `2^−62` (`expm1`, `sin`, `cos`), `2^−60` (`tan`).
+const EPS: [u64; 4] = [
+    0x3ba0_0000_0000_0004,
+    0x3c00_0000_0000_0004,
+    0x3c10_0000_0000_0004,
+    0x3c30_0000_0000_0004,
+];
+
+fn opt(v: Option<f64>) -> String {
+    v.map_or_else(
+        || String::from("none"),
+        |v| std::format!("{:016x}", v.to_bits()),
+    )
+}
+
+/// A double-word at the test's threshold: a leading word `hi`, and a trailing
+/// word `g/2 − eps·|hi|·(1 + s)`, `|s| ≤ 1/2`, with either sign, so both
+/// outcomes occur.
+fn near_threshold(rng: &mut SplitMix64, hi: f64, eps: f64) -> DoubleWord {
+    let magnitude = hi.abs();
+    let g = if magnitude.to_bits() & ((1 << 52) - 1) == 0 {
+        crate::ulp::ulp(magnitude) * 0.5
+    } else {
+        crate::ulp::ulp(magnitude)
+    };
+    let s = unit(rng) - 0.5;
+    let lo = g * 0.5 - eps * magnitude * (1.0 + s);
+    let lo = if rng.next_u64() & 1 == 1 { -lo } else { lo };
+    DoubleWord::sum(hi, lo)
+}
+
+fn unit(rng: &mut SplitMix64) -> f64 {
+    #[allow(clippy::cast_precision_loss)]
+    let u = (rng.next_u64() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+    u
+}
+
 #[test]
-#[ignore = "writes the Q cross-check corpus for scripts/check_formal.sh"]
-fn q_crosscheck_corpus() {
-    let path = std::env::var("MORPHIQ_Q_CORPUS").expect("MORPHIQ_Q_CORPUS");
+#[ignore = "writes the internal cross-check corpus for scripts/check_formal.sh"]
+fn internal_crosscheck_corpus() {
+    let path = std::env::var("MORPHIQ_INTERNAL_CORPUS").expect("MORPHIQ_INTERNAL_CORPUS");
     let mut rng = SplitMix64::new(0x7163_726f_7373_0001);
     let mut out = String::new();
     for _ in 0..4000 {
+        // decide_with: leading words across the proved range, both signs.
+        let eps = f64::from_bits(EPS[usize::try_from(rng.next_u64() % 4).unwrap()]);
+        let e = i32::try_from(rng.next_u64() % 1900).unwrap() - 900;
+        // One in eight a power of two, where the gap below is halved.
+        let m = if rng.next_u64().is_multiple_of(8) {
+            1.0
+        } else {
+            1.0 + unit(&mut rng)
+        };
+        let hi = m * f64::from_bits(u64::try_from(1023 + e).unwrap() << 52);
+        let hi = if rng.next_u64() & 1 == 1 { -hi } else { hi };
+        let y = near_threshold(&mut rng, hi, eps);
+        writeln!(
+            out,
+            "decide_with {:016x} {:016x} {:016x} : {}",
+            y.hi().to_bits(),
+            y.lo().to_bits(),
+            eps.to_bits(),
+            opt(crate::ln::decide_with(y, eps))
+        )
+        .unwrap();
+        // decide_scaled: exp's EPS, a leading word in [3/4, 5/2), every scale.
+        let eps = f64::from_bits(EPS[0]);
+        let k = i32::try_from(rng.next_u64() % 2046).unwrap() - 1021;
+        let hi = if rng.next_u64().is_multiple_of(8) {
+            1.0
+        } else {
+            0.75 + 1.75 * unit(&mut rng)
+        };
+        let (hi, k) = if rng.next_u64().is_multiple_of(16) {
+            (0.75 + 0.25 * unit(&mut rng), 1024)
+        } else {
+            (hi, k)
+        };
+        let y = near_threshold(&mut rng, hi, eps);
+        writeln!(
+            out,
+            "decide_scaled {:016x} {:016x} {:016x} {k} : {}",
+            y.hi().to_bits(),
+            y.lo().to_bits(),
+            eps.to_bits(),
+            opt(crate::exp::decide_scaled(y, k))
+        )
+        .unwrap();
+
         let (a, b) = (r128(&mut rng), r128(&mut rng));
         // Cancellation: b near −a.
         let b = if rng.next_u64().is_multiple_of(4) {

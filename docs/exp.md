@@ -163,6 +163,15 @@ with `EPS = ε₁·(1 + 2^−50) = 2^−69·(1 + 2^−50)`, a binary64 constant.
 
 Scaling by `2^k` is exact (below), so the returned value is `RN(e^x)`.
 
+**Machine-checked:** `formal/binary64/RoundingTest.v` transcribes the test
+(`decide_scaled`, and `ln`'s `decide_with`, which every other kernel shares) on
+binary64 and proves it: when the test passes, the returned word is `RN` of every
+real within `ε₁` of `y_hi + y_lo`, for `2^−80 ≤ ε₁ ≤ 2^−60` (`decide_with_ok`),
+and for `decide_scaled` the exact scaling makes it `RN(Z·2^k)`
+(`decide_scaled_ok`). The formal job compares the transcriptions with the Rust
+code bit for bit on the internal cross-check corpus, with cases at the test's
+threshold so both outcomes occur.
+
 **Scaling:** `y_hi · 2^k` is exact for `k ≥ −1021`. For `k = 1024`, where `Y < 1`
 near overflow, it's applied as `(y_hi · 2^(k−1)) · 2`.
 
@@ -294,7 +303,7 @@ manifest is updated.
   transcription of `q128.rs` computes it (`Q128.v`: `mul_value`, `add_ok`,
   `to_f64_ok`, `from_f64_ok`, `neg_ok`, `mul_pow2_ok`). The formal job
   extracts the transcription and compares it with `q128.rs` bit for bit on the
-  Q cross-check corpus (`src/q_crosscheck.rs`). `src/q128/tests.rs` also checks
+  internal cross-check corpus (`src/internal_crosscheck.rs`). `src/q128/tests.rs` also checks
   the contract in exact big-integer arithmetic, ties and subnormals included.
 - **The determinism digest's `exp` section** on every target
   ([determinism.md](determinism.md)).

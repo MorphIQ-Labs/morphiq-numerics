@@ -141,7 +141,7 @@ by `k mod 4`, with `sin`'s sign from `x`.
   of `q256.rs` computes it, limb arithmetic included (`formal/q/Limbs.v`,
   `Digits64.v`, `Shifts.v`, `LimbScan.v`), and that `from_limbs` truncates
   with relative error in `[−2^−255, 0]`. The formal job compares the
-  transcription with `q256.rs` bit for bit on the Q cross-check corpus.
+  transcription with `q256.rs` bit for bit on the internal cross-check corpus.
   `src/q256/tests.rs` also checks the contract in exact big-integer arithmetic.
 
 `sin r = r·H_1` and `cos r = G_1`, in `s = r²`:

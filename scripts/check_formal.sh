@@ -19,18 +19,18 @@
 #      results bit for bit on the cross-check corpora given as the first two
 #      arguments. Write the arguments first with
 #        cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
-#        MORPHIQ_Q_CORPUS=$PWD/target/q-crosscheck.txt cargo test --locked -p morphiq-numerics --lib q_crosscheck -- --ignored
+#        MORPHIQ_INTERNAL_CORPUS=$PWD/target/internal-crosscheck.txt cargo test --locked -p morphiq-numerics --lib internal_crosscheck -- --ignored
 #        ./scripts/write_gappa_proofs.sh target/gappa-proofs   (in the certificates image)
 #
 # Runs inside the pinned Coq image (see the formal job in .github/workflows/ci.yml),
 # which provides coqc, coq_makefile and opam; Flocq and math-comp are pinned here.
 set -eu
 if [ $# -ne 3 ]; then
-  echo "usage: $0 <cross-check corpus> <Q cross-check corpus> <Gappa proofs directory>" >&2
+  echo "usage: $0 <cross-check corpus> <internal cross-check corpus> <Gappa proofs directory>" >&2
   exit 2
 fi
 corpus=$(realpath "$1")
-qcorpus=$(realpath "$2")
+icorpus=$(realpath "$2")
 proofs=$(realpath "$3")
 cd "$(dirname "$0")/.."
 
@@ -54,7 +54,7 @@ done)
 (cd "$work/two-prod" && coqc TwoProdBinary64.v)
 (cd "$work/binary64" && for proof in Binary64Add Instances Binary64Mul Grid Binary64Div \
     IEEE64 IEEE64Add IEEE64Mul IEEE64Div IEEE64Eft IEEE64Sqrt \
-    Isqrt SqrtRound SqrtAlgorithm; do
+    Isqrt SqrtRound SqrtAlgorithm RoundingGaps RoundingCore RoundingTest; do
   coqc -R ../double-word Double -R . Binary64 -R ../two-prod "" "$proof.v" || exit 1
 done)
 
@@ -122,7 +122,7 @@ echo "certificates in Coq: $certificates proved"
   && ocamlfind ocamlopt -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
   && ./crosscheck "$corpus")
 (cd "$work/extraction" \
-  && coqc -R ../q Q QCrosscheck.v \
-  && ocamlfind ocamlopt -o qcrosscheck qcrosscheck.mli qcrosscheck.ml qdriver.ml \
-  && ./qcrosscheck "$qcorpus")
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q InternalCrosscheck.v \
+  && ocamlfind ocamlopt -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
+  && ./internalcrosscheck "$icorpus")
 echo "formal: OK"

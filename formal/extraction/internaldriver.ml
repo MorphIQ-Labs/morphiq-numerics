@@ -1,12 +1,14 @@
-(* Runs the extracted Q128 and Q256 transcriptions (QCrosscheck.v) on the Q
-   cross-check corpus and compares each result with the Rust library's.
+(* Runs the extracted Q128 and Q256 transcriptions and rounding tests
+   (InternalCrosscheck.v) on the internal cross-check corpus and compares each
+   result with the Rust library's.
 
    Each line is "op args : result". A value is "n e k l1 .. lk": its sign
    (0 or 1), its exponent in decimal, its limb count and its 64-bit limbs in
-   hex, least significant first; a binary64 is 16 hex digits. Exits 1 on a
-   mismatch or a malformed line. *)
+   hex, least significant first; a binary64 is 16 hex digits; a rounding
+   test's result is a binary64 or "none". Exits 1 on a mismatch or a malformed
+   line. *)
 
-open Qcrosscheck
+open Internalcrosscheck
 
 let rec pos_of_u64 n =
   if n = 1L then XH
@@ -53,6 +55,8 @@ let show (n, e, l) =
 
 let show_bits z = Printf.sprintf "%016Lx" (u64_of_z z)
 
+let show_opt = function None -> "none" | Some z -> show_bits z
+
 let compute op args =
   match op with
   | "q128_mul" | "q128_add" | "q256_mul" | "q256_add" ->
@@ -68,6 +72,15 @@ let compute op args =
   | "q128_from_f64" | "q256_from_f64" ->
       let bits = z_of_u64 (hex (List.hd args)) in
       let ((n, e), l) = (if op = "q128_from_f64" then x_q128_from_f64 else x_q256_from_f64) bits in show (n, e, l)
+  | "decide_with" ->
+      (match args with
+       | [hi; lo; eps] -> show_opt (x_decide_with (z_of_u64 (hex hi)) (z_of_u64 (hex lo)) (z_of_u64 (hex eps)))
+       | _ -> failwith "decide_with takes three words")
+  | "decide_scaled" ->
+      (match args with
+       | [hi; lo; eps; k] ->
+           show_opt (x_decide_scaled (z_of_u64 (hex hi)) (z_of_u64 (hex lo)) (z_of_u64 (hex eps)) (z_of_int (int_of_string k)))
+       | _ -> failwith "decide_scaled takes three words and an exponent")
   | "q256_from_limbs" ->
       let ((n, e, l), _) = value args in
       let ((n, e), l) = x_q256_from_limbs n e l in show (n, e, l)
@@ -96,5 +109,5 @@ let () =
        | _ -> failwith ("malformed line " ^ string_of_int !lines)
      done
    with End_of_file -> ());
-  Printf.printf "q crosscheck: %d cases, %d mismatches\n" !lines !failures;
+  Printf.printf "internal crosscheck: %d cases, %d mismatches\n" !lines !failures;
   if !failures > 0 || !lines = 0 then exit 1

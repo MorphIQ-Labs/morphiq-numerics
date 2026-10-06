@@ -29,12 +29,12 @@ pub mod elementary;
 mod exp;
 mod exp2;
 mod expm1;
+#[cfg(test)]
+mod internal_crosscheck;
 mod ln;
 mod log2;
 mod q128;
 mod q256;
-#[cfg(test)]
-mod q_crosscheck;
 pub mod random;
 pub mod reduce;
 mod sqrt;
