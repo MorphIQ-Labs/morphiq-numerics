@@ -4,8 +4,7 @@
 use super::{EPS, Reduced, X_OVERFLOW, X_ZERO, small, small_parts};
 use crate::q128::Q128;
 use crate::random::SplitMix64;
-use crate::test_exact::Exact;
-use serde_json::Value;
+use crate::test_exact::{Exact, entries, field, word};
 
 /// The analytic miss rate of the rounding test (§4): about `2^−15`.
 const ANALYTIC_MISS_RATE: f64 = 1.0 / 32768.0;
@@ -57,18 +56,12 @@ fn small_arguments_agree_with_the_general_accurate_path() {
 
 /// The fixture's 192-bit references: `(x, e^x)`.
 fn precise() -> std::vec::Vec<(f64, Exact)> {
-    let fixture: Value =
-        serde_json::from_str(include_str!("../../../reference/fixtures/exp.json")).unwrap();
-    fixture["precise"]
-        .as_array()
-        .unwrap()
-        .iter()
+    let fixture = include_str!("../../../reference/fixtures/exp.json");
+    entries(fixture, &["precise"])
+        .into_iter()
         .map(|c| {
-            let x = f64::from_bits(u64::from_str_radix(c["x"].as_str().unwrap(), 16).unwrap());
-            (
-                x,
-                Exact::of_hex(c["m"].as_str().unwrap(), c["e"].as_i64().unwrap()),
-            )
+            let e = field(c, "e").parse().unwrap();
+            (word(c, "x"), Exact::of_hex(field(c, "m"), e))
         })
         .collect()
 }
@@ -76,7 +69,9 @@ fn precise() -> std::vec::Vec<(f64, Exact)> {
 #[test]
 fn every_unrounded_result_is_within_its_certified_bound() {
     let small_arguments = f64::from_bits(0x3e10_0000_0000_0000);
-    for (x, reference) in precise() {
+    let cases = precise();
+    assert_eq!(cases.len(), 1200);
+    for (x, reference) in cases {
         let reduced = Reduced::of(x);
         // §6, general case: below 2^-123.9 (1097/1024 * 2^-124 < 2^-123.9).
         let y = Exact::of(reduced.accurate_value());

@@ -3,10 +3,8 @@
 
 use super::Q128;
 use crate::random::SplitMix64;
-use crate::test_exact::Exact;
+use crate::test_exact::{BigInt, Exact};
 use core::cmp::Ordering;
-use num_bigint::BigInt;
-use num_traits::Signed;
 
 /// `−q`, exactly.
 fn negated(q: Q128) -> Q128 {
@@ -37,7 +35,7 @@ fn new_normalizes_exactly() {
         let q = Q128::new(false, m, e);
         assert!(q.m == 0 || q.m >> 127 == 1, "{q:?} is not normalized");
         let expected = Exact {
-            mantissa: BigInt::from(m),
+            mantissa: BigInt::from_u128(m),
             exponent: i64::from(e),
         };
         assert_eq!(Exact::of(q).cmp(&expected), Ordering::Equal);
