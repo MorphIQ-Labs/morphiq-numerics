@@ -3,10 +3,19 @@ oracle for binary64, built on mpmath's interval arithmetic.
 
 `correctly_rounded(f, x)` evaluates the interval function f on the exact
 binary64 x, doubling the precision from 128 bits until both ends of the
-enclosure round to the same binary64 number, which is then the correctly
-rounded value (to nearest, ties to even; subnormals rounded once; overflow to
-infinity). Rounding is done in integer arithmetic on the endpoints' exact
-(sign, mantissa, exponent) tuples, so no value depends on a tolerance.
+enclosure round to the same binary64 number, at two consecutive precisions
+alike, which is then the correctly rounded value (to nearest, ties to even;
+subnormals rounded once; overflow to infinity). Rounding is done in integer
+arithmetic on the endpoints' exact (sign, mantissa, exponent) tuples, so no
+value depends on a tolerance.
+
+Why two precisions: mpmath's directed roundings are not guaranteed correct
+when the true value lies within its guard bits of a grid point, and a binary64
+midpoint is always a grid point. At 128 bits, iv.exp(x) - 1 at
+x = 0x1.6a09e667ff3cep-53, whose value is 2^-142 above a midpoint, returned a
+zero-width enclosure on the midpoint itself; both ends rounded alike, to the
+wrong neighbour. Agreement at p and 2p fails only if mpmath errs identically
+at both, which needs the value within about 2^-2p of the grid point.
 """
 import math
 import struct
@@ -58,15 +67,25 @@ def round_endpoint(raw):
     return -value if sign else value
 
 
+def settled(f, x, prec):
+    """f's enclosure at x and precision prec, rounded: its value if both ends
+    round alike, else None."""
+    iv.prec = prec
+    y = f(iv.mpf(x))
+    lo, hi = (round_endpoint(end) for end in y._mpi_)
+    return lo if to_bits(lo) == to_bits(hi) else None
+
+
 def correctly_rounded(f, x, start=128, limit=1 << 15):
-    """f (an mpmath interval function) at the binary64 x, correctly rounded."""
+    """f (an mpmath interval function) at the binary64 x, correctly rounded:
+    settled at two consecutive precisions, to the same value."""
     prec = start
     while True:
-        iv.prec = prec
-        y = f(iv.mpf(x))
-        lo, hi = (round_endpoint(end) for end in y._mpi_)
-        if to_bits(lo) == to_bits(hi):
-            return lo
+        first = settled(f, x, prec)
+        if first is not None:
+            second = settled(f, x, 2 * prec)
+            if second is not None and to_bits(second) == to_bits(first):
+                return first
         prec *= 2
         if prec > limit:
             sys.exit(f'f({x!r}) did not settle by {limit} bits')

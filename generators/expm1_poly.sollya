@@ -1,0 +1,34 @@
+// expm1's small-argument polynomial (docs/expm1.md, section 3):
+// e^x - 1 = x + x^2/2 + x^3 * W(x), W(x) = c3 + x*(c4 + ... + x*c9), with c3..c9
+// binary64 (fpminimax, relative), on |x| <= A.
+//
+// The cubic tail (e^x - 1 - x - x^2/2)/x^3 has a removable singularity at 0,
+// which Sollya's supnorm can't enclose. It is the series sum_n x^n/(n+3)!, so
+// W is fitted to, and bounded against, the polynomial T of its first 31 terms,
+// and the bound adds T's remainder. For |x| <= A < 1 the remainder is below
+// A^31/34! / (1 - A) (the terms decrease geometrically by at most A); relative
+// to the tail, which is at least 1/6 - A/24 > 0.16 there, it is below
+// 6.3 A^31/34!, printed as remainder_bound.
+//
+// Run in the pinned image (scripts/check_certificates.sh).
+prec = 300;
+display = hexadecimal;
+A = 0.0312501;
+I = [-A; A];
+// fact(k) = k!, by an explicit product (Sollya has no factorial operator).
+procedure fact(k) { var r, i; r = 1; for i from 2 to k do r = r * i; return r; };
+T = 0;
+for n from 30 to 0 by -1 do T = T * x + 1/fact(n + 3);
+p = fpminimax(T, [|0, 1, 2, 3, 4, 5, 6|], [|D, D, D, D, D, D, D|], I, relative);
+fit = sup(supnorm(p, T, I, relative, 2^-30));
+remainder = 6.3 * A^31 / fact(34);
+print("c3", coeff(p, 0));
+print("c4", coeff(p, 1));
+print("c5", coeff(p, 2));
+print("c6", coeff(p, 3));
+print("c7", coeff(p, 4));
+print("c8", coeff(p, 5));
+print("c9", coeff(p, 6));
+print("remainder_bound", round(remainder, 24, RU));
+print("relative_error_bound", round(fit + remainder, 24, RU));
+quit;

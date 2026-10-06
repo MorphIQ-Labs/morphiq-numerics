@@ -267,8 +267,15 @@ fn reciprocal(k: usize) -> Q128 {
 }
 
 /// §5: `y_hi` when the rounding test proves it is `RN` of the value `Y`
-/// approximates within `ε₁`.
+/// approximates within `ε₁ = 2^−63`.
 pub(crate) fn decide(y: DoubleWord) -> Option<f64> {
+    decide_with(y, EPS)
+}
+
+/// §5's rounding test with `eps = ε₁·(1 + 2^−50)` for any certified `ε₁`:
+/// `y_hi` when it is provably `RN` of the value `Y` approximates within `ε₁`.
+/// Shared with `expm1`.
+pub(crate) fn decide_with(y: DoubleWord, eps: f64) -> Option<f64> {
     let (y_hi, y_lo) = (y.hi(), y.lo());
     let magnitude = y_hi.abs();
     // The smaller of the gaps on either side of y_hi: toward zero at a power
@@ -278,7 +285,7 @@ pub(crate) fn decide(y: DoubleWord) -> Option<f64> {
     } else {
         ulp(magnitude)
     };
-    (y_lo.abs() + EPS * magnitude < g * 0.5).then_some(y_hi)
+    (y_lo.abs() + eps * magnitude < g * 0.5).then_some(y_hi)
 }
 
 #[cfg(test)]

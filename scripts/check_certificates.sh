@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # The certificates lane: Sollya approximation bounds and Gappa rounding-error
 # bounds, bound to the sources they describe. For each function directory
-# formal/<f> (exp, ln, exp2, log2):
+# formal/<f> (exp, ln, exp2, log2, expm1):
 #
 #   1. formal/<f>/binding.sha256 matches: a change to the derivation, the
 #      generated constants or a certificate fails until the certificates are
@@ -16,12 +16,12 @@ set -eu
 cd "$(dirname "$0")/.."
 
 failed=0
-for dir in formal/exp formal/ln formal/exp2 formal/log2; do
+for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1; do
   f=${dir#formal/}
   sha256sum --check --quiet "$dir/binding.sha256"
   # A function with its own polynomial replays its Sollya script.
   if [ -f "generators/${f}_poly.sollya" ]; then
-    sollya "generators/${f}_poly.sollya" | grep -E '^(c[0-9]+|error_bound|relative_error_bound) ' \
+    sollya "generators/${f}_poly.sollya" | grep -E '^(c[0-9]+|error_bound|relative_error_bound|remainder_bound) ' \
       | diff -u "generators/${f}_poly.out" -
     echo "replayed: generators/${f}_poly.sollya"
   fi

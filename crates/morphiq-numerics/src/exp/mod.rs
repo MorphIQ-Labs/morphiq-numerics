@@ -60,11 +60,11 @@ pub fn exp(x: f64) -> f64 {
 }
 
 /// The reduction of §3: `x = k·ln 2 + j·L + r`, `L = ln 2 / 128`.
-struct Reduced {
+pub(crate) struct Reduced {
     /// `n = 128·k + j`, an integer, `|n| < 2^18`.
     n: f64,
     j: usize,
-    k: i32,
+    pub(crate) k: i32,
     /// `r1 = x − n·L1`, exact.
     r1: f64,
     /// `n·L2 = p2 + e2`, exactly.
@@ -76,7 +76,7 @@ struct Reduced {
 
 impl Reduced {
     /// §3, steps 1–4.
-    fn of(x: f64) -> Self {
+    pub(crate) fn of(x: f64) -> Self {
         let n = (x * INV_L + SHIFTER) - SHIFTER;
         // |n| < 2^18 (§3, step 2), so the conversion is exact.
         #[allow(clippy::cast_possible_truncation)]
@@ -109,7 +109,7 @@ impl Reduced {
 
     /// §4: `Y`, within `ε₁ = 2^−69` of `2^(j/128)·e^r` (certified:
     /// `formal/exp/fast.g`).
-    fn fast_value(&self) -> DoubleWord {
+    pub(crate) fn fast_value(&self) -> DoubleWord {
         fast_at(self.r, self.j)
     }
 
@@ -120,7 +120,7 @@ impl Reduced {
 
     /// §6, general case: `e^x` from the reduction, the series to degree 12
     /// and the product with `2^(j/128)` in `Q128`, within `2^−123.9`.
-    fn accurate_value(&self) -> Q128 {
+    pub(crate) fn accurate_value(&self) -> Q128 {
         let (p3, e3) = two_prod(self.n, L3);
         let r = [-self.p2, -self.e2, -p3, -e3, -(self.n * L4)]
             .into_iter()
@@ -185,7 +185,7 @@ fn reciprocal(k: usize) -> Q128 {
 
 /// `y·2^k` for `−1021 ≤ k ≤ 1024`, exact for the normal results the fast
 /// path returns (§5, scaling).
-fn scale(y: f64, k: i32) -> f64 {
+pub(crate) fn scale(y: f64, k: i32) -> f64 {
     if k == 1024 {
         return y * pow2(1023) * 2.0;
     }
