@@ -28,6 +28,7 @@ pub mod eft;
 pub mod elementary;
 mod exp;
 mod exp2;
+mod expm1;
 mod ln;
 mod log2;
 mod q128;

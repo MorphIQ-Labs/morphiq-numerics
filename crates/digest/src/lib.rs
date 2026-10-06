@@ -11,7 +11,7 @@
 
 use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
-use morphiq_numerics::elementary::{exp, exp2, ln, ln_1p, log2, log10};
+use morphiq_numerics::elementary::{exp, exp2, expm1, ln, ln_1p, log2, log10};
 use morphiq_numerics::random::{SplitMix64, Xoshiro256PlusPlus, unit_closed_open, unit_open};
 use morphiq_numerics::reduce::{dot, dot2, max_abs, sum, sum_squares, sum_squares2, sum2};
 use morphiq_numerics::ulp::{ordered_bits, ulp, ulps_between};
@@ -366,6 +366,42 @@ pub fn corpus_digest() -> [u8; 32] {
     for e in -60..0 {
         for _ in 0..64 {
             r.f64(exp2(words.with_exponent(e)));
+        }
+    }
+
+    r.label("expm1");
+    // Special values, each threshold of docs/expm1.md §1 with its neighbours,
+    // both sides of the 2^-5 switch, then arguments across the whole domain and
+    // at every small scale, both signs.
+    for bits in [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        0x4086_2e42_fefa_39ef,
+        0x4086_2e42_fefa_39f0,
+        0xc042_b708_8723_20e1,
+        0xc042_b708_8723_20e2,
+        0x3ca6_a09e_667f_3bcc,
+        0x3ca6_a09e_667f_3bcd,
+        0xbca6_a09e_667f_3bcc,
+        0xbca6_a09e_667f_3bcd,
+        0x3fa0_0000_0000_0000,
+        0x3f9f_ffff_ffff_ffff,
+        0xbfa0_0000_0000_0000,
+        0xbf9f_ffff_ffff_ffff,
+    ] {
+        r.f64(expm1(f64::from_bits(bits)));
+    }
+    for _ in 0..20_000 {
+        #[allow(clippy::cast_precision_loss)] // a 53-bit integer
+        let unit = (words.next_word() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+        r.f64(expm1(-38.0 + 748.0 * unit));
+    }
+    for e in -60..0 {
+        for _ in 0..64 {
+            r.f64(expm1(words.with_exponent(e)));
         }
     }
 

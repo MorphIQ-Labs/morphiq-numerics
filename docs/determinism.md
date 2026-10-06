@@ -23,6 +23,7 @@ functions unnoticed.
 | `ln` | NaN, ±∞, ±0, −1, the extreme encodings, 1 and its neighbours; 20,000 positive encodings, subnormals included; 4,000 arguments in `[0.5, 2)` | `ln` |
 | `ln_1p` | NaN, ±∞, ±0, −1 and its neighbour, −2, each branch edge of [ln.md](ln.md) §7, the largest finite; 20,000 arguments with magnitudes from `2^−60` to `2^1023`, either sign | `ln_1p` |
 | `exp2` | NaN, ±∞, ±0, each threshold of [exp2.md](exp2.md) §1 with its neighbour; every integer from −1076 to 1025; 20,000 arguments in `[−1077, 1026)`; 64 of each binade from `2^−60` to `2^−1`, both signs | `exp2` |
+| `expm1` | NaN, ±∞, ±0, each threshold of [expm1.md](expm1.md) §1 with its neighbour, both sides of `±2^−5`; 20,000 arguments in `[−38, 710)`; 64 of each binade from `2^−60` to `2^−1`, both signs | `expm1` |
 | `log2`, `log10` | NaN, ±∞, ±0, −1, the extreme encodings, 1 and its neighbours; `10^n` for `0 ≤ n ≤ 22`; every power of two from `2^−1074` to `2^1023`; 20,000 positive encodings; 4,000 arguments in `[0.5, 2)` | `log2`, then `log10` |
 | `random` | four seeds | 4,096 words of each stream, both uniforms of each SplitMix64 word, and a word after `jump` and after `long_jump` |
 
