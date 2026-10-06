@@ -17,5 +17,5 @@ core-math	git	https://gitlab.inria.fr/core-math/core-math.git	e072473ef919f1884b
 crlibm	git	https://github.com/taschini/crlibm	eb3063791aa75bc9705b49283bf14250465220a7	eb3063791aa75bc9705b49283bf14250465220a7	-	LGPL-2.1 (unofficial mirror of CRlibm 1.0beta4; no official repository exists)
 sleef	git	https://github.com/shibatch/sleef	3.9.0	906ca7512ee483296780a81a21b9ca715d40dfe1	src/libm	BSL-1.0
 boost-math	git	https://github.com/boostorg/math	boost-1.92.0	f12be767c04d9499aaa6f88b22d5f1b464c1c27a	include/boost/math/special_functions include/boost/math/tools	BSL-1.0
-cephes	tarball	https://www.netlib.org/cephes/double.tgz	-	unpinned	-	Cephes (no explicit license)
-qd	tarball	https://www.davidhbailey.com/dhbsoftware/qd-2.3.24.tar.gz	-	unpinned	-	BSD-3-Clause-LBNL
+cephes	tarball	https://www.netlib.org/cephes/cmath.tgz	-	edd158659ecf529ccc5d5eb22c1ef2792ad9204cd1e6823bf082b3c05b3be421	-	Cephes (no explicit license)
+qd	tarball	https://www.davidhbailey.com/dhbsoftware/qd-2.3.24.tar.gz	-	a47b6c73f86e6421e86a883568dd08e299b20e36c11a99bdfbe50e01bde60e38	-	BSD-3-Clause-LBNL
