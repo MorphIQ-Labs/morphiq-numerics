@@ -68,6 +68,17 @@ impl Q128 {
         Self::new(bits >> 63 == 1, significand as u128, e)
     }
 
+    /// `−self`, exactly.
+    pub(crate) const fn neg(self) -> Self {
+        if self.m == 0 {
+            return self;
+        }
+        Self {
+            negative: !self.negative,
+            ..self
+        }
+    }
+
     /// `self · 2^k`, exactly.
     pub(crate) const fn mul_pow2(self, k: i32) -> Self {
         if self.m == 0 {

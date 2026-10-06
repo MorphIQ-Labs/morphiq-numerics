@@ -11,7 +11,7 @@
 
 use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
-use morphiq_numerics::elementary::exp;
+use morphiq_numerics::elementary::{exp, ln, ln_1p};
 use morphiq_numerics::random::{SplitMix64, Xoshiro256PlusPlus, unit_closed_open, unit_open};
 use morphiq_numerics::reduce::{dot, dot2, max_abs, sum, sum_squares, sum_squares2, sum2};
 use morphiq_numerics::ulp::{ordered_bits, ulp, ulps_between};
@@ -272,6 +272,65 @@ pub fn corpus_digest() -> [u8; 32] {
         for _ in 0..64 {
             r.f64(exp(words.with_exponent(e)));
         }
+    }
+
+    r.label("ln");
+    // Special values, the neighbours of 1, then every positive binade
+    // (subnormals included) and arguments near 1, where cancellation is.
+    for bits in [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        0xbff0_0000_0000_0000,
+        1,
+        0x000f_ffff_ffff_ffff,
+        0x7fef_ffff_ffff_ffff,
+        0x3ff0_0000_0000_0000,
+        0x3ff0_0000_0000_0001,
+        0x3fef_ffff_ffff_ffff,
+    ] {
+        r.f64(ln(f64::from_bits(bits)));
+    }
+    for _ in 0..20_000 {
+        r.f64(ln(f64::from_bits(
+            1 + words.next_word() % 0x7fef_ffff_ffff_ffff,
+        )));
+    }
+    for _ in 0..4_000 {
+        r.f64(ln(f64::from_bits(
+            0x3fe0_0000_0000_0000 + words.next_word() % (1 << 53),
+        )));
+    }
+
+    r.label("ln_1p");
+    // Special values and each branch's edges (docs/ln.md §7), then magnitudes
+    // from 2^-60 to 2^1023, either sign where defined.
+    for bits in [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        0xbff0_0000_0000_0000,
+        0xbfef_ffff_ffff_ffff,
+        0xc000_0000_0000_0000,
+        0x3c90_0000_0000_0000,
+        0x3c8f_ffff_ffff_ffff,
+        0x3f80_0000_0000_0000,
+        0xbf80_0000_0000_0000,
+        0x4340_0000_0000_0000,
+        0x433f_ffff_ffff_ffff,
+        0x7fef_ffff_ffff_ffff,
+    ] {
+        r.f64(ln_1p(f64::from_bits(bits)));
+    }
+    for _ in 0..20_000 {
+        let e = 963 + words.next_word() % 1084;
+        let word = words.next_word();
+        let x = f64::from_bits((e << 52) | (word >> 12) | (word & (1 << 63)));
+        r.f64(ln_1p(x));
     }
 
     r.label("random");
