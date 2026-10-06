@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # The certificates lane: Sollya approximation bounds and Gappa rounding-error
 # bounds, bound to the sources they describe. For each function directory
-# formal/<f> (exp, ln, exp2, log2, expm1):
+# formal/<f> (exp, ln, exp2, log2, expm1, trig):
 #
 #   1. formal/<f>/binding.sha256 matches: a change to the derivation, the
 #      generated constants or a certificate fails until the certificates are
@@ -16,17 +16,18 @@ set -eu
 cd "$(dirname "$0")/.."
 
 failed=0
-for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1; do
+for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig; do
   f=${dir#formal/}
   sha256sum --check --quiet "$dir/binding.sha256"
   # A function with its own polynomial replays its Sollya script.
   if [ -f "generators/${f}_poly.sollya" ]; then
-    sollya "generators/${f}_poly.sollya" | grep -E '^(c[0-9]+|error_bound|relative_error_bound|remainder_bound) ' \
+    sollya "generators/${f}_poly.sollya" | grep -E '^([sc][0-9]+|[a-z_]*error_bound|[a-z_]*remainder_bound) ' \
       | diff -u "generators/${f}_poly.out" -
     echo "replayed: generators/${f}_poly.sollya"
   fi
   for certificate in "$dir"/*.g; do
-    if gappa -Eprecision=300 "$certificate" >/dev/null 2>&1; then
+    # Q256's bounds reach 2^-260: Gappa needs the wider working precision.
+    if gappa -Eprecision=400 "$certificate" >/dev/null 2>&1; then
       echo "proved: $certificate"
     else
       echo "not proved: $certificate" >&2

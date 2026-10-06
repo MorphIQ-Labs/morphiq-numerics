@@ -17,7 +17,7 @@ use tables::{COS_STEPS, POLY_C, POLY_S, SIN_STEPS, TABLE};
 /// `RN(π/4)`, below `π/4`: up to it, `x` needs no reduction (§3).
 const QUARTER_PI: f64 = f64::from_bits(0x3fe9_21fb_5444_2d18);
 /// The largest `x` with `RN(sin x) = x` (§1; the reference fixture's threshold
-/// "largest x with sin(x) = x", [LM] Table 2's `1.4422·2^−26`).
+/// "largest x with sin(x) = x", Lefèvre and Muller's Table 2, `1.4422·2^−26`).
 const SIN_IS_X: f64 = f64::from_bits(0x3e47_1374_4912_3ef6);
 /// `cos x` for `|x| < 2^−25` (§1): the largest `|x|` with
 /// `RN(cos x) = 1 − k·2^−53`, `k = 0..3`; beyond the last, `1 − 4·2^−53`.
@@ -34,7 +34,7 @@ const EPS: f64 = f64::from_bits(0x3c10_0000_0000_0004);
 /// `1.5 · 2^52`: adding and subtracting it rounds to the nearest integer.
 const SHIFTER: f64 = f64::from_bits(0x4338_0000_0000_0000);
 
-/// `sin x`: correctly rounded wherever [LM]'s worst cases cover it
+/// `sin x`: correctly rounded wherever Lefèvre and Muller's worst cases cover it
 /// (`|x| ≤ 1.4422·2^−26` and `2^−24 ≤ |x| ≤ 2 + 4675/8192`) and whenever the
 /// rounding test decides; otherwise within `(1/2 + 2^−140)` ulp (§6).
 ///
@@ -51,7 +51,7 @@ pub fn sin(x: f64) -> f64 {
     reduced.finish(Function::Sin)
 }
 
-/// `cos x`: correctly rounded wherever [LM]'s worst cases cover it
+/// `cos x`: correctly rounded wherever Lefèvre and Muller's worst cases cover it
 /// (`|x| ≤ 12867/8192`) and whenever the rounding test decides; otherwise
 /// within `(1/2 + 2^−140)` ulp (§6).
 ///
@@ -184,18 +184,13 @@ fn two_over_pi_bits(end: i32) -> u64 {
     let p = (end - 1) as usize;
     let (w, o) = (p / 64, p % 64);
     let here = TWO_OVER_PI[w] >> (63 - o);
+    // The rest comes from the previous word, unless this one holds all 64 bits
+    // or there is none before it.
     if o == 63 || w == 0 {
-        if w == 0 && o < 63 {
-            return here;
-        }
-        return here
-            | if o == 63 {
-                0
-            } else {
-                TWO_OVER_PI[w - 1] << (o + 1)
-            };
+        here
+    } else {
+        here | (TWO_OVER_PI[w - 1] << (o + 1))
     }
-    here | (TWO_OVER_PI[w - 1] << (o + 1))
 }
 
 /// §3: `x = k·π/2 + r`, `|r| ≤ π/4`, for finite `x ≥ 0`: `k mod 4` and `r` in
