@@ -1,95 +1,89 @@
 # Source provenance policy
 
-Everything in this repository is distributed under MIT OR Apache-2.0. That is
-only possible if every algorithm, constant and coefficient here is ours to
-license. This policy applies to every change, from the first commit. A change
-that doesn't follow it is a defect, however well it tests.
+Everything in this repository is distributed under MIT OR Apache-2.0. Code may
+come from anywhere, provided it lives in this repository, where it can be
+modified, and can be distributed under those terms. This policy applies to
+every change. A change that doesn't follow it is a defect, however well it
+tests.
 
 ## What may be used
 
 - **Mathematical definitions and published mathematics:** identities,
   series, continued fractions, error analyses, theorems and worst-case
-  results, cited to the paper or book. An idea or a mathematical fact isn't an
-  implementation.
+  results, cited to the paper or book.
 - **Values we generate:** coefficients, constants and tables produced by a
   generator in `generators/` from the mathematical definition. They must use
   pinned tools (Sollya, mpmath) at a recorded precision, and CI must reproduce
   them.
+- **Third-party code under a compatible license,** vendored into this
+  repository. A compatible license lets the code ship inside an MIT OR
+  Apache-2.0 crate with no condition beyond keeping its notices: MIT,
+  BSD-2-Clause, BSD-3-Clause, ISC, Zlib, Apache-2.0 and BSL-1.0, and the Sun
+  notice of fdlibm-derived code.
+  - Examples: musl, FreeBSD's msun (fdlibm), CORE-MATH, SLEEF, QD and
+    Boost.Math, each under its own license.
+  - It is recorded as [Recording](#recording) describes, its notices travel
+    with it, and it then meets the same standards as code written here: a
+    document stating what it computes and its error bound, and the tests and
+    evidence that support them. Correct rounding is claimed only where shown.
 - **Test oracles:** tools used as black boxes, such as MPFR through `rug` and
-  mpmath, in test and tooling crates that are never published. Their outputs
-  check our results; their source isn't read to write ours.
+  mpmath, in test and tooling crates that are never published.
 - **Published worst-case data:** hardest-to-round arguments from the
   literature, recorded with their citation and used as test inputs and as
   inputs to bound arguments.
 
 ## What may not be used
 
-- **Code, coefficient tables or implementation structure taken from another
-  implementation.** That includes libm (glibc, musl, FreeBSD/fdlibm,
-  Apple), CORE-MATH, CRlibm, SLEEF, Cephes, Netlib SPECFUN (Cody), StatLib
-  (AS241), QD and Boost. Permissively licensed code is no exception: adopting
-  one needs its own recorded rights review and a decision in this file.
-- **Renaming, reordering or re-deriving an adapted algorithm** to present it
-  as new. Citing a paper doesn't cancel having consulted an implementation.
-- **Code from MorphIQ Labs' other repositories** without a provenance audit.
-  Our own history isn't proof of independent origin.
+- **Code under a copyleft license:** GPL, LGPL, AGPL, MPL, EPL, APSL and the
+  like. Distributing it would bind this crate and its users to those terms.
+  Examples: glibc and CRlibm (LGPL), Apple's Libm (APSL).
+- **Code with no license or unclear terms,** such as Cephes, until its terms
+  are recorded and shown compatible. Netlib SPECFUN (Cody) and StatLib (AS241)
+  need that record too before any use.
+- **A disguised copy of either:** renamed, reordered or re-derived. It is the
+  same code.
+- **Code from MorphIQ Labs' other repositories** whose own origin fails this
+  policy. Code we wrote ourselves is fine; an in-house kernel derived from
+  Cephes is not.
 
 ## AI-assisted contributions
 
-A language model trained on public code may have seen any of the implementations
-listed above, and nobody can say which, which version, or what it retained. A
-model-assisted change therefore can't make the disclosure that [Recording](#recording)
-requires. Its rule depends on how much of the result the published mathematics
-determines.
+A model may write any part of this repository, library code included. The
+work meets the same standards as any other change: derivation documents for
+the functions, generated constants, certificates for the bounds, and tests.
 
-**May be model-assisted**, with the disclosure below:
-- derivation documents, which cite only published mathematics;
-- generators, test oracles and fixtures, proofs and certificates (Sollya, Gappa,
-  Coq, Lean), gates, CI and documentation;
-- library code for a **fully specified algorithm**, one whose cited source states
-  it operation by operation, so that the code adds nothing but names, types and
-  layout. Examples: the error-free transforms and published double-word
-  algorithms, and integer generators defined bit for bit by their papers. The
-  pull request cites the section of the source that determines each operation.
-
-**Must be written by a person**, from the function's derivation document: library
-code for any function whose implementation involves design choices the
-mathematics leaves open. These include:
-- argument reduction schemes;
-- table sizes and polynomial or rational degrees;
-- the fast path's working precision;
-- the rounding test;
-- the structure of the accurate path.
-
-The elementary functions, the normal family and the special functions are all in
-this class. The model may write their derivation documents, generators, tests and
-certificates, but not their library code.
-
-**During the work,** a model must not be given, or retrieve, the source of any
-implementation listed under [What may not be used](#what-may-not-be-used).
+**During the work,** a model must not be given, or retrieve, the source of a
+copyleft or unclear-license implementation, so it can't reproduce it.
+Compatible source may be given to it; whatever it takes from that source is
+third-party code, recorded and noticed as below.
 
 **The pull request discloses:**
 - the tool and model used;
 - which files are model-assisted;
-- that no implementation was consulted during the work;
-- for model-assisted library code, the source sections that determine it.
-
-**Similarity gate.** Before the first function with open design choices lands, CI
-gains a gate comparing the library's source, token by token, against the
-implementations listed above. The comparison is mechanical, so nobody reads
-them. The gate runs on every pull request from then on, whoever wrote the
-change.
+- which implementations, if any, were consulted, and what was taken from each.
 
 ## Recording
 
-Each derivation document in `docs/` names the mathematics it uses (with
-citations) and the generator that produced its constants. If a contributor
-consulted any implementation while working on a function, the pull request
-says which one, which version, and what was read. That function's derivation
-then has to show it didn't take that implementation's structure, or the
-function is redone by someone who didn't read it.
+- **Derivations.** Each derivation document in `docs/` names the mathematics it
+  uses, with citations, and the generator that produced its constants.
+- **Vendored code.** `THIRD_PARTY_NOTICES.md`, shipped with the library crate,
+  records for each source:
+  - the project and its exact version (tag or commit);
+  - where it was obtained, and the SHA-256 of what was taken;
+  - its license, with the license text and the copyright notices;
+  - the files here derived from it, and how they were changed.
+
+  The derived files also keep the original's notices in their headers.
+- **Consultation.** A contributor who consulted a copyleft or unclear-license
+  implementation while working on a function says so in the pull request: which
+  one, which version, and what was read. That function's code is then written
+  by someone who didn't read it.
 
 ## Third-party notices
+
+No third-party code is vendored yet, so `THIRD_PARTY_NOTICES.md` doesn't exist.
+The first vendored source adds it, and the repository-hygiene gate's license
+check extends to it then.
 
 Published dependencies of the library crate: none. The test and tooling crates'
 licenses are checked by `cargo-deny` against the allowlist in `deny.toml`. MPFR

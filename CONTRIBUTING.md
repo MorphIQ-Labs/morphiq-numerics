@@ -13,18 +13,19 @@ your first change.
 
 ## Provenance comes first
 
-Every algorithm and constant here must be ours to license under
-MIT OR Apache-2.0. Don't copy or adapt code, coefficient tables or
-implementation structure from any other math library, however permissive its
-license.
+Everything here must be distributable under MIT OR Apache-2.0 and live in
+this repository. Code from another library is welcome under a compatible
+license (MIT, BSD, ISC, Zlib, Apache-2.0, BSL-1.0): vendor it, keep its
+notices, and record it in `THIRD_PARTY_NOTICES.md`. Copyleft (GPL, LGPL, MPL,
+APSL) and unlicensed code can't come in.
 
-If you consulted another implementation while working on a function, say so in
-the pull request: which one, which version, and what you read. See
-[PROVENANCE.md](docs/PROVENANCE.md).
+If you consulted a copyleft or unlicensed implementation while working on a
+function, say so in the pull request: which one, which version, and what you
+read. See [PROVENANCE.md](docs/PROVENANCE.md).
 
 If a language model assisted your change, its rules are in
 [AI-assisted contributions](docs/PROVENANCE.md#ai-assisted-contributions): what
-it may write, what a person must write, and what the pull request discloses.
+it may be given, and what the pull request discloses.
 
 ## Running the gates locally
 

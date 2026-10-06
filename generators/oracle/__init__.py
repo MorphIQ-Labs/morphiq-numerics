@@ -72,6 +72,30 @@ def correctly_rounded(f, x, start=128, limit=1 << 15):
             sys.exit(f'f({x!r}) did not settle by {limit} bits')
 
 
+def precise(f, x, bits=192):
+    """f (an mpmath interval function) at the binary64 x as (negative, m, e):
+    m has exactly `bits` bits and |m 2^e - |f(x)|| <= 2^-bits |f(x)|. The
+    enclosure is computed at 2 bits + 64 bits and must be narrower than
+    2^-(bits + 8) relatively; its lower end is rounded to `bits` bits, in
+    integer arithmetic. For checking unrounded intermediate results against
+    their error bounds."""
+    iv.prec = 2 * bits + 64
+    y = f(iv.mpf(x))
+    (s_lo, m_lo, e_lo, _), (s_hi, m_hi, e_hi, _) = y._mpi_
+    m_lo, m_hi, e_lo, e_hi = int(m_lo), int(m_hi), int(e_lo), int(e_hi)
+    assert m_lo and m_hi and s_lo == s_hi, f'f({x!r}) is not bounded away from zero'
+    e0 = min(e_lo, e_hi)
+    a, b = m_lo << (e_lo - e0), m_hi << (e_hi - e0)  # |ends| * 2^-e0, exactly
+    assert abs(b - a) << (bits + 8) <= min(a, b), f'f({x!r}) enclosure too wide'
+    # mpmath keeps mantissas odd, so an end may have fewer than `bits` bits.
+    shift = a.bit_length() - bits
+    m = (a + (1 << (shift - 1))) >> shift if shift > 0 else a << -shift  # nearest, ties up
+    e = e0 + shift
+    if m >> bits:
+        m, e = m >> 1, e + 1
+    return bool(s_lo), m, e
+
+
 def binary_digits(v, count):
     """The first `count` significant binary digits of |v|, a nonzero mpf, and
     the exponent of the leading one, computed with 4 * count bits."""

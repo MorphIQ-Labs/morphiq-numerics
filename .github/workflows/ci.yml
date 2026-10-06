@@ -221,6 +221,21 @@ jobs:
   # Machine-checked proofs, bound to the source they describe: the double-word
   # error bounds and two_prod's exactness (docs/double-word.md). The Coq image
   # is pinned by digest; Flocq and math-comp versions are pinned in the script.
+  certificates:
+    name: certificates (sollya, gappa)
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Sollya and Gappa certificates reproduce, prove their goals, and are bound to their sources
+        # Debian bookworm, pinned by digest, with Sollya 8.0 and Gappa 1.4.1
+        # pinned by package version.
+        run: |
+          docker run --rm -v "$PWD:/w:ro" -w /w \
+            debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 \
+            bash -c 'apt-get update -qq >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq sollya=8.0+ds-2+b1 gappa=1.4.1-1 >/dev/null && ./scripts/check_certificates.sh'
+
   formal:
     name: formal (coq)
     needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]

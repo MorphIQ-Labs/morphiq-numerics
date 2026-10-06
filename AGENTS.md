@@ -18,7 +18,7 @@ Milestone M1 of the plan is complete; the repository is working through M2. The 
 
 - **Correct rounding is the contract.** For every finite argument in its domain, a function returns the binary64 value nearest the exact result, ties to even, with IEEE 754-2019 §9.2 special-value semantics. A function is claimed correctly rounded only over a domain where its accurate path is proved sufficient against the published worst cases; anywhere else its proved bound is stated instead. Never claim more than the artifacts establish.
 - **Target independence is enforced, not assumed.** No platform libm (the crate is `no_std`; Clippy's `disallowed-methods` denies the `std` transcendentals in every target, tests included). No implicit contraction. Error-free transforms are exact with or without FMA. A vectorized path performs the scalar operation sequence per lane and returns the scalar result bit for bit. The determinism digest proves this on every supported target.
-- **Provenance is clean.** Algorithms come from mathematical definitions and published mathematics; every coefficient and constant comes from a versioned generator. No code, tables or structure from another implementation (see [PROVENANCE.md](docs/PROVENANCE.md)). An agent writes library code only for fully specified algorithms, and never retrieves another implementation's source ([AI-assisted contributions](docs/PROVENANCE.md#ai-assisted-contributions)).
+- **Provenance is clean.** Everything here can ship under MIT OR Apache-2.0 and lives in this repository. Algorithms come from published mathematics or from vendored code under a compatible license, recorded with its notices; every generated coefficient and constant comes from a versioned generator. No copyleft or unclear-license code, and an agent is never given such source ([PROVENANCE.md](docs/PROVENANCE.md), [AI-assisted contributions](docs/PROVENANCE.md#ai-assisted-contributions)).
 - **Expected values come from outside the implementation.** Test oracles are MPFR, mpmath and published worst-case data, never a rearrangement of the function under test and never a tolerance wide enough to accept a wrong rounding. For a correctly rounded function the assertion is bit equality.
 - **Performance is designed.** Each function's fast path is chosen for its operation count and branch behaviour; the accurate path's rate is measured and reported. Performance claims are local same-host measurements, never CI timing.
 
@@ -45,6 +45,7 @@ cargo build -p morphiq-numerics --locked --target thumbv7em-none-eabihf   # no_s
 ./scripts/check_generators.sh
 cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
 # then, in the pinned Coq image (see the formal job): ./scripts/check_formal.sh target/crosscheck.txt
+# and, in the pinned Debian image (see the certificates job): ./scripts/check_certificates.sh
 cargo deny --locked check licenses
 ```
 
