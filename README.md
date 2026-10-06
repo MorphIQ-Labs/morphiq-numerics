@@ -5,11 +5,10 @@ elementary functions, seeded random streams and the normal family. Every
 function is derived from first principles, with machine-checked error
 bounds.
 
-> **Status: pre-release (milestone M1).** The library provides error-free
-> transforms, double-word arithmetic, ULP utilities and seeded streams so far;
-> nothing is published yet. The
-> [project plan](docs/PLAN.md) describes what release 0.1 will contain and how
-> it is built and verified.
+> **Status: pre-release.** Nothing is published yet. The scope of release 0.1
+> and the remaining work are tracked in its
+> [epic](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/100) and the
+> repository's [milestones](https://github.com/MorphIQ-Labs/morphiq-numerics/milestones).
 
 ## Why
 
@@ -38,10 +37,13 @@ reference, returns the same bits.
   constant from a versioned generator. No copyleft code; see the
   [provenance policy](docs/PROVENANCE.md).
 - **Evidence:**
-  - bit-exact tests against MPFR and mpmath;
-  - Sollya and Gappa certificates checked by Coq, bound to the source they
-    describe;
-  - mutation testing and fuzzing.
+  - bit-exact tests against an interval-arithmetic oracle (mpmath), exact
+    integer arithmetic and published worst cases;
+  - Sollya approximation bounds and Gappa error certificates, the Gappa
+    certificates checked in Coq;
+  - Coq proofs of the arithmetic contracts, each tied to the Rust code by an
+    extracted transcription compared bit for bit;
+  - every proof bound by hash to the source it describes.
 
 ## License
 

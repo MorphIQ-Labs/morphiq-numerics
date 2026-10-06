@@ -7,9 +7,10 @@
 - the pull-request and release rules;
 - the definition of done.
 
-It applies to human and agent contributors alike. Read it, the
-[plan](docs/PLAN.md) and the [provenance policy](docs/PROVENANCE.md) before
-your first change.
+It applies to human and agent contributors alike. Read it and the
+[provenance policy](docs/PROVENANCE.md) before your first change. Scope and
+progress are tracked in the repository's
+[milestones](https://github.com/MorphIQ-Labs/morphiq-numerics/milestones) and issues.
 
 ## Provenance comes first
 

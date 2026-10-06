@@ -6,13 +6,23 @@ This file is the repository's engineering contract for human and agent contribut
 
 ## Purpose and Architecture
 
-`morphiq-numerics` provides binary64 numerical primitives whose results are **correctly rounded** and **identical on every target**: elementary functions, seeded random streams and the normal family. It is the shared numerics substrate for MorphIQ Labs' engines and is published openly under MIT OR Apache-2.0. Read [the plan](docs/PLAN.md) and [the provenance policy](docs/PROVENANCE.md) before any change.
+`morphiq-numerics` provides binary64 numerical primitives whose results are **correctly rounded** and **identical on every target**: elementary functions, seeded random streams and the normal family. It is the shared numerics substrate for MorphIQ Labs' engines and is published openly under MIT OR Apache-2.0. Read [the provenance policy](docs/PROVENANCE.md) before any change. Scope, intent and progress are recorded in GitHub issues, epics and milestones, never in repository documents.
 
 The library's public API is what `crates/morphiq-numerics/src/lib.rs` lists, and each function's contract and derivation is a document in `docs/`; documentation must not describe functions that are not in the source tree.
 
 - `crates/morphiq-numerics` is the published library. It is `#![no_std]`, has no dependencies, forbids `unsafe`, and never calls a platform math library. A `std` feature, if one is ever added, may only add conveniences, never a different numerical result.
 - Test oracles (MPFR, mpmath), generators, proofs and fuzzing live outside the published crate and are never its dependencies.
 - Consumers take pinned releases. A defect found by a consumer is fixed here and consumed back at a released version.
+
+```text
+crates/morphiq-numerics/   the published library: no_std, no dependencies
+crates/reference/          reference tests against the fixtures, and the cross-check corpus writer (unpublished)
+crates/digest/             the determinism digest, and digest-embedded for the no_std target
+generators/                Sollya and mpmath generators for constants, certificates and fixtures
+formal/                    Gappa certificates, Coq proofs, the axiom audit and the proof-binding manifests
+docs/                      each function's contract and derivation, and the provenance policy
+scripts/                   gate logic that CI and contributors run identically
+```
 
 ## Design Constraints
 
@@ -22,6 +32,17 @@ The library's public API is what `crates/morphiq-numerics/src/lib.rs` lists, and
 - **Expected values come from outside the implementation.** Test oracles are MPFR, mpmath and published worst-case data, never a rearrangement of the function under test and never a tolerance wide enough to accept a wrong rounding. For a correctly rounded function the assertion is bit equality.
 - **Performance is designed.** Each function's fast path is chosen for its operation count and branch behaviour; the accurate path's rate is measured and reported. Performance claims are local same-host measurements, never CI timing.
 
+## How a Correctly Rounded Function Is Built
+
+Each function follows the same pipeline, and its derivation document is as much the deliverable as its code:
+
+1. **Specification:** domain, special values, overflow and underflow thresholds (derived, not copied), and the exact mathematical definition.
+2. **Argument reduction:** derived from the function's algebra, with constants generated at stated precision and their rounding error accounted for; Payne–Hanek for large trigonometric arguments.
+3. **Fast path:** an approximation evaluated in binary64 or double-word arithmetic. Its approximation error is certified by Sollya `supnorm`, its evaluation error by Gappa.
+4. **Rounding test:** Ziv's strategy. The fast result is returned only when its error interval provably cannot straddle a rounding boundary.
+5. **Accurate path:** `Q128` or `Q256` integer-significand arithmetic (no fused multiply-add needed), with an error bound proved small enough for the published worst cases of that function. Where no worst-case result covers a domain, correct rounding there is not claimed; the proved bound is stated instead.
+6. **Generators:** every coefficient and constant comes from a versioned generator under `generators/`, with pinned tools and a recorded precision, and CI replays it.
+
 ## Invariants and Trust Boundaries
 
 Every invariant names its enforcement, chosen from this ladder: (1) unrepresentable by construction (types, `no_std`, the absence of a dependency), (2) enforced inside the owning function, (3) only then a tested convention hardened by mutation gates. Never assert source text, byte offsets or statement order in a test. A proof artifact is bound by hash to the source it describes; changing that source fails the gate until the proof is rerun. Escape hatches (an allowed lint, a skipped gate) ship with their reason and exit condition.
@@ -30,7 +51,7 @@ Every invariant names its enforcement, chosen from this ladder: (1) unrepresenta
 
 - Finish the job in the change that surfaces it: fix the defect pattern, not the instance, search the crate for siblings, and say what the search found, including when it found none. If completing the pattern would make one change unreviewable, split it into stacked pull requests that land together.
 - Root-cause every regression: how it entered, why the safeguards missed it, and what prevents recurrence.
-- Documentation ships in the change that invalidates it. Standards and contract documents describe the current tree only; the plan records intent and is updated as milestones land.
+- Documentation ships in the change that invalidates it. Standards and contract documents describe the current tree only; intent and progress live in GitHub issues and milestones.
 - Prefer simple, auditable code. Every function's derivation is a document, and the code follows it.
 
 ## Build, Test, and Development Commands
