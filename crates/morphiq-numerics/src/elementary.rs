@@ -2,6 +2,8 @@
 //! nearest to the exact result, ties to even, on every target.
 //!
 //! Each function's derivation, with its certificates, is in `docs/`:
-//! [`exp`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/exp.md).
+//! [`exp`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/exp.md),
+//! [`ln` and `ln_1p`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/ln.md).
 
 pub use crate::exp::exp;
+pub use crate::ln::{ln, ln_1p};

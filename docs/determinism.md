@@ -20,6 +20,8 @@ functions unnoticed.
 | `double_word_checked` | 20,000 triples with exponents in `[−1020, 1020)`, past every operation's domain | every checked operation: the result's words, or a code for the error |
 | `reduce` | slices of every length from 0 to 32, exponents in `[−100, 100]`, mixed signs; one slice holding a NaN | `sum`, `sum2`, `dot`, `dot2`, `sum_squares`, `sum_squares2`, `max_abs` |
 | `exp` | NaN, ±∞, ±0, the extreme encodings, each threshold of [exp.md](exp.md) §1 with its neighbour; 20,000 arguments in `[−746, 710)`; 64 of each binade from `2^−60` to `2^−1`, both signs | `exp` |
+| `ln` | NaN, ±∞, ±0, −1, the extreme encodings, 1 and its neighbours; 20,000 positive encodings, subnormals included; 4,000 arguments in `[0.5, 2)` | `ln` |
+| `ln_1p` | NaN, ±∞, ±0, −1 and its neighbour, −2, each branch edge of [ln.md](ln.md) §7, the largest finite; 20,000 arguments with magnitudes from `2^−60` to `2^1023`, either sign | `ln_1p` |
 | `random` | four seeds | 4,096 words of each stream, both uniforms of each SplitMix64 word, and a word after `jump` and after `long_jump` |
 
 ## Where it is checked

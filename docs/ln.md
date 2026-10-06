@@ -1,12 +1,9 @@
-# `ln` and `ln_1p`: correctly rounded logarithms (derivation, draft for review)
+# `ln` and `ln_1p`: correctly rounded logarithms
 
-> **Status: derivation complete, waiting for the kernel.** This document is the
-> derivation the kernels are written from. Every bound below is certified, and
-> every constant generated, by the artifacts in §8. Under the
-> [provenance policy](PROVENANCE.md#ai-assisted-contributions), the kernels are
-> written by a person from this document, in the same pull request, so the
-> document never describes code that doesn't exist. Each numbered **decision**
-> is a design choice open to review.
+`morphiq_numerics::elementary::{ln, ln_1p}` (`crates/morphiq-numerics/src/ln/`)
+follow this derivation step for step, with [exp]'s `Q128` type. Every bound
+below is certified, and every constant generated, by the artifacts in §8. Each
+numbered **decision** is a design choice open to review.
 
 `ln(x)` returns `ln x` rounded to nearest, ties to even, for every binary64 `x`.
 `ln_1p(x)` returns `ln(1 + x)`, without rounding `1 + x`. It is correctly rounded
@@ -162,8 +159,8 @@ operations.**
    - Its relative error against `E·ln 2` is below `2^−96.47` (*generated*).
 7. `Y = DoubleWord(l_hi, l_lo).add(S)`.
 
-The kernel may skip a term that is zero (`E = 0`, or `R[i] = 1`) or add it.
-The fast-path certificates hold either way.
+The kernel adds every term, including a zero one (`E = 0`, or `R[i] = 1`);
+the fast-path certificates also cover skipping it.
 
 **The fast-path bound:** relative to `ln x`, `Y`'s error is below `2^−64`
 (*certified*, by case):
@@ -308,21 +305,30 @@ The fast path is within `2^−64`, and the accurate path within `2^−123`.
 - **Replay:** `scripts/check_generators.sh` replays both generators.
 
 **The binding** (`formal/ln/binding.sha256`) covers this document, the
-constants, the Sollya script and output, and every certificate. When the kernels
-land, it gains their source.
+constants, the Sollya script and output, every certificate, and the kernels'
+source (`ln/mod.rs`, `q128.rs`).
 
-`tables.rs` isn't compiled until the kernel declares `mod tables`.
+## 9. Checked by
 
-## 9. Checked by (when the kernels land)
-
-The kernels' tests, written with them:
-
-- Bit-exact agreement with `crates/reference/fixtures/ln.json`:
-  - 4,019 `ln` cases, including [LM] Table 5's worst cases;
-  - 3,960 `ln_1p` cases.
-
-  An `ln_1p` mismatch would be an input inside §7's window. It's reported, not
-  waived.
-- The determinism digest on every target.
-- The fast paths' pass rates, measured and reported.
+- **Bit-exact agreement** with `crates/reference/fixtures/ln.json`
+  (`crates/reference/tests/ln.rs`): 4,019 `ln` cases, including [LM] Table 5's
+  worst cases, and 3,960 `ln_1p` cases. An `ln_1p` mismatch would be an input
+  inside §7's window. It's reported, not waived.
+- **Every unrounded result within its certified bound,** against values to 192
+  bits (the fixture's `precise` section), in exact arithmetic
+  (`src/ln/tests.rs`):
+  - `ln`'s fast path within `2^−64` and accurate path within `2^−123`, on 1,200
+    arguments;
+  - `ln_1p`'s within `2^−63` and `2^−123` on 1,400 arguments across its
+    branches, 200 of them around `2^53`, where `1 + x` splits as `(x, 1)`;
+  - `P` against `ln(1 + z)` within `3·2^−66` for 600 double-word `z` with a
+    nonzero low word, which random arguments rarely produce.
+- **The fast paths against the accurate paths:** equal whenever the fast path
+  returns, on 2^20 `ln` and about 550,000 `ln_1p` arguments. Measured, they send
+  `2^−9.4` of arguments to the accurate path (1,502 of 1,048,576 for `ln`, 761 of
+  550,857 for `ln_1p`), against the analytic bound `2^−9`; the tests fail above
+  four times that.
+- **The rounding test at its boundary,** for both signs and at powers of two.
+- **The determinism digest's `ln` and `ln_1p` sections** on every target
+  ([determinism.md](determinism.md)).
 - Exhaustive checks of chosen sub-intervals against the oracle (scheduled).

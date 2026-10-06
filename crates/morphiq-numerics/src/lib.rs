@@ -27,6 +27,7 @@ pub mod double_word;
 pub mod eft;
 pub mod elementary;
 mod exp;
+mod ln;
 mod q128;
 pub mod random;
 pub mod reduce;

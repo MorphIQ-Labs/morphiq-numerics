@@ -24,6 +24,12 @@ The cases:
 - Inputs from a SplitMix64 stream (Steele, Lea and Flood, OOPSLA 2014): ln over
   every positive binade including the subnormals, near 1, and in [0.5, 2];
   ln_1p near 0 at every scale, across (-1, 1), near -1, and large.
+
+The "precise" section records, for SplitMix64 inputs to each function, the
+value to 192 bits (oracle.precise): the reference for the unrounded fast and
+accurate results, checked against their certified error bounds. Its "ln_1p_z"
+entries hold ln(1 + z) for double-word z = z_hi + z_lo with |z| <= 2^-7 and a
+nonzero z_lo, the fast path's inner evaluation (docs/ln.md section 4).
 """
 import json
 import math
@@ -33,7 +39,7 @@ import sys
 import mpmath
 from mpmath import iv
 
-from oracle import check_worst_case, correctly_rounded, from_bits, splitmix64, to_bits
+from oracle import check_worst_case, correctly_rounded, from_bits, precise, splitmix64, to_bits
 
 OUTPUT = pathlib.Path(__file__).resolve().parents[1] / 'crates/reference/fixtures/ln.json'
 
@@ -127,6 +133,54 @@ def ln_1p_cases():
     return [(kind, x) for kind, x in cases if not (x <= -1.0 and kind.startswith('random'))]
 
 
+def precise_cases():
+    """(function, inputs): ln over every binade, near 1 and in [0.5, 2];
+    ln_1p across each of its branches (section 7 of docs/ln.md)."""
+    words = splitmix64(0x6C6E5F7072653031)
+    unit = lambda: (next(words) >> 11) * 2.0 ** -53  # noqa: E731
+    ln_x = [from_bits(1 + next(words) % (0x7FF0000000000000 - 1)) for _ in range(500)]
+    for _ in range(400):
+        k = 1 + next(words) % 52
+        u = 1.0 + unit()
+        x = 1.0 + u * 2.0 ** -k if next(words) & 1 else 1.0 - u * 2.0 ** -(k + 1)
+        ln_x.append(x)
+    ln_x += [0.5 + unit() * 1.5 for _ in range(300)]
+    ln_x = [x for x in ln_x if x != 1.0]
+    ln_1p_x = []
+    for _ in range(400):  # 2^-54 <= |x| < 2^-7
+        x = (1.0 + unit()) * 2.0 ** (-54 + next(words) % 47)
+        ln_1p_x.append(-x if next(words) & 1 else x)
+    for _ in range(400):  # 2^-7 <= |x| < 1
+        x = (1.0 + unit()) * 2.0 ** (-7 + next(words) % 7)
+        ln_1p_x.append(-x if next(words) & 1 else x)
+    for _ in range(400):  # large
+        ln_1p_x.append((1.0 + unit()) * 2.0 ** (next(words) % 1024))
+    for _ in range(200):  # around 2^53, where 1 + x splits as (x, 1)
+        ln_1p_x.append((1.0 + unit()) * 2.0 ** (52 + next(words) % 12))
+    ln_1p_z = []
+    for _ in range(600):
+        z_hi = (1.0 + unit()) * 2.0 ** (-7 - next(words) % 50)
+        z_hi = -z_hi if next(words) & 1 else z_hi
+        ulp = 2.0 ** (math.frexp(z_hi)[1] - 53)
+        z_lo = (unit() - 0.5) * ulp  # |z_lo| < ulp(z_hi)/2, so (z_hi, z_lo) is a double-word
+        if z_lo == 0.0 or abs(z_hi) >= 2.0 ** -7:
+            continue
+        ln_1p_z.append((z_hi, z_lo))
+
+    def entry(f, x):
+        negative, m, e = precise(f, x)
+        return {'x': f'{to_bits(x):016x}', 'negative': negative, 'm': f'{m:048x}', 'e': e}
+    def entry_z(z_hi, z_lo):
+        negative, m, e = precise(lambda v: iv.log(1 + v + iv.mpf(z_lo)), z_hi)
+        return {'z_hi': f'{to_bits(z_hi):016x}', 'z_lo': f'{to_bits(z_lo):016x}',
+                'negative': negative, 'm': f'{m:048x}', 'e': e}
+    return {
+        'ln': [entry(iv.log, x) for x in ln_x],
+        'ln_1p': [entry(lambda v: iv.log(1 + v), x) for x in ln_1p_x],
+        'ln_1p_z': [entry_z(z_hi, z_lo) for z_hi, z_lo in ln_1p_z],
+    }
+
+
 def document():
     return {
         'generator': 'generators/ln_reference.py',
@@ -139,6 +193,7 @@ def document():
             'IEEE 754-2019, section 9.2 (special values)',
             'Steele, Lea and Flood, OOPSLA 2014, Figure 16 (the random inputs)',
         ],
+        'precise': precise_cases(),
         'ln': [
             {'kind': kind, 'x': f'{to_bits(x):016x}', 'ln': f'{to_bits(ln_rn(x)):016x}'}
             for kind, x in ln_cases()
