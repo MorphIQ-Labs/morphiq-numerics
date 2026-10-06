@@ -5,35 +5,38 @@
 #      fails until the proofs are rerun and the manifest is updated with them.
 #   2. No proof file admits a goal.
 #   3. The double-word development (formal/double-word), the two_prod binding
-#      proof (formal/two-prod) and the binary64 bindings (formal/binary64) build.
+#      proof (formal/two-prod), the binary64 bindings (formal/binary64) and the
+#      Q128/Q256 contracts (formal/q) build.
 #   4. The global axioms the relied-on theorems (formal/audit/Audit.v) rest on
 #      are exactly those listed in formal/axioms.expected.
 #   5. Every Gappa certificate's Coq proof (gappa -Bcoq, written into the
-#      directory given as the second argument by scripts/write_gappa_proofs.sh)
+#      directory given as the third argument by scripts/write_gappa_proofs.sh)
 #      builds with each rewriting hint proved as a lemma by
 #      formal/gappa/Hints.v, so no hypothesis is left; and each final theorem's
 #      global axioms are among formal/axioms.expected.
-#   6. The proved IEEE 754 definitions, extracted to OCaml (formal/extraction),
-#      reproduce the Rust library's results bit for bit on the cross-check
-#      corpus, the file given as the first argument. Write the arguments first
-#      with
+#   6. The proved IEEE 754 definitions and the Q128/Q256 transcriptions,
+#      extracted to OCaml (formal/extraction), reproduce the Rust library's
+#      results bit for bit on the cross-check corpora given as the first two
+#      arguments. Write the arguments first with
 #        cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
+#        MORPHIQ_Q_CORPUS=$PWD/target/q-crosscheck.txt cargo test --locked -p morphiq-numerics --lib q_crosscheck -- --ignored
 #        ./scripts/write_gappa_proofs.sh target/gappa-proofs   (in the certificates image)
 #
 # Runs inside the pinned Coq image (see the formal job in .github/workflows/ci.yml),
 # which provides coqc, coq_makefile and opam; Flocq and math-comp are pinned here.
 set -eu
-if [ $# -ne 2 ]; then
-  echo "usage: $0 <cross-check corpus> <Gappa proofs directory>" >&2
+if [ $# -ne 3 ]; then
+  echo "usage: $0 <cross-check corpus> <Q cross-check corpus> <Gappa proofs directory>" >&2
   exit 2
 fi
 corpus=$(realpath "$1")
-proofs=$(realpath "$2")
+qcorpus=$(realpath "$2")
+proofs=$(realpath "$3")
 cd "$(dirname "$0")/.."
 
 sha256sum --check --quiet formal/binding.sha256
 
-if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v formal/binary64/*.v formal/extraction/*.v \
+if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v formal/binary64/*.v formal/extraction/*.v formal/q/*.v \
     formal/gappa/*.v "$proofs"/*/*.v; then
   echo "a proof admits a goal" >&2
   exit 1
@@ -43,7 +46,10 @@ opam install --yes coq-flocq.3.4.3 coq-mathcomp-ssreflect.1.14.0 coq-gappa.1.5.2
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-cp -r formal/double-word formal/two-prod formal/binary64 formal/audit formal/extraction "$work/"
+cp -r formal/double-word formal/two-prod formal/binary64 formal/q formal/audit formal/extraction "$work/"
+(cd "$work/q" && for proof in QSpec QRound Q128Mul Q128 Limbs Digits64 Shifts LimbScan Q256; do
+  coqc -R . Q "$proof.v" || exit 1
+done)
 (cd "$work/double-word" && coq_makefile -f _CoqProject -o Makefile && make -j"$(nproc)")
 (cd "$work/two-prod" && coqc TwoProdBinary64.v)
 (cd "$work/binary64" && for proof in Binary64Add Instances Binary64Mul Grid Binary64Div \
@@ -52,7 +58,7 @@ cp -r formal/double-word formal/two-prod formal/binary64 formal/audit formal/ext
   coqc -R ../double-word Double -R . Binary64 -R ../two-prod "" "$proof.v" || exit 1
 done)
 
-(cd "$work/audit" && coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" -R ../binary64 Binary64 Audit.v) > "$work/audit.log"
+(cd "$work/audit" && coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" -R ../binary64 Binary64 -R ../q Q Audit.v) > "$work/audit.log"
 # Each axiom entry starts unindented; its type follows on the same line or on
 # indented lines after it, depending on its length.
 grep -E '^[^[:space:]]' "$work/audit.log" \
@@ -115,4 +121,8 @@ echo "certificates in Coq: $certificates proved"
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
   && ocamlfind ocamlopt -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
   && ./crosscheck "$corpus")
+(cd "$work/extraction" \
+  && coqc -R ../q Q QCrosscheck.v \
+  && ocamlfind ocamlopt -o qcrosscheck qcrosscheck.mli qcrosscheck.ml qdriver.ml \
+  && ./qcrosscheck "$qcorpus")
 echo "formal: OK"

@@ -137,7 +137,12 @@ by `k mod 4`, with `sin`'s sign from `x`.
 - Multiplication is truncated, with relative error in `[−2^−255, 0]`.
 - Addition errs by at most `2^−254·max(|a|, |b|)`.
 - Conversion from and rounding to binary64 are exact.
-- `src/q256/tests.rs` checks the contract in exact big-integer arithmetic.
+- The contract is proved in Coq: `formal/q/Q256.v` proves that a transcription
+  of `q256.rs` computes it, limb arithmetic included (`formal/q/Limbs.v`,
+  `Digits64.v`, `Shifts.v`, `LimbScan.v`), and that `from_limbs` truncates
+  with relative error in `[−2^−255, 0]`. The formal job compares the
+  transcription with `q256.rs` bit for bit on the Q cross-check corpus.
+  `src/q256/tests.rs` also checks the contract in exact big-integer arithmetic.
 
 `sin r = r·H_1` and `cos r = G_1`, in `s = r²`:
 - `H_n = 1 − (s/((2n)(2n+1)))·H_(n+1)` and `G_n = 1 − (s/((2n−1)(2n)))·G_(n+1)`,

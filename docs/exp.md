@@ -175,7 +175,7 @@ near overflow, it's applied as `(y_hi · 2^(k−1)) · 2`.
 - **The type:** a private sign-magnitude type `Q128 = (sign, m: u128, e: i32)`,
   with value `±m·2^e`, and `m` normalized (top bit set) or zero. It is
   deterministic on every target and uses only integer instructions.
-- **Its contract,** which the certificates assume and its tests must check:
+- **Its contract,** which the certificates assume. It is proved in Coq (§8):
   - **Multiplication:** the exact product, truncated toward zero to 128 bits.
     Relative error in `[−2^−127, 0]`.
   - **Addition:** absolute error at most `2^−126·max(|a|, |b|)`. That allows the
@@ -289,9 +289,13 @@ manifest is updated.
 - **The fast path against the accurate path** on 2^20 arguments: equal whenever
   the fast path returns. It sent 23 of 1,021,637 (`2^−15.4`) to the accurate
   path, against the analytic `2^−15`; the test fails above four times that.
-- **The `Q128` contract,** in exact big-integer arithmetic (`src/q128/tests.rs`):
-  multiplication, addition, conversion and rounding, ties and subnormals
-  included.
+- **The `Q128` contract, proved:** `formal/q` proves the contract for any
+  significand width (`QSpec.v`, `QRound.v`) and that a step-for-step
+  transcription of `q128.rs` computes it (`Q128.v`: `mul_value`, `add_ok`,
+  `to_f64_ok`, `from_f64_ok`, `neg_ok`, `mul_pow2_ok`). The formal job
+  extracts the transcription and compares it with `q128.rs` bit for bit on the
+  Q cross-check corpus (`src/q_crosscheck.rs`). `src/q128/tests.rs` also checks
+  the contract in exact big-integer arithmetic, ties and subnormals included.
 - **The determinism digest's `exp` section** on every target
   ([determinism.md](determinism.md)).
 - Exhaustive checks of chosen sub-intervals against the oracle (scheduled).
