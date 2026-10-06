@@ -250,8 +250,16 @@ jobs:
         run: |
           mkdir -p target
           cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
+      - name: Write the Gappa certificates' Coq proofs
+        # The certificates job's image and Gappa version. Gappa's proof search
+        # can differ between hosts, so the proofs are written here and checked
+        # below rather than committed.
+        run: |
+          docker run --rm -v "$PWD:/w" -w /w \
+            debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 \
+            bash -c 'apt-get update -qq >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gappa=1.4.1-1 >/dev/null && ./scripts/write_gappa_proofs.sh target/gappa-proofs'
       - name: Proofs build, are bound to the source, assume only the expected axioms, and match the Rust bit for bit
         run: |
           docker run --rm -v "$PWD:/w:ro" -w /w \
             coqorg/coq@sha256:6113894351967e84f6eca8bd584abbea2c8b97621bb1a0aa9cf7b1d24e7f49ef \
-            bash -c 'opam update --quiet >/dev/null 2>&1 || true; ./scripts/check_formal.sh target/crosscheck.txt'
+            bash -c 'opam update --quiet >/dev/null 2>&1 || true; ./scripts/check_formal.sh target/crosscheck.txt target/gappa-proofs'

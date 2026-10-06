@@ -9,8 +9,6 @@
 #   2. generators/<f>_poly.sollya, where there is one, reproduces
 #      generators/<f>_poly.out exactly.
 #   3. Every Gappa certificate in formal/<f> proves its goal.
-#   4. formal/<f>/coq holds exactly Gappa's Coq proof of each certificate
-#      (scripts/write_gappa_proofs.sh), which the formal lane checks in Coq.
 #
 # Runs in the pinned image of the certificates job (.github/workflows/ci.yml),
 # which provides Sollya 8.0 and Gappa 1.4.1.
@@ -38,18 +36,6 @@ for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig
   done
 done
 
-proofs=$(mktemp -d)
-trap 'rm -rf "$proofs"' EXIT
-./scripts/write_gappa_proofs.sh --into "$proofs"
-for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig; do
-  f=${dir#formal/}
-  if ! diff -r -u "$dir/coq" "$proofs/$f" > "$proofs/$f.diff"; then
-    head -n 40 "$proofs/$f.diff" >&2
-    echo "formal/$f/coq differs from Gappa's proofs: rerun scripts/write_gappa_proofs.sh" >&2
-    failed=1
-  fi
-done
-echo "replayed: Gappa's Coq proofs"
 
 [ "$failed" -eq 0 ]
 echo "certificates: OK"

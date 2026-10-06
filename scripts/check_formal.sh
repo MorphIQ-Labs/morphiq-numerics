@@ -8,29 +8,33 @@
 #      proof (formal/two-prod) and the binary64 bindings (formal/binary64) build.
 #   4. The global axioms the relied-on theorems (formal/audit/Audit.v) rest on
 #      are exactly those listed in formal/axioms.expected.
-#   5. Every Gappa certificate's Coq proof (formal/<f>/coq, replayed by the
-#      certificates lane) builds with each rewriting hint proved as a lemma by
+#   5. Every Gappa certificate's Coq proof (gappa -Bcoq, written into the
+#      directory given as the second argument by scripts/write_gappa_proofs.sh)
+#      builds with each rewriting hint proved as a lemma by
 #      formal/gappa/Hints.v, so no hypothesis is left; and each final theorem's
 #      global axioms are among formal/axioms.expected.
 #   6. The proved IEEE 754 definitions, extracted to OCaml (formal/extraction),
 #      reproduce the Rust library's results bit for bit on the cross-check
-#      corpus, the file given as the only argument. Write it first with
+#      corpus, the file given as the first argument. Write the arguments first
+#      with
 #        cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
+#        ./scripts/write_gappa_proofs.sh target/gappa-proofs   (in the certificates image)
 #
 # Runs inside the pinned Coq image (see the formal job in .github/workflows/ci.yml),
 # which provides coqc, coq_makefile and opam; Flocq and math-comp are pinned here.
 set -eu
-if [ $# -ne 1 ]; then
-  echo "usage: $0 <cross-check corpus>" >&2
+if [ $# -ne 2 ]; then
+  echo "usage: $0 <cross-check corpus> <Gappa proofs directory>" >&2
   exit 2
 fi
 corpus=$(realpath "$1")
+proofs=$(realpath "$2")
 cd "$(dirname "$0")/.."
 
 sha256sum --check --quiet formal/binding.sha256
 
 if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v formal/binary64/*.v formal/extraction/*.v \
-    formal/gappa/*.v formal/*/coq/*.v; then
+    formal/gappa/*.v "$proofs"/*/*.v; then
   echo "a proof admits a goal" >&2
   exit 1
 fi
@@ -74,8 +78,8 @@ mkdir "$work/gappa"
 cp formal/gappa/Hints.v "$work/gappa/"
 (cd "$work/gappa" && coqc -R . "" Hints.v)
 printf '' > "$work/gappa/CertificateAudit.v"
-for proof in formal/*/coq/*.v; do
-  f=$(basename "$(dirname "$(dirname "$proof")")")
+for proof in "$proofs"/*/*.v; do
+  f=$(basename "$(dirname "$proof")")
   module="${f}_$(basename "$proof" .v)"
   if ! grep -q '^Lemma l1 : s1 -> False\.$' "$proof"; then
     echo "$proof: no final theorem l1" >&2

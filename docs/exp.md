@@ -249,10 +249,12 @@ result once therefore rounds `e^x` correctly.
   job, runs in a Debian image pinned by digest, with Sollya and Gappa pinned by
   package version. It checks that `formal/exp/binding.sha256` matches, that the
   Sollya script reproduces its output exactly, and that every certificate proves
-  its goal. It also replays each certificate's Coq proof (`gappa -Bcoq`,
-  committed in `formal/exp/coq` by `scripts/write_gappa_proofs.sh`).
+  its goal.
 - **Coq:** `scripts/check_formal.sh`, the formal job, builds every certificate's
-  Coq proof. Gappa checks a rewriting hint only symbolically and states it as a
+  Coq proof, which `scripts/write_gappa_proofs.sh` writes there with the same
+  pinned Gappa (`gappa -Bcoq`). Gappa's proof search can take a different,
+  equally valid route on a different host, so the proofs aren't committed; the
+  theorem each proves is stated by the bound certificate. Gappa checks a rewriting hint only symbolically and states it as a
   hypothesis of its proof; the gate turns each hypothesis into a lemma proved
   by `formal/gappa/Hints.v`, so no hint is assumed. A hint that divides states
   its denominators' nonzero conditions (`{ x <> 0 }`), which Gappa proves from
