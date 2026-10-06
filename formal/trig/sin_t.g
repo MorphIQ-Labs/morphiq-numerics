@@ -19,9 +19,10 @@ ST = t + t * t * t * Pt * (1 + al);
   /\ d2 in [-1b-105, 1b-105]
   -> (SN - ST) / ST in [-1b-65, 1b-65] }
 
-(SN - ST) / ST -> ((SN - ST) / th) / (ST / th);
-ST / th -> (1 + dl) + (1 + dl) * (1 + dl) * (1 + dl) * th * th * Pt * (1 + al);
-(SN - ST) / th -> (1 + dl) * d2 + th * th * (Ph * (1 + et) * (1 + d2) - (1 + dl) * (1 + dl) * (1 + dl) * Pt * (1 + al));
+(SN - ST) / ST -> ((SN - ST) / th) / (ST / th) { th <> 0, ST <> 0 };
+ST / th -> (1 + dl) + (1 + dl) * (1 + dl) * (1 + dl) * th * th * Pt * (1 + al) { th <> 0 };
+(SN - ST) / th -> (1 + dl) * d2 + th * th * (Ph * (1 + et) * (1 + d2) - (1 + dl) * (1 + dl) * (1 + dl) * Pt * (1 + al))
+  { th <> 0 };
 Ph * (1 + et) * (1 + d2) - (1 + dl) * (1 + dl) * (1 + dl) * Pt * (1 + al) ->
   Ph * ((1 + et) * (1 + d2) - 1) - Pt * ((1 + dl) * (1 + dl) * (1 + dl) * (1 + al) - 1)
   - th * th * ((1 + dl) * (1 + dl) - 1) * (s1 + s2 * th * th * (1 + (1 + dl) * (1 + dl)));

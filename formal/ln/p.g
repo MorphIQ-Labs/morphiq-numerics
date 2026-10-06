@@ -46,16 +46,16 @@ L = z - z * z / 2 + Tz + a;
 
 # P - L = zl^2/2 + (T - Tz) + T et - zh zl ec + (t - c) eu - a + (z + B) d1
 #         + ((z + B)(1 + d1) + u) d2; each term divided by zh, then by L / zh.
-(P - L) / L -> ((P - L) / zh) / (L / zh);
-L / zh -> (1 + dl) - zh * (1 + dl) * (1 + dl) / 2 + Tz / zh + al * (Tz / zh);
+(P - L) / L -> ((P - L) / zh) / (L / zh) { zh <> 0, L <> 0 };
+L / zh -> (1 + dl) - zh * (1 + dl) * (1 + dl) / 2 + Tz / zh + al * (Tz / zh) { zh <> 0 };
 (P - L) / zh -> zh * dl * dl / 2 + (T - Tz) / zh + (zh * zh * W) * et - zh * dl * ec
                + ((t - c) / zh) * eu - al * (Tz / zh) + ((z + B) / zh) * d1
-               + (((z + B) * (1 + d1) + u) / zh) * d2;
+               + (((z + B) * (1 + d1) + u) / zh) * d2 { zh <> 0 };
 # z^3 W(z) - zh^3 W(zh) = (z^3 - zh^3) W(z) + zh^3 (W(z) - W(zh)), and
 # z^k - zh^k = zl (z^(k-1) + ... + zh^(k-1)).
-(T - Tz) / zh -> -dl * ((z * z + z * zh + zh * zh) * Wz + zh * zh * zh * D);
-Tz / zh -> (1 + dl) * z * z * Wz;
-(t - c) / zh -> zh * zh * W * (1 + et) - zh * dl * (1 + ec);
-(z + B) / zh -> 1 + dl - zh / 2;
-u / zh -> ((t - c) / zh) * (1 + eu);
-((z + B) * (1 + d1) + u) / zh -> ((z + B) / zh) * (1 + d1) + u / zh;
+(T - Tz) / zh -> -dl * ((z * z + z * zh + zh * zh) * Wz + zh * zh * zh * D) { zh <> 0 };
+Tz / zh -> (1 + dl) * z * z * Wz { zh <> 0 };
+(t - c) / zh -> zh * zh * W * (1 + et) - zh * dl * (1 + ec) { zh <> 0 };
+(z + B) / zh -> 1 + dl - zh / 2 { zh <> 0 };
+u / zh -> ((t - c) / zh) * (1 + eu) { zh <> 0 };
+((z + B) * (1 + d1) + u) / zh -> ((z + B) / zh) * (1 + d1) + u / zh { zh <> 0 };

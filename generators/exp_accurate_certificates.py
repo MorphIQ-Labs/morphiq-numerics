@@ -84,7 +84,7 @@ def generate():
         f'  /\\ E1 in [-{literal(*up_prev)}, {literal(*up_prev)}]',
         '  -> (Y - Tj * X1) / (Tj * X1) in [-1b-124, 1b-124] }',
         '',
-        '(Y - Tj * X1) / (Tj * X1) -> (1 + eT) * (1 + mY) * (1 + E1 / X1) - 1;',
+        '(Y - Tj * X1) / (Tj * X1) -> (1 + eT) * (1 + mY) * (1 + E1 / X1) - 1 { Tj <> 0, X1 <> 0 };',
     ]) + '\n'
     return files
 

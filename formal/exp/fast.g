@@ -45,5 +45,6 @@ Y = (Tj * (1 + d4)) * E * (1 + d3);
 
 # The relative error is the polynomial's and the hypotheses' errors over e^R,
 # plus the double-word steps' relative errors.
-(Y - Tj * expR) / (Tj * expR) -> (1 + d4) * (1 + d3) * (1 + d2) * (1 + (1 + P - expR) / expR) - 1;
+(Y - Tj * expR) / (Tj * expR) -> (1 + d4) * (1 + d3) * (1 + d2) * (1 + (1 + P - expR) / expR) - 1
+  { Tj <> 0, expR <> 0 };
 1 + P - expR -> dr + (q - Q) - m - a + (rhi + rlo + q) * d1;

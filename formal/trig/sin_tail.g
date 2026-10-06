@@ -20,5 +20,7 @@ T = th * th * th * P;
 
 { |th| in [1b-60, 0.0078126] -> (tail - T) / T in [-1b-50, 1b-50] }
 
-(tail - T) / T -> (1 + (a3 - th * th * th) / (th * th * th)) * (1 + (ps - P) / P) * (1 + (tail - a3 * ps) / (a3 * ps)) - 1;
-(a3 - th * th * th) / (th * th * th) -> (1 + (uh - th * th) / (th * th)) * (1 + (a3 - th * uh) / (th * uh)) - 1;
+(tail - T) / T -> (1 + (a3 - th * th * th) / (th * th * th)) * (1 + (ps - P) / P) * (1 + (tail - a3 * ps) / (a3 * ps)) - 1
+  { T <> 0, th <> 0, P <> 0, a3 <> 0, ps <> 0 };
+(a3 - th * th * th) / (th * th * th) -> (1 + (uh - th * th) / (th * th)) * (1 + (a3 - th * uh) / (th * uh)) - 1
+  { th <> 0, uh <> 0 };

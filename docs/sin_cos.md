@@ -183,6 +183,8 @@ use, so its pair is theirs bit for bit.
 | `generators/sin_cos_reference.py` | the fixture: [LM] Tables 8 and 10, the small-argument thresholds, arguments near `k·π/2`, random arguments in every binade, 1,200 values to 256 bits, and 607 reductions |
 | `generators/tan_reference.py` | `tan`'s fixture: [LM] Table 12, the small-argument threshold, arguments near `k·π/2`, random arguments in every binade, and 1,200 values to 256 bits |
 
+Every certificate's Coq proof is also built, with each rewriting hint proved, by the formal job ([exp.md](exp.md), gates).
+
 The binding `formal/trig/binding.sha256` covers this document, the Sollya script
 and output, the generated tables and every certificate. It also covers the
 source: `trig/mod.rs` and `q256.rs`.

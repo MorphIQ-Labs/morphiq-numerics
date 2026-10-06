@@ -112,8 +112,10 @@ T = zh * zh * zh * W;
 
 # t / T = (1 + e_z3) (1 + e_w) (1 + e_t), the relative errors of z3, w and the
 # last product.
-(t - T) / T -> (1 + (z3 - zh * zh * zh) / (zh * zh * zh)) * (1 + (w - W) / W) * (1 + (t - z3 * w) / (z3 * w)) - 1;
-(z3 - zh * zh * zh) / (zh * zh * zh) -> (1 + (sh - zh * zh) / (zh * zh)) * (1 + (z3 - zh * sh) / (zh * sh)) - 1;
+(t - T) / T -> (1 + (z3 - zh * zh * zh) / (zh * zh * zh)) * (1 + (w - W) / W) * (1 + (t - z3 * w) / (z3 * w)) - 1
+  {{ T <> 0, zh <> 0, W <> 0, z3 <> 0, w <> 0 }};
+(z3 - zh * zh * zh) / (zh * zh * zh) -> (1 + (sh - zh * zh) / (zh * zh)) * (1 + (z3 - zh * sh) / (zh * sh)) - 1
+  {{ zh <> 0, sh <> 0 }};
 '''
 
 
@@ -166,19 +168,19 @@ L = z - z * z / 2 + Tz + a;
 
 # P - L = zl^2/2 + (T - Tz) + T et - zh zl ec + (t - c) eu - a + (z + B) d1
 #         + ((z + B)(1 + d1) + u) d2; each term divided by zh, then by L / zh.
-(P - L) / L -> ((P - L) / zh) / (L / zh);
-L / zh -> (1 + dl) - zh * (1 + dl) * (1 + dl) / 2 + Tz / zh + al * (Tz / zh);
+(P - L) / L -> ((P - L) / zh) / (L / zh) {{ zh <> 0, L <> 0 }};
+L / zh -> (1 + dl) - zh * (1 + dl) * (1 + dl) / 2 + Tz / zh + al * (Tz / zh) {{ zh <> 0 }};
 (P - L) / zh -> zh * dl * dl / 2 + (T - Tz) / zh + (zh * zh * W) * et - zh * dl * ec
                + ((t - c) / zh) * eu - al * (Tz / zh) + ((z + B) / zh) * d1
-               + (((z + B) * (1 + d1) + u) / zh) * d2;
+               + (((z + B) * (1 + d1) + u) / zh) * d2 {{ zh <> 0 }};
 # z^3 W(z) - zh^3 W(zh) = (z^3 - zh^3) W(z) + zh^3 (W(z) - W(zh)), and
 # z^k - zh^k = zl (z^(k-1) + ... + zh^(k-1)).
-(T - Tz) / zh -> -dl * ((z * z + z * zh + zh * zh) * Wz + zh * zh * zh * D);
-Tz / zh -> (1 + dl) * z * z * Wz;
-(t - c) / zh -> zh * zh * W * (1 + et) - zh * dl * (1 + ec);
-(z + B) / zh -> 1 + dl - zh / 2;
-u / zh -> ((t - c) / zh) * (1 + eu);
-((z + B) * (1 + d1) + u) / zh -> ((z + B) / zh) * (1 + d1) + u / zh;
+(T - Tz) / zh -> -dl * ((z * z + z * zh + zh * zh) * Wz + zh * zh * zh * D) {{ zh <> 0 }};
+Tz / zh -> (1 + dl) * z * z * Wz {{ zh <> 0 }};
+(t - c) / zh -> zh * zh * W * (1 + et) - zh * dl * (1 + ec) {{ zh <> 0 }};
+(z + B) / zh -> 1 + dl - zh / 2 {{ zh <> 0 }};
+u / zh -> ((t - c) / zh) * (1 + eu) {{ zh <> 0 }};
+((z + B) * (1 + d1) + u) / zh -> ((z + B) / zh) * (1 + d1) + u / zh {{ zh <> 0 }};
 '''
 
 
@@ -323,7 +325,7 @@ Y = (X1 + E1) * (1 + mz) / X1;
 {{ {common}
   -> Y - 1 in [-{ACCURATE}, {ACCURATE}] }}
 
-Y - 1 -> E1 / X1 + (1 + E1 / X1) * mz;
+Y - 1 -> E1 / X1 + (1 + E1 / X1) * mz {{ X1 <> 0 }};
 '''
     dzr = up(accurate_ln_1p_dz())
     kb = d['case_b']
@@ -338,7 +340,7 @@ Y = k2 * (1 + eN) + k3 * (1 + q) * (1 + mz) + dz + s2;
   /\\ {sym('eN', '1b-127')} /\\ {sym('s2', s2b)} /\\ {sym('dz', dzr)}
   -> Y - 1 in [-{ACCURATE}, {ACCURATE}] }}
 
-Y - 1 -> k2 * eN + k3 * (q + (1 + q) * mz) + dz + s2;
+Y - 1 -> k2 * eN + k3 * (q + (1 + q) * mz) + dz + s2 {{ X1 <> 0 }};
 '''
     kc = d['case_c']
     s1c = up(2 * U * max(kc['k1'], kc['k2']))
@@ -354,7 +356,7 @@ Y = k1 * (1 + eL) * (1 + mL) + k2 * (1 + eN) + s1 + k3 * (1 + q) * (1 + mz) + dz
   /\\ {sym('s1', s1c)} /\\ {sym('s2', s2c)} /\\ {sym('dz', dzr)}
   -> Y - 1 in [-{ACCURATE}, {ACCURATE}] }}
 
-Y - 1 -> k1 * ((1 + eL) * (1 + mL) - 1) + k2 * eN + k3 * (q + (1 + q) * mz) + dz + s1 + s2;
+Y - 1 -> k1 * ((1 + eL) * (1 + mL) - 1) + k2 * eN + k3 * (q + (1 + q) * mz) + dz + s1 + s2 {{ X1 <> 0 }};
 '''
     return files
 

@@ -104,6 +104,8 @@ Both paths err by less than half an ulp of `n`, so both return `n` exactly.
 | `formal/log2/fast_log10.g`, `accurate_log10.g` | `log10`'s paths: `2^−63` and `2^−122` |
 | `generators/log2_log10_reference.py` | the fixture: [LM] Table 7 and its §5.2 siblings, exact powers, special values, random arguments, and 1,200 values to 192 bits per function |
 
+Every certificate's Coq proof is also built, with each rewriting hint proved, by the formal job ([exp.md](exp.md), gates).
+
 The binding `formal/log2/binding.sha256` covers this document, the constants,
 the certificates and the source.
 
