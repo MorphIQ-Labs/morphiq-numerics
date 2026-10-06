@@ -1,0 +1,24 @@
+// The fast path's polynomial for ln and ln_1p (docs/ln.md, section 4):
+// ln(1 + z) = z - z^2/2 + z^3 * (c3 + z*(c4 + ... + z*c9)), with c3..c9
+// binary64 (fpminimax, relative error to the cubic tail), on |z| <= A; the
+// approximation error of the tail is bounded rigorously (supnorm, relative).
+//
+// Run in the pinned image (scripts/check_certificates.sh).
+prec = 300;
+display = hexadecimal;
+A = 0.0078126;
+I = [-A; A];
+f = log1p(x) - x + x^2/2;
+p = fpminimax(f, [|3, 4, 5, 6, 7, 8, 9|], [|D, D, D, D, D, D, D|], I, relative);
+c3 = coeff(p, 3); c4 = coeff(p, 4); c5 = coeff(p, 5); c6 = coeff(p, 6);
+c7 = coeff(p, 7); c8 = coeff(p, 8); c9 = coeff(p, 9);
+err = supnorm(p, f, I, relative, 2^-30);
+print("c3", c3);
+print("c4", c4);
+print("c5", c5);
+print("c6", c6);
+print("c7", c7);
+print("c8", c8);
+print("c9", c9);
+print("relative_error_bound", sup(err));
+quit;
