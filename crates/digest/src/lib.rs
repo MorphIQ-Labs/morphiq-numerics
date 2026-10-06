@@ -11,7 +11,7 @@
 
 use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
-use morphiq_numerics::elementary::{exp, ln, ln_1p};
+use morphiq_numerics::elementary::{exp, exp2, ln, ln_1p, log2, log10};
 use morphiq_numerics::random::{SplitMix64, Xoshiro256PlusPlus, unit_closed_open, unit_open};
 use morphiq_numerics::reduce::{dot, dot2, max_abs, sum, sum_squares, sum_squares2, sum2};
 use morphiq_numerics::ulp::{ordered_bits, ulp, ulps_between};
@@ -331,6 +331,85 @@ pub fn corpus_digest() -> [u8; 32] {
         let word = words.next_word();
         let x = f64::from_bits((e << 52) | (word >> 12) | (word & (1 << 63)));
         r.f64(ln_1p(x));
+    }
+
+    r.label("exp2");
+    // Special values, every threshold of docs/exp2.md §1 with its neighbours,
+    // integers, then arguments across the whole domain and near zero.
+    for bits in [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        0x408f_ffff_ffff_ffff,
+        0x4090_0000_0000_0000,
+        0xc090_cbff_ffff_ffff,
+        0xc090_cc00_0000_0000,
+        0xc08f_f000_0000_0000,
+        0xc08f_f000_0000_0001,
+        0x3ca7_1547_652b_82fd,
+        0x3ca7_1547_652b_82fe,
+        0xbc97_1547_652b_82fe,
+        0xbc97_1547_652b_82ff,
+    ] {
+        r.f64(exp2(f64::from_bits(bits)));
+    }
+    for n in -1076..=1025 {
+        r.f64(exp2(f64::from(n)));
+    }
+    for _ in 0..20_000 {
+        #[allow(clippy::cast_precision_loss)] // a 53-bit integer
+        let unit = (words.next_word() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+        r.f64(exp2(-1077.0 + 2103.0 * unit));
+    }
+    for e in -60..0 {
+        for _ in 0..64 {
+            r.f64(exp2(words.with_exponent(e)));
+        }
+    }
+
+    for (name, f) in [("log2", log2 as fn(f64) -> f64), ("log10", log10)] {
+        r.label(name);
+        // Special values, 1 and its neighbours, the exact powers, then every
+        // positive binade and arguments near 1.
+        for bits in [
+            0x7ff8_0000_0000_0000,
+            0x7ff0_0000_0000_0000,
+            0xfff0_0000_0000_0000,
+            0,
+            1 << 63,
+            0xbff0_0000_0000_0000,
+            1,
+            0x7fef_ffff_ffff_ffff,
+            0x3ff0_0000_0000_0000,
+            0x3ff0_0000_0000_0001,
+            0x3fef_ffff_ffff_ffff,
+        ] {
+            r.f64(f(f64::from_bits(bits)));
+        }
+        let mut power = 1.0;
+        for _ in 0..=22 {
+            r.f64(f(power));
+            power *= 10.0;
+        }
+        for e in -1074..=1023 {
+            r.f64(f(f64::from_bits(if e < -1022 {
+                1 << (e + 1074)
+            } else {
+                u64::try_from(e + 1023).unwrap() << 52
+            })));
+        }
+        for _ in 0..20_000 {
+            r.f64(f(f64::from_bits(
+                1 + words.next_word() % 0x7fef_ffff_ffff_ffff,
+            )));
+        }
+        for _ in 0..4_000 {
+            r.f64(f(f64::from_bits(
+                0x3fe0_0000_0000_0000 + words.next_word() % (1 << 53),
+            )));
+        }
     }
 
     r.label("random");

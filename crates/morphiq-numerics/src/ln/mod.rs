@@ -107,8 +107,8 @@ fn split(x: f64) -> (f64, f64) {
 /// The reduction of §3: `x = 2^E·y`, `y ∈ [0.70703125, 1.4140625)`, and
 /// `R[i] ≈ 1/y`, so `ln x = E·ln 2 − ln R[i] + ln(1 + z)` with
 /// `z = y·R[i] − 1`.
-struct Reduced {
-    e: i32,
+pub(crate) struct Reduced {
+    pub(crate) e: i32,
     i: usize,
     y: f64,
     r: f64,
@@ -116,7 +116,7 @@ struct Reduced {
 
 impl Reduced {
     /// §3, steps 1–3, for finite `x > 0`.
-    fn of(x: f64) -> Self {
+    pub(crate) fn of(x: f64) -> Self {
         let (bits, scaled) = if x < f64::MIN_POSITIVE {
             ((x * TWO_54).to_bits(), 54)
         } else {
@@ -148,19 +148,37 @@ impl Reduced {
 
     /// §4: `Y ≈ ln x` as a double-word, within `2^−64` (certified:
     /// `formal/ln/fast_a.g`, `fast_b.g`, `fast_c.g`).
-    fn fast_value(&self) -> DoubleWord {
+    pub(crate) fn fast_value(&self) -> DoubleWord {
+        let e = f64::from(self.e);
+        DoubleWord::sum(e * LN2_HI, e * LN2_LO).add(self.ln_y_fast())
+    }
+
+    /// §4, steps 1–5: `S = (−ln R[i]) + ln(1 + z) ≈ ln y` as a double-word,
+    /// within `2^−64` of `ln y` (`formal/ln/fast_a.g` and `fast_b.g` with
+    /// `E = 0`). Shared with `log2`.
+    pub(crate) fn ln_y_fast(&self) -> DoubleWord {
         // z = y·R[i] − 1 exactly: the product by two_prod, p − 1 by Sterbenz.
         let (p, q) = two_prod(self.y, self.r);
         let ln_1p_z = ln_1p_double_word(DoubleWord::sum(p - 1.0, q));
         let (n_hi, n_lo) = NEG_LN_R_BITS[self.i];
-        let s = DoubleWord::sum(f64::from_bits(n_hi), f64::from_bits(n_lo)).add(ln_1p_z);
-        let e = f64::from(self.e);
-        DoubleWord::sum(e * LN2_HI, e * LN2_LO).add(s)
+        DoubleWord::sum(f64::from_bits(n_hi), f64::from_bits(n_lo)).add(ln_1p_z)
+    }
+
+    /// §6 for `ln y`: `(−ln R[i]) + z·G_1` in `Q128`, the table term skipped
+    /// where `R[i] = 1`, within `2^−123` of `ln y` (`formal/ln/accurate_sum_a.g`
+    /// and `_b.g`). Shared with `log2`.
+    pub(crate) fn ln_y_accurate(&self, z: Q128) -> Q128 {
+        let ln_1p_z = z.mul(series(z));
+        if self.r == 1.0 {
+            return ln_1p_z;
+        }
+        let (negative, m, e) = NEG_LN_R_Q128[self.i];
+        Q128::new(negative, m, e).add(ln_1p_z)
     }
 
     /// `z = y·R[i] − 1` exactly, from the significands in integer arithmetic
     /// (§6, step 1).
-    fn z_exact(&self) -> Q128 {
+    pub(crate) fn z_exact(&self) -> Q128 {
         let (m_y, e_y) = significand(self.y);
         let (m_r, e_r) = significand(self.r);
         let product = u128::from(m_y) * u128::from(m_r);
@@ -186,7 +204,7 @@ impl Reduced {
 
     /// §6: `(E·ln 2 + (−ln R[i])) + z·G_1` in `Q128`, a zero term skipped,
     /// within `2^−123` of `ln x` (certified: `formal/ln/accurate_sum_*.g`).
-    fn accurate_value(&self, z: Q128) -> Q128 {
+    pub(crate) fn accurate_value(&self, z: Q128) -> Q128 {
         let ln_1p_z = z.mul(series(z));
         let e_ln2 = (self.e != 0)
             .then(|| Q128::from_f64(f64::from(self.e)).mul(Q128::new(false, LN2_Q128, -128)));
@@ -250,7 +268,7 @@ fn reciprocal(k: usize) -> Q128 {
 
 /// §5: `y_hi` when the rounding test proves it is `RN` of the value `Y`
 /// approximates within `ε₁`.
-fn decide(y: DoubleWord) -> Option<f64> {
+pub(crate) fn decide(y: DoubleWord) -> Option<f64> {
     let (y_hi, y_lo) = (y.hi(), y.lo());
     let magnitude = y_hi.abs();
     // The smaller of the gaps on either side of y_hi: toward zero at a power

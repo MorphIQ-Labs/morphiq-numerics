@@ -125,7 +125,8 @@ def check_worst_case(f, sign, digits, exp2, image, after, label):
     53 significant bits `image` then the bits `after`, so a mistyped input fails.
     Returns x."""
     x = from_binary(sign, digits, exp2)
-    expected = image.replace('-', '').replace('.', '') + after
+    # Significant bits: an image printed as 0.1... starts after its leading zeros.
+    expected = image.replace('-', '').replace('.', '').lstrip('0') + after
     with mpmath.workprec(4 * len(expected) + 64):
         got, _ = binary_digits(f(mpmath.mpf(x)), len(expected))
     if got != expected:

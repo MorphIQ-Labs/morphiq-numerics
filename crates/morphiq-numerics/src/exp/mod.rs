@@ -104,33 +104,13 @@ impl Reduced {
     /// rounded. Only for `k ≥ −1021`, where the result is normal (§4,
     /// decision 3).
     fn fast(&self) -> Option<f64> {
-        let y = self.fast_value();
-        let (y_hi, y_lo) = (y.hi(), y.lo());
-        // The smaller of the gaps on either side of y_hi > 0.
-        let g = if y_hi.to_bits() & FRACTION == 0 {
-            ulp(y_hi) * 0.5
-        } else {
-            ulp(y_hi)
-        };
-        (y_lo.abs() + EPS * y_hi < g * 0.5).then(|| scale(y_hi, self.k))
+        decide_scaled(self.fast_value(), self.k)
     }
 
     /// §4: `Y`, within `ε₁ = 2^−69` of `2^(j/128)·e^r` (certified:
     /// `formal/exp/fast.g`).
     fn fast_value(&self) -> DoubleWord {
-        let r_hi = self.r.hi();
-        let [c3, c4, c5, c6] = POLY;
-        let t5 = c5 + r_hi * c6;
-        let t4 = c4 + r_hi * t5;
-        let t3 = c3 + r_hi * t4;
-        let h = 0.5 + r_hi * t3;
-        let q = (r_hi * r_hi) * h;
-        let p = self.r.add_f64(q);
-        let e = DoubleWord::from_f64(1.0).add(p);
-        let (t_hi, t_lo) = T_BITS[self.j];
-        // An exact table pair: two_sum returns it unchanged.
-        let t_j = DoubleWord::sum(f64::from_bits(t_hi), f64::from_bits(t_lo));
-        t_j.mul(e)
+        fast_at(self.r, self.j)
     }
 
     /// §6, general case, rounded once.
@@ -147,16 +127,54 @@ impl Reduced {
             .fold(Q128::from_f64(self.r1), |sum, term| {
                 sum.add(Q128::from_f64(term))
             });
-        // H_13 = 1, H_k = 1 + (r·(1/k))·H_(k+1): the levels certified in
-        // formal/exp/accurate_level_*.g.
-        let mut h = Q128::ONE;
-        for k in (1..=12).rev() {
-            h = Q128::ONE.add(r.mul(reciprocal(k)).mul(h));
-        }
-        Q128::new(false, T_Q128[self.j], -127)
-            .mul(h)
-            .mul_pow2(self.k)
+        accurate_at(r, self.j, self.k)
     }
+}
+
+/// §4 at a reduced argument: `Y ≈ 2^(j/128)·e^r` for the double-word `r`,
+/// `|r_hi| ≤ 0.0027077`, `|r_lo| ≤ 2^−62`, within `ε₁ = 2^−69` of
+/// `2^(j/128)·e^R` when `r` is within `2^−113` of `R` (`formal/exp/fast.g`).
+/// Shared with `exp2`.
+pub(crate) fn fast_at(r: DoubleWord, j: usize) -> DoubleWord {
+    let r_hi = r.hi();
+    let [c3, c4, c5, c6] = POLY;
+    let t5 = c5 + r_hi * c6;
+    let t4 = c4 + r_hi * t5;
+    let t3 = c3 + r_hi * t4;
+    let h = 0.5 + r_hi * t3;
+    let q = (r_hi * r_hi) * h;
+    let p = r.add_f64(q);
+    let e = DoubleWord::from_f64(1.0).add(p);
+    let (t_hi, t_lo) = T_BITS[j];
+    // An exact table pair: two_sum returns it unchanged.
+    let t_j = DoubleWord::sum(f64::from_bits(t_hi), f64::from_bits(t_lo));
+    t_j.mul(e)
+}
+
+/// §5: `y_hi·2^k` when the rounding test proves `y_hi` is `RN` of the value
+/// `Y` approximates within `ε₁`, for `Y > 0` and `−1021 ≤ k ≤ 1024`.
+pub(crate) fn decide_scaled(y: DoubleWord, k: i32) -> Option<f64> {
+    let (y_hi, y_lo) = (y.hi(), y.lo());
+    // The smaller of the gaps on either side of y_hi > 0.
+    let g = if y_hi.to_bits() & FRACTION == 0 {
+        ulp(y_hi) * 0.5
+    } else {
+        ulp(y_hi)
+    };
+    (y_lo.abs() + EPS * y_hi < g * 0.5).then(|| scale(y_hi, k))
+}
+
+/// §6 at a reduced argument: `2^k·2^(j/128)·e^r` in `Q128`, from the series to
+/// degree 12 (the levels certified in `formal/exp/accurate_level_*.g`) and the
+/// product with the table (`accurate_y.g`), for `|r| ≤ 0.0027078`. Shared with
+/// `exp2`.
+pub(crate) fn accurate_at(r: Q128, j: usize, k: i32) -> Q128 {
+    // H_13 = 1, H_k = 1 + (r·(1/k))·H_(k+1).
+    let mut h = Q128::ONE;
+    for level in (1..=12).rev() {
+        h = Q128::ONE.add(r.mul(reciprocal(level)).mul(h));
+    }
+    Q128::new(false, T_Q128[j], -127).mul(h).mul_pow2(k)
 }
 
 /// `1/k` as a `Q128` constant (generated), `1 ≤ k ≤ 12`.
