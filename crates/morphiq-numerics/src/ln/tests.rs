@@ -5,39 +5,37 @@ use super::{EPS, Reduced, TWO_M7, decide, ln_1p_double_word, series, split};
 use crate::double_word::DoubleWord;
 use crate::q128::Q128;
 use crate::random::SplitMix64;
-use crate::test_exact::Exact;
-use serde_json::Value;
+use crate::test_exact::{Exact, entries, field, word};
 
 fn double_word(y: DoubleWord) -> Exact {
     Exact::of(Q128::from_f64(y.hi())).add(&Exact::of(Q128::from_f64(y.lo())))
 }
 
+const FIXTURE: &str = include_str!("../../../reference/fixtures/ln.json");
+
+/// A signed 192-bit reference from a fixture object.
+fn reference(c: &str) -> Exact {
+    let v = Exact::of_hex(field(c, "m"), field(c, "e").parse().unwrap());
+    if field(c, "negative") == "true" {
+        v.neg()
+    } else {
+        v
+    }
+}
+
 /// The fixture's 192-bit references for `function`: `(x, value)`.
 fn precise(function: &str) -> std::vec::Vec<(f64, Exact)> {
-    let fixture: Value =
-        serde_json::from_str(include_str!("../../../reference/fixtures/ln.json")).unwrap();
-    fixture["precise"][function]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|c| {
-            let x = f64::from_bits(u64::from_str_radix(c["x"].as_str().unwrap(), 16).unwrap());
-            let v = Exact::of_hex(c["m"].as_str().unwrap(), c["e"].as_i64().unwrap());
-            (
-                x,
-                if c["negative"].as_bool().unwrap() {
-                    v.neg()
-                } else {
-                    v
-                },
-            )
-        })
+    entries(FIXTURE, &["precise", function])
+        .into_iter()
+        .map(|c| (word(c, "x"), reference(c)))
         .collect()
 }
 
 #[test]
 fn every_unrounded_ln_is_within_its_certified_bound() {
-    for (x, reference) in precise("ln") {
+    let cases = precise("ln");
+    assert_eq!(cases.len(), 1200);
+    for (x, reference) in cases {
         let reduced = Reduced::of(x);
         // §4: 2^-64. §6: 2^-123.
         assert!(
@@ -51,7 +49,9 @@ fn every_unrounded_ln_is_within_its_certified_bound() {
 
 #[test]
 fn every_unrounded_ln_1p_is_within_its_certified_bound() {
-    for (x, reference) in precise("ln_1p") {
+    let cases = precise("ln_1p");
+    assert_eq!(cases.len(), 1400);
+    for (x, reference) in cases {
         let (fast, accurate) = if x.abs() < TWO_M7 {
             let z = Q128::from_f64(x);
             (ln_1p_double_word(DoubleWord::from_f64(x)), z.mul(series(z)))
@@ -155,21 +155,11 @@ fn rounding_test_constant_is_its_definition() {
 
 #[test]
 fn ln_1p_of_a_double_word_is_within_its_certified_bound() {
-    let fixture: Value =
-        serde_json::from_str(include_str!("../../../reference/fixtures/ln.json")).unwrap();
-    let word = |c: &Value, k: &str| {
-        f64::from_bits(u64::from_str_radix(c[k].as_str().unwrap(), 16).unwrap())
-    };
-    let cases = fixture["precise"]["ln_1p_z"].as_array().unwrap();
+    let cases = entries(FIXTURE, &["precise", "ln_1p_z"]);
     assert!(cases.len() > 500);
     for c in cases {
         let (z_hi, z_lo) = (word(c, "z_hi"), word(c, "z_lo"));
-        let v = Exact::of_hex(c["m"].as_str().unwrap(), c["e"].as_i64().unwrap());
-        let reference = if c["negative"].as_bool().unwrap() {
-            v.neg()
-        } else {
-            v
-        };
+        let reference = reference(c);
         // §4, step 4: 3·2^-66 (formal/ln/p.g).
         let p = ln_1p_double_word(DoubleWord::sum(z_hi, z_lo));
         assert!(
