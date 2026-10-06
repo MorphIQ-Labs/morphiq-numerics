@@ -43,7 +43,8 @@ trap 'rm -rf "$proofs"' EXIT
 ./scripts/write_gappa_proofs.sh --into "$proofs"
 for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig; do
   f=${dir#formal/}
-  if ! diff -r -q "$dir/coq" "$proofs/$f" >&2; then
+  if ! diff -r -u "$dir/coq" "$proofs/$f" > "$proofs/$f.diff"; then
+    head -n 40 "$proofs/$f.diff" >&2
     echo "formal/$f/coq differs from Gappa's proofs: rerun scripts/write_gappa_proofs.sh" >&2
     failed=1
   fi
