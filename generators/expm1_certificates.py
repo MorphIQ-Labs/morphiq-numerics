@@ -119,8 +119,10 @@ T = x * x * x * W;
 
 {{ |x| in [{X_MIN}, {A_LIT}] -> (t - T) / T in [-{TAIL}, {TAIL}] }}
 
-(t - T) / T -> (1 + (x3 - x * x * x) / (x * x * x)) * (1 + (w - W) / W) * (1 + (t - x3 * w) / (x3 * w)) - 1;
-(x3 - x * x * x) / (x * x * x) -> (1 + (sh - x * x) / (x * x)) * (1 + (x3 - x * sh) / (x * sh)) - 1;
+(t - T) / T -> (1 + (x3 - x * x * x) / (x * x * x)) * (1 + (w - W) / W) * (1 + (t - x3 * w) / (x3 * w)) - 1
+  {{ T <> 0, x <> 0, W <> 0, x3 <> 0, w <> 0 }};
+(x3 - x * x * x) / (x * x * x) -> (1 + (sh - x * x) / (x * x)) * (1 + (x3 - x * sh) / (x * sh)) - 1
+  {{ x <> 0, sh <> 0 }};
 '''
     p = f'''# expm1's small-argument result (docs/expm1.md, section 3):
 #   P = add_f64(add(x, x^2/2 as a double-word), t)
@@ -146,9 +148,10 @@ L = x + B + T * (1 + al);
   /\\ {sym('d1', DW_ADD)} /\\ {sym('d2', '1b-105')}
   -> (P - L) / L in [-{POLY}, {POLY}] }}
 
-(P - L) / L -> ((P - L) / x) / (L / x);
-L / x -> 1 + x / 2 + x * x * W * (1 + al);
-(P - L) / x -> x * x * W * (et - al) + (1 + x / 2) * d1 + ((1 + x / 2) * (1 + d1) + x * x * W * (1 + et)) * d2;
+(P - L) / L -> ((P - L) / x) / (L / x) {{ x <> 0, L <> 0 }};
+L / x -> 1 + x / 2 + x * x * W * (1 + al) {{ x <> 0 }};
+(P - L) / x -> x * x * W * (et - al) + (1 + x / 2) * d1 + ((1 + x / 2) * (1 + d1) + x * x * W * (1 + et)) * d2
+  {{ x <> 0 }};
 '''
     return {'tail.g': tail, 'p.g': p}
 
@@ -195,7 +198,7 @@ Y = (G + E2) * (1 + m) / G;
 {{ G in [{float((1 - spread) * Fraction(99, 100)):.9f}, {float((1 + spread) * Fraction(101, 100)):.9f}] /\\ {sym('E2', e2)} /\\ m in [-1b-127, 0]
   -> Y - 1 in [-{ACCURATE_SMALL}, {ACCURATE_SMALL}] }}
 
-Y - 1 -> E2 / G + (1 + E2 / G) * m;
+Y - 1 -> E2 / G + (1 + E2 / G) * m {{ G <> 0 }};
 '''
     return files
 

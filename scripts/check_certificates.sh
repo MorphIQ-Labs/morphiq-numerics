@@ -35,5 +35,7 @@ for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig
     fi
   done
 done
+
+
 [ "$failed" -eq 0 ]
 echo "certificates: OK"

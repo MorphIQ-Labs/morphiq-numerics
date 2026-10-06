@@ -139,6 +139,8 @@ At that `ε₁` the test sends about one argument in 2^8.5 to the accurate path
 | `formal/expm1/fast_general.g`, `accurate_general.g` | the other paths: `2^−62` and `2^−118` |
 | `generators/expm1_reference.py` | the fixture: thresholds, special values, random arguments at every scale, and 1,200 values to 192 bits |
 
+Every certificate's Coq proof is also built, with each rewriting hint proved, by the formal job ([exp.md](exp.md), gates).
+
 The binding `formal/expm1/binding.sha256` covers this document, the Sollya
 script and output, the constants, every certificate and the source.
 

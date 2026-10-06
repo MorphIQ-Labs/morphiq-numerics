@@ -90,6 +90,8 @@ rounding once rounds `2^x` correctly. `2^n` for an integer `n` gives `r = 0`,
 | `formal/exp2/reduction.g` (Gappa 1.4.1) | the reduction, within `2^−113` |
 | `generators/exp2_reference.py` | the fixture: [LM] Table 6, thresholds, integers, special values, random arguments, and 1,200 values to 192 bits |
 
+Every certificate's Coq proof is also built, with each rewriting hint proved, by the formal job ([exp.md](exp.md), gates).
+
 The binding `formal/exp2/binding.sha256` covers this document, the constants,
 the certificate and the source.
 

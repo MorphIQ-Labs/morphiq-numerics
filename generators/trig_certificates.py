@@ -93,8 +93,10 @@ T = th * th * th * P;
 
 {{ |th| in [{T_SPLIT}, {T_LIT}] -> (tail - T) / T in [-{TAIL}, {TAIL}] }}
 
-(tail - T) / T -> (1 + (a3 - th * th * th) / (th * th * th)) * (1 + (ps - P) / P) * (1 + (tail - a3 * ps) / (a3 * ps)) - 1;
-(a3 - th * th * th) / (th * th * th) -> (1 + (uh - th * th) / (th * th)) * (1 + (a3 - th * uh) / (th * uh)) - 1;
+(tail - T) / T -> (1 + (a3 - th * th * th) / (th * th * th)) * (1 + (ps - P) / P) * (1 + (tail - a3 * ps) / (a3 * ps)) - 1
+  {{ T <> 0, th <> 0, P <> 0, a3 <> 0, ps <> 0 }};
+(a3 - th * th * th) / (th * th * th) -> (1 + (uh - th * th) / (th * th)) * (1 + (a3 - th * uh) / (th * uh)) - 1
+  {{ th <> 0, uh <> 0 }};
 '''
     cos_tail = f'''# The fast path's cosine tail (docs/sin_cos.md, section 4): with t_hi a
 # binary64, {T_SPLIT} <= |t_hi| <= {T_LIT},
@@ -116,8 +118,10 @@ T = th * th * th * th * P;
 
 {{ |th| in [{T_SPLIT}, {T_LIT}] -> (tail - T) / T in [-{TAIL}, {TAIL}] }}
 
-(tail - T) / T -> (1 + (a4 - th * th * th * th) / (th * th * th * th)) * (1 + (pc - P) / P) * (1 + (tail - a4 * pc) / (a4 * pc)) - 1;
-(a4 - th * th * th * th) / (th * th * th * th) -> (1 + (uh - th * th) / (th * th)) * (1 + (uh - th * th) / (th * th)) * (1 + (a4 - uh * uh) / (uh * uh)) - 1;
+(tail - T) / T -> (1 + (a4 - th * th * th * th) / (th * th * th * th)) * (1 + (pc - P) / P) * (1 + (tail - a4 * pc) / (a4 * pc)) - 1
+  {{ T <> 0, th <> 0, P <> 0, a4 <> 0, pc <> 0 }};
+(a4 - th * th * th * th) / (th * th * th * th) -> (1 + (uh - th * th) / (th * th)) * (1 + (uh - th * th) / (th * th)) * (1 + (a4 - uh * uh) / (uh * uh)) - 1
+  {{ th <> 0, uh <> 0 }};
 '''
     return {'sin_tail.g': sin_tail, 'cos_tail.g': cos_tail}
 
@@ -152,9 +156,10 @@ ST = t + t * t * t * Pt * (1 + al);
   /\\ {sym('d2', '1b-105')}
   -> (SN - ST) / ST in [-{SIN_T}, {SIN_T}] }}
 
-(SN - ST) / ST -> ((SN - ST) / th) / (ST / th);
-ST / th -> (1 + dl) + (1 + dl) * (1 + dl) * (1 + dl) * th * th * Pt * (1 + al);
-(SN - ST) / th -> (1 + dl) * d2 + th * th * (Ph * (1 + et) * (1 + d2) - (1 + dl) * (1 + dl) * (1 + dl) * Pt * (1 + al));
+(SN - ST) / ST -> ((SN - ST) / th) / (ST / th) {{ th <> 0, ST <> 0 }};
+ST / th -> (1 + dl) + (1 + dl) * (1 + dl) * (1 + dl) * th * th * Pt * (1 + al) {{ th <> 0 }};
+(SN - ST) / th -> (1 + dl) * d2 + th * th * (Ph * (1 + et) * (1 + d2) - (1 + dl) * (1 + dl) * (1 + dl) * Pt * (1 + al))
+  {{ th <> 0 }};
 Ph * (1 + et) * (1 + d2) - (1 + dl) * (1 + dl) * (1 + dl) * Pt * (1 + al) ->
   Ph * ((1 + et) * (1 + d2) - 1) - Pt * ((1 + dl) * (1 + dl) * (1 + dl) * (1 + al) - 1)
   - th * th * ((1 + dl) * (1 + dl) - 1) * (s1 + s2 * th * th * (1 + (1 + dl) * (1 + dl)));
@@ -181,12 +186,12 @@ CT = -(t * t) / 2 + t * t * t * t * Pt * (1 + al);
   /\\ {sym('ec', '1b-53')} /\\ {sym('eu', '1b-53')} /\\ {sym('d2', '1b-105')}
   -> (CM - CT) / CT in [-{COS_T}, {COS_T}] }}
 
-(CM - CT) / CT -> ((CM - CT) / (th * th)) / (CT / (th * th));
-CT / (th * th) -> -(1 + dl) * (1 + dl) / 2 + (1 + dl) * (1 + dl) * (1 + dl) * (1 + dl) * th * th * Pt * (1 + al);
+(CM - CT) / CT -> ((CM - CT) / (th * th)) / (CT / (th * th)) {{ th <> 0, CT <> 0 }};
+CT / (th * th) -> -(1 + dl) * (1 + dl) / 2 + (1 + dl) * (1 + dl) * (1 + dl) * (1 + dl) * th * th * Pt * (1 + al) {{ th <> 0 }};
 (CM - CT) / (th * th) ->
   th * th * (Ph * ((1 + et) * (1 + eu) * (1 + d2) - 1) - Pt * ((1 + dl) * (1 + dl) * (1 + dl) * (1 + dl) * (1 + al) - 1)
              - th * th * ((1 + dl) * (1 + dl) - 1) * (c1 + c2 * th * th * (1 + (1 + dl) * (1 + dl))))
-  + dl * (1 - (1 + ec) * (1 + eu) * (1 + d2)) + dl * dl / 2 - d2 / 2;
+  + dl * (1 - (1 + ec) * (1 + eu) * (1 + d2)) + dl * dl / 2 - d2 / 2 {{ th <> 0 }};
 '''
     suffix = '_tiny' if tiny else ''
     return {f'sin_t{suffix}.g': sin_t, f'cos_t{suffix}.g': cos_t}

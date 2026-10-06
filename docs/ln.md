@@ -296,6 +296,8 @@ The fast path is within `2^−64`, and the accurate path within `2^−123`.
 | `formal/ln/accurate_level_*.g` | Gappa | the series' Horner levels |
 | `formal/ln/accurate_sum_a.g`, `_b.g`, `_c.g` | Gappa | the accurate result, within `2^−123` relative, by case |
 
+Every certificate's Coq proof is also built, with each rewriting hint proved, by the formal job ([exp.md](exp.md), gates).
+
 **Gates:**
 - **Certificates:** `scripts/check_certificates.sh` checks `formal/ln` as it
   does `formal/exp`, in the `certificates (sollya, gappa)` job:

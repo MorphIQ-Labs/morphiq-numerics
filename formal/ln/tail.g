@@ -33,5 +33,7 @@ T = zh * zh * zh * W;
 
 # t / T = (1 + e_z3) (1 + e_w) (1 + e_t), the relative errors of z3, w and the
 # last product.
-(t - T) / T -> (1 + (z3 - zh * zh * zh) / (zh * zh * zh)) * (1 + (w - W) / W) * (1 + (t - z3 * w) / (z3 * w)) - 1;
-(z3 - zh * zh * zh) / (zh * zh * zh) -> (1 + (sh - zh * zh) / (zh * zh)) * (1 + (z3 - zh * sh) / (zh * sh)) - 1;
+(t - T) / T -> (1 + (z3 - zh * zh * zh) / (zh * zh * zh)) * (1 + (w - W) / W) * (1 + (t - z3 * w) / (z3 * w)) - 1
+  { T <> 0, zh <> 0, W <> 0, z3 <> 0, w <> 0 };
+(z3 - zh * zh * zh) / (zh * zh * zh) -> (1 + (sh - zh * zh) / (zh * zh)) * (1 + (z3 - zh * sh) / (zh * sh)) - 1
+  { zh <> 0, sh <> 0 };

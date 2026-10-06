@@ -22,9 +22,9 @@ CT = -(t * t) / 2 + t * t * t * t * Pt * (1 + al);
   /\ ec in [-1b-53, 1b-53] /\ eu in [-1b-53, 1b-53] /\ d2 in [-1b-105, 1b-105]
   -> (CM - CT) / CT in [-1b-65, 1b-65] }
 
-(CM - CT) / CT -> ((CM - CT) / (th * th)) / (CT / (th * th));
-CT / (th * th) -> -(1 + dl) * (1 + dl) / 2 + (1 + dl) * (1 + dl) * (1 + dl) * (1 + dl) * th * th * Pt * (1 + al);
+(CM - CT) / CT -> ((CM - CT) / (th * th)) / (CT / (th * th)) { th <> 0, CT <> 0 };
+CT / (th * th) -> -(1 + dl) * (1 + dl) / 2 + (1 + dl) * (1 + dl) * (1 + dl) * (1 + dl) * th * th * Pt * (1 + al) { th <> 0 };
 (CM - CT) / (th * th) ->
   th * th * (Ph * ((1 + et) * (1 + eu) * (1 + d2) - 1) - Pt * ((1 + dl) * (1 + dl) * (1 + dl) * (1 + dl) * (1 + al) - 1)
              - th * th * ((1 + dl) * (1 + dl) - 1) * (c1 + c2 * th * th * (1 + (1 + dl) * (1 + dl))))
-  + dl * (1 - (1 + ec) * (1 + eu) * (1 + d2)) + dl * dl / 2 - d2 / 2;
+  + dl * (1 - (1 + ec) * (1 + eu) * (1 + d2)) + dl * dl / 2 - d2 / 2 { th <> 0 };

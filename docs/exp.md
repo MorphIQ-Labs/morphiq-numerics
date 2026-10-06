@@ -250,6 +250,16 @@ result once therefore rounds `e^x` correctly.
   package version. It checks that `formal/exp/binding.sha256` matches, that the
   Sollya script reproduces its output exactly, and that every certificate proves
   its goal.
+- **Coq:** `scripts/check_formal.sh`, the formal job, builds every certificate's
+  Coq proof, which `scripts/write_gappa_proofs.sh` writes there with the same
+  pinned Gappa (`gappa -Bcoq`). Gappa's proof search can take a different,
+  equally valid route on a different host, so the proofs aren't committed; the
+  theorem each proves is stated by the bound certificate. Gappa checks a rewriting hint only symbolically and states it as a
+  hypothesis of its proof; the gate turns each hypothesis into a lemma proved
+  by `formal/gappa/Hints.v`, so no hint is assumed. A hint that divides states
+  its denominators' nonzero conditions (`{ x <> 0 }`), which Gappa proves from
+  the bounds. The final theorems' axioms must be among
+  `formal/axioms.expected`.
 - **Replay:** `scripts/check_generators.sh` replays the Python generators.
 
 **The binding:** it covers this document, the constants, the Sollya script and

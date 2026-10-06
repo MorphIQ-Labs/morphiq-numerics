@@ -1,4 +1,4 @@
-c7bc029a42760817e7072caa7848ed7b8decd59d6532a038866c89a83a7dc98c  docs/log2.md
+35f4c48533654de63be76d9a0a07281ac4f8ed1043f0ecb7435ebc0a7ccd4127  docs/log2.md
 5617861c3421b34945b2b385e1b506dd4dc74762704d177799e402b35425a964  crates/morphiq-numerics/src/log2/tables.rs
 bef3daf0a7e08ab156c020d4764731705e50e30cbcccd72b85fff4d2f06e6b06  crates/morphiq-numerics/src/log2/mod.rs
 15b49f50f8f0792bde3825bc3f0f08086adb4c3cc7d2f433775b02a2cff8b93e  formal/log2/accurate_log10.g

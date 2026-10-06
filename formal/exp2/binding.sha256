@@ -1,4 +1,4 @@
-bdb17ad893a5a57b660e8bc9ed5c9864f57c817b22c8beac17ae1115971ddd47  docs/exp2.md
+0ac9c50853195744dbc4c2ca7ba3a6adae5fffd97105545fecc727dfb2460c33  docs/exp2.md
 40a7d18d871c168d520ade2ceda9c26ead558ac25cedb72a997c560ada3386d3  crates/morphiq-numerics/src/exp2/tables.rs
 db3817ab1c16f0e234654d2e9b0935a1ca17684f036ee182de92896d144d5440  crates/morphiq-numerics/src/exp2/mod.rs
 d3b34a6eb17113a5cde41ac3e97c859f43b23cd284ec768532ffa2c3e2918258  formal/exp2/reduction.g
