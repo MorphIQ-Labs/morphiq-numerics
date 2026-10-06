@@ -52,9 +52,9 @@ determines.
   algorithms, and integer generators defined bit for bit by their papers. The
   pull request cites the section of the source that determines each operation.
 
-**Must be written by a person**, from the function's derivation document: library
-code for any function whose implementation involves design choices the
-mathematics leaves open. These include:
+**May be model-assisted only from a complete derivation**: library code for any
+function whose implementation involves design choices the mathematics leaves
+open. These include:
 - argument reduction schemes;
 - table sizes and polynomial or rational degrees;
 - the fast path's working precision;
@@ -62,8 +62,14 @@ mathematics leaves open. These include:
 - the structure of the accurate path.
 
 The elementary functions, the normal family and the special functions are all in
-this class. The model may write their derivation documents, generators, tests and
-certificates, but not their library code.
+this class. Their library code is written from the function's derivation
+document, by a person or a model. A model may write it only once that document
+fixes every choice above and its certificates bound every error, so that the
+code follows the document step for step; the pull request cites the section
+that determines each step, as for a fully specified algorithm. (Until
+2026-10-05 this class had to be written by a person; the maintainer extended it
+then, with the similarity gate below still required before the first such
+function lands.)
 
 **During the work,** a model must not be given, or retrieve, the source of any
 implementation listed under [What may not be used](#what-may-not-be-used).
