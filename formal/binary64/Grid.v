@@ -79,3 +79,48 @@ Proof.
     by (apply mag_ge_bpow; replace (m + 1 - 1)%Z with m by ring; exact Hx).
   lia.
 Qed.
+
+(** The double-word additions round sums and differences of their inputs, so
+    their results stay on any grid the inputs share. *)
+From Binary64 Require Import Binary64Add.
+
+Lemma grid_two_sum q a b : on_grid q a -> on_grid q b ->
+  on_grid q (fst (two_sum a b)) /\ on_grid q (snd (two_sum a b)).
+Proof.
+  intros Ga Gb. unfold two_sum; cbv zeta; cbn [fst snd].
+  split; repeat first [assumption | apply grid_round | apply grid_plus | apply grid_minus
+                       | apply grid_opp | exact _].
+Qed.
+
+Lemma grid_fast_two_sum q a b : on_grid q a -> on_grid q b ->
+  on_grid q (fst (fast_two_sum a b)) /\ on_grid q (snd (fast_two_sum a b)).
+Proof.
+  intros Ga Gb. unfold fast_two_sum; cbv zeta; cbn [fst snd].
+  split; repeat first [assumption | apply grid_round | apply grid_plus | apply grid_minus
+                       | apply grid_opp | exact _].
+Qed.
+
+Lemma grid_add_f64 q xh xl y : on_grid q xh -> on_grid q xl -> on_grid q y ->
+  on_grid q (fst (add_f64 xh xl y)) /\ on_grid q (snd (add_f64 xh xl y)).
+Proof.
+  intros Gh Gl Gy. unfold add_f64.
+  destruct (grid_two_sum q xh y Gh Gy) as [Gs Gt].
+  destruct (two_sum xh y) as [sh sl]. cbn [fst snd] in Gs, Gt.
+  apply grid_fast_two_sum; [exact Gs | ].
+  repeat first [assumption | apply grid_round | apply grid_plus | exact _].
+Qed.
+
+Lemma grid_add q xh xl yh yl : on_grid q xh -> on_grid q xl -> on_grid q yh -> on_grid q yl ->
+  on_grid q (fst (add xh xl yh yl)) /\ on_grid q (snd (add xh xl yh yl)).
+Proof.
+  intros Gxh Gxl Gyh Gyl. unfold add.
+  destruct (grid_two_sum q xh yh Gxh Gyh) as [Gsh Gsl].
+  destruct (grid_two_sum q xl yl Gxl Gyl) as [Gth Gtl].
+  destruct (two_sum xh yh) as [sh sl]. destruct (two_sum xl yl) as [th tl]. cbn [fst snd] in *.
+  assert (Gc : on_grid q (rndF (sl + th)))
+    by (repeat first [assumption | apply grid_round | apply grid_plus | exact _]).
+  destruct (grid_fast_two_sum q sh (rndF (sl + th)) Gsh Gc) as [Gvh Gvl].
+  destruct (fast_two_sum sh (rndF (sl + th))) as [vh vl]. cbn [fst snd] in *.
+  apply grid_fast_two_sum; [exact Gvh | ].
+  repeat first [assumption | apply grid_round | apply grid_plus | exact _].
+Qed.

@@ -124,6 +124,21 @@ Proof.
   unfold fast_two_sum; simpl. split; apply fmtF_rnd.
 Qed.
 
+(** Fast2Sum is exact when [|b| <= |a|], so its result is a double-word number. *)
+Lemma fast_two_sum_dw a b : fmtF a -> fmtF b -> Rabs b <= Rabs a ->
+  let '(s, t) := fast_two_sum a b in s = rndF (s + t).
+Proof.
+  intros Fa Fb H.
+  pose proof (@F2Sum.F2Sum_correct_abs prec (ltac:(unfold prec; lia)) ne
+                (ltac:(intros x; apply round_NE_opp)) (ltac:(simpl; lia))
+                a b (fmtF_fmtX a Fa) (fmtF_fmtX b Fb) H) as C.
+  pose proof (@F2Sum.F2Sum_correct_DW prec (ltac:(unfold prec; lia)) ne a b C) as D. cbv zeta in D.
+  destruct (fast_two_sum_fmt a b Fa Fb) as [Fs Ft].
+  rewrite (fast_two_sum_eq a b Fa Fb).
+  destruct (F2Sum.Fast2Sum prec ne a b) as [s t]. cbn [fst snd] in *.
+  destruct D as [_ D]. rewrite (sum_round _ _ Fs Ft). exact D.
+Qed.
+
 (** A binary64 double-word number is a double-word number of the unbounded model. *)
 Lemma dw_of_binary64 xh xl : fmtF xh -> fmtF xl -> xh = rndF (xh + xl) ->
   double_word prec ne xh xl.
