@@ -16,7 +16,11 @@
 #      global axioms are among formal/axioms.expected.
 #   6. The kernels' transcriptions and proofs (formal/exp/*.v), which apply the
 #      certificates' theorems, build; and the global axioms the theorems in
-#      formal/audit/KernelAudit.v rest on are among formal/axioms.expected.
+#      formal/audit/KernelAudit.v rest on are among formal/axioms.expected and
+#      formal/axioms.int63.expected. The second list is Coq's primitive 63-bit
+#      integers: CoqInterval, which proves the kernels' constants, computes with
+#      them through Bignums. Its calls stay above 53 bits of precision, so no
+#      primitive floats are used.
 #   7. The proved IEEE 754 definitions and the Q128/Q256 transcriptions,
 #      extracted to OCaml (formal/extraction), reproduce the Rust library's
 #      results bit for bit on the cross-check corpora given as the first two
@@ -45,7 +49,8 @@ if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v for
   exit 1
 fi
 
-opam install --yes coq-flocq.3.4.3 coq-mathcomp-ssreflect.1.14.0 coq-gappa.1.5.2 >/dev/null
+opam install --yes coq-flocq.3.4.3 coq-mathcomp-ssreflect.1.14.0 coq-gappa.1.5.2 \
+  coq-bignums.9.0.0+coq8.15 coq-coquelicot.3.4.5 coq-interval.4.11.5 >/dev/null
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -57,7 +62,7 @@ done)
 (cd "$work/two-prod" && coqc TwoProdBinary64.v)
 (cd "$work/binary64" && for proof in Binary64Add Instances Binary64Mul Grid Binary64Div \
     IEEE64 IEEE64Add IEEE64Mul IEEE64Div IEEE64Eft IEEE64Sqrt \
-    Isqrt SqrtRound SqrtAlgorithm RoundingGaps RoundingCore RoundingTest; do
+    Isqrt SqrtRound SqrtAlgorithm RoundingGaps RoundingCore RoundingTest Encodings; do
   coqc -R ../double-word Double -R . Binary64 -R ../two-prod "" "$proof.v" || exit 1
 done)
 
@@ -123,13 +128,16 @@ echo "certificates in Coq: $certificates proved"
 # The kernels' proofs, beside the certificates' modules they apply.
 cp formal/exp/*.v formal/audit/KernelAudit.v "$work/gappa/"
 (cd "$work/gappa" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R . "" ExpReduction.v \
+  && for proof in ExpTables ExpReduction ExpFast; do
+       coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R . "" "$proof.v" || exit 1
+     done \
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R . "" KernelAudit.v) > "$work/kernel-audit.log"
 grep -E '^[^[:space:]]' "$work/kernel-audit.log" \
   | grep -v -E '^(Axioms:|Closed under the global context)' \
   | sed 's/ :.*//' | sort -u > "$work/kernel-axioms"
-if ! comm -23 "$work/kernel-axioms" "$work/expected" | diff /dev/null - >&2; then
-  echo "a kernel theorem rests on an axiom outside formal/axioms.expected" >&2
+sort -u formal/axioms.expected formal/axioms.int63.expected > "$work/kernel-expected"
+if ! comm -23 "$work/kernel-axioms" "$work/kernel-expected" | diff /dev/null - >&2; then
+  echo "a kernel theorem rests on an axiom outside formal/axioms.expected and formal/axioms.int63.expected" >&2
   exit 1
 fi
 kernels=$(grep -c '^Print Assumptions' formal/audit/KernelAudit.v)
