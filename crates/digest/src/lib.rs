@@ -15,6 +15,7 @@ use morphiq_numerics::elementary::{
     cos, exp, exp2, expm1, ln, ln_1p, log2, log10, sin, sincos, sqrt, tan,
 };
 use morphiq_numerics::log_space::{log_diff_exp, log_sum_exp};
+use morphiq_numerics::normal::log_norm_pdf;
 use morphiq_numerics::random::{
     SplitMix64, Xoshiro256PlusPlus, normal_pair, unit_closed_open, unit_open,
 };
@@ -649,6 +650,40 @@ pub fn corpus_digest() -> [u8; 32] {
             normal_in(&mut words, -1022, 1023),
         );
         r.f64(log_diff_exp(x.max(y), x.min(y)));
+    }
+
+    r.label("log_norm_pdf");
+    // Special values, each regime boundary of docs/log_norm_pdf.md §1 with its
+    // neighbours, the overflow threshold and a regime-L tie, then arguments
+    // across every regime and near zero.
+    for bits in [
+        0x7ff8_0000_0000_0000_u64, // NaN
+        0x7ff0_0000_0000_0000,     // +inf
+        0x0000_0000_0000_0000,     // +0
+        0x0000_0000_0000_0001,     // least subnormal
+        0x3e3f_ffff_ffff_ffff,     // below 2^-27
+        0x3e40_0000_0000_0000,     // 2^-27
+        0x5f30_0000_0000_0000,     // 2^500
+        0x5f30_0000_0000_0001,     // above 2^500
+        0x5ff0_0000_0000_0000,     // 2^512
+        0x5ff6_a09e_667f_3bcc,     // the overflow threshold, 1.8961503816218352e154
+        0x5ff6_a09e_667f_3bcd,     // its successor
+        0x6000_0000_0000_0000,     // 2^513
+    ] {
+        let x = f64::from_bits(bits);
+        r.f64(log_norm_pdf(x));
+        r.f64(log_norm_pdf(-x));
+    }
+    r.f64(log_norm_pdf(
+        134_217_727.0 * f64::from_bits(0x5dd0_0000_0000_0000),
+    )); // a tie: (2^27 - 1)·2^478
+    for _ in 0..20_000 {
+        r.f64(log_norm_pdf(normal_in(&mut words, -40, 512)));
+    }
+    for _ in 0..10_000 {
+        #[allow(clippy::cast_precision_loss)] // a 53-bit integer
+        let unit = (words.next_word() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+        r.f64(log_norm_pdf(16.0 * unit - 8.0));
     }
 
     r.0.finalize().into()
