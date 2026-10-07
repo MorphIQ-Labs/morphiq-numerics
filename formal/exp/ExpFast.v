@@ -284,3 +284,133 @@ Proof.
       by (change 4 with (bpow radix2 2); rewrite <- bpow_plus; reflexivity).
     pose proof (bpow_gt_0 radix2 (-1022)). pose proof (Rle_0_sqr (B rh)). unfold Rsqr in *. lra.
 Qed.
+
+Lemma bpow_m (k : nat) : bpow radix2 (- Z.of_nat k) = / 2 ^ k.
+Proof. rewrite bpow_opp, bpow_powerRZ, <- pow_powerRZ. reflexivity. Qed.
+
+(** The double-word bounds, as fast.g states them. *)
+Lemma u2_105 : 2 * bpow radix2 (- prec) ^ 2 = / 2 ^ 105.
+Proof.
+  rewrite <- bpow_m. change (- Z.of_nat 105)%Z with (1 + (-53 + -53))%Z.
+  rewrite !bpow_plus. change (- prec)%Z with (-53)%Z. change (bpow radix2 1) with 2. ring.
+Qed.
+
+Lemma gr q x : on_grid q x -> on_grid q (rn x).
+Proof.
+  intros H.
+  exact (@grid_round (FLT_exp (-1074) 53) (@FLT_exp_valid (-1074) 53 prec_gt_0)
+           Gappa_round_def.rndNE (valid_rnd_N _) q x H).
+Qed.
+
+(** [q] is a multiple of [2^-967] when [r_hi] is one of [2^-151]: the grid
+    refines by [r_hi]'s at each product. *)
+Lemma poly_grid rh : finite rh -> Rabs (B rh) <= 0.00270769 -> on_grid (-151) (B rh) ->
+  on_grid (-967) (B (poly_q rh)).
+Proof.
+  intros Fr Hr G. pose proof (poly_ok rh Fr Hr) as PO. cbv zeta in PO.
+  destruct PO as [_ [E _]]. rewrite E.
+  pose proof (val_grid 375299968947529 51 51 ltac:(lia)) as G3.
+  pose proof (val_grid 6004799503160511 57 57 ltac:(lia)) as G4.
+  pose proof (val_grid 4803840849707593 59 59 ltac:(lia)) as G5.
+  pose proof (val_grid 3202560482380763 61 61 ltac:(lia)) as G6.
+  assert (Gh : on_grid (-1) (/ 2)) by (exists 1%Z; change (IZR 1 * bpow radix2 (-1)) with (1 * / 2); ring).
+  pose proof (gr _ _ (grid_mult _ _ _ _ G G6)) as Ga.
+  pose proof (gr (-212) _ (grid_plus _ _ _ (grid_le (- Z.of_nat 59) (-212) _ ltac:(lia) G5) Ga)) as Gt5.
+  pose proof (gr _ _ (grid_mult _ _ _ _ G Gt5)) as Gb.
+  pose proof (gr (-363) _ (grid_plus _ _ _ (grid_le (- Z.of_nat 57) (-363) _ ltac:(lia) G4) Gb)) as Gt4.
+  pose proof (gr _ _ (grid_mult _ _ _ _ G Gt4)) as Gc.
+  pose proof (gr (-514) _ (grid_plus _ _ _ (grid_le (- Z.of_nat 51) (-514) _ ltac:(lia) G3) Gc)) as Gt3.
+  pose proof (gr _ _ (grid_mult _ _ _ _ G Gt3)) as Gd.
+  pose proof (gr (-665) _ (grid_plus _ _ _ (grid_le (-1) (-665) _ ltac:(lia) Gh) Gd)) as Gt.
+  pose proof (gr _ _ (grid_mult _ _ _ _ G G)) as Gr2.
+  exact (gr _ _ (grid_mult _ _ _ _ Gr2 Gt)).
+Qed.
+
+Lemma add_f64_zero : add_f64 0 0 0 = (0, 0).
+Proof.
+  assert (Z : rndF 0 = 0) by (apply round_0; exact _).
+  unfold add_f64, two_sum, fast_two_sum. cbv zeta.
+  repeat (rewrite ?Rplus_0_r, ?Rplus_0_l, ?Rminus_0_r, ?Rminus_0_l, ?Ropp_0, ?Z).
+  reflexivity.
+Qed.
+
+Lemma small_big x e : Rabs x <= 1 -> (0 <= e)%Z -> Rabs x <= bpow radix2 e.
+Proof.
+  intros H He. apply Rle_trans with 1; [exact H | ].
+  change 1 with (bpow radix2 0). apply bpow_le. exact He.
+Qed.
+
+Lemma bnd10 x : Rabs x <= 1 -> bnd 1 0 x.
+Proof. intros H. unfold bnd. change (IZR 1 * bpow radix2 0) with (1 * 1). lra. Qed.
+
+(** [P = r.add_f64(q)]: a double-word number on [2^-967]'s grid, equal to
+    [(r_hi + r_lo + q)·(1 + d1)] with [|d1| <= 2^-105] ([d1] in fast.g). *)
+Lemma p_step rh rl :
+  finite rh -> finite rl -> B rh = rndF (B rh + B rl) ->
+  Rabs (B rh) <= 0.00270769 -> Rabs (B rl) <= bpow radix2 (-62) ->
+  on_grid (-151) (B rh) -> on_grid (-151) (B rl) ->
+  let '(ph, pl) := add_f64_64 rh rl (poly_q rh) in
+  finite ph /\ finite pl /\ B ph = rndF (B ph + B pl) /\
+  on_grid (-967) (B ph) /\ on_grid (-967) (B pl) /\
+  exists d1, Rabs d1 <= / 2 ^ 105 /\ B ph + B pl = (B rh + B rl + B (poly_q rh)) * (1 + d1).
+Proof.
+  intros Fh Fl Dh Hrh Hrl Gh Gl.
+  pose proof (poly_ok rh Fh Hrh) as PO. cbv zeta in PO. destruct PO as [Fq [Bq [Mq Rq]]].
+  pose proof (poly_grid rh Fh Hrh Gh) as Gq.
+  set (q := poly_q rh) in *.
+  change (bpow radix2 (-17)) with (/ 131072) in Mq.
+  change (bpow radix2 (-62)) with (/ 4611686018427387904) in Hrl.
+  assert (Uh : Rabs (B rh) <= 1) by lra. assert (Ul : Rabs (B rl) <= 1) by lra.
+  assert (Uq : Rabs (B q) <= 1) by lra.
+  pose proof (add_f64_ieee rh rl q Fh Fl Fq Dh (small_big _ 1018 Uh ltac:(lia))
+                (small_big _ 1018 Ul ltac:(lia)) (small_big _ 1018 Uq ltac:(lia))) as AI.
+  destruct (add_f64_64_ok 1 0 rh rl q Fh Fl Fq (bnd10 _ Uh) (bnd10 _ Ul) (bnd10 _ Uq)
+              ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) ltac:(lia)) as [_ [_ EQ]].
+  pose proof (add_f64_dw (B rh) (B rl) (B q) (B_fmt rh) (B_fmt rl) (B_fmt q) Dh) as DW.
+  pose proof (grid_add_f64 (-967) (B rh) (B rl) (B q) (grid_le (-151) (-967) _ ltac:(lia) Gh)
+                (grid_le (-151) (-967) _ ltac:(lia) Gl) Gq) as GP.
+  destruct (add_f64_64 rh rl q) as [ph pl]. cbn [fst snd] in EQ.
+  rewrite <- EQ in DW, GP. cbn [fst snd] in DW, GP. destruct GP as [Gph Gpl].
+  destruct AI as [Fph [Fpl Rel]].
+  split; [exact Fph | split; [exact Fpl | split; [exact DW | split; [exact Gph | split; [exact Gpl | ]]]]].
+  destruct (Req_dec (B rh) 0) as [Z0 | NZ].
+  - (* r_hi = 0: then r_lo = q = 0, and so is P. *)
+    assert (Z : forall rnd, Valid_rnd rnd -> round radix2 (FLT_exp (-1074) 53) rnd 0 = 0)
+      by (intros rnd V; apply round_0; exact V).
+    assert (L0 : B rl = 0).
+    { rewrite Z0, Rplus_0_l, round_generic in Dh; [lra | exact _ | apply B_fmt]. }
+    assert (Q0 : B q = 0).
+    { rewrite Bq, Z0, Rmult_0_r, (Z Gappa_round_def.rndNE (valid_rnd_N _)), Rmult_0_l.
+      exact (Z Gappa_round_def.rndNE (valid_rnd_N _)). }
+    rewrite Z0, L0, Q0, add_f64_zero in EQ. injection EQ as E1 E2.
+    exists 0. split; [rewrite Rabs_R0; apply Rlt_le, Rinv_0_lt_compat, pow_lt; lra | ].
+    rewrite E1, E2, Z0, L0, Q0. ring.
+  - (* r_hi <> 0: S = r_hi + r_lo + q is r_hi's sign and magnitude, so not zero. *)
+    pose proof (grid_nonzero _ _ Gh NZ) as Big.
+    assert (Vbig : bpow radix2 (-1022) <= Rabs (B rh + B rl)).
+    { apply Rnot_lt_le. intros H.
+      assert (F : fmtF (bpow radix2 (-1022)))
+        by (apply generic_format_bpow; unfold FLT_exp, emin, prec; lia).
+      pose proof (abs_round_le_generic radix2 (FLT_exp emin prec) (Znearest ne) _ _ F (Rlt_le _ _ H)) as A.
+      rewrite <- Dh in A. assert (bpow radix2 (-1022) < bpow radix2 (-151)) by (apply bpow_lt; lia). lra. }
+    pose proof (rel_FLT _ Vbig) as RL. rewrite <- Dh in RL.
+    replace (B rh - (B rh + B rl)) with (- B rl) in RL by ring. rewrite Rabs_Ropp in RL.
+    pose proof (Rabs_triang (B rh) (B rl)) as T.
+    assert (Lrel : Rabs (B rl) <= / 4503599627370496 * Rabs (B rh)).
+    { assert (Rabs (B rl) * (1 - / 9007199254740992) <= / 9007199254740992 * Rabs (B rh)) by lra.
+      pose proof (Rabs_pos (B rh)). lra. }
+    assert (Sq : B rh * B rh <= 0.00270769 * Rabs (B rh)).
+    { rewrite <- (Rabs_pos_eq (B rh * B rh)) by apply Rle_0_sqr. rewrite Rabs_mult.
+      apply Rmult_le_compat_r; [apply Rabs_pos | exact Hrh]. }
+    assert (Tiny : bpow radix2 (-1020) <= / 1024 * bpow radix2 (-151)).
+    { replace (/ 1024 * bpow radix2 (-151)) with (bpow radix2 (-161))
+        by (change (/ 1024) with (bpow radix2 (-10)); rewrite <- bpow_plus; reflexivity).
+      apply bpow_le. lia. }
+    assert (SNZ : B rh + B rl + B q <> 0).
+    { intros S0. assert (Rabs (B rh) <= Rabs (B rl) + Rabs (B q)).
+      { replace (B rh) with (- (B rl + B q)) by lra. rewrite Rabs_Ropp. apply Rabs_triang. }
+      pose proof (bpow_gt_0 radix2 (-151)). pose proof (Rabs_pos (B rl)). lra. }
+    exists ((B ph + B pl - (B rh + B rl + B q)) / (B rh + B rl + B q)). split.
+    + rewrite <- u2_105. exact Rel.
+    + field. exact SNZ.
+Qed.
