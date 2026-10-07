@@ -7,8 +7,8 @@ higher-order terms included, in exact rational arithmetic (fractions.Fraction),
 and checks that the constants the document claims dominate them.
 
 It certifies the arithmetic of the composition, not that the implementation
-follows the derivation; the reference fixtures check that. Irrational constants enter only through rational
-enclosures stated below.
+follows the derivation; the reference fixtures check that. Irrational constants
+enter only through rational enclosures stated below.
 
 Standard library only. `--check` exits non-zero if a claim fails; without it,
 the computed constants are printed.

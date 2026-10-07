@@ -13,8 +13,9 @@ Two kinds of case:
   every ŷ it accepts is within the bound. It is also exact, accepting every
   binary64 within the bound, except where y ± B lies within the enclosure's
   width of a binary64 number. There the generator cannot decide, and excludes
-  that number. Terms below e^−2000 (see below) are such a case. Each bounded case also records RN(y), for
-  reporting how far ŷ is from the correctly rounded result.
+  that number. Terms below e^−2000 (see below) are such a case. Each bounded
+  case also records RN(y), for reporting how far ŷ is from the correctly
+  rounded result.
 
 The enclosure uses the shifted forms y = m + ln(1 + Σ e^(xᵢ − m)) and
 y = a + ln(1 − e^(b − a)), at a precision doubled from 256 bits until the
