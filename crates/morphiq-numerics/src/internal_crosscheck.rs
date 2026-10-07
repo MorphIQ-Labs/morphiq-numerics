@@ -1,9 +1,10 @@
 //! Writes the internal cross-check corpus: `Q128` and `Q256` operations, the
-//! rounding tests (`ln::decide_with`, `exp::decide_scaled`) and `exp`'s
-//! reduction on reproducible inputs, with this crate's results.
-//! `scripts/check_formal.sh` runs the proved transcriptions (`formal/q`,
-//! `formal/binary64/RoundingTest.v` and `formal/exp/ExpReduction.v`, extracted
-//! by `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
+//! rounding tests (`ln::decide_with`, `exp::decide_scaled`), `exp`'s reduction
+//! and its fast value (`exp::fast_at`) on reproducible inputs, with this crate's
+//! results. `scripts/check_formal.sh` runs the proved transcriptions
+//! (`formal/q`, `formal/binary64/RoundingTest.v`, `formal/exp/ExpReduction.v`
+//! and `formal/exp/ExpFast.v`, extracted by
+//! `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
 //! identical results, which ties the proofs to this code.
 //!
 //! Ignored by default; run with the output path in `MORPHIQ_INTERNAL_CORPUS`:
@@ -142,7 +143,7 @@ fn internal_crosscheck_corpus() {
     let path = std::env::var("MORPHIQ_INTERNAL_CORPUS").expect("MORPHIQ_INTERNAL_CORPUS");
     let mut rng = SplitMix64::new(0x7163_726f_7373_0001);
     let mut out = String::new();
-    for _ in 0..4000 {
+    for i in 0..4000 {
         // decide_with: leading words across the proved range, both signs.
         let eps = f64::from_bits(EPS[usize::try_from(rng.next_u64() % 4).unwrap()]);
         let e = i32::try_from(rng.next_u64() % 1900).unwrap() - 900;
@@ -200,6 +201,19 @@ fn internal_crosscheck_corpus() {
             words[3].to_bits(),
             words[4].to_bits(),
             words[5].to_bits()
+        )
+        .unwrap();
+        // fast_at at that reduced argument, cycling through every table index.
+        let r = DoubleWord::from_parts(words[4], words[5]).unwrap();
+        let j = i % 128;
+        let y = crate::exp::fast_at(r, j);
+        writeln!(
+            out,
+            "fast {:016x} {:016x} {j} : {:016x} {:016x}",
+            words[4].to_bits(),
+            words[5].to_bits(),
+            y.hi().to_bits(),
+            y.lo().to_bits()
         )
         .unwrap();
 

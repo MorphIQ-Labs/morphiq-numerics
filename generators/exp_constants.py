@@ -204,7 +204,7 @@ def coq_tables(l_split, poly, poly_bound, table_dw):
             f'  split; [exact ({fin[0]}) | split; [exact ({fin[1]}) | ]].',
             f'  rewrite {rw[0]}, {rw[1]}; cbn [cond_Zopp].',
             f'  split; [{grid[0]} | split; [{grid[1]} | ]].',
-            '  split; [interval | split; [interval | ]].',
+            '  split; [interval with (i_prec 64) | split; [interval with (i_prec 64) | ]].',
             f'  rewrite INR_IZR_INZ; change (Z.of_nat {j}) with {j}%Z.',
             '  interval with (i_prec 160).',
             'Qed.',

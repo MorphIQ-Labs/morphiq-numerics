@@ -104,12 +104,15 @@ Then `e^x = 2^k · T_j · e^r`.
 binary64 and proves steps 1–4 for every `x` in `[−745.1333, 709.79]` (the
 domain past the overflow and underflow thresholds) and every `L` within
 `2^−206` of `L1 + L2 + L3 + L4` (`reduce_ok`): `n` is an integer with
-`|n| ≤ 137,601`, `r1` and `p2 + e2` are exact, `|x − n·L| ≤ 0.0027077`, and
-`(r_hi, r_lo)` is within `2^−113` of it. The last bound is
-`formal/exp/reduction.g`'s theorem, applied through Gappa's Coq proof. The
-formal job compares the transcription with the Rust code bit for bit on the
-internal cross-check corpus: arguments across the domain, at ties of `x/L`, and
-tiny.
+`|n| ≤ 137,601`, `r1` and `p2 + e2` are exact, `|x − n·L| ≤ 0.0027076063`
+(inside the certificates' `0.0027077`), `r_hi = RN(r_hi + r_lo)`, and
+`(r_hi, r_lo)` is within `2^−113` of `x − n·L`. For `|x| ≥ 2^−99` every word of
+the reduction is a multiple of `2^−151`. The `2^−113` bound is
+`formal/exp/reduction.g`'s theorem, applied through Gappa's Coq proof.
+`formal/exp/ExpTables.v` proves with CoqInterval that the generated split is
+within `2^−206` of `ln 2 / 128`, so `L` is exactly `ln 2 / 128`. The formal job
+compares the transcription with the Rust code bit for bit on the internal
+cross-check corpus: arguments across the domain, at ties of `x/L`, and tiny.
 
 ## 4. Fast path
 
@@ -125,7 +128,8 @@ double-word operations,** so the only new error analysis is the polynomial's.
    - The evaluation error `|q − Q(r_hi)|`, against the same polynomial evaluated
      exactly, is below `2^−70` (*certified*: `formal/exp/poly.g`).
 2. `P = DoubleWord(r_hi, r_lo).add_f64(q)`: `e^r − 1`. The polynomial is evaluated
-   at `r_hi`, not the exact `r`; the difference `|Q(r) − Q(r_hi)|` is below
+   at `r_hi`, not the exact `r`; `r − r_hi` is at most `|r_lo| + 2^−113 ≤
+   2^−62 + 2^−113`, and the difference `|Q(r) − Q(r_hi)|` is below
    `0x1.9p−71 ≈ 2^−70.4` (*certified*: `formal/exp/mvt.g`).
 3. `E = DoubleWord::from_f64(1.0).add(P)`: `e^r`.
 4. `Y = T_j.mul(E)`, where `T_j` is a double-word table entry, `2^(j/128)` rounded
@@ -142,6 +146,31 @@ double-word operations,** so the only new error analysis is the polynomial's.
 
 At that bound the rounding test (§5) should send roughly one argument in 2^15 to
 the accurate path; measured, it sends one in 2^15.4 (§8).
+
+**Machine-checked:** `formal/exp/ExpFast.v` transcribes `fast_at` on binary64
+and proves `ε₁` for it (`fast_ok`): for `(r_hi, r_lo)` within `2^−113` of `R`,
+`|R| ≤ 0.0027076063`, both on `2^−151`'s grid, and every `j`, `Y` is a
+double-word number within `2^−69` relatively of `2^(j/128)·e^R`, with `y_hi` in
+`[3/4, 4]`.
+- **The certificates' theorems,** applied through Gappa's Coq proofs:
+  `fast.g`, and `mvt.g` for `Q(r) − Q(r_hi)`.
+- **Their hypotheses about the transcription.** The polynomial is `fast.g`'s
+  rounded Horner chain. The double-word steps meet their machine-checked bounds
+  and return double-word numbers. Every word stays on `2^−967`'s grid, so the
+  last product's low terms are normal or zero, as its bound requires.
+- **The constants,** in `formal/exp/ExpTables.v`, which
+  `generators/exp_constants.py` writes from the same encodings as `tables.rs`.
+  CoqInterval proves Sollya's approximation bound, every table pair within
+  `2^−107`, and the `L` split, from the definitions of `exp` and `ln`.
+
+`exp_fast_ok` composes the reduction, `fast_ok` and the rounding test
+(`decide_scaled_ok`): for every finite `x` with `−745.1333 ≤ x < X_OVERFLOW`,
+`|x| ≥ 2^−99` and `k ≥ −1021`, a value the fast path returns is `RN(e^x)`. The
+formal job also compares `fast_at` with the Rust code bit for bit, at the
+corpus's reduced arguments, cycling through every table index.
+
+CoqInterval computes with Coq's primitive 63-bit integers, so these theorems
+also rest on their specification, listed in `formal/axioms.int63.expected`.
 
 **Decision 3: the fast path doesn't handle results that may be subnormal**
 (`k < −1021`). They go straight to the accurate path, which rounds once. Scaling
