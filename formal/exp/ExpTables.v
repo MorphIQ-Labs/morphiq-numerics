@@ -211,6 +211,7 @@ Definition exp_t_lo (j : nat) : f64 := b64_of_bits (snd (nth j exp_t_bits (0%Z, 
 Definition exp_t_ok (j : nat) : Prop :=
   finite (exp_t_hi j) /\ finite (exp_t_lo j) /\
   on_grid (-120) (B (exp_t_hi j)) /\ on_grid (-120) (B (exp_t_lo j)) /\
+  Rabs (B (exp_t_hi j)) <= 2 /\ Rabs (B (exp_t_lo j)) <= 1 /\
   Rabs ((B (exp_t_hi j) + B (exp_t_lo j) - exp (INR j * ln 2 / 128)) / exp (INR j * ln 2 / 128))
     <= / 2 ^ 107.
 
@@ -220,6 +221,7 @@ Proof.
   split; [exact (bits_finite 4607182418800017408 _ _ _ eq_refl) | split; [exact (bits_finite_zero 0 false eq_refl) | ]].
   rewrite (bits_val 4607182418800017408 false 4503599627370496 52 eq_refl), (bits_zero 0 false eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply grid_0 | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 0) with 0%Z.
   interval with (i_prec 160).
 Qed.
@@ -229,6 +231,7 @@ Proof.
   split; [exact (bits_finite 4607206872900645685 _ _ _ eq_refl) | split; [exact (bits_finite 4367191094983183799 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607206872900645685 false 4528053727998773 52 eq_refl), (bits_val 4367191094983183799 false 7706655688543671 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 1) with 1%Z.
   interval with (i_prec 160).
 Qed.
@@ -238,6 +241,7 @@ Proof.
   split; [exact (bits_finite 4607231459784622177 _ _ _ eq_refl) | split; [exact (bits_finite 13578793245212346461 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607231459784622177 false 4552640611975265 52 eq_refl), (bits_val 13578793245212346461 true 4943968317671517 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 2) with 2%Z.
   interval with (i_prec 160).
 Qed.
@@ -247,6 +251,7 @@ Proof.
   split; [exact (bits_finite 4607256180172947333 _ _ _ eq_refl) | split; [exact (bits_finite 13587539416858478958 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607256180172947333 false 4577361000300421 52 eq_refl), (bits_val 13587539416858478958 true 4682940709063022 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 3) with 3%Z.
   interval with (i_prec 160).
 Qed.
@@ -256,6 +261,7 @@ Proof.
   split; [exact (bits_finite 4607281034790536564 _ _ _ eq_refl) | split; [exact (bits_finite 4363271031250859109 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607281034790536564 false 4602215617889652 52 eq_refl), (bits_val 4363271031250859109 false 8290191583589477 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 4) with 4%Z.
   interval with (i_prec 160).
 Qed.
@@ -265,6 +271,7 @@ Proof.
   split; [exact (bits_finite 4607306024366241502 _ _ _ eq_refl) | split; [exact (bits_finite 13586394566636944423 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607306024366241502 false 4627205193594590 52 eq_refl), (bits_val 13586394566636944423 true 8041690114898983 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 5) with 5%Z.
   interval with (i_prec 160).
 Qed.
@@ -274,6 +281,7 @@ Proof.
   split; [exact (bits_finite 4607331149632871368 _ _ _ eq_refl) | split; [exact (bits_finite 4350906866888508671 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607331149632871368 false 4652330460224456 52 eq_refl), (bits_val 4350906866888508671 false 4933226475980031 109 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 6) with 6%Z.
   interval with (i_prec 160).
 Qed.
@@ -283,6 +291,7 @@ Proof.
   split; [exact (bits_finite 4607356411327214467 _ _ _ eq_refl) | split; [exact (bits_finite 4364349194537886006 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607356411327214467 false 4677592154567555 52 eq_refl), (bits_val 4364349194537886006 false 4864755243245878 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 7) with 7%Z.
   interval with (i_prec 160).
 Qed.
@@ -292,6 +301,7 @@ Proof.
   split; [exact (bits_finite 4607381810190059791 _ _ _ eq_refl) | split; [exact (bits_finite 4366422556490359051 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607381810190059791 false 4702991017412879 52 eq_refl), (bits_val 4366422556490359051 false 6938117195718923 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 8) with 8%Z.
   interval with (i_prec 160).
 Qed.
@@ -301,6 +311,7 @@ Proof.
   split; [exact (bits_finite 4607407346966218743 _ _ _ eq_refl) | split; [exact (bits_finite 4364021969547579249 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607407346966218743 false 4728527793571831 52 eq_refl), (bits_val 4364021969547579249 false 4537530252939121 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 9) with 9%Z.
   interval with (i_prec 160).
 Qed.
@@ -310,6 +321,7 @@ Proof.
   split; [exact (bits_finite 4607433022404546978 _ _ _ eq_refl) | split; [exact (bits_finite 4341533911911070547 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607433022404546978 false 4754203231900066 52 eq_refl), (bits_val 4341533911911070547 false 4567470753282899 111 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 10) with 10%Z.
   interval with (i_prec 160).
 Qed.
@@ -319,6 +331,7 @@ Proof.
   split; [exact (bits_finite 4607458837257966363 _ _ _ eq_refl) | split; [exact (bits_finite 13577116947141541243 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607458837257966363 false 4780018085319451 52 eq_refl), (bits_val 13577116947141541243 true 7771269874236795 109 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 11) with 11%Z.
   interval with (i_prec 160).
 Qed.
@@ -328,6 +341,7 @@ Proof.
   split; [exact (bits_finite 4607484792283487057 _ _ _ eq_refl) | split; [exact (bits_finite 13589265599107996474 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607484792283487057 false 4805973110840145 52 eq_refl), (bits_val 13589265599107996474 true 6409122958580538 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 12) with 12%Z.
   interval with (i_prec 160).
 Qed.
@@ -337,6 +351,7 @@ Proof.
   split; [exact (bits_finite 4607510888242229708 _ _ _ eq_refl) | split; [exact (bits_finite 13569826252758230471 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607510888242229708 false 4832069069582796 52 eq_refl), (bits_val 13569826252758230471 true 4984175118296519 110 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 13) with 13%Z.
   interval with (i_prec 160).
 Qed.
@@ -346,6 +361,7 @@ Proof.
   split; [exact (bits_finite 4607537125899447776 _ _ _ eq_refl) | split; [exact (bits_finite 13588257000691676830 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607537125899447776 false 4858306726800864 52 eq_refl), (bits_val 13588257000691676830 true 5400524542260894 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 14) with 14%Z.
   interval with (i_prec 160).
 Qed.
@@ -355,6 +371,7 @@ Proof.
   split; [exact (bits_finite 4607563506024549969 _ _ _ eq_refl) | split; [exact (bits_finite 4360118216378198794 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607563506024549969 false 4884686851903057 52 eq_refl), (bits_val 4360118216378198794 false 5137376710929162 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 15) with 15%Z.
   interval with (i_prec 160).
 Qed.
@@ -364,6 +381,7 @@ Proof.
   split; [exact (bits_finite 4607590029391122811 _ _ _ eq_refl) | split; [exact (bits_finite 13583296563091311222 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607590029391122811 false 4911210218475899 52 eq_refl), (bits_val 13583296563091311222 true 4943686569265782 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 16) with 16%Z.
   interval with (i_prec 160).
 Qed.
@@ -373,6 +391,7 @@ Proof.
   split; [exact (bits_finite 4607616696776953322 _ _ _ eq_refl) | split; [exact (bits_finite 13587659296779734892 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607616696776953322 false 4937877604306410 52 eq_refl), (bits_val 13587659296779734892 true 4802820630318956 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 17) with 17%Z.
   interval with (i_prec 160).
 Qed.
@@ -382,6 +401,7 @@ Proof.
   split; [exact (bits_finite 4607643508964051829 _ _ _ eq_refl) | split; [exact (bits_finite 4363525473012639972 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607643508964051829 false 4964689791404917 52 eq_refl), (bits_val 4363525473012639972 false 8544633345370340 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 18) with 18%Z.
   interval with (i_prec 160).
 Qed.
@@ -391,6 +411,7 @@ Proof.
   split; [exact (bits_finite 4607670466738674900 _ _ _ eq_refl) | split; [exact (bits_finite 13589985186450175495 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607670466738674900 false 4991647566027988 52 eq_refl), (bits_val 13589985186450175495 true 7128710300759559 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 19) with 19%Z.
   interval with (i_prec 160).
 Qed.
@@ -400,6 +421,7 @@ Proof.
   split; [exact (bits_finite 4607697570891348394 _ _ _ eq_refl) | split; [exact (bits_finite 4367930260564632636 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607697570891348394 false 5018751718701482 52 eq_refl), (bits_val 4367930260564632636 false 8445821269992508 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 20) with 20%Z.
   interval with (i_prec 160).
 Qed.
@@ -409,6 +431,7 @@ Proof.
   split; [exact (bits_finite 4607724822216890653 _ _ _ eq_refl) | split; [exact (bits_finite 13587887394723182476 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607724822216890653 false 5046003044243741 52 eq_refl), (bits_val 13587887394723182476 true 5030918573766540 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 21) with 21%Z.
   interval with (i_prec 160).
 Qed.
@@ -418,6 +441,7 @@ Proof.
   split; [exact (bits_finite 4607752221514435798 _ _ _ eq_refl) | split; [exact (bits_finite 4363362921486124181 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607752221514435798 false 5073402341788886 52 eq_refl), (bits_val 4363362921486124181 false 8382081818854549 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 22) with 22%Z.
   interval with (i_prec 160).
 Qed.
@@ -427,6 +451,7 @@ Proof.
   split; [exact (bits_finite 4607779769587457174 _ _ _ eq_refl) | split; [exact (bits_finite 4360233750371804654 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607779769587457174 false 5100950414810262 52 eq_refl), (bits_val 4360233750371804654 false 5252910704535022 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 23) with 23%Z.
   interval with (i_prec 160).
 Qed.
@@ -436,6 +461,7 @@ Proof.
   split; [exact (bits_finite 4607807467243790904 _ _ _ eq_refl) | split; [exact (bits_finite 4366715371991270771 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607807467243790904 false 5128648071143992 52 eq_refl), (bits_val 4366715371991270771 false 7230932696630643 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 24) with 24%Z.
   interval with (i_prec 160).
 Qed.
@@ -445,6 +471,7 @@ Proof.
   split; [exact (bits_finite 4607835315295659583 _ _ _ eq_refl) | split; [exact (bits_finite 4362511763081852068 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607835315295659583 false 5156496123012671 52 eq_refl), (bits_val 4362511763081852068 false 7530923414582436 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 25) with 25%Z.
   interval with (i_prec 160).
 Qed.
@@ -454,6 +481,7 @@ Proof.
   split; [exact (bits_finite 4607863314559696093 _ _ _ eq_refl) | split; [exact (bits_finite 4360255418560211417 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607863314559696093 false 5184495387049181 52 eq_refl), (bits_val 4360255418560211417 false 5274578892941785 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 26) with 26%Z.
   interval with (i_prec 160).
 Qed.
@@ -463,6 +491,7 @@ Proof.
   split; [exact (bits_finite 4607891465856967553 _ _ _ eq_refl) | split; [exact (bits_finite 13590258639888649598 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607891465856967553 false 5212646684320641 52 eq_refl), (bits_val 13590258639888649598 true 7402163739233662 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 27) with 27%Z.
   interval with (i_prec 160).
 Qed.
@@ -472,6 +501,7 @@ Proof.
   split; [exact (bits_finite 4607919770012999393 _ _ _ eq_refl) | split; [exact (bits_finite 4361194079743971925 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607919770012999393 false 5240950840352481 52 eq_refl), (bits_val 4361194079743971925 false 6213240076702293 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 28) with 28%Z.
   interval with (i_prec 160).
 Qed.
@@ -481,6 +511,7 @@ Proof.
   split; [exact (bits_finite 4607948227857799568 _ _ _ eq_refl) | split; [exact (bits_finite 13565135496219728548 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607948227857799568 false 5269408685152656 52 eq_refl), (bits_val 13565135496219728548 true 4797018207165092 111 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 29) with 29%Z.
   interval with (i_prec 160).
 Qed.
@@ -490,6 +521,7 @@ Proof.
   split; [exact (bits_finite 4607976840225882891 _ _ _ eq_refl) | split; [exact (bits_finite 4363990544311599573 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4607976840225882891 false 5298021053235979 52 eq_refl), (bits_val 4363990544311599573 false 4506105016959445 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 30) with 30%Z.
   interval with (i_prec 160).
 Qed.
@@ -499,6 +531,7 @@ Proof.
   split; [exact (bits_finite 4608005607956295510 _ _ _ eq_refl) | split; [exact (bits_finite 4355484481588896643 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608005607956295510 false 5326788783648598 52 eq_refl), (bits_val 4355484481588896643 false 5007241548997507 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 31) with 31%Z.
   interval with (i_prec 160).
 Qed.
@@ -508,6 +541,7 @@ Proof.
   split; [exact (bits_finite 4608034531892639509 _ _ _ eq_refl) | split; [exact (bits_finite 4361442028785074916 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608034531892639509 false 5355712719992597 52 eq_refl), (bits_val 4361442028785074916 false 6461189117805284 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 32) with 32%Z.
   interval with (i_prec 160).
 Qed.
@@ -517,6 +551,7 @@ Proof.
   split; [exact (bits_finite 4608063612883097649 _ _ _ eq_refl) | split; [exact (bits_finite 4362471707397063804 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608063612883097649 false 5384793710450737 52 eq_refl), (bits_val 4362471707397063804 false 7490867729794172 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 33) with 33%Z.
   interval with (i_prec 160).
 Qed.
@@ -526,6 +561,7 @@ Proof.
   split; [exact (bits_finite 4608092851780458239 _ _ _ eq_refl) | split; [exact (bits_finite 4364875488757701030 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608092851780458239 false 5414032607811327 52 eq_refl), (bits_val 4364875488757701030 false 5391049463060902 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 34) with 34%Z.
   interval with (i_prec 160).
 Qed.
@@ -535,6 +571,7 @@ Proof.
   split; [exact (bits_finite 4608122249442140145 _ _ _ eq_refl) | split; [exact (bits_finite 13586054879713838632 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608122249442140145 false 5443430269493233 52 eq_refl), (bits_val 13586054879713838632 true 7702003191793192 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 35) with 35%Z.
   interval with (i_prec 160).
 Qed.
@@ -544,6 +581,7 @@ Proof.
   split; [exact (bits_finite 4608151806730217931 _ _ _ eq_refl) | split; [exact (bits_finite 13589113705542642402 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608151806730217931 false 5472987557571019 52 eq_refl), (bits_val 13589113705542642402 true 6257229393226466 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 36) with 36%Z.
   interval with (i_prec 160).
 Qed.
@@ -553,6 +591,7 @@ Proof.
   split; [exact (bits_finite 4608181524511447142 _ _ _ eq_refl) | split; [exact (bits_finite 13591465159290324157 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608181524511447142 false 5502705338800230 52 eq_refl), (bits_val 13591465159290324157 true 8608683140908221 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 37) with 37%Z.
   interval with (i_prec 160).
 Qed.
@@ -562,6 +601,7 @@ Proof.
   split; [exact (bits_finite 4608211403657289719 _ _ _ eq_refl) | split; [exact (bits_finite 13580011175581709795 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608211403657289719 false 5532584484642807 52 eq_refl), (bits_val 13580011175581709795 true 6161898687034851 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 38) with 38%Z.
   interval with (i_prec 160).
 Qed.
@@ -571,6 +611,7 @@ Proof.
   split; [exact (bits_finite 4608241445043939557 _ _ _ eq_refl) | split; [exact (bits_finite 13591582166996560323 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608241445043939557 false 5562625871292645 52 eq_refl), (bits_val 13591582166996560323 true 8725690847144387 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 39) with 39%Z.
   interval with (i_prec 160).
 Qed.
@@ -580,6 +621,7 @@ Proof.
   split; [exact (bits_finite 4608271649552348194 _ _ _ eq_refl) | split; [exact (bits_finite 4362538921552289468 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608271649552348194 false 5592830379701282 52 eq_refl), (bits_val 4362538921552289468 false 7558081885019836 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 40) with 40%Z.
   interval with (i_prec 160).
 Qed.
@@ -589,6 +631,7 @@ Proof.
   split; [exact (bits_finite 4608302018068250652 _ _ _ eq_refl) | split; [exact (bits_finite 13589559253539420659 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608302018068250652 false 5623198895603740 52 eq_refl), (bits_val 13589559253539420659 true 6702777390004723 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 41) with 41%Z.
   interval with (i_prec 160).
 Qed.
@@ -598,6 +641,7 @@ Proof.
   split; [exact (bits_finite 4608332551482191402 _ _ _ eq_refl) | split; [exact (bits_finite 13573553959711314552 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608332551482191402 false 5653732309544490 52 eq_refl), (bits_val 13573553959711314552 true 8711882071380600 110 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 42) with 42%Z.
   interval with (i_prec 160).
 Qed.
@@ -607,6 +651,7 @@ Proof.
   split; [exact (bits_finite 4608363250689550487 _ _ _ eq_refl) | split; [exact (bits_finite 13583357706942511513 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608363250689550487 false 5684431516903575 52 eq_refl), (bits_val 13583357706942511513 true 5004830420466073 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 43) with 43%Z.
   interval with (i_prec 160).
 Qed.
@@ -616,6 +661,7 @@ Proof.
   split; [exact (bits_finite 4608394116590569773 _ _ _ eq_refl) | split; [exact (bits_finite 4343892788969963728 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608394116590569773 false 5715297417922861 52 eq_refl), (bits_val 4343892788969963728 false 6926347812176080 111 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 44) with 44%Z.
   interval with (i_prec 160).
 Qed.
@@ -625,6 +671,7 @@ Proof.
   split; [exact (bits_finite 4608425150090379351 _ _ _ eq_refl) | split; [exact (bits_finite 4367528791999023734 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608425150090379351 false 5746330917732439 52 eq_refl), (bits_val 4367528791999023734 false 8044352704383606 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 45) with 45%Z.
   interval with (i_prec 160).
 Qed.
@@ -634,6 +681,7 @@ Proof.
   split; [exact (bits_finite 4608456352099024080 _ _ _ eq_refl) | split; [exact (bits_finite 4356038173484147440 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608456352099024080 false 5777532926377168 52 eq_refl), (bits_val 4356038173484147440 false 5560933444248304 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 46) with 46%Z.
   interval with (i_prec 160).
 Qed.
@@ -643,6 +691,7 @@ Proof.
   split; [exact (bits_finite 4608487723531490270 _ _ _ eq_refl) | split; [exact (bits_finite 4366744939570249302 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608487723531490270 false 5808904358843358 52 eq_refl), (bits_val 4366744939570249302 false 7260500275609174 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 47) with 47%Z.
   interval with (i_prec 160).
 Qed.
@@ -652,6 +701,7 @@ Proof.
   split; [exact (bits_finite 4608519265307732519 _ _ _ eq_refl) | split; [exact (bits_finite 4358714333135127266 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608519265307732519 false 5840446135085607 52 eq_refl), (bits_val 4358714333135127266 false 8237093095228130 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 48) with 48%Z.
   interval with (i_prec 160).
 Qed.
@@ -661,6 +711,7 @@ Proof.
   split; [exact (bits_finite 4608550978352700685 _ _ _ eq_refl) | split; [exact (bits_finite 4366500267238783027 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608550978352700685 false 5872159180053773 52 eq_refl), (bits_val 4366500267238783027 false 7015827944142899 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 49) with 49%Z.
   interval with (i_prec 160).
 Qed.
@@ -670,6 +721,7 @@ Proof.
   split; [exact (bits_finite 4608582863596367015 _ _ _ eq_refl) | split; [exact (bits_finite 13588682830448777187 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608582863596367015 false 5904044423720103 52 eq_refl), (bits_val 13588682830448777187 true 5826354299361251 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 50) with 50%Z.
   interval with (i_prec 160).
 Qed.
@@ -679,6 +731,7 @@ Proof.
   split; [exact (bits_finite 4608614921973753410 _ _ _ eq_refl) | split; [exact (bits_finite 13587208916176835567 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608614921973753410 false 5936102801106498 52 eq_refl), (bits_val 13587208916176835567 true 8856039654790127 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 51) with 51%Z.
   interval with (i_prec 160).
 Qed.
@@ -688,6 +741,7 @@ Proof.
   split; [exact (bits_finite 4608647154424958850 _ _ _ eq_refl) | split; [exact (bits_finite 13582991433109945517 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608647154424958850 false 5968335252311938 52 eq_refl), (bits_val 13582991433109945517 true 4638556587900077 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 52) with 52%Z.
   interval with (i_prec 160).
 Qed.
@@ -697,6 +751,7 @@ Proof.
   split; [exact (bits_finite 4608679561895186959 _ _ _ eq_refl) | split; [exact (bits_finite 13586630674096186779 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608679561895186959 false 6000742722540047 52 eq_refl), (bits_val 13586630674096186779 true 8277797574141339 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 53) with 53%Z.
   interval with (i_prec 160).
 Qed.
@@ -706,6 +761,7 @@ Proof.
   split; [exact (bits_finite 4608712145334773722 _ _ _ eq_refl) | split; [exact (bits_finite 4366727111384077229 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608712145334773722 false 6033326162126810 52 eq_refl), (bits_val 4366727111384077229 false 7242672089437101 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 54) with 54%Z.
   interval with (i_prec 160).
 Qed.
@@ -715,6 +771,7 @@ Proof.
   split; [exact (bits_finite 4608744905699215357 _ _ _ eq_refl) | split; [exact (bits_finite 4360212184385068520 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608744905699215357 false 6066086526568445 52 eq_refl), (bits_val 4360212184385068520 false 5231344717798888 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 55) with 55%Z.
   interval with (i_prec 160).
 Qed.
@@ -724,6 +781,7 @@ Proof.
   split; [exact (bits_finite 4608777843949196329 _ _ _ eq_refl) | split; [exact (bits_finite 4365732190869669805 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608777843949196329 false 6099024776549417 52 eq_refl), (bits_val 4365732190869669805 false 6247751575029677 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 56) with 56%Z.
   interval with (i_prec 160).
 Qed.
@@ -733,6 +791,7 @@ Proof.
   split; [exact (bits_finite 4608810961050617527 _ _ _ eq_refl) | split; [exact (bits_finite 4340426722385692322 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608810961050617527 false 6132141877970615 52 eq_refl), (bits_val 4340426722385692322 false 7963880855275170 112 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 57) with 57%Z.
   interval with (i_prec 160).
 Qed.
@@ -742,6 +801,7 @@ Proof.
   split; [exact (bits_finite 4608844257974624584 _ _ _ eq_refl) | split; [exact (bits_finite 4367267852856649310 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608844257974624584 false 6165438801977672 52 eq_refl), (bits_val 4367267852856649310 false 7783413562009182 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 58) with 58%Z.
   interval with (i_prec 160).
 Qed.
@@ -751,6 +811,7 @@ Proof.
   split; [exact (bits_finite 4608877735697636361 _ _ _ eq_refl) | split; [exact (bits_finite 13588453276408798791 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608877735697636361 false 6198916524989449 52 eq_refl), (bits_val 13588453276408798791 true 5596800259382855 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 59) with 59%Z.
   interval with (i_prec 160).
 Qed.
@@ -760,6 +821,7 @@ Proof.
   split; [exact (bits_finite 4608911395201373573 _ _ _ eq_refl) | split; [exact (bits_finite 13588349367777014935 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608911395201373573 false 6232576028726661 52 eq_refl), (bits_val 13588349367777014935 true 5492891627598999 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 60) with 60%Z.
   interval with (i_prec 160).
 Qed.
@@ -769,6 +831,7 @@ Proof.
   split; [exact (bits_finite 4608945237472887584 _ _ _ eq_refl) | split; [exact (bits_finite 13586313600378439987 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608945237472887584 false 6266418300240672 52 eq_refl), (bits_val 13586313600378439987 true 7960723856394547 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 61) with 61%Z.
   interval with (i_prec 160).
 Qed.
@@ -778,6 +841,7 @@ Proof.
   split; [exact (bits_finite 4608979263504589349 _ _ _ eq_refl) | split; [exact (bits_finite 13590656452562328628 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4608979263504589349 false 6300444331942437 52 eq_refl), (bits_val 13590656452562328628 true 7799976412912692 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 62) with 62%Z.
   interval with (i_prec 160).
 Qed.
@@ -787,6 +851,7 @@ Proof.
   split; [exact (bits_finite 4609013474294278515 _ _ _ eq_refl) | split; [exact (bits_finite 4350539561172418149 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609013474294278515 false 6334655121631603 52 eq_refl), (bits_val 4350539561172418149 false 4565920759889509 109 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 63) with 63%Z.
   interval with (i_prec 160).
 Qed.
@@ -796,6 +861,7 @@ Proof.
   split; [exact (bits_finite 4609047870845172685 _ _ _ eq_refl) | split; [exact (bits_finite 13590699516259099734 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609047870845172685 false 6369051672525773 52 eq_refl), (bits_val 13590699516259099734 true 7843040109683798 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 64) with 64%Z.
   interval with (i_prec 160).
 Qed.
@@ -805,6 +871,7 @@ Proof.
   split; [exact (bits_finite 4609082454165936831 _ _ _ eq_refl) | split; [exact (bits_finite 13579066830680427277 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609082454165936831 false 6403634993289919 52 eq_refl), (bits_val 13579066830680427277 true 5217553785752333 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 65) with 65%Z.
   interval with (i_prec 160).
 Qed.
@@ -814,6 +881,7 @@ Proof.
   split; [exact (bits_finite 4609117225270712879 _ _ _ eq_refl) | split; [exact (bits_finite 13577154659704670379 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609117225270712879 false 6438406098065967 52 eq_refl), (bits_val 13577154659704670379 true 7808982437365931 109 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 66) with 66%Z.
   interval with (i_prec 160).
 Qed.
@@ -823,6 +891,7 @@ Proof.
   split; [exact (bits_finite 4609152185179149444 _ _ _ eq_refl) | split; [exact (bits_finite 13585174311714819830 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609152185179149444 false 6473366006502532 52 eq_refl), (bits_val 13585174311714819830 true 6821435192774390 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 67) with 67%Z.
   interval with (i_prec 160).
 Qed.
@@ -832,6 +901,7 @@ Proof.
   split; [exact (bits_finite 4609187334916431732 _ _ _ eq_refl) | split; [exact (bits_finite 13583259204604951193 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609187334916431732 false 6508515743784820 52 eq_refl), (bits_val 13583259204604951193 true 4906328082905753 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 68) with 68%Z.
   interval with (i_prec 160).
 Qed.
@@ -841,6 +911,7 @@ Proof.
   split; [exact (bits_finite 4609222675513311604 _ _ _ eq_refl) | split; [exact (bits_finite 13587545727556769084 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609222675513311604 false 6543856340664692 52 eq_refl), (bits_val 13587545727556769084 true 4689251407353148 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 69) with 69%Z.
   interval with (i_prec 160).
 Qed.
@@ -850,6 +921,7 @@ Proof.
   split; [exact (bits_finite 4609258208006137801 _ _ _ eq_refl) | split; [exact (bits_finite 13587400041910332883 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609258208006137801 false 6579388833490889 52 eq_refl), (bits_val 13587400041910332883 true 4543565760916947 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 70) with 70%Z.
   interval with (i_prec 160).
 Qed.
@@ -859,6 +931,7 @@ Proof.
   split; [exact (bits_finite 4609293933436886335 _ _ _ eq_refl) | split; [exact (bits_finite 4366352779363620397 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609293933436886335 false 6615114264239423 52 eq_refl), (bits_val 4366352779363620397 false 6868340068980269 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 71) with 71%Z.
   interval with (i_prec 160).
 Qed.
@@ -868,6 +941,7 @@ Proof.
   split; [exact (bits_finite 4609329852853191047 _ _ _ eq_refl) | split; [exact (bits_finite 13584005980894828847 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609329852853191047 false 6651033680544135 52 eq_refl), (bits_val 13584005980894828847 true 5653104372783407 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 72) with 72%Z.
   interval with (i_prec 160).
 Qed.
@@ -877,6 +951,7 @@ Proof.
   split; [exact (bits_finite 4609365967308374322 _ _ _ eq_refl) | split; [exact (bits_finite 4368230284707384790 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609365967308374322 false 6687148135727410 52 eq_refl), (bits_val 4368230284707384790 false 8745845412744662 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 73) with 73%Z.
   interval with (i_prec 160).
 Qed.
@@ -886,6 +961,7 @@ Proof.
   split; [exact (bits_finite 4609402277861477986 _ _ _ eq_refl) | split; [exact (bits_finite 4355083105960556926 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609402277861477986 false 6723458688831074 52 eq_refl), (bits_val 4355083105960556926 false 4605865920657790 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 74) with 74%Z.
   interval with (i_prec 160).
 Qed.
@@ -895,6 +971,7 @@ Proof.
   split; [exact (bits_finite 4609438785577294354 _ _ _ eq_refl) | split; [exact (bits_finite 13588059942349018923 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609438785577294354 false 6759966404647442 52 eq_refl), (bits_val 13588059942349018923 true 5203466199602987 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 75) with 75%Z.
   interval with (i_prec 160).
 Qed.
@@ -904,6 +981,7 @@ Proof.
   split; [exact (bits_finite 4609475491526397459 _ _ _ eq_refl) | split; [exact (bits_finite 13591102941469946584 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609475491526397459 false 6796672353750547 52 eq_refl), (bits_val 13591102941469946584 true 8246465320530648 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 76) with 76%Z.
   interval with (i_prec 160).
 Qed.
@@ -913,6 +991,7 @@ Proof.
   split; [exact (bits_finite 4609512396785174445 _ _ _ eq_refl) | split; [exact (bits_finite 13585344141126127099 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609512396785174445 false 6833577612527533 52 eq_refl), (bits_val 13585344141126127099 true 6991264604081659 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 77) with 77%Z.
   interval with (i_prec 160).
 Qed.
@@ -922,6 +1001,7 @@ Proof.
   split; [exact (bits_finite 4609549502435857133 _ _ _ eq_refl) | split; [exact (bits_finite 13591800971496060602 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609549502435857133 false 6870683263210221 52 eq_refl), (bits_val 13591800971496060602 true 8944495346644666 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 78) with 78%Z.
   interval with (i_prec 160).
 Qed.
@@ -931,6 +1011,7 @@ Proof.
   split; [exact (bits_finite 4609586809566553753 _ _ _ eq_refl) | split; [exact (bits_finite 4366684878742009146 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609586809566553753 false 6907990393906841 52 eq_refl), (bits_val 4366684878742009146 false 7200439447369018 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 79) with 79%Z.
   interval with (i_prec 160).
 Qed.
@@ -940,6 +1021,7 @@ Proof.
   split; [exact (bits_finite 4609624319271280859 _ _ _ eq_refl) | split; [exact (bits_finite 4365934111530306343 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609624319271280859 false 6945500098633947 52 eq_refl), (bits_val 4365934111530306343 false 6449672235666215 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 80) with 80%Z.
   interval with (i_prec 160).
 Qed.
@@ -949,6 +1031,7 @@ Proof.
   split; [exact (bits_finite 4609662032649995404 _ _ _ eq_refl) | split; [exact (bits_finite 13578587477079876522 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609662032649995404 false 6983213477348492 52 eq_refl), (bits_val 13578587477079876522 true 4738200185201578 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 81) with 81%Z.
   interval with (i_prec 160).
 Qed.
@@ -958,6 +1041,7 @@ Proof.
   split; [exact (bits_finite 4609699950808626998 _ _ _ eq_refl) | split; [exact (bits_finite 4361116198887462764 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609699950808626998 false 7021131635980086 52 eq_refl), (bits_val 4361116198887462764 false 6135359220193132 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 82) with 82%Z.
   interval with (i_prec 160).
 Qed.
@@ -967,6 +1051,7 @@ Proof.
   split; [exact (bits_finite 4609738074859110342 _ _ _ eq_refl) | split; [exact (bits_finite 13591255066430940452 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609738074859110342 false 7059255686463430 52 eq_refl), (bits_val 13591255066430940452 true 8398590281524516 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 83) with 83%Z.
   interval with (i_prec 160).
 Qed.
@@ -976,6 +1061,7 @@ Proof.
   split; [exact (bits_finite 4609776405919417829 _ _ _ eq_refl) | split; [exact (bits_finite 13575924912210935484 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609776405919417829 false 7097586746770917 52 eq_refl), (bits_val 13575924912210935484 true 6579234943631036 109 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 84) with 84%Z.
   interval with (i_prec 160).
 Qed.
@@ -985,6 +1071,7 @@ Proof.
   split; [exact (bits_finite 4609814945113592335 _ _ _ eq_refl) | split; [exact (bits_finite 13580124724857794617 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609814945113592335 false 7136125940945423 52 eq_refl), (bits_val 13580124724857794617 true 6275447963119673 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 85) with 85%Z.
   interval with (i_prec 160).
 Qed.
@@ -994,6 +1081,7 @@ Proof.
   split; [exact (bits_finite 4609853693571780176 _ _ _ eq_refl) | split; [exact (bits_finite 13591046031677294033 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609853693571780176 false 7174874399133264 52 eq_refl), (bits_val 13591046031677294033 true 8189555527878097 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 86) with 86%Z.
   interval with (i_prec 160).
 Qed.
@@ -1003,6 +1091,7 @@ Proof.
   split; [exact (bits_finite 4609892652430264250 _ _ _ eq_refl) | split; [exact (bits_finite 13587768808785765938 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609892652430264250 false 7213833257617338 52 eq_refl), (bits_val 13587768808785765938 true 4912332636350002 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 87) with 87%Z.
   interval with (i_prec 160).
 Qed.
@@ -1012,6 +1101,7 @@ Proof.
   split; [exact (bits_finite 4609931822831497360 _ _ _ eq_refl) | split; [exact (bits_finite 4358495182437610174 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609931822831497360 false 7253003658850448 52 eq_refl), (bits_val 4358495182437610174 false 8017942397711038 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 88) with 88%Z.
   interval with (i_prec 160).
 Qed.
@@ -1021,6 +1111,7 @@ Proof.
   split; [exact (bits_finite 4609971205924135715 _ _ _ eq_refl) | split; [exact (bits_finite 4357273091511307374 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4609971205924135715 false 7292386751488803 52 eq_refl), (bits_val 4357273091511307374 false 6795851471408238 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 89) with 89%Z.
   interval with (i_prec 160).
 Qed.
@@ -1030,6 +1121,7 @@ Proof.
   split; [exact (bits_finite 4610010802863072613 _ _ _ eq_refl) | split; [exact (bits_finite 13588302672336573747 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610010802863072613 false 7331983690425701 52 eq_refl), (bits_val 13588302672336573747 true 5446196187157811 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 90) with 90%Z.
   interval with (i_prec 160).
 Qed.
@@ -1039,6 +1131,7 @@ Proof.
   split; [exact (bits_finite 4610050614809472307 _ _ _ eq_refl) | split; [exact (bits_finite 4365730062588982955 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610050614809472307 false 7371795636825395 52 eq_refl), (bits_val 4365730062588982955 false 6245623294342827 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 91) with 91%Z.
   interval with (i_prec 160).
 Qed.
@@ -1048,6 +1141,7 @@ Proof.
   split; [exact (bits_finite 4610090642930804061 _ _ _ eq_refl) | split; [exact (bits_finite 13591071403650400737 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610090642930804061 false 7411823758157149 52 eq_refl), (bits_val 13591071403650400737 true 8214927500984801 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 92) with 92%Z.
   interval with (i_prec 160).
 Qed.
@@ -1057,6 +1151,7 @@ Proof.
   split; [exact (bits_finite 4610130888400876376 _ _ _ eq_refl) | split; [exact (bits_finite 4367308009094079431 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610130888400876376 false 7452069228229464 52 eq_refl), (bits_val 4367308009094079431 false 7823569799439303 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 93) with 93%Z.
   interval with (i_prec 160).
 Qed.
@@ -1066,6 +1161,7 @@ Proof.
   split; [exact (bits_finite 4610171352399871423 _ _ _ eq_refl) | split; [exact (bits_finite 4364263780368514353 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610171352399871423 false 7492533227224511 52 eq_refl), (bits_val 4364263780368514353 false 4779341073874225 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 94) with 94%Z.
   interval with (i_prec 160).
 Qed.
@@ -1075,6 +1171,7 @@ Proof.
   split; [exact (bits_finite 4610212036114379642 _ _ _ eq_refl) | split; [exact (bits_finite 13587239356240194768 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610212036114379642 false 7533216941732730 52 eq_refl), (bits_val 13587239356240194768 true 8886479718149328 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 95) with 95%Z.
   interval with (i_prec 160).
 Qed.
@@ -1084,6 +1181,7 @@ Proof.
   split; [exact (bits_finite 4610252940737434541 _ _ _ eq_refl) | split; [exact (bits_finite 4366136266477915265 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610252940737434541 false 7574121564787629 52 eq_refl), (bits_val 4366136266477915265 false 6651827183275137 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 96) with 96%Z.
   interval with (i_prec 160).
 Qed.
@@ -1093,6 +1191,7 @@ Proof.
   split; [exact (bits_finite 4610294067468547686 _ _ _ eq_refl) | split; [exact (bits_finite 13590701445652472869 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610294067468547686 false 7615248295900774 52 eq_refl), (bits_val 13590701445652472869 true 7844969503056933 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 97) with 97%Z.
   interval with (i_prec 160).
 Qed.
@@ -1102,6 +1201,7 @@ Proof.
   split; [exact (bits_finite 4610335417513743867 _ _ _ eq_refl) | split; [exact (bits_finite 13574553368877389576 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610335417513743867 false 7656598341096955 52 eq_refl), (bits_val 13574553368877389576 true 5207691610085128 109 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 98) with 98%Z.
   interval with (i_prec 160).
 Qed.
@@ -1111,6 +1211,7 @@ Proof.
   split; [exact (bits_finite 4610376992085596474 _ _ _ eq_refl) | split; [exact (bits_finite 13590862981238517219 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610376992085596474 false 7698172912949562 52 eq_refl), (bits_val 13590862981238517219 true 8006505089101283 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 99) with 99%Z.
   interval with (i_prec 160).
 Qed.
@@ -1120,6 +1221,7 @@ Proof.
   split; [exact (bits_finite 4610418792403263047 _ _ _ eq_refl) | split; [exact (bits_finite 13579857349850737723 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610418792403263047 false 7739973230616135 52 eq_refl), (bits_val 13579857349850737723 true 6008072956062779 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 100) with 100%Z.
   interval with (i_prec 160).
 Qed.
@@ -1129,6 +1231,7 @@ Proof.
   split; [exact (bits_finite 4610460819692521034 _ _ _ eq_refl) | split; [exact (bits_finite 13591578708859431214 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610460819692521034 false 7782000519874122 52 eq_refl), (bits_val 13591578708859431214 true 8722232710015278 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 101) with 101%Z.
   interval with (i_prec 160).
 Qed.
@@ -1138,6 +1241,7 @@ Proof.
   split; [exact (bits_finite 4610503075185803730 _ _ _ eq_refl) | split; [exact (bits_finite 4360115354860363396 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610503075185803730 false 7824256013156818 52 eq_refl), (bits_val 4360115354860363396 false 5134515193093764 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 102) with 102%Z.
   interval with (i_prec 160).
 Qed.
@@ -1147,6 +1251,7 @@ Proof.
   split; [exact (bits_finite 4610545560122236425 _ _ _ eq_refl) | split; [exact (bits_finite 13591579770539973747 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610545560122236425 false 7866740949589513 52 eq_refl), (bits_val 13591579770539973747 true 8723294390557811 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 103) with 103%Z.
   interval with (i_prec 160).
 Qed.
@@ -1156,6 +1261,7 @@ Proof.
   split; [exact (bits_finite 4610588275747672732 _ _ _ eq_refl) | split; [exact (bits_finite 4359783942552832221 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610588275747672732 false 7909456575025820 52 eq_refl), (bits_val 4359783942552832221 false 4803102885562589 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 104) with 104%Z.
   interval with (i_prec 160).
 Qed.
@@ -1165,6 +1271,7 @@ Proof.
   split; [exact (bits_finite 4610631223314731130 _ _ _ eq_refl) | split; [exact (bits_finite 4367160369958077962 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610631223314731130 false 7952404142084218 52 eq_refl), (bits_val 4367160369958077962 false 7675930663437834 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 105) with 105%Z.
   interval with (i_prec 160).
 Qed.
@@ -1174,6 +1281,7 @@ Proof.
   split; [exact (bits_finite 4610674404082831691 _ _ _ eq_refl) | split; [exact (bits_finite 4364700857452215469 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610674404082831691 false 7995584910184779 52 eq_refl), (bits_val 4364700857452215469 false 5216418157575341 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 106) with 106%Z.
   interval with (i_prec 160).
 Qed.
@@ -1183,6 +1291,7 @@ Proof.
   split; [exact (bits_finite 4610717819318233013 _ _ _ eq_refl) | split; [exact (bits_finite 4355452239314181188 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610717819318233013 false 8039000145586101 52 eq_refl), (bits_val 4355452239314181188 false 4974999274282052 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 107) with 107%Z.
   interval with (i_prec 160).
 Qed.
@@ -1192,6 +1301,7 @@ Proof.
   split; [exact (bits_finite 4610761470294069353 _ _ _ eq_refl) | split; [exact (bits_finite 4356392388485794267 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610761470294069353 false 8082651121422441 52 eq_refl), (bits_val 4356392388485794267 false 5915148445895131 108 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 108) with 108%Z.
   interval with (i_prec 160).
 Qed.
@@ -1201,6 +1311,7 @@ Proof.
   split; [exact (bits_finite 4610805358290387962 _ _ _ eq_refl) | split; [exact (bits_finite 13586753400162393458 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610805358290387962 false 8126539117741050 52 eq_refl), (bits_val 13586753400162393458 true 8400523640348018 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 109) with 109%Z.
   interval with (i_prec 160).
 Qed.
@@ -1210,6 +1321,7 @@ Proof.
   split; [exact (bits_finite 4610849484594186620 _ _ _ eq_refl) | split; [exact (bits_finite 13590944721038572188 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610849484594186620 false 8170665421539708 52 eq_refl), (bits_val 13590944721038572188 true 8088244889156252 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 110) with 110%Z.
   interval with (i_prec 160).
 Qed.
@@ -1219,6 +1331,7 @@ Proof.
   split; [exact (bits_finite 4610893850499451378 _ _ _ eq_refl) | split; [exact (bits_finite 13591098945498350968 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610893850499451378 false 8215031326804466 52 eq_refl), (bits_val 13591098945498350968 true 8242469348935032 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 111) with 111%Z.
   interval with (i_prec 160).
 Qed.
@@ -1228,6 +1341,7 @@ Proof.
   split; [exact (bits_finite 4610938457307194503 _ _ _ eq_refl) | split; [exact (bits_finite 4360307985706858247 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610938457307194503 false 8259638134547591 52 eq_refl), (bits_val 4360307985706858247 false 5327146039588615 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 112) with 112%Z.
   interval with (i_prec 160).
 Qed.
@@ -1237,6 +1351,7 @@ Proof.
   split; [exact (bits_finite 4610983306325492632 _ _ _ eq_refl) | split; [exact (bits_finite 13587675367378640872 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4610983306325492632 false 8304487152845720 52 eq_refl), (bits_val 13587675367378640872 true 4818891229224936 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 113) with 113%Z.
   interval with (i_prec 160).
 Qed.
@@ -1246,6 +1361,7 @@ Proof.
   split; [exact (bits_finite 4611028398869525125 _ _ _ eq_refl) | split; [exact (bits_finite 4367404223318308146 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611028398869525125 false 8349579696878213 52 eq_refl), (bits_val 4367404223318308146 false 7919784023668018 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 114) with 114%Z.
   interval with (i_prec 160).
 Qed.
@@ -1255,6 +1371,7 @@ Proof.
   split; [exact (bits_finite 4611073736261612640 _ _ _ eq_refl) | split; [exact (bits_finite 4364791058101442755 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611073736261612640 false 8394917088965728 52 eq_refl), (bits_val 4364791058101442755 false 5306618806802627 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 115) with 115%Z.
   interval with (i_prec 160).
 Qed.
@@ -1264,6 +1381,7 @@ Proof.
   split; [exact (bits_finite 4611119319831255903 _ _ _ eq_refl) | split; [exact (bits_finite 13587823851967368028 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611119319831255903 false 8440500658608991 52 eq_refl), (bits_val 13587823851967368028 true 4967375817952092 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 116) with 116%Z.
   interval with (i_prec 160).
 Qed.
@@ -1273,6 +1391,7 @@ Proof.
   split; [exact (bits_finite 4611165150915174697 _ _ _ eq_refl) | split; [exact (bits_finite 13589530681406002326 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611165150915174697 false 8486331742527785 52 eq_refl), (bits_val 13589530681406002326 true 6674205256586390 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 117) with 117%Z.
   interval with (i_prec 160).
 Qed.
@@ -1282,6 +1401,7 @@ Proof.
   split; [exact (bits_finite 4611211230857347062 _ _ _ eq_refl) | split; [exact (bits_finite 4360503177631091855 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611211230857347062 false 8532411684700150 52 eq_refl), (bits_val 4360503177631091855 false 5522337963822223 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 118) with 118%Z.
   interval with (i_prec 160).
 Qed.
@@ -1291,6 +1411,7 @@ Proof.
   split; [exact (bits_finite 4611257561009048707 _ _ _ eq_refl) | split; [exact (bits_finite 4364785334270856674 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611257561009048707 false 8578741836401795 52 eq_refl), (bits_val 4364785334270856674 false 5300894976216546 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 119) with 119%Z.
   interval with (i_prec 160).
 Qed.
@@ -1300,6 +1421,7 @@ Proof.
   split; [exact (bits_finite 4611304142728892634 _ _ _ eq_refl) | split; [exact (bits_finite 13591472399984634003 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611304142728892634 false 8625323556245722 52 eq_refl), (bits_val 13591472399984634003 true 8615923835218067 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 120) with 120%Z.
   interval with (i_prec 160).
 Qed.
@@ -1309,6 +1431,7 @@ Proof.
   split; [exact (bits_finite 4611350977382868977 _ _ _ eq_refl) | split; [exact (bits_finite 13590900450404707724 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611350977382868977 false 8672158210222065 52 eq_refl), (bits_val 13590900450404707724 true 8043974255291788 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 121) with 121%Z.
   interval with (i_prec 160).
 Qed.
@@ -1318,6 +1441,7 @@ Proof.
   split; [exact (bits_finite 4611398066344385063 _ _ _ eq_refl) | split; [exact (bits_finite 4367867066664138416 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611398066344385063 false 8719247171738151 52 eq_refl), (bits_val 4367867066664138416 false 8382627369498288 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 122) with 122%Z.
   interval with (i_prec 160).
 Qed.
@@ -1327,6 +1451,7 @@ Proof.
   split; [exact (bits_finite 4611445410994305687 _ _ _ eq_refl) | split; [exact (bits_finite 4365010197099155011 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611445410994305687 false 8766591821658775 52 eq_refl), (bits_val 4365010197099155011 false 5525757804514883 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 123) with 123%Z.
   interval with (i_prec 160).
 Qed.
@@ -1336,6 +1461,7 @@ Proof.
   split; [exact (bits_finite 4611493012720993600 _ _ _ eq_refl) | split; [exact (bits_finite 4366754277802680715 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611493012720993600 false 8814193548346688 52 eq_refl), (bits_val 4366754277802680715 false 7269838508040587 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 124) with 124%Z.
   interval with (i_prec 160).
 Qed.
@@ -1345,6 +1471,7 @@ Proof.
   split; [exact (bits_finite 4611540872920350228 _ _ _ eq_refl) | split; [exact (bits_finite 13591224939947898122 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611540872920350228 false 8862053747703316 52 eq_refl), (bits_val 13591224939947898122 true 8368463798482186 106 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 125) with 125%Z.
   interval with (i_prec 160).
 Qed.
@@ -1354,6 +1481,7 @@ Proof.
   split; [exact (bits_finite 4611588992995856600 _ _ _ eq_refl) | split; [exact (bits_finite 4361534289538814750 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611588992995856600 false 8910173823209688 52 eq_refl), (bits_val 4361534289538814750 false 6553449871545118 107 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 126) with 126%Z.
   interval with (i_prec 160).
 Qed.
@@ -1363,6 +1491,7 @@ Proof.
   split; [exact (bits_finite 4611637374358614513 _ _ _ eq_refl) | split; [exact (bits_finite 4351299075965286887 _ _ _ eq_refl) | ]].
   rewrite (bits_val 4611637374358614513 false 8958555185967601 52 eq_refl), (bits_val 4351299075965286887 false 5325435552758247 109 eq_refl); cbn [cond_Zopp].
   split; [apply (val_grid _ _ 120); lia | split; [apply (val_grid _ _ 120); lia | ]].
+  split; [interval | split; [interval | ]].
   rewrite INR_IZR_INZ; change (Z.of_nat 127) with 127%Z.
   interval with (i_prec 160).
 Qed.

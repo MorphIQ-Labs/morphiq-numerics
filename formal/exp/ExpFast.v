@@ -485,3 +485,100 @@ Proof.
   split; [exact Feh | split; [exact Fel | split; [exact DW | split; [exact Gel | split; [lra | ]]]]].
   exists d2. split; [exact R2 | exact Ee].
 Qed.
+
+Lemma bnd12 x : Rabs x <= 4 -> bnd 1 2 x.
+Proof. intros H. unfold bnd. change (IZR 1 * bpow radix2 2) with (1 * 4). lra. Qed.
+
+(** [T_j = sum(hi, lo)] and [Y = T_j.mul(E)]: [Y] is a double-word number equal
+    to [T·(1 + d4)·E·(1 + d3)], with [T = 2^(j/128)], [|d4| <= 2^-107] and
+    [|d3| <= 21·2^-108] ([d4] and [d3] in fast.g). *)
+Lemma y_step eh el j :
+  finite eh -> finite el -> B eh = rndF (B eh + B el) -> on_grid (-967) (B el) ->
+  / 2 <= B eh <= 2 -> 0.99 <= B eh + B el <= 1.01 -> (j < 128)%nat ->
+  let T := exp (INR j * ln 2 / 128) in
+  let '(th, tl) := two_sum64 (exp_t_hi j) (exp_t_lo j) in
+  let '(yh, yl) := mul64 th tl eh el in
+  finite yh /\ finite yl /\ B yh = rndF (B yh + B yl) /\ 1 <= T <= 2 /\
+  exists d3 d4, Rabs d3 <= 21 / 2 ^ 108 /\ Rabs d4 <= / 2 ^ 107 /\
+    B yh + B yl = T * (1 + d4) * (B eh + B el) * (1 + d3).
+Proof.
+  intros Feh Fel Deh Gel Heh Hev Hj T.
+  destruct (exp_table_ok j Hj) as [Fhi [Flo [Ghi [Glo [Bhi [Blo Rel4]]]]]].
+  change (exp (INR j * ln 2 / 128)) with T in Rel4.
+  assert (HT : 1 <= T <= 2).
+  { assert (J : 0 <= INR j <= 127).
+    { split; [apply pos_INR | ].
+      replace 127 with (INR 127) by (rewrite INR_IZR_INZ; reflexivity). apply le_INR. lia. }
+    unfold T. split.
+    - assert (0 <= INR j * ln 2 / 128) by (assert (0 < ln 2) by interval; nra).
+      pose proof (exp_ineq1_le (INR j * ln 2 / 128)). lra.
+    - interval. }
+  set (hi := exp_t_hi j) in *. set (lo := exp_t_lo j) in *.
+  assert (W : 0.99 <= B hi + B lo <= 2.01).
+  { assert (Rabs (B hi + B lo - T) <= / 2 ^ 107 * T).
+    { replace (B hi + B lo - T) with ((B hi + B lo - T) / T * T) by (field; lra).
+      rewrite Rabs_mult, (Rabs_pos_eq T) by lra. apply Rmult_le_compat_r; [lra | exact Rel4]. }
+    apply Rabs_le_inv in H. assert (0 < / 2 ^ 107 < / 1000) by (split; interval). nra. }
+  assert (B2 : Rabs (B hi) <= bpow radix2 1020)
+    by (apply Rle_trans with 2; [exact Bhi | change 2 with (bpow radix2 1); apply bpow_le; lia]).
+  pose proof (two_sum_ieee hi lo Fhi Flo B2 (small_big (B lo) 1020 Blo ltac:(lia))) as TS.
+  destruct (two_sum64 hi lo) as [th tl]. destruct TS as [Fth [Ftl [Eth Ets]]].
+  assert (Dth : B th = rndF (B th + B tl)) by (rewrite Ets; exact Eth).
+  assert (Gth : on_grid (-120) (B th))
+    by (rewrite Eth; repeat first [assumption | apply grid_round | apply grid_plus | exact _]).
+  assert (Gtl : on_grid (-120) (B tl)).
+  { replace (B tl) with (B hi + B lo - B th) by lra. apply grid_minus; [apply grid_plus | ]; assumption. }
+  (* th = RN(hi + lo) is near hi + lo, and tl is its small remainder. *)
+  assert (Vb : bpow radix2 (-1022) <= Rabs (B hi + B lo))
+    by (rewrite Rabs_pos_eq by lra; apply Rle_trans with (/ 1024);
+        [change (/ 1024) with (bpow radix2 (-10)); apply bpow_le; lia | lra]).
+  pose proof (rel_FLT _ Vb) as RT. rewrite <- Eth in RT.
+  rewrite (Rabs_pos_eq (B hi + B lo)) in RT by lra. apply Rabs_le_inv in RT.
+  assert (Uth : 0.98 <= B th <= 2.02) by lra.
+  assert (Utl : Rabs (B tl) <= / 1024).
+  { replace (B tl) with (- (B th - (B hi + B lo))) by lra. rewrite Rabs_Ropp. apply Rabs_le. lra. }
+  assert (Uel : Rabs (B el) <= 2) by (apply Rabs_le; lra).
+  (* mul's domain *)
+  assert (Dom : in_two_prod_domain (B th) (B eh)).
+  { right. rewrite Rabs_mult, !Rabs_pos_eq by lra. apply Rle_trans with (/ 4).
+    - change (/ 4) with (bpow radix2 (-2)). apply bpow_le. lia.
+    - nra. }
+  assert (N1 : normal_or_zero (B th * B el)).
+  { destruct (Req_dec (B el) 0) as [Z | NZ]; [left; rewrite Z; ring | right].
+    pose proof (grid_nonzero _ _ Gel NZ) as G. rewrite Rabs_mult, (Rabs_pos_eq (B th)) by lra.
+    apply Rle_trans with (bpow radix2 (-967) * / 2).
+    - replace (bpow radix2 (-967) * / 2) with (bpow radix2 (-968))
+        by (change (/ 2) with (bpow radix2 (-1)); rewrite <- bpow_plus; reflexivity).
+      apply bpow_le. lia.
+    - pose proof (bpow_gt_0 radix2 (-967)). nra. }
+  assert (N2 : normal_or_zero (B tl * B eh)).
+  { destruct (Req_dec (B tl) 0) as [Z | NZ]; [left; rewrite Z; ring | right].
+    pose proof (grid_nonzero _ _ Gtl NZ) as G. rewrite Rabs_mult, (Rabs_pos_eq (B eh)) by lra.
+    apply Rle_trans with (bpow radix2 (-120) * / 2).
+    - replace (bpow radix2 (-120) * / 2) with (bpow radix2 (-121))
+        by (change (/ 2) with (bpow radix2 (-1)); rewrite <- bpow_plus; reflexivity).
+      apply bpow_le. lia.
+    - pose proof (bpow_gt_0 radix2 (-120)). nra. }
+  assert (S4 : forall x, Rabs x <= 4 -> Rabs x <= bpow radix2 508)
+    by (intros x Hx; apply Rle_trans with 4; [exact Hx | change 4 with (bpow radix2 2); apply bpow_le; lia]).
+  assert (Ath : Rabs (B th) <= 4) by (apply Rabs_le; lra).
+  assert (Atl : Rabs (B tl) <= 4) by lra.
+  assert (Aeh : Rabs (B eh) <= 4) by (apply Rabs_le; lra).
+  assert (Ael : Rabs (B el) <= 4) by lra.
+  pose proof (mul_ieee th tl eh el Fth Ftl Dth Feh Fel Deh (S4 _ Ath) (S4 _ Atl) (S4 _ Aeh) (S4 _ Ael)
+                Dom N1 N2) as MI.
+  destruct (mul64_ok 2 th tl eh el Fth Ftl Feh Fel (bnd12 _ Ath) (bnd12 _ Atl) (bnd12 _ Aeh) (bnd12 _ Ael)
+              ltac:(lia)) as [_ [_ EQ]].
+  pose proof (mul_dw _ _ _ _ (B_fmt th) (B_fmt tl) Dth (B_fmt eh) (B_fmt el) Deh Dom N1 N2) as DW.
+  destruct (mul64 th tl eh el) as [yh yl]. cbn [fst snd] in EQ.
+  rewrite <- EQ in DW. cbn [fst snd] in DW.
+  destruct MI as [Fyh [Fyl Rel3]].
+  split; [exact Fyh | split; [exact Fyl | split; [exact DW | split; [exact HT | ]]]].
+  assert (Wne : (B th + B tl) * (B eh + B el) <> 0) by (rewrite Ets; apply Rmult_integral_contrapositive; lra).
+  exists ((B yh + B yl - (B th + B tl) * (B eh + B el)) / ((B th + B tl) * (B eh + B el))).
+  exists ((B hi + B lo - T) / T).
+  split; [ | split; [exact Rel4 | ]].
+  - apply Rlt_le, Rlt_le_trans with (1 := Rel3). unfold prec.
+    change (bpow radix2 (-53)) with (/ 9007199254740992). interval.
+  - rewrite <- Ets. field. repeat split; intro; lra.
+Qed.
