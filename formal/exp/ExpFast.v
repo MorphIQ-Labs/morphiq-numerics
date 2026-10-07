@@ -414,3 +414,74 @@ Proof.
     + rewrite <- u2_105. exact Rel.
     + field. exact SNZ.
 Qed.
+
+Lemma one_dw : B c_one = rndF (B c_one + B c_zero).
+Proof.
+  rewrite c_zero_val, Rplus_0_r. symmetry. apply round_generic; [exact _ | apply B_fmt].
+Qed.
+
+Lemma c_one_1 : B c_one = 1.
+Proof. rewrite c_one_val. change (2 ^ 52) with (2 * 2 ^ 51). simpl. lra. Qed.
+
+(** [E = 1.add(P)]: a double-word number near 1 on [2^-967]'s grid, equal to
+    [(1 + P)·(1 + d2)] with [|d2| <= 25·2^-109] ([d2] in fast.g). *)
+Lemma e_step ph pl :
+  finite ph -> finite pl -> B ph = rndF (B ph + B pl) -> Rabs (B ph + B pl) <= / 256 ->
+  on_grid (-967) (B ph) -> on_grid (-967) (B pl) ->
+  let '(eh, el) := add64 c_one c_zero ph pl in
+  finite eh /\ finite el /\ B eh = rndF (B eh + B el) /\ on_grid (-967) (B el) /\
+  / 2 <= B eh <= 2 /\
+  exists d2, Rabs d2 <= 25 / 2 ^ 109 /\ B eh + B el = (1 + (B ph + B pl)) * (1 + d2).
+Proof.
+  intros Fph Fpl Dp Hp Gph Gpl.
+  pose proof c_one_1 as O1. pose proof c_zero_val as O0.
+  assert (Uph : Rabs (B ph) <= / 128).
+  { rewrite Dp. pose proof (rnd_mag (B ph + B pl)) as M.
+    assert (bpow radix2 (-1022) <= / 1024) by (change (/ 1024) with (bpow radix2 (-10)); apply bpow_le; lia).
+    lra. }
+  assert (Upl : Rabs (B pl) <= 1).
+  { replace (B pl) with ((B ph + B pl) - B ph) by ring.
+    apply Rle_trans with (1 := Rabs_triang _ _). rewrite Rabs_Ropp. lra. }
+  assert (U1 : Rabs (B c_one) <= 1) by (rewrite O1, Rabs_R1; lra).
+  assert (U0 : Rabs (B c_zero) <= 1) by (rewrite O0, Rabs_R0; lra).
+  assert (Uph1 : Rabs (B ph) <= 1) by lra.
+  assert (NZ : B c_one + B c_zero + (B ph + B pl) <> 0).
+  { rewrite O1, O0. intros H. pose proof Hp as Hp'. apply Rabs_le_inv in Hp'. lra. }
+  pose proof (add_ieee c_one c_zero ph pl c_one_finite c_zero_finite one_dw Fph Fpl Dp
+                (small_big _ 1016 U1 ltac:(lia)) (small_big _ 1016 U0 ltac:(lia))
+                (small_big _ 1016 Uph1 ltac:(lia)) (small_big _ 1016 Upl ltac:(lia)) NZ) as AI.
+  destruct (add64_ok 1 0 c_one c_zero ph pl c_one_finite c_zero_finite Fph Fpl
+              (bnd10 _ U1) (bnd10 _ U0) (bnd10 _ Uph1) (bnd10 _ Upl)
+              ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) ltac:(lia)) as [_ [_ EQ]].
+  assert (Hx : 1 <= B c_one <= 2 - 2 * bpow radix2 (- prec)).
+  { rewrite O1. change (bpow radix2 (- prec)) with (/ 9007199254740992). lra. }
+  assert (Hy : Rabs (B ph) <= Rabs (B c_one)) by (rewrite O1, Rabs_R1; lra).
+  assert (Hs : B c_one + B ph <> 0)
+    by (rewrite O1; intros H; pose proof Uph as U'; apply Rabs_le_inv in U'; lra).
+  pose proof (add_dw _ _ _ _ (B_fmt c_one) (B_fmt c_zero) one_dw (B_fmt ph) (B_fmt pl) Dp NZ Hy Hs Hx) as DW.
+  assert (G1 : on_grid (-967) (B c_one)).
+  { rewrite O1. apply grid_le with 0%Z; [lia | ]. exists 1%Z. change (bpow radix2 0) with 1. ring. }
+  assert (G0 : on_grid (-967) (B c_zero)) by (rewrite O0; apply grid_0).
+  pose proof (grid_add (-967) _ _ _ _ G1 G0 Gph Gpl) as GE.
+  destruct (add64 c_one c_zero ph pl) as [eh el]. cbn [fst snd] in EQ.
+  rewrite <- EQ in DW, GE. cbn [fst snd] in DW, GE. destruct GE as [_ Gel].
+  destruct AI as [Feh [Fel Rel]].
+  rewrite O1, O0, Rplus_0_r in Rel.
+  assert (R2 : Rabs ((B eh + B el - (1 + (B ph + B pl))) / (1 + (B ph + B pl))) <= 25 / 2 ^ 109).
+  { apply Rle_trans with (1 := Rel). unfold prec. change (bpow radix2 (-53)) with (/ 9007199254740992).
+    interval. }
+  assert (P1 : 1 - / 256 <= 1 + (B ph + B pl) <= 1 + / 256) by (apply Rabs_le_inv in Hp; lra).
+  set (d2 := (B eh + B el - (1 + (B ph + B pl))) / (1 + (B ph + B pl))) in R2.
+  assert (Ee : B eh + B el = (1 + (B ph + B pl)) * (1 + d2)) by (unfold d2; field; lra).
+  assert (D2 : Rabs d2 <= / 1000) by (apply Rle_trans with (1 := R2); interval).
+  (* E is within 2^-8 of 1, and E_hi = RN(E) is near it. *)
+  assert (Ev : 0.99 <= B eh + B el <= 1.01).
+  { rewrite Ee. apply Rabs_le_inv in D2. split; nra. }
+  assert (Big : bpow radix2 (-1022) <= Rabs (B eh + B el))
+    by (rewrite Rabs_pos_eq by lra; apply Rle_trans with (/ 1024);
+        [change (/ 1024) with (bpow radix2 (-10)); apply bpow_le; lia | lra]).
+  pose proof (rel_FLT _ Big) as RE. rewrite <- DW in RE.
+  rewrite (Rabs_pos_eq (B eh + B el)) in RE by lra. apply Rabs_le_inv in RE.
+  split; [exact Feh | split; [exact Fel | split; [exact DW | split; [exact Gel | split; [lra | ]]]]].
+  exists d2. split; [exact R2 | exact Ee].
+Qed.
