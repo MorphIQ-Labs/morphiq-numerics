@@ -114,7 +114,7 @@ Definition Qpoly (v : R) : R :=
 
 (** formal/exp/mvt.g's theorem: evaluating [Q] at [r_hi] instead of the exact
     [R = r_hi + delta] costs at most [0x1.9p-71]. *)
-Theorem mvt_bound rhi delta : Rabs rhi <= 0.00270769 -> Rabs delta <= 4503599627370497 * / 2 ^ 114 ->
+Theorem mvt_bound rhi delta : Rabs rhi <= 0.00270769 -> Rabs delta <= 4503599627370498 * / 2 ^ 114 ->
   Rabs (Qpoly (rhi + delta) - Qpoly rhi) <= 25 * / 2 ^ 75.
 Proof.
   intros Hr Hd. unfold Qpoly.
@@ -581,4 +581,109 @@ Proof.
   - apply Rlt_le, Rlt_le_trans with (1 := Rel3). unfold prec.
     change (bpow radix2 (-53)) with (/ 9007199254740992). interval.
   - rewrite <- Ets. field. repeat split; intro; lra.
+Qed.
+
+(** The fast value: for a reduced argument [(r_hi, r_lo)] within [2^-113] of
+    [R], [|R| <= 0.0027076063], and every table index [j], [fast_at] returns a
+    double-word [Y] within [2^-69] relatively of [Z = 2^(j/128)·e^R], with its
+    leading word in [[3/4, 4]]: the premises of [decide_scaled_ok] at
+    [ε₁ = 2^-69]. *)
+Theorem fast_ok rh rl j (R : R) :
+  finite rh -> finite rl -> B rh = rndF (B rh + B rl) ->
+  Rabs (B rh + B rl - R) <= bpow radix2 (-113) -> Rabs R <= 0.0027076063 ->
+  on_grid (-151) (B rh) -> on_grid (-151) (B rl) -> (j < 128)%nat ->
+  let Z := exp (INR j * ln 2 / 128) * exp R in
+  let '(yh, yl) := fast_at rh rl j in
+  finite yh /\ finite yl /\ B yh = rndF (B yh + B yl) /\ 3 / 4 <= B yh <= 4 /\
+  Rabs (Z - (B yh + B yl)) <= / 2 ^ 69 * Rabs Z.
+Proof.
+  intros Fh Fl Dh HrR HR Gh Gl Hj Z.
+  change (bpow radix2 (-113)) with (bpow radix2 (- Z.of_nat 113)) in HrR. rewrite bpow_m in HrR.
+  (* r_hi and r_lo *)
+  assert (Vs : Rabs (B rh + B rl) < bpow radix2 (-8)).
+  { change (bpow radix2 (-8)) with (/ 256). pose proof (Rabs_triang_inv2 (B rh + B rl) R) as T.
+    apply Rabs_le_inv in HrR. assert (0 < / 2 ^ 113 < / 1000000) by (split; interval).
+    apply Rabs_le_inv in HR. apply Rabs_lt. lra. }
+  pose proof (err_small _ Vs) as Es. rewrite <- Dh in Es.
+  replace (B rh - (B rh + B rl)) with (- B rl) in Es by ring. rewrite Rabs_Ropp in Es.
+  assert (Hrl : Rabs (B rl) <= / 2 ^ 62)
+    by (change (bpow radix2 (-62)) with (bpow radix2 (- Z.of_nat 62)) in Es; rewrite bpow_m in Es; exact Es).
+  assert (Hrh : Rabs (B rh) <= 0.00270769).
+  { replace (B rh) with ((B rh + B rl - R) + R - B rl) by ring.
+    apply Rle_trans with (Rabs (B rh + B rl - R) + Rabs R + Rabs (B rl)).
+    - apply Rle_trans with (Rabs (B rh + B rl - R + R) + Rabs (B rl)).
+      + unfold Rminus at 2. rewrite <- (Rabs_Ropp (B rl)). apply Rabs_triang.
+      + pose proof (Rabs_triang (B rh + B rl - R) R). lra.
+    - assert (/ 2 ^ 113 + / 2 ^ 62 <= / 10000000000) by interval. lra. }
+  (* the steps *)
+  pose proof (poly_ok rh Fh Hrh) as PO. cbv zeta in PO. destruct PO as [_ [Bq [Mq _]]].
+  change (bpow radix2 (-17)) with (/ 131072) in Mq.
+  pose proof (p_step rh rl Fh Fl Dh Hrh Es Gh Gl) as PS.
+  unfold fast_at. cbv zeta.
+  destruct (add_f64_64 rh rl (poly_q rh)) as [ph pl].
+  destruct PS as [Fph [Fpl [Dp [Gph [Gpl [d1 [Hd1 EP]]]]]]].
+  assert (Hd1' : Rabs d1 <= / 1000) by (apply Rle_trans with (1 := Hd1); interval).
+  assert (HP : Rabs (B ph + B pl) <= / 256).
+  { rewrite EP, Rabs_mult. apply Rle_trans with ((0.00270769 + / 2 ^ 62 + / 131072) * (1 + / 1000)).
+    - apply Rmult_le_compat; try apply Rabs_pos.
+      + apply Rle_trans with (Rabs (B rh) + Rabs (B rl) + Rabs (B (poly_q rh))); [ | lra].
+        pose proof (Rabs_triang (B rh + B rl) (B (poly_q rh))). pose proof (Rabs_triang (B rh) (B rl)). lra.
+      + apply Rle_trans with (1 := Rabs_triang _ _). rewrite Rabs_R1. lra.
+    - interval. }
+  pose proof (e_step ph pl Fph Fpl Dp HP Gph Gpl) as ES.
+  destruct (add64 c_one c_zero ph pl) as [eh el].
+  destruct ES as [Feh [Fel [Deh [Gel [Heh [d2 [Hd2 EE]]]]]]].
+  assert (Hd2' : Rabs d2 <= / 1000) by (apply Rle_trans with (1 := Hd2); interval).
+  assert (Hev : 0.99 <= B eh + B el <= 1.01).
+  { rewrite EE. apply Rabs_le_inv in HP. apply Rabs_le_inv in Hd2'. split; nra. }
+  pose proof (y_step eh el j Feh Fel Deh Gel Heh Hev Hj) as YS. cbv zeta in YS.
+  destruct (two_sum64 (exp_t_hi j) (exp_t_lo j)) as [th tl].
+  destruct (mul64 th tl eh el) as [yh yl].
+  destruct YS as [Fyh [Fyl [Dy [HT [d3 [d4 [Hd3 [Hd4 EY]]]]]]]].
+  (* fast.g's theorem *)
+  set (T := exp (INR j * ln 2 / 128)) in *.
+  set (dr := B rh + B rl - R).
+  set (m := Qpoly R - Qpoly (B rh)).
+  set (a := exp R - 1 - R - Qpoly R).
+  assert (Hdr : Rabs dr <= / 2 ^ 113) by exact HrR.
+  assert (Hm : Rabs m <= 25 / 2 ^ 75).
+  { unfold m. replace R with (B rh + (R - B rh)) at 1 by ring.
+    apply mvt_bound; [exact Hrh | ].
+    replace (R - B rh) with (B rl - dr) by (unfold dr; ring).
+    apply Rle_trans with (1 := Rabs_triang _ _). rewrite Rabs_Ropp.
+    assert (/ 2 ^ 62 + / 2 ^ 113 = 4503599627370498 * / 2 ^ 114) by field. lra. }
+  assert (Ha : Rabs a <= exp_poly_bound).
+  { pose proof (exp_poly_approx R ltac:(lra)) as PA.
+    rewrite exp_c3_val, exp_c4_val, exp_c5_val, exp_c6_val in PA.
+    unfold a, Qpoly. replace (375299968947529 * / 2 ^ 51) with (6004799503160464 / 2 ^ 55) by (unfold Rdiv; field).
+    replace (6004799503160511 * / 2 ^ 57) with (6004799503160511 / 2 ^ 57) by reflexivity.
+    replace (4803840849707593 * / 2 ^ 59) with (4803840849707593 / 2 ^ 59) by reflexivity.
+    replace (3202560482380763 * / 2 ^ 61) with (6405120964761526 / 2 ^ 62) by (unfold Rdiv; field).
+    replace (/ 2) with (1 / 2) by field. exact PA. }
+  assert (Fr : rn (B rh) = B rh) by (apply round_generic; [apply valid_rnd_N | apply B_fmt]).
+  pose proof (fast_bound T (B rh) (B rl) dr m a d4 d1 d2 d3 Fr Hrh Hrl Hdr Hm Ha
+                Hd1 Hd2 Hd3 Hd4 HT) as FB.
+  cbv zeta in FB. rewrite <- Bq in FB.
+  (* fast.g's Y is the computed Y, and its e^R is exp R. *)
+  assert (EY' : B yh + B yl = T * (1 + d4) * ((1 + (B rh + B rl + B (poly_q rh)) * (1 + d1)) * (1 + d2)) * (1 + d3))
+    by (rewrite EY, EE, EP; ring).
+  assert (ER : 1 + (B rh + B rl - dr) + Qpoly (B rh) + m + a = exp R) by (unfold dr, m, a; ring).
+  unfold Qpoly in ER. rewrite <- EY', ER in FB.
+  assert (eR : 0.99 <= exp R <= 1.01) by (apply Rabs_le_inv in HR; split; interval).
+  assert (Zp : 0.99 <= Z <= 2.03) by (unfold Z; fold T; nra).
+  assert (EZ : Rabs (Z - (B yh + B yl)) <= / 2 ^ 69 * Rabs Z).
+  { unfold Z. fold T.
+    replace (T * exp R - (B yh + B yl)) with (- ((B yh + B yl - T * exp R) / (T * exp R)) * (T * exp R))
+      by (field; split; lra).
+    rewrite Rabs_mult, Rabs_Ropp. apply Rmult_le_compat_r; [apply Rabs_pos | exact FB]. }
+  (* y_hi = RN(Y) is near Y, which is near Z. *)
+  assert (Yv : 0.98 <= B yh + B yl <= 2.04).
+  { rewrite (Rabs_pos_eq Z) in EZ by lra. apply Rabs_le_inv in EZ.
+    assert (/ 2 ^ 69 < / 1000) by interval. nra. }
+  assert (Yb : bpow radix2 (-1022) <= Rabs (B yh + B yl))
+    by (rewrite Rabs_pos_eq by lra; apply Rle_trans with (/ 1024);
+        [change (/ 1024) with (bpow radix2 (-10)); apply bpow_le; lia | lra]).
+  pose proof (rel_FLT _ Yb) as RY. rewrite <- Dy in RY.
+  rewrite (Rabs_pos_eq (B yh + B yl)) in RY by lra. apply Rabs_le_inv in RY.
+  split; [exact Fyh | split; [exact Fyl | split; [exact Dy | split; [lra | exact EZ]]]].
 Qed.
