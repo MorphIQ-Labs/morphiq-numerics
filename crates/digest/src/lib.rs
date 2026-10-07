@@ -14,6 +14,7 @@ use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::elementary::{
     cos, exp, exp2, expm1, ln, ln_1p, log2, log10, sin, sincos, sqrt, tan,
 };
+use morphiq_numerics::log_space::{log_diff_exp, log_sum_exp};
 use morphiq_numerics::random::{
     SplitMix64, Xoshiro256PlusPlus, normal_pair, unit_closed_open, unit_open,
 };
@@ -573,6 +574,81 @@ pub fn corpus_digest() -> [u8; 32] {
         r.u64(xoshiro.next_u64());
         xoshiro.long_jump();
         r.u64(xoshiro.next_u64());
+    }
+
+    let (inf, nan, max) = (f64::INFINITY, f64::NAN, f64::MAX);
+    r.label("log_sum_exp");
+    // Special values and zero mass (docs/log_space.md §1), then slices of
+    // every length from 1 to 8 whose gaps below their maximum reach
+    // cancellation, subnormal and underflowed terms, then pairs across the
+    // whole exponent range, past two_sum's domain and into overflow.
+    for x in [
+        &[][..],
+        &[-inf],
+        &[-inf, -inf],
+        &[nan],
+        &[1.0, nan],
+        &[inf, 1.0],
+        &[-inf, inf],
+        &[-0.0],
+        &[-inf, -0.0],
+        &[-800.0],
+        &[0.0, 0.0],
+        &[0.0, -745.1],
+        &[0.0, -800.0],
+        &[max, max],
+        &[max, -max],
+        &[-max, -max],
+    ] {
+        r.f64(log_sum_exp(x));
+    }
+    for len in 1..=8 {
+        for _ in 0..1_000 {
+            let mut x = [0.0; 8];
+            let top = normal_in(&mut words, -8, 10);
+            for v in x.iter_mut().take(len) {
+                *v = top - normal_in(&mut words, -40, 10).abs();
+            }
+            r.f64(log_sum_exp(&x[..len]));
+        }
+    }
+    for _ in 0..4_000 {
+        let pair = [
+            normal_in(&mut words, -1022, 1023),
+            normal_in(&mut words, -1022, 1023),
+        ];
+        r.f64(log_sum_exp(&pair));
+    }
+
+    r.label("log_diff_exp");
+    // Special values (§1), then pairs whose gap reaches both regions, the
+    // boundary at T and underflow, then pairs across the whole exponent range.
+    for (a, b) in [
+        (nan, 1.0),
+        (1.0, nan),
+        (1.0, 2.0),
+        (inf, inf),
+        (-inf, -inf),
+        (3.0, -inf),
+        (-0.0, -inf),
+        (inf, 5.0),
+        (0.0, 0.0),
+        (0.0, f64::from_bits(0xbfe6_2e42_fefa_39ef)),
+        (0.0, -745.5),
+        (max, -max),
+    ] {
+        r.f64(log_diff_exp(a, b));
+    }
+    for _ in 0..10_000 {
+        let a = normal_in(&mut words, -8, 10);
+        r.f64(log_diff_exp(a, a - normal_in(&mut words, -60, 11).abs()));
+    }
+    for _ in 0..4_000 {
+        let (x, y) = (
+            normal_in(&mut words, -1022, 1023),
+            normal_in(&mut words, -1022, 1023),
+        );
+        r.f64(log_diff_exp(x.max(y), x.min(y)));
     }
 
     r.0.finalize().into()

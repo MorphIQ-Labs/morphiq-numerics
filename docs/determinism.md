@@ -30,6 +30,8 @@ functions unnoticed.
 | `sqrt` | 10,000 arbitrary encodings, both signs, subnormals, infinities and NaNs; 10,000 positive encodings | `sqrt` |
 | `normal_pair` | `w1` in `{0, 2^64 − 1, 2^63}` against `w2` in `{0, 2^64 − 1}` and every octant boundary `o·2^61`; 10,000 pairs of words | both deviates of `normal_pair` |
 | `random` | four seeds | 4,096 words of each stream, both uniforms of each SplitMix64 word, and a word after `jump` and after `long_jump` |
+| `log_sum_exp` | the special values and zero-mass cases of [log_space.md](log_space.md) §1, overflow and `±max` pairs; 1,000 slices of each length from 1 to 8, gaps below their maximum from `2^−40` to `2^11`; 4,000 pairs with exponents in `[−1022, 1023]` | `log_sum_exp` |
+| `log_diff_exp` | the special values of [log_space.md](log_space.md) §1, the region boundary `T`, underflow and overflow; 10,000 pairs with gaps from `2^−60` to `2^12`; 4,000 ordered pairs with exponents in `[−1022, 1023]` | `log_diff_exp` |
 
 ## Where it is checked
 
