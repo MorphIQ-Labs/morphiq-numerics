@@ -9,7 +9,7 @@
 
 From Coq Require Import ZArith Reals Lia Lra Psatz Classical.
 From Flocq Require Import Core Relative IEEE754.Binary IEEE754.Bits.
-From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Mul IEEE64Eft Binary64Mul.
+From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Mul IEEE64Eft Binary64Mul Grid.
 From Gappa Require Gappa_definitions Gappa_round_def.
 Require exp_reduction.
 
@@ -298,15 +298,18 @@ Definition reduce (x : f64) : f64 * f64 * f64 * f64 * f64 * f64 :=
 
 (** For every [x] the kernel reduces, with [L = L1 + L2 + L3 + L4 + dL]: [n] is
     an integer [k], [|k| <= 137601]; [r1 = x − k·L1] and [p2 + e2 = k·L2]
-    exactly; [|x − k·L| <= 0.0027077]; and [r_hi + r_lo] is within [2^−113] of
-    [x − k·L]. *)
+    exactly; [|x − k·L| <= 0.0027076063], inside the certificates' [0.0027077];
+    [r_hi] is [RN(r_hi + r_lo)], and [r_hi + r_lo] is within [2^−113] of
+    [x − k·L]; and for [|x| >= 2^−99], [r_hi] and [r_lo] are multiples of
+    [2^−151], which bounds the fast path's nonzero low words from below. *)
 Theorem reduce_ok x dL : finite x -> -745.1333 <= B x <= 709.79 -> Rabs dL <= bpow radix2 (-206) ->
   let L := l1v + l2v + l3v + l4v + dL in
   let '(n, r1, p2, e2, rh, rl) := reduce x in
   exists k : Z, B n = IZR k /\ (Z.abs k <= 137601)%Z /\
     finite n /\ finite r1 /\ finite p2 /\ finite e2 /\ finite rh /\ finite rl /\
     B r1 = B x - IZR k * l1v /\ B p2 = rndF (IZR k * l2v) /\ B p2 + B e2 = IZR k * l2v /\
-    Rabs (B x - IZR k * L) <= 0.0027077 /\
+    Rabs (B x - IZR k * L) <= 0.0027076063 /\ B rh = rndF (B rh + B rl) /\
+    (bpow radix2 (-99) <= Rabs (B x) -> on_grid (-151) (B rh) /\ on_grid (-151) (B rl)) /\
     Rabs (B rh + B rl - (B x - IZR k * L)) <= bpow radix2 (-113).
 Proof.
   intros Fx Hx HdL L.
@@ -322,7 +325,7 @@ Proof.
   destruct Lr as [La Lb].
   (* the reduced argument *)
   set (R := B x - IZR k * L).
-  assert (HR : Rabs R <= 0.0027077).
+  assert (HR : Rabs R <= 0.0027076063).
   { replace R with (L * (B x / L - IZR k)) by (unfold R; field; lra).
     rewrite Rabs_mult, (Rabs_pos_eq L) by lra.
     apply Rle_trans with (0.0054152124 * (/ 2 + / 1000000000)); [ | lra].
@@ -437,14 +440,44 @@ Proof.
   { rewrite Brr. apply Rle_trans with (IZR 1 * bpow radix2 1); [ | simpl; lra].
     apply bnd_round; [lia | lia | pw; lra]. }
   pose proof (two_sum_ieee s rr Fs Frr Sb RRb) as TS2.
-  destruct (two_sum64 s rr) as [rh rl]. destruct TS2 as [Fh [Fl [_ Bhl]]].
+  destruct (two_sum64 s rr) as [rh rl]. destruct TS2 as [Fh [Fl [Bh Bhl]]].
+  (* Every intermediate is a multiple of 2^-151 when |x| >= 2^-99. *)
+  assert (Grd : bpow radix2 (-99) <= Rabs (B x) -> on_grid (-151) (B rh) /\ on_grid (-151) (B rl)).
+  { intros Hx99.
+    assert (Gx : on_grid (-151) (B x)).
+    { apply (grid_fmt_bound (FLT_exp emin prec) (-99)).
+      - intros e. unfold FLT_exp, emin, prec. lia.
+      - apply B_fmt.
+      - right. exact Hx99. }
+    assert (Gk : forall q m, (q <= 0)%Z -> on_grid q (IZR m * bpow radix2 q) -> on_grid q (IZR k * (IZR m * bpow radix2 q))).
+    { intros q m Hq Gm. replace q with (0 + q)%Z at 1 by ring. apply grid_mult; [ | exact Gm].
+      exists k. simpl. ring. }
+    assert (G1 : on_grid (-151) (IZR k * l1v)).
+    { apply grid_le with (-42)%Z; [lia | ]. apply Gk; [lia | ]. now exists 23816355775%Z. }
+    assert (G2 : on_grid (-151) (IZR k * l2v)).
+    { apply grid_le with (-96)%Z; [lia | ]. unfold l2v, F2R; cbn [Fnum Fexp].
+      apply Gk; [lia | ]. now exists (-7988006341064857)%Z. }
+    assert (G3 : on_grid (-151) (IZR k * l3v)).
+    { unfold l3v, F2R; cbn [Fnum Fexp]. apply Gk; [lia | ]. now exists 6759741496705267%Z. }
+    assert (Ge2 : B e2 = IZR k * l2v - B p2) by lra.
+    assert (Gt : B t = B r1 + - B p2 - B s) by lra.
+    assert (Gu2 : B (fmul n c_l3) = rndF (IZR k * l3v))
+      by (rewrite Bu2, Bn, c_l3_val; reflexivity).
+    assert (Gl : B rl = B s + B rr - B rh) by lra.
+    rewrite Gl, Bh, Bs, Brr, Bu1, Gu2, Gt, Bs, Ge2, Bp, Er1.
+    split; repeat first [assumption | apply grid_round | apply grid_plus | apply grid_minus
+                         | apply grid_opp | exact _]. }
   exists k. repeat split; try assumption.
-  rewrite Bhl.
-  apply (reduction_bound R dL k (B r1) (B p2) (B s) (B t) (B e2) (B rr) Kb HR HdL).
-  - rewrite Er1. unfold R, L. ring.
-  - exact Bp.
-  - rewrite Bs. reflexivity.
-  - lra.
-  - lra.
-  - rewrite Brr, Bu1, Bu2, Bn, c_l3_val. reflexivity.
+  - (* r_hi = RN(r_hi + r_lo) *)
+    rewrite Bhl. exact Bh.
+  - apply (proj1 (Grd ltac:(assumption))).
+  - apply (proj2 (Grd ltac:(assumption))).
+  - rewrite Bhl.
+    apply (reduction_bound R dL k (B r1) (B p2) (B s) (B t) (B e2) (B rr) Kb ltac:(lra) HdL).
+    + rewrite Er1. unfold R, L. ring.
+    + exact Bp.
+    + rewrite Bs. reflexivity.
+    + lra.
+    + lra.
+    + rewrite Brr, Bu1, Bu2, Bn, c_l3_val. reflexivity.
 Qed.
