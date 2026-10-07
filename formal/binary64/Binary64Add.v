@@ -11,7 +11,7 @@
     theorems apply. Overflow is outside both models; the library states input
     magnitudes that exclude it (docs/double-word.md). *)
 
-From Coq Require Import Reals ZArith Lia.
+From Coq Require Import Reals ZArith Lia Lra.
 From Flocq Require Import Core Plus_error.
 From Double Require Import DWPlus F2Sum F2SumFLX.
 
@@ -149,6 +149,28 @@ Proof.
   destruct (F2Sum.Fast2Sum prec ne _ _) eqn:Z; simpl in B. exact B.
 Qed.
 
+(** [add_f64]'s result is itself a double-word number, so it can feed the next
+    double-word operation. *)
+Theorem add_f64_dw xh xl y : fmtF xh -> fmtF xl -> fmtF y -> xh = rndF (xh + xl) ->
+  let '(zh, zl) := add_f64 xh xl y in zh = rndF (zh + zl).
+Proof.
+  intros Fh Fl Fy E.
+  destruct (@DWPlusFP_correct prec (ltac:(unfold prec; lia)) ne eq_refl
+              (ltac:(unfold prec; lia)) xh xl y (fmtF_fmtX y Fy) (dw_of_binary64 xh xl Fh Fl E)) as [_ D].
+  unfold add_f64.
+  rewrite (two_sum_eq xh y Fh Fy).
+  destruct (two_sum_fmt xh y Fh Fy) as [Fsh Fsl].
+  rewrite (sum_round xl _ Fl Fsl).
+  assert (Fv : fmtF (rndX (xl + TwoSum_err prec ne xh y)))
+    by (rewrite <- (sum_round xl _ Fl Fsl); apply fmtF_rnd).
+  destruct (fast_two_sum_fmt _ _ Fsh Fv) as [Fzh Fzl].
+  rewrite (fast_two_sum_eq _ _ Fsh Fv).
+  set (F := F2Sum.Fast2Sum prec ne (TwoSum_sum prec ne xh y) (rndX (xl + TwoSum_err prec ne xh y))) in *.
+  assert (D' : double_word prec ne (fst F) (snd F)) by exact D.
+  clearbody F. destruct F as [zh zl]. cbn [fst snd] in D', Fzh, Fzl.
+  destruct D' as [_ Dz]. rewrite (sum_round _ _ Fzh Fzl). exact Dz.
+Qed.
+
 Theorem add_bound xh xl yh yl :
   fmtF xh -> fmtF xl -> xh = rndF (xh + xl) ->
   fmtF yh -> fmtF yl -> yh = rndF (yh + yl) ->
@@ -179,6 +201,46 @@ Proof.
   rewrite (fast_two_sum_eq _ _ Fvh Fw).
   set (Z := F2Sum.Fast2Sum prec ne vh (rndX (TwoSum_err prec ne xl yl + vl))) in *.
   destruct Z as [zh zl]. exact B.
+Qed.
+
+(** [add]'s result is a double-word number when [x]'s leading word is in
+    [[1, 2 − 2u]] and [y]'s is no larger: Muller and Rideau's normalized case,
+    which their proof reaches by scaling. *)
+Theorem add_dw xh xl yh yl :
+  fmtF xh -> fmtF xl -> xh = rndF (xh + xl) ->
+  fmtF yh -> fmtF yl -> yh = rndF (yh + yl) ->
+  xh + xl + (yh + yl) <> 0 -> Rabs yh <= Rabs xh -> xh + yh <> 0 ->
+  1 <= xh <= 2 - 2 * bpow radix2 (- prec) ->
+  let '(zh, zl) := add xh xl yh yl in zh = rndF (zh + zl).
+Proof.
+  intros Fxh Fxl Ex Fyh Fyl Ey Hn Hy Hs Hx.
+  destruct (@DWPlusDW_relerr_bound_pre prec (ltac:(unfold prec; lia)) ne eq_refl
+              (ltac:(unfold prec; lia)) xh xl yh yl
+              (dw_of_binary64 xh xl Fxh Fxl Ex) (dw_of_binary64 yh yl Fyh Fyl Ey) Hn Hy Hs
+              ltac:(lra) ltac:(lra) (proj1 Hx) ltac:(lra)) as [D _].
+  unfold add.
+  rewrite (two_sum_eq xh yh Fxh Fyh), (two_sum_eq xl yl Fxl Fyl).
+  destruct (two_sum_fmt xh yh Fxh Fyh) as [Fsh Fsl].
+  destruct (two_sum_fmt xl yl Fxl Fyl) as [Fth Ftl].
+  rewrite (sum_round _ _ Fsl Fth).
+  assert (Fc : fmtF (rndX (TwoSum_err prec ne xh yh + TwoSum_sum prec ne xl yl)))
+    by (rewrite <- (sum_round _ _ Fsl Fth); apply fmtF_rnd).
+  rewrite (fast_two_sum_eq _ _ Fsh Fc).
+  destruct (fast_two_sum_fmt _ _ Fsh Fc) as [Fvh Fvl].
+  set (V := F2Sum.Fast2Sum prec ne (TwoSum_sum prec ne xh yh)
+              (rndX (TwoSum_err prec ne xh yh + TwoSum_sum prec ne xl yl))) in *.
+  assert (D1 : double_word prec ne
+     (fst (F2Sum.Fast2Sum prec ne (fst V) (rndX (TwoSum_err prec ne xl yl + snd V))))
+     (snd (F2Sum.Fast2Sum prec ne (fst V) (rndX (TwoSum_err prec ne xl yl + snd V))))) by exact D.
+  clearbody V. destruct V as [vh vl]. cbn [fst snd] in Fvh, Fvl, D1. cbv beta iota.
+  rewrite (sum_round _ _ Ftl Fvl).
+  assert (Fw : fmtF (rndX (TwoSum_err prec ne xl yl + vl)))
+    by (rewrite <- (sum_round _ _ Ftl Fvl); apply fmtF_rnd).
+  destruct (fast_two_sum_fmt _ _ Fvh Fw) as [Fzh Fzl].
+  rewrite (fast_two_sum_eq _ _ Fvh Fw).
+  set (Z := F2Sum.Fast2Sum prec ne vh (rndX (TwoSum_err prec ne xl yl + vl))) in *.
+  clearbody Z. destruct Z as [zh zl]. cbn [fst snd] in D1, Fzh, Fzl.
+  destruct D1 as [_ Dz]. rewrite (sum_round _ _ Fzh Fzl). exact Dz.
 Qed.
 
 Lemma round_NE_opp_ne x : rndF (- x) = - rndF x.
