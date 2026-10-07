@@ -57,6 +57,14 @@ T = -0.6931471805599453  # RN(−ln 2), docs/log_space.md decision 6
 DROP = -2000
 
 
+def pow2(x):
+    """2^x through mpmath, rounded once. CPython's float ** calls the
+    platform's pow(), which may differ between C libraries in the last bit,
+    and would make the generated inputs, and so the fixture, platform-dependent."""
+    with mpmath.workprec(200):
+        return float(mpmath.mpf(2) ** mpmath.mpf(x))
+
+
 def hex64(x):
     return format(to_bits(x), '016x')
 
@@ -247,7 +255,7 @@ def lse_bounded():
     # Cancellation family: e^m + e^b = 1, so y is near 0 and the bound's
     # absolute term dominates; the two_sum tail dl is visible here.
     for i in range(30):
-        m = -(2.0 ** (-10 + 14.5 * i / 29))  # from -2^-10 to about -22.6
+        m = -pow2(-10 + 14.5 * i / 29)  # from -2^-10 to about -22.6
         with mpmath.workprec(256):
             b = float(mpmath.log(-mpmath.expm1(mpmath.mpf(m))))
         hand.append(([m, b], 'cancellation family: e^m + e^b = 1'))
@@ -261,13 +269,13 @@ def lse_bounded():
     for i in range(400):
         scale = scales[i % len(scales)]
         x1 = scale * (2 * uniform() - 1)
-        gap = 2.0 ** (-60 + 72 * uniform())  # log-uniform in [2^-60, 2^12]
+        gap = pow2(-60 + 72 * uniform())  # log-uniform in [2^-60, 2^12]
         cases.append(lse_case([x1, x1 - gap]))
     for i in range(200):
         n = 3 + i % 14
         scale = scales[i % len(scales)]
         centre = scale * (2 * uniform() - 1)
-        spread = 2.0 ** (-20 + 32 * uniform())
+        spread = pow2(-20 + 32 * uniform())
         cases.append(lse_case([centre + spread * (2 * uniform() - 1) for _ in range(n)]))
     return cases
 
@@ -300,7 +308,7 @@ def diff_bounded():
     # Cancellation family: e^a - e^b = 1, so y is near 0. Small a gives
     # region B with a large |d| and a visible dl; large a gives region A.
     for i in range(30):
-        a = 2.0 ** (-10 + 14.5 * i / 29)  # from 2^-10 to about 22.6
+        a = pow2(-10 + 14.5 * i / 29)  # from 2^-10 to about 22.6
         with mpmath.workprec(256):
             b = float(mpmath.log(mpmath.expm1(mpmath.mpf(a))))
         hand.append((a, b, 'cancellation family: e^a - e^b = 1'))
@@ -314,7 +322,7 @@ def diff_bounded():
     for i in range(400):
         scale = scales[i % len(scales)]
         a = scale * (2 * uniform() - 1)
-        gap = 2.0 ** (-70 + 82 * uniform())  # log-uniform in [2^-70, 2^12]
+        gap = pow2(-70 + 82 * uniform())  # log-uniform in [2^-70, 2^12]
         b = a - gap
         if b == a:
             b = math.nextafter(a, -INF)
