@@ -128,7 +128,7 @@ def coq_tables(l_split, poly, poly_bound, table_dw):
         '',
         'From Coq Require Import Reals ZArith List Lia.',
         'From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.',
-        'From Binary64 Require Import IEEE64 Encodings.',
+        'From Binary64 Require Import IEEE64 Grid Encodings.',
         'From Interval Require Import Tactic.',
         'Import ListNotations.',
         '',
@@ -163,7 +163,8 @@ def coq_tables(l_split, poly, poly_bound, table_dw):
         'Qed.',
         '',
         '(** [T_j = 2^(j/128)] as a double-word [(hi, lo)], within [2^-107]',
-        '    relatively ([d4] in formal/exp/fast.g). *)',
+        '    relatively ([d4] in formal/exp/fast.g); both words are multiples of',
+        '    [2^-120], so a nonzero one is at least that in magnitude. *)',
         'Definition exp_t_bits : list (Z * Z) := [',
     ]
     pairs = [(to_bits(hi), to_bits(lo)) for hi, lo in table_dw]
@@ -175,27 +176,33 @@ def coq_tables(l_split, poly, poly_bound, table_dw):
         '',
         'Definition exp_t_ok (j : nat) : Prop :=',
         '  finite (exp_t_hi j) /\\ finite (exp_t_lo j) /\\',
+        '  on_grid (-120) (B (exp_t_hi j)) /\\ on_grid (-120) (B (exp_t_lo j)) /\\',
         '  Rabs ((B (exp_t_hi j) + B (exp_t_lo j) - exp (INR j * ln 2 / 128)) / exp (INR j * ln 2 / 128))',
         '    <= / 2 ^ 107.',
         '',
     ]
     for j, (h, l) in enumerate(pairs):
         dh, dl = decode(h), decode(l)
-        assert dh is not None and dh[0] == 0
+        assert dh is not None and dh[0] == 0 and dh[2] <= 120
         rw = [f'(bits_val {h} false {dh[1]} {dh[2]} eq_refl)']
         fin = [f'bits_finite {h} _ _ _ eq_refl']
+        grid = ['apply (val_grid _ _ 120); lia']
         if dl is None:
             rw.append(f'(bits_zero {l} false eq_refl)')
             fin.append(f'bits_finite_zero {l} false eq_refl')
+            grid.append('apply grid_0')
         else:
+            assert dl[2] <= 120
             rw.append(f'(bits_val {l} {"true" if dl[0] else "false"} {dl[1]} {dl[2]} eq_refl)')
             fin.append(f'bits_finite {l} _ _ _ eq_refl')
+            grid.append('apply (val_grid _ _ 120); lia')
         lines += [
             f'Lemma exp_t_ok_{j} : exp_t_ok {j}.',
             'Proof.',
             f'  unfold exp_t_ok, exp_t_hi, exp_t_lo; cbn [nth fst snd exp_t_bits].',
             f'  split; [exact ({fin[0]}) | split; [exact ({fin[1]}) | ]].',
             f'  rewrite {rw[0]}, {rw[1]}; cbn [cond_Zopp].',
+            f'  split; [{grid[0]} | split; [{grid[1]} | ]].',
             f'  rewrite INR_IZR_INZ; change (Z.of_nat {j}) with {j}%Z.',
             '  interval with (i_prec 160).',
             'Qed.',
