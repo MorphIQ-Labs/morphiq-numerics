@@ -1,12 +1,12 @@
-(* Runs the extracted Q128 and Q256 transcriptions and rounding tests
-   (InternalCrosscheck.v) on the internal cross-check corpus and compares each
-   result with the Rust library's.
+(* Runs the extracted Q128 and Q256 transcriptions, rounding tests and exp's
+   reduction (InternalCrosscheck.v) on the internal cross-check corpus and
+   compares each result with the Rust library's.
 
    Each line is "op args : result". A value is "n e k l1 .. lk": its sign
    (0 or 1), its exponent in decimal, its limb count and its 64-bit limbs in
    hex, least significant first; a binary64 is 16 hex digits; a rounding
-   test's result is a binary64 or "none". Exits 1 on a mismatch or a malformed
-   line. *)
+   test's result is a binary64 or "none"; a reduction's is its six words.
+   Exits 1 on a mismatch or a malformed line. *)
 
 open Internalcrosscheck
 
@@ -81,6 +81,10 @@ let compute op args =
        | [hi; lo; eps; k] ->
            show_opt (x_decide_scaled (z_of_u64 (hex hi)) (z_of_u64 (hex lo)) (z_of_u64 (hex eps)) (z_of_int (int_of_string k)))
        | _ -> failwith "decide_scaled takes three words and an exponent")
+  | "reduce" ->
+      (match args with
+       | [x] -> String.concat " " (List.map show_bits (x_reduce (z_of_u64 (hex x))))
+       | _ -> failwith "reduce takes one word")
   | "q256_from_limbs" ->
       let ((n, e, l), _) = value args in
       let ((n, e), l) = x_q256_from_limbs n e l in show (n, e, l)

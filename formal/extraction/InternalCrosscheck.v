@@ -1,13 +1,15 @@
-(** The proved Q128 and Q256 transcriptions (formal/q) and rounding tests
-    (formal/binary64/RoundingTest.v), extracted to OCaml so
-    formal/extraction/internaldriver.ml can run them on the internal cross-check corpus and
-    compare with q128.rs and q256.rs bit for bit. A value travels as its sign,
+(** The proved Q128 and Q256 transcriptions (formal/q), rounding tests
+    (formal/binary64/RoundingTest.v) and exp's reduction
+    (formal/exp/ExpReduction.v), extracted to OCaml so
+    formal/extraction/internaldriver.ml can run them on the internal cross-check
+    corpus and compare with the Rust code bit for bit. A value travels as its sign,
     its exponent and its significand's 64-bit limbs, least significant first. *)
 
 From Coq Require Import ZArith List Extraction ExtrOcamlBasic.
 From Flocq Require Import IEEE754.Binary IEEE754.Bits.
 From Q Require Import Limbs Digits64 Q128 Q256.
 From Binary64 Require Import IEEE64 RoundingTest.
+Require ExpReduction.
 Import ListNotations.
 
 Definition limbs (k : nat) (x : Z) : list Z := map (fun i => dig x (Z.of_nat i)) (seq 0 k).
@@ -32,5 +34,10 @@ Definition opt_bits (o : option f64) : option Z := match o with Some v => Some (
 Definition x_decide_with hi lo eps := opt_bits (decide_with (b64_of_bits hi) (b64_of_bits lo) (b64_of_bits eps)).
 Definition x_decide_scaled hi lo eps k := opt_bits (decide_scaled (b64_of_bits hi) (b64_of_bits lo) (b64_of_bits eps) k).
 
-Extraction "internalcrosscheck.ml" x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
+(** exp's reduction (ExpReduction.v): [n], [r1], [p2], [e2], [r_hi], [r_lo]. *)
+Definition x_reduce x :=
+  let '(n, r1, p2, e2, rh, rl) := ExpReduction.reduce (b64_of_bits x) in
+  map bits_of_b64 [n; r1; p2; e2; rh; rl].
+
+Extraction "internalcrosscheck.ml" x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
   x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs.

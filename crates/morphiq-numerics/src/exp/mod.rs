@@ -75,6 +75,12 @@ pub(crate) struct Reduced {
 }
 
 impl Reduced {
+    /// `[n, r1, p2, e2, r_hi, r_lo]`, for the internal cross-check.
+    #[cfg(test)]
+    pub(crate) fn words(&self) -> [f64; 6] {
+        [self.n, self.r1, self.p2, self.e2, self.r.hi(), self.r.lo()]
+    }
+
     /// §3, steps 1–4.
     pub(crate) fn of(x: f64) -> Self {
         let n = (x * INV_L + SHIFTER) - SHIFTER;
