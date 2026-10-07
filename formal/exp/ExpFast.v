@@ -169,6 +169,42 @@ Qed.
 Lemma Rabs_mult_le a b A C : Rabs a <= A -> Rabs b <= C -> Rabs (a * b) <= A * C.
 Proof. intros Ha Hb. rewrite Rabs_mult. apply Rmult_le_compat; try apply Rabs_pos; assumption. Qed.
 
+(** Rounding errs by at most [u = 2^-53] relatively above [2^-1022], and never
+    exceeds [2^-1022] in magnitude below it. *)
+Lemma rel_FLT v : bpow radix2 (-1022) <= Rabs v -> Rabs (rndF v - v) <= / 9007199254740992 * Rabs v.
+Proof.
+  intros H.
+  pose proof (relative_error_N_FLT radix2 emin prec ltac:(unfold prec; lia) ne v H) as R.
+  change (bpow radix2 (- prec + 1)) with (/ 4503599627370496) in R. lra.
+Qed.
+
+Lemma rnd_mag v : Rabs (rndF v) <= (1 + / 9007199254740992) * Rabs v + bpow radix2 (-1022).
+Proof.
+  pose proof (bpow_gt_0 radix2 (-1022)) as P.
+  destruct (Rle_lt_dec (bpow radix2 (-1022)) (Rabs v)) as [H | H].
+  - pose proof (rel_FLT v H) as R. pose proof (Rabs_triang_inv (rndF v) v). lra.
+  - assert (F : fmtF (bpow radix2 (-1022)))
+      by (apply generic_format_bpow; unfold FLT_exp, emin, prec; lia).
+    pose proof (abs_round_le_generic radix2 (FLT_exp emin prec) (Znearest ne) v _ F (Rlt_le _ _ H)).
+    pose proof (Rabs_pos v). lra.
+Qed.
+
+(** A double-word's low word, when its sum is below [2^-8]: at most half an
+    ulp of [2^-9]'s binade. *)
+Lemma err_small v : Rabs v < bpow radix2 (-8) -> Rabs (rndF v - v) <= bpow radix2 (-62).
+Proof.
+  intros H. destruct (Req_dec v 0) as [-> | Hv].
+  - rewrite round_0 by apply valid_rnd_N. rewrite Rminus_0_r, Rabs_R0. apply bpow_ge_0.
+  - apply Rle_trans with (/ 2 * ulp radix2 (FLT_exp emin prec) v).
+    + apply error_le_half_ulp. exact _.
+    + rewrite ulp_neq_0 by exact Hv. unfold cexp.
+      pose proof (mag_le_bpow radix2 v (-8) Hv H) as M.
+      replace (bpow radix2 (-62)) with (bpow radix2 (-1) * bpow radix2 (-61))
+        by (rewrite <- bpow_plus; reflexivity).
+      change (bpow radix2 (-1)) with (/ 2).
+      apply Rmult_le_compat_l; [lra | apply bpow_le]. unfold FLT_exp, emin, prec. lia.
+Qed.
+
 (** [poly_q] computes [fast.g]'s [q], at most [2^-17]. *)
 Lemma poly_ok rh : finite rh -> Rabs (B rh) <= 0.00270769 ->
   let r := B rh in
@@ -176,7 +212,8 @@ Lemma poly_ok rh : finite rh -> Rabs (B rh) <= 0.00270769 ->
   let c5 := 4803840849707593 * / 2 ^ 59 in let c6 := 3202560482380763 * / 2 ^ 61 in
   finite (poly_q rh) /\
   B (poly_q rh) = rn (rn (r * r) * rn (/ 2 + rn (r * rn (c3 + rn (r * rn (c4 + rn (r * rn (c5 + rn (r * c6))))))))) /\
-  Rabs (B (poly_q rh)) <= bpow radix2 (-17).
+  Rabs (B (poly_q rh)) <= bpow radix2 (-17) /\
+  Rabs (B (poly_q rh)) <= 1.001 * (r * r) + bpow radix2 (-1020).
 Proof.
   intros Fr Hr. cbv zeta.
   pose proof exp_c3_finite as F3. pose proof exp_c4_finite as F4.
@@ -233,6 +270,17 @@ Proof.
   destruct (fmul_p (-17) _ _ Fj Fi ltac:(lia)) as [Fk [Ek Bk]].
   { change (bpow radix2 (-17)) with (/ 131072).
     apply Rle_trans with (/ 131072 * 1); [apply Rabs_mult_le; assumption | lra]. }
-  split; [exact Fk | split; [ | exact Bk]].
-  rewrite Ek, Ej, Ei, Eg, Ef, Ee, Ed, Ec, Eb, Ea, V3, V4, V5, V6, Vh. reflexivity.
+  split; [exact Fk | split; [ | split; [exact Bk | ]]].
+  - rewrite Ek, Ej, Ei, Eg, Ef, Ee, Ed, Ec, Eb, Ea, V3, V4, V5, V6, Vh. reflexivity.
+  - (* |q| <= (1 + u)^2 r^2 plus what underflow can add. *)
+    pose proof (rnd_mag (B (fmul rh rh) * B (fadd c_half (fmul rh (fadd exp_c3 (fmul rh (fadd exp_c4
+                  (fmul rh (fadd exp_c5 (fmul rh exp_c6)))))))))) as M2.
+    pose proof (rnd_mag (B rh * B rh)) as M1. rewrite <- Ej in M1. rewrite <- Ek in M2.
+    assert (Hh : Rabs (B (fmul rh rh) * B (fadd c_half (fmul rh (fadd exp_c3 (fmul rh (fadd exp_c4
+                  (fmul rh (fadd exp_c5 (fmul rh exp_c6))))))))) <= Rabs (B (fmul rh rh)) * 1)
+      by (apply Rabs_mult_le; [lra | exact Bi]).
+    rewrite (Rabs_pos_eq (B rh * B rh)) in M1 by apply Rle_0_sqr.
+    replace (bpow radix2 (-1020)) with (4 * bpow radix2 (-1022))
+      by (change 4 with (bpow radix2 2); rewrite <- bpow_plus; reflexivity).
+    pose proof (bpow_gt_0 radix2 (-1022)). pose proof (Rle_0_sqr (B rh)). unfold Rsqr in *. lra.
 Qed.
