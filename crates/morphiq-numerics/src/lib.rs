@@ -12,6 +12,8 @@
 //! - [`log_space`]: `log_sum_exp` and `log_diff_exp`, logarithms of sums and
 //!   differences of exponentials, within proved error bounds, with `−∞` as
 //!   exact zero mass;
+//! - [`normal`]: `log_norm_pdf`, the logarithm of the standard normal
+//!   density, correctly rounded wherever its rounding test decides;
 //! - [`random`]: seeded SplitMix64 and xoshiro256++ streams, with exact
 //!   unit uniforms and Box–Muller normal pairs;
 //! - [`reduce`]: sums, dot products and sums of squares in a specified order,
@@ -36,7 +38,9 @@ mod expm1;
 mod internal_crosscheck;
 mod ln;
 mod log2;
+mod log_norm_pdf;
 pub mod log_space;
+pub mod normal;
 mod q128;
 mod q256;
 pub mod random;

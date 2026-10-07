@@ -32,6 +32,7 @@ functions unnoticed.
 | `random` | four seeds | 4,096 words of each stream, both uniforms of each SplitMix64 word, and a word after `jump` and after `long_jump` |
 | `log_sum_exp` | the special values and zero-mass cases of [log_space.md](log_space.md) §1, overflow and `±max` pairs; 1,000 slices of each length from 1 to 8, gaps below their maximum from `2^−40` to `2^11`; 4,000 pairs with exponents in `[−1022, 1023]` | `log_sum_exp` |
 | `log_diff_exp` | the special values of [log_space.md](log_space.md) §1, the region boundary `T`, underflow and overflow; 10,000 pairs with gaps from `2^−60` to `2^12`; 4,000 ordered pairs with exponents in `[−1022, 1023]` | `log_diff_exp` |
+| `log_norm_pdf` | NaN, ±∞, ±0, the least subnormal, each regime boundary of [log_norm_pdf.md](log_norm_pdf.md) §1 (`2^−27`, `2^500`, `2^512`, `2^513`), the overflow threshold and its successor, all with both signs, and a regime-L tie; 20,000 arguments with exponents in `[−40, 512]`; 10,000 in `[−8, 8)` | `log_norm_pdf` |
 
 ## Where it is checked
 
