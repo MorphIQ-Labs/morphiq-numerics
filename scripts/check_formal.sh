@@ -14,7 +14,10 @@
 #      builds with each rewriting hint proved as a lemma by
 #      formal/gappa/Hints.v, so no hypothesis is left; and each final theorem's
 #      global axioms are among formal/axioms.expected.
-#   6. The proved IEEE 754 definitions and the Q128/Q256 transcriptions,
+#   6. The kernels' transcriptions and proofs (formal/exp/*.v), which apply the
+#      certificates' theorems, build; and the global axioms the theorems in
+#      formal/audit/KernelAudit.v rest on are among formal/axioms.expected.
+#   7. The proved IEEE 754 definitions and the Q128/Q256 transcriptions,
 #      extracted to OCaml (formal/extraction), reproduce the Rust library's
 #      results bit for bit on the cross-check corpora given as the first two
 #      arguments. Write the arguments first with
@@ -37,7 +40,7 @@ cd "$(dirname "$0")/.."
 sha256sum --check --quiet formal/binding.sha256
 
 if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v formal/binary64/*.v formal/extraction/*.v formal/q/*.v \
-    formal/gappa/*.v "$proofs"/*/*.v; then
+    formal/exp/*.v formal/gappa/*.v "$proofs"/*/*.v; then
   echo "a proof admits a goal" >&2
   exit 1
 fi
@@ -117,12 +120,32 @@ if [ "$reports" -ne "$certificates" ]; then
 fi
 echo "certificates in Coq: $certificates proved"
 
+# The kernels' proofs, beside the certificates' modules they apply.
+cp formal/exp/*.v formal/audit/KernelAudit.v "$work/gappa/"
+(cd "$work/gappa" \
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R . "" ExpReduction.v \
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R . "" KernelAudit.v) > "$work/kernel-audit.log"
+grep -E '^[^[:space:]]' "$work/kernel-audit.log" \
+  | grep -v -E '^(Axioms:|Closed under the global context)' \
+  | sed 's/ :.*//' | sort -u > "$work/kernel-axioms"
+if ! comm -23 "$work/kernel-axioms" "$work/expected" | diff /dev/null - >&2; then
+  echo "a kernel theorem rests on an axiom outside formal/axioms.expected" >&2
+  exit 1
+fi
+kernels=$(grep -c '^Print Assumptions' formal/audit/KernelAudit.v)
+reports=$(( $(grep -c '^Axioms:' "$work/kernel-audit.log" || true) + $(grep -c 'Closed under the global context' "$work/kernel-audit.log" || true) ))
+if [ "$reports" -ne "$kernels" ]; then
+  echo "the kernel audit reported on $reports theorems, not $kernels" >&2
+  exit 1
+fi
+echo "kernel proofs: $kernels proved"
+
 (cd "$work/extraction" \
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
   && ocamlfind ocamlopt -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
   && ./crosscheck "$corpus")
 (cd "$work/extraction" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q InternalCrosscheck.v \
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R ../gappa "" InternalCrosscheck.v \
   && ocamlfind ocamlopt -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
   && ./internalcrosscheck "$icorpus")
 echo "formal: OK"

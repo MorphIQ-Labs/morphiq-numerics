@@ -1,9 +1,9 @@
-//! Writes the internal cross-check corpus: `Q128` and `Q256` operations and
-//! the rounding tests (`ln::decide_with`, `exp::decide_scaled`) on reproducible
-//! inputs, with this crate's results. `scripts/check_formal.sh`
-//! runs the proved transcriptions (`formal/q` and
-//! `formal/binary64/RoundingTest.v`, extracted by
-//! `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
+//! Writes the internal cross-check corpus: `Q128` and `Q256` operations, the
+//! rounding tests (`ln::decide_with`, `exp::decide_scaled`) and `exp`'s
+//! reduction on reproducible inputs, with this crate's results.
+//! `scripts/check_formal.sh` runs the proved transcriptions (`formal/q`,
+//! `formal/binary64/RoundingTest.v` and `formal/exp/ExpReduction.v`, extracted
+//! by `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
 //! identical results, which ties the proofs to this code.
 //!
 //! Ignored by default; run with the output path in `MORPHIQ_INTERNAL_CORPUS`:
@@ -117,6 +117,25 @@ fn unit(rng: &mut SplitMix64) -> f64 {
     u
 }
 
+/// An argument of `exp`'s reduction: anywhere in its domain, at a tie of
+/// `x/L` (where `n` turns), or tiny (`n = 0`, and `r1 = x`).
+fn reduction_argument(rng: &mut SplitMix64) -> f64 {
+    /// `ln 2 / 128`, near enough to place a tie within `2^−40`.
+    const L: f64 = core::f64::consts::LN_2 / 128.0;
+    match rng.next_u64() % 3 {
+        0 => -745.13 + 1454.91 * unit(rng),
+        1 => {
+            #[allow(clippy::cast_precision_loss)] // |n| < 2^18
+            let n = (rng.next_u64() % 268_660) as f64 - 137_590.0;
+            (n + 0.5) * L + (unit(rng) - 0.5) * f64::from_bits(0x3d70_0000_0000_0000)
+        }
+        _ => {
+            let x = unit(rng) * f64::from_bits((1023 - rng.next_u64() % 61) << 52);
+            if rng.next_u64() & 1 == 1 { -x } else { x }
+        }
+    }
+}
+
 #[test]
 #[ignore = "writes the internal cross-check corpus for scripts/check_formal.sh"]
 fn internal_crosscheck_corpus() {
@@ -166,6 +185,21 @@ fn internal_crosscheck_corpus() {
             y.lo().to_bits(),
             eps.to_bits(),
             opt(crate::exp::decide_scaled(y, k))
+        )
+        .unwrap();
+
+        let x = reduction_argument(&mut rng);
+        let words = crate::exp::Reduced::of(x).words();
+        writeln!(
+            out,
+            "reduce {:016x} : {:016x} {:016x} {:016x} {:016x} {:016x} {:016x}",
+            x.to_bits(),
+            words[0].to_bits(),
+            words[1].to_bits(),
+            words[2].to_bits(),
+            words[3].to_bits(),
+            words[4].to_bits(),
+            words[5].to_bits()
         )
         .unwrap();
 

@@ -79,8 +79,12 @@ fast path.
    - `L4 = RN(L − L1 − L2 − L3)`.
 
    So `|L − (L1 + L2 + L3 + L4)| < 2^−206` (*generated*).
-   - **Fast path:** `r1 = x − n·L1` is exact (Sterbenz, as in [Tang] §5.1, for
-     `n ≠ 0`; `r1 = x` for `n = 0`). `(p2, e2) = two_prod(n, L2)` is exact.
+   - **Fast path:** `r1 = x − n·L1` is exact: `r1 = x` for `n = 0`; otherwise
+     `|x| ≥ 2^−9`, so `x` and `n·L1` are both multiples of
+     `2^min(cexp(x), −42) ≥ 2^−61`, and `|r1| < 2^−8` needs at most 53 bits at
+     that quantum. (Sterbenz's lemma, as in [Tang] §5.1, would need
+     `x ≥ n·L1/2`, which a tie at `n = ±1` can miss.) `(p2, e2) = two_prod(n, L2)`
+     is exact.
      Then `r` is the double-word `(r_hi, r_lo)`:
      ```
      (s, t) = two_sum(r1, −p2)
@@ -95,6 +99,17 @@ fast path.
      `RN(n·L4)` are summed in 128-bit arithmetic (§5).
 
 Then `e^x = 2^k · T_j · e^r`.
+
+**Machine-checked:** `formal/exp/ExpReduction.v` transcribes `Reduced::of` on
+binary64 and proves steps 1–4 for every `x` in `[−745.1333, 709.79]` (the
+domain past the overflow and underflow thresholds) and every `L` within
+`2^−206` of `L1 + L2 + L3 + L4` (`reduce_ok`): `n` is an integer with
+`|n| ≤ 137,601`, `r1` and `p2 + e2` are exact, `|x − n·L| ≤ 0.0027077`, and
+`(r_hi, r_lo)` is within `2^−113` of it. The last bound is
+`formal/exp/reduction.g`'s theorem, applied through Gappa's Coq proof. The
+formal job compares the transcription with the Rust code bit for bit on the
+internal cross-check corpus: arguments across the domain, at ties of `x/L`, and
+tiny.
 
 ## 4. Fast path
 
