@@ -137,6 +137,31 @@ Proof.
       apply Z.log2_lt_pow2 in Lg; [ | exact P]. lia.
 Qed.
 
+(** A finite binary64 number's encoding converts to its value. *)
+Lemma bits_exp_ok (f : binary_float 53 1024) : is_finite 53 1024 f = true ->
+  ((bits_of_b64 f / 2 ^ 52) mod 2 ^ 11 <> 2047)%Z.
+Proof.
+  intros F. pose proof (split_bits_of_binary_float_correct 52 11 eq_refl eq_refl f) as S.
+  unfold split_bits in S. change (bits_of_binary_float 52 11 f) with (bits_of_b64 f) in S.
+  destruct f as [s | s | s pl Hpl | s mx ex Hb]; try discriminate F.
+  - clear S. destruct s; vm_compute; discriminate.
+  - pose proof Hb as Hb'. unfold bounded in Hb'. apply andb_prop in Hb'. destruct Hb' as [_ Hb'].
+    apply Zle_bool_imp_le in Hb'.
+    (* Project the exponent field without unfolding the encoding. *)
+    apply (f_equal snd) in S. unfold split_bits_of_binary_float in S. cbv beta zeta in S.
+    destruct (0 <=? Z.pos mx - 2 ^ 52)%Z; cbv beta iota delta [snd] in S; rewrite S.
+    all: cbn in Hb' |- *; lia.
+Qed.
+
+Lemma from_f64_b64 (f : binary_float 53 1024) : is_finite 53 1024 f = true ->
+  Q128.qval (Q128.from_f64 (bits_of_b64 f)) = B2R 53 1024 f.
+Proof.
+  intros F. rewrite Q128.from_f64_ok.
+  - unfold b64_of_bits, bits_of_b64. f_equal. apply binary_float_of_bits_of_binary_float.
+  - exact (bits_of_binary_float_range 52 11 eq_refl eq_refl f).
+  - exact (bits_exp_ok f F).
+Qed.
+
 Lemma bpow_m (k : nat) : bpow radix2 (- Z.of_nat k) = / 2 ^ k.
 Proof. rewrite bpow_opp, bpow_powerRZ, <- pow_powerRZ. reflexivity. Qed.
 
