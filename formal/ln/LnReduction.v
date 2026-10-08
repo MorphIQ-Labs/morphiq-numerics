@@ -138,3 +138,96 @@ Proof.
       change (bpow radix2 53) with 9007199254740992. field.
     + lia.
 Qed.
+
+(** The table intervals lie in [[0.70703125, 1.4140625]]. *)
+Lemma ln_range i : (i < 128)%nat -> 0.70703125 <= ln_lo i /\ ln_hi i <= 1.4140625 /\ ln_lo i < ln_hi i.
+Proof.
+  intros H. unfold ln_lo, ln_hi. rewrite S_INR.
+  assert (I0 : 0 <= INR i) by apply pos_INR.
+  assert (I1 : INR i <= 127) by (replace 127 with (INR 127) by (rewrite INR_IZR_INZ; reflexivity); apply le_INR; lia).
+  destruct (Nat.ltb_spec i 53) as [S | S].
+  - assert (INR i <= 52) by (replace 52 with (INR 52) by (rewrite INR_IZR_INZ; reflexivity); apply le_INR; lia). lra.
+  - assert (53 <= INR i) by (replace 53 with (INR 53) by (rewrite INR_IZR_INZ; reflexivity); apply le_INR; lia). lra.
+Qed.
+
+(** A power of two by its encoding. *)
+Lemma pow2_bits b : (1 <= b <= 2046)%Z ->
+  finite (b64_of_bits (Z.lor (Z.shiftl b 52) 0)) /\ B (b64_of_bits (Z.lor (Z.shiftl b 52) 0)) = bpow radix2 (b - 1023).
+Proof.
+  intros Hb. destruct (build b 0 Hb ltac:(lia)) as [F V]. split; [exact F | ]. rewrite V.
+  change (IZR (0 + 2 ^ 52)) with (bpow radix2 52). rewrite <- bpow_plus. f_equal. ring.
+Qed.
+
+Lemma c_one_ok : finite c_one /\ B c_one = 1.
+Proof. exact (pow2_bits 1023 ltac:(lia)). Qed.
+
+Lemma c_two_54_ok : finite c_two_54 /\ B c_two_54 = bpow radix2 54.
+Proof. exact (pow2_bits 1077 ltac:(lia)). Qed.
+
+Lemma c_min_pos_ok : finite c_min_pos /\ B c_min_pos = bpow radix2 (-1022).
+Proof. exact (pow2_bits 1 ltac:(lia)). Qed.
+
+(** [Reduced::of]: [x = 2^E·y] with [y] in table interval [i], for every
+    finite [x > 0]. *)
+Theorem reduce_ok x : finite x -> 0 < B x ->
+  let '(e, i, y, r) := reduce x in
+  (i < 128)%nat /\ r = ln_r i /\ finite y /\ ln_lo i <= B y < ln_hi i /\ on_grid (-53) (B y) /\
+  B x = bpow radix2 e * B y /\ (-1074 <= e <= 1024)%Z.
+Proof.
+  intros Fx Px. destruct c_min_pos_ok as [Fm Bm]. destruct c_two_54_ok as [F54 B54].
+  unfold reduce. rewrite (Bcompare_correct 53 1024 x c_min_pos Fx Fm), Bm.
+  destruct (Rcompare_spec (B x) (bpow radix2 (-1022))) as [L | E | G].
+  - (* subnormal: scaled by 2^54, exactly *)
+    assert (Gx : on_grid (-1074) (B x)).
+    { apply (grid_le (cexp radix2 (FLT_exp emin prec) (B x))).
+      - unfold cexp, FLT_exp, emin. lia.
+      - apply grid_fmt. apply B_fmt. }
+    destruct Gx as [m Hm].
+    pose proof (bpow_gt_0 radix2 (-1074)) as P1074.
+    assert (M1 : (1 <= m)%Z).
+    { cut (0 < m)%Z; [lia | ]. apply lt_IZR. apply Rmult_lt_reg_r with (bpow radix2 (-1074)); [exact P1074 | ].
+      rewrite <- Hm, Rmult_0_l. exact Px. }
+    assert (M2 : (m < 2 ^ 52)%Z).
+    { apply lt_IZR. apply Rmult_lt_reg_r with (bpow radix2 (-1074)); [exact P1074 | ].
+      rewrite <- Hm. change (IZR (2 ^ 52)) with (bpow radix2 52). rewrite <- bpow_plus. exact L. }
+    assert (Fmt : generic_format radix2 (FLT_exp (-1074) 53) (B x * B c_two_54)).
+    { rewrite B54, Hm, Rmult_assoc, <- bpow_plus. apply generic_format_FLT.
+      exists (Float radix2 m (-1074 + 54)); [reflexivity | simpl; lia | simpl; lia]. }
+    assert (Ov : Rabs (B x * B c_two_54) < bpow radix2 1024).
+    { rewrite B54, Rabs_pos_eq by (pose proof (bpow_gt_0 radix2 54); nra).
+      apply Rlt_trans with (bpow radix2 (-1022) * bpow radix2 54); [apply Rmult_lt_compat_r; [apply bpow_gt_0 | exact L] | ].
+      rewrite <- bpow_plus. apply bpow_lt. lia. }
+    destruct (RoundingTest.fmul_exact x c_two_54 Fx F54 Fmt Ov) as [Fv Bv].
+    assert (Hv : bpow radix2 (-1022) <= B (fmul x c_two_54)).
+    { rewrite Bv, B54, Hm, Rmult_assoc, <- bpow_plus.
+      apply Rle_trans with (1 * bpow radix2 (-1074 + 54)).
+      - rewrite Rmult_1_l. apply bpow_le. lia.
+      - apply Rmult_le_compat_r; [apply bpow_ge_0 | apply IZR_le; exact M1]. }
+    pose proof (core (fmul x c_two_54) 54 Fv Hv) as C.
+    cbv beta iota zeta in C |- *.
+    match goal with |- context [if ?c then ?a else ?b] => destruct (if c then a else b) as [y e] end.
+    destruct C as [Li [Fy [[Iy1 Iy2] [Gy [Ev Er]]]]].
+    destruct (ln_range _ Li) as [R1 [R2 _]].
+    assert (Ex : B x = bpow radix2 e * B y).
+    { apply Rmult_eq_reg_r with (bpow radix2 54); [ | apply Rgt_not_eq, bpow_gt_0].
+      rewrite <- B54, <- Bv, Ev, bpow_plus, B54. ring. }
+    repeat split; try reflexivity; try assumption; try lia.
+    (* 2^E·y >= 2^-1074 with y < 2, so E >= -1074 *)
+    cut (-1075 < e)%Z; [lia | ]. apply (lt_bpow radix2).
+    assert (X : bpow radix2 (-1074) <= B x).
+    { rewrite Hm. rewrite <- (Rmult_1_l (bpow radix2 (-1074))) at 1. apply Rmult_le_compat_r; [lra | apply IZR_le; lia]. }
+    assert (B2 : bpow radix2 (-1074) = 2 * bpow radix2 (-1075)).
+    { change 2 with (bpow radix2 1). rewrite <- bpow_plus. reflexivity. }
+    pose proof (bpow_gt_0 radix2 e). pose proof (bpow_gt_0 radix2 (-1075)). nra.
+  - (* normal *)
+    pose proof (core x 0 Fx (Req_le _ _ (eq_sym E))) as C.
+    cbv beta iota zeta in C |- *.
+    match goal with |- context [if ?c then ?a else ?b] => destruct (if c then a else b) as [y e] end.
+    destruct C as [Li [Fy [[Iy1 Iy2] [Gy [Ev Er]]]]]. rewrite Z.add_0_r in Ev, Er.
+    repeat split; try reflexivity; try assumption; lia.
+  - pose proof (core x 0 Fx (Rlt_le _ _ G)) as C.
+    cbv beta iota zeta in C |- *.
+    match goal with |- context [if ?c then ?a else ?b] => destruct (if c then a else b) as [y e] end.
+    destruct C as [Li [Fy [[Iy1 Iy2] [Gy [Ev Er]]]]]. rewrite Z.add_0_r in Ev, Er.
+    repeat split; try reflexivity; try assumption; lia.
+Qed.
