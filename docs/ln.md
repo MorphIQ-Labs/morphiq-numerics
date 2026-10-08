@@ -102,6 +102,23 @@ bits.**
 `2^−63`. So `z` is `0` or `|z| ≥ 2^−63`, and `|z_hi| ≥ 2^−64`. The certificates
 assume that range (§4).
 
+**Machine-checked:** `formal/ln/LnReduction.v` transcribes `Reduced::of`,
+`Reduced::z` and `Reduced::z_exact` on binary64 and the proved `Q128`
+transcription, and proves them.
+- **`reduce_ok`:** for every finite `x > 0`, subnormals included, `x = 2^E·y`
+  exactly, with `y` in table interval `i`, on `2^−53`'s grid, and
+  `−1,074 ≤ E ≤ 1,024`. The proof reads the fields from `x`'s encoding as the
+  code does.
+- **`z_ok`:** `(z_hi, z_lo)` is `y·R[i] − 1` exactly, a double-word with
+  `|z_lo| ≤ 2^−53·|z_hi|`, `|z| ≤ 2^−7`, and either zero or
+  `|z_hi| ≥ 2^−63`.
+- **`z_exact_ok`:** `z_exact` is the same value in `Q128`, normalized or zero.
+
+`formal/ln/LnTables.v`, which `generators/ln_constants.py` writes with the
+tables, proves each `R[i]` from its encoding: on `2^−10`'s grid, and within
+`2^−7` of `1/y` at both ends of its interval. The formal job compares the
+reduction with the Rust code bit for bit on the internal cross-check corpus.
+
 **The three cases** for the error analysis. Each certificate is relative to
 `ln x`, so it needs each term's size over `ln x`:
 - **A:** `E = 0` and `R[i] = 1`. Then `ln x = ln(1 + z)`, with no other term.
