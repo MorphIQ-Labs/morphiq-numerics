@@ -81,6 +81,12 @@ impl Reduced {
         [self.n, self.r1, self.p2, self.e2, self.r.hi(), self.r.lo()]
     }
 
+    /// `(j, k)`, for the internal cross-check.
+    #[cfg(test)]
+    pub(crate) fn jk(&self) -> (usize, i32) {
+        (self.j, self.k)
+    }
+
     /// §3, steps 1–4.
     pub(crate) fn of(x: f64) -> Self {
         let n = (x * INV_L + SHIFTER) - SHIFTER;

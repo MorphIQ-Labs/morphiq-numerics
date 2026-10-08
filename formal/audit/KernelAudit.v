@@ -4,11 +4,15 @@
     their global axioms to be among formal/axioms.expected and, for the
     constants CoqInterval proves, formal/axioms.int63.expected. *)
 
-Require ExpTables ExpReduction ExpFast.
+Require ExpTables ExpReduction ExpFast ExpAccurate.
 
 Print Assumptions ExpTables.exp_l_split.
 Print Assumptions ExpTables.exp_poly_approx.
 Print Assumptions ExpTables.exp_table_ok.
+Print Assumptions ExpTables.exp_tq_table_ok.
+Print Assumptions ExpTables.exp_recip_table_ok.
 Print Assumptions ExpReduction.reduce_ok.
 Print Assumptions ExpFast.fast_ok.
 Print Assumptions ExpFast.exp_fast_ok.
+Print Assumptions ExpAccurate.accurate_ok.
+Print Assumptions ExpAccurate.exp_accurate_ok.

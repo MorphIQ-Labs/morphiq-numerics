@@ -200,7 +200,7 @@ def coq_tables(l_split, poly, poly_bound, table_dw, table_q, reciprocals):
         lines += [
             f'Lemma exp_t_ok_{j} : exp_t_ok {j}.',
             'Proof.',
-            f'  unfold exp_t_ok, exp_t_hi, exp_t_lo; cbn [nth fst snd exp_t_bits].',
+            f'  unfold exp_t_ok; change (exp_t_hi {j}) with (b64_of_bits {h}); change (exp_t_lo {j}) with (b64_of_bits {l}).',
             f'  split; [exact ({fin[0]}) | split; [exact ({fin[1]}) | ]].',
             f'  rewrite {rw[0]}, {rw[1]}; cbn [cond_Zopp].',
             f'  split; [{grid[0]} | split; [{grid[1]} | ]].',
@@ -236,10 +236,10 @@ def coq_tables(l_split, poly, poly_bound, table_dw, table_q, reciprocals):
         lines += [
             f'Lemma exp_tq_ok_{j} : exp_tq_ok {j}.',
             'Proof.',
-            '  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].',
+            f'  unfold exp_tq_ok; change (exp_tq {j}) with {m}%Z.',
             '  split; [lia | ].',
             f'  rewrite INR_IZR_INZ; change (Z.of_nat {j}) with {j}%Z.',
-            '  interval with (i_prec 200).',
+            '  interval with (i_prec 140).',
             'Qed.',
         ]
     lines += [
@@ -269,10 +269,10 @@ def coq_tables(l_split, poly, poly_bound, table_dw, table_q, reciprocals):
         lines += [
             f'Lemma exp_recip_ok_{i} : exp_recip_ok {i}.',
             'Proof.',
-            '  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].',
+            f'  unfold exp_recip_ok; change (exp_recip {i}) with ({m}%Z, {-e}%nat); cbn [fst snd].',
             '  split; [lia | ].',
             f'  rewrite INR_IZR_INZ; change (Z.of_nat {i}) with {i}%Z.',
-            '  interval with (i_prec 200).',
+            '  interval with (i_prec 140).',
             'Qed.',
         ]
     lines += [

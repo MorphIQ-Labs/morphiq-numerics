@@ -1,9 +1,9 @@
 //! Writes the internal cross-check corpus: `Q128` and `Q256` operations, the
-//! rounding tests (`ln::decide_with`, `exp::decide_scaled`), `exp`'s reduction
-//! and its fast value (`exp::fast_at`) on reproducible inputs, with this crate's
-//! results. `scripts/check_formal.sh` runs the proved transcriptions
-//! (`formal/q`, `formal/binary64/RoundingTest.v`, `formal/exp/ExpReduction.v`
-//! and `formal/exp/ExpFast.v`, extracted by
+//! rounding tests (`ln::decide_with`, `exp::decide_scaled`), `exp`'s reduction,
+//! fast value (`exp::fast_at`) and accurate path (`Reduced::accurate_value`) on
+//! reproducible inputs, with this crate's results. `scripts/check_formal.sh`
+//! runs the proved transcriptions (`formal/q`, `formal/binary64/RoundingTest.v`,
+//! `formal/exp/ExpReduction.v`, `ExpFast.v` and `ExpAccurate.v`, extracted by
 //! `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
 //! identical results, which ties the proofs to this code.
 //!
@@ -214,6 +214,16 @@ fn internal_crosscheck_corpus() {
             words[5].to_bits(),
             y.hi().to_bits(),
             y.lo().to_bits()
+        )
+        .unwrap();
+        // The accurate path's 128-bit value at the same argument.
+        let reduced = crate::exp::Reduced::of(x);
+        let (j, k) = reduced.jk();
+        writeln!(
+            out,
+            "accurate {:016x} {j} {k} : {}",
+            x.to_bits(),
+            q128(reduced.accurate_value())
         )
         .unwrap();
 
