@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """The constants of ln and ln_1p (docs/ln.md), with their errors.
 
-Writes crates/morphiq-numerics/src/ln/tables.rs; with --check, fails if the
-committed file differs from a fresh generation. Needs mpmath
+Writes crates/morphiq-numerics/src/ln/tables.rs and formal/ln/LnTables.v; with
+--check, fails if a committed file differs from a fresh generation. Needs mpmath
 (generators/requirements.txt). Every value is computed from its definition with
 mpmath at 600 bits and rounded once, in integer arithmetic; each error is
 checked against the bound docs/ln.md relies on.
@@ -40,8 +40,11 @@ import sys
 
 import mpmath
 
+from exp_constants import decode
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'crates/morphiq-numerics/src/ln/tables.rs'
+COQ_OUTPUT = ROOT / 'formal/ln/LnTables.v'
 POLY = ROOT / 'generators/ln_poly.out'
 PREC = 600
 Z_MAX = mpmath.mpf(2) ** -7
@@ -243,17 +246,100 @@ def generate():
         *[f'    {f(c)},' for c in poly],
         '];',
     ]
+    return {OUTPUT: '\n'.join(lines) + '\n', COQ_OUTPUT: coq_tables(r)}
+
+
+def coq_tables(r):
+    """formal/ln/LnTables.v: the reduction's reciprocals and what the proofs
+    take about them, each entry proved from its encoding."""
+    lines = [
+        '(** Constants of [ln]\'s reduction, written by generators/ln_constants.py; do',
+        '    not edit. Each is given by its binary64 encoding, as in',
+        '    crates/morphiq-numerics/src/ln/tables.rs, with what the proofs take about',
+        '    it (docs/ln.md, section 3). *)',
+        '',
+        'From Coq Require Import Reals ZArith List Lia Lra.',
+        'From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.',
+        'From Binary64 Require Import IEEE64 Grid Encodings.',
+        'Import ListNotations.',
+        '',
+        'Open Scope R_scope.',
+        '',
+        '(** Table interval [i]: the significand [m] in [[1 + i/128, 1 + (i+1)/128)],',
+        '    and [y = m] for [i < 53], [y = m/2] otherwise. *)',
+        'Definition ln_lo (i : nat) : R := if (i <? 53)%nat then 1 + INR i / 128 else (1 + INR i / 128) / 2.',
+        'Definition ln_hi (i : nat) : R := if (i <? 53)%nat then 1 + INR (S i) / 128 else (1 + INR (S i) / 128) / 2.',
+        '',
+        '(** [R[i]], the reduction\'s reciprocals, by their encodings. *)',
+        'Definition ln_r_bits : list Z := [',
+        *[f'  {to_bits(v)}%Z{";" if i < 127 else ""}' for i, v in enumerate(r)],
+        '].',
+        'Definition ln_r (i : nat) : f64 := b64_of_bits (nth i ln_r_bits 0%Z).',
+        '',
+        '(** Each [R[i]] is a binary64 number on [2^-10]\'s grid between [1/2] and [2],',
+        '    and [|y·R[i] - 1| <= 2^-7] over its interval: [y·R[i]] is increasing in',
+        '    [y], so the endpoints decide it. *)',
+        'Definition ln_r_ok (i : nat) : Prop :=',
+        '  finite (ln_r i) /\\ on_grid (-10) (B (ln_r i)) /\\ / 2 <= B (ln_r i) <= 2 /\\',
+        '  1 - / 128 <= ln_lo i * B (ln_r i) /\\ ln_hi i * B (ln_r i) <= 1 + / 128.',
+        '',
+    ]
+    for i, v in enumerate(r):
+        bits = to_bits(v)
+        s, m, k = decode(bits)
+        assert s == 0
+        n = Fraction(m, 2 ** k) * 1024
+        assert n.denominator == 1, 'on 2^-10\'s grid'
+        lines += [
+            f'Lemma ln_r_ok_{i} : ln_r_ok {i}.',
+            'Proof.',
+            f'  unfold ln_r_ok, ln_lo, ln_hi. change (ln_r {i}) with (b64_of_bits {bits}).',
+            f'  split; [exact (bits_finite {bits} _ _ _ eq_refl) | ].',
+            f'  rewrite (bits_val {bits} false {m} {k} eq_refl). cbn [SpecFloat.cond_Zopp].',
+            f'  replace (2 ^ {k}) with {2 ** k} by ring.',
+            f'  replace (INR {i}) with {i} by (rewrite INR_IZR_INZ; reflexivity).',
+            f'  replace (INR (S {i})) with {i + 1} by (rewrite INR_IZR_INZ; reflexivity).',
+            '  cbv [Nat.ltb Nat.leb].',
+            f'  split; [exists {n.numerator}%Z; change (bpow radix2 (-10)) with (/ 1024); lra | ].',
+            '  repeat split; lra.',
+            'Qed.',
+        ]
+    lines += [
+        '',
+        'Theorem ln_r_table_ok i : (i < 128)%nat -> ln_r_ok i.',
+        'Proof.',
+        '  intros H.',
+        *[f'  destruct i as [|i]; [exact ln_r_ok_{i} | ].' for i in range(128)],
+        '  lia.',
+        'Qed.',
+        '',
+        '(** [R[0] = R[127] = 1]: arguments near 1 reduce with no table term. *)',
+        'Lemma ln_r_ends : B (ln_r 0) = 1 /\\ B (ln_r 127) = 1.',
+        'Proof.',
+        '  split.',
+    ]
+    for i in (0, 127):
+        bits = to_bits(r[i])
+        _, m, k = decode(bits)
+        assert r[i] == 1.0
+        lines += [
+            f'  - change (ln_r {i}) with (b64_of_bits {bits}).',
+            f'    rewrite (bits_val {bits} false {m} {k} eq_refl). cbn [SpecFloat.cond_Zopp].',
+            f'    replace (2 ^ {k}) with {2 ** k} by ring. lra.',
+        ]
+    lines += ['Qed.']
     return '\n'.join(lines) + '\n'
 
 
 def main():
-    data = generate()
-    if '--check' in sys.argv[1:]:
-        if OUTPUT.read_text() != data:
-            sys.exit(f'{OUTPUT} differs from a fresh generation')
-        return
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(data)
+    check = '--check' in sys.argv[1:]
+    for path, text in generate().items():
+        if check:
+            if path.read_text() != text:
+                sys.exit(f'{path} differs from a fresh generation')
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
 
 
 if __name__ == '__main__':
