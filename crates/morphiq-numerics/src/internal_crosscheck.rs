@@ -1,12 +1,14 @@
 //! Writes the internal cross-check corpus: `Q128` and `Q256` operations, the
 //! rounding tests (`ln::decide_with`, `exp::decide_scaled`), `exp`'s reduction,
 //! fast value (`exp::fast_at`), accurate path (`Reduced::accurate_value`) and
-//! small-argument path (`exp::small_parts`, `exp::small`) on reproducible
-//! inputs, with this crate's results. `scripts/check_formal.sh` runs the proved
+//! small-argument path (`exp::small_parts`, `exp::small`), and `ln`'s
+//! reduction (`ln::Reduced::of`, `z`, `z_exact`) on reproducible inputs, with
+//! this crate's results. `scripts/check_formal.sh` runs the proved
 //! transcriptions (`formal/q`, `formal/binary64/RoundingTest.v`,
-//! `formal/exp/ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v` and `ExpSmall.v`,
-//! extracted by `formal/extraction/InternalCrosscheck.v`) on the same inputs
-//! and requires identical results, which ties the proofs to this code.
+//! `formal/exp/ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v`, `ExpSmall.v` and
+//! `formal/ln/LnReduction.v`, extracted by
+//! `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
+//! identical results, which ties the proofs to this code.
 //!
 //! Ignored by default; run with the output path in `MORPHIQ_INTERNAL_CORPUS`:
 //! `cargo test -p morphiq-numerics --lib internal_crosscheck -- --ignored`.
@@ -138,6 +140,29 @@ fn reduction_argument(rng: &mut SplitMix64) -> f64 {
     }
 }
 
+/// An argument of `ln`'s reduction: any positive finite encoding, a
+/// subnormal, near 1 (`R[i] = 1`), or at a table interval's edge.
+fn ln_argument(rng: &mut SplitMix64) -> f64 {
+    match rng.next_u64() % 4 {
+        0 => f64::from_bits(1 + rng.next_u64() % 0x7fef_ffff_ffff_ffff),
+        1 => f64::from_bits(1 + rng.next_u64() % ((1 << 52) - 1)),
+        2 => 1.0 + (unit(rng) - 0.5) * f64::from_bits(0x3f90_0000_0000_0000),
+        _ => {
+            // 1 + i/128, or the number below it, scaled.
+            let edge = 1.0
+                + f64::from_bits(0x3f80_0000_0000_0000)
+                    * f64::from(u32::try_from(rng.next_u64() % 128).unwrap());
+            let edge = if rng.next_u64() & 1 == 1 {
+                f64::from_bits(edge.to_bits() - 1)
+            } else {
+                edge
+            };
+            let e = i32::try_from(rng.next_u64() % 2000).unwrap() - 1000;
+            edge * f64::from_bits(u64::try_from(1023 + e).unwrap() << 52)
+        }
+    }
+}
+
 #[test]
 #[ignore = "writes the internal cross-check corpus for scripts/check_formal.sh"]
 fn internal_crosscheck_corpus() {
@@ -239,6 +264,23 @@ fn internal_crosscheck_corpus() {
             h.to_bits(),
             q128(w),
             crate::exp::small(x).to_bits()
+        )
+        .unwrap();
+        // ln's reduction: E, i, y, R[i], the double-word z and z in Q128.
+        let x = ln_argument(&mut rng);
+        let reduced = crate::ln::Reduced::of(x);
+        let (i, y, r) = reduced.parts();
+        let z = reduced.z();
+        writeln!(
+            out,
+            "ln_reduce {:016x} : {} {i} {:016x} {:016x} {:016x} {:016x} {}",
+            x.to_bits(),
+            reduced.e,
+            y.to_bits(),
+            r.to_bits(),
+            z.hi().to_bits(),
+            z.lo().to_bits(),
+            q128(reduced.z_exact())
         )
         .unwrap();
 

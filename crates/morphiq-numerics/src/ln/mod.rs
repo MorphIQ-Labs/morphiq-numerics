@@ -115,6 +115,12 @@ pub(crate) struct Reduced {
 }
 
 impl Reduced {
+    /// `(i, y, R[i])`, for the internal cross-check.
+    #[cfg(test)]
+    pub(crate) fn parts(&self) -> (usize, f64, f64) {
+        (self.i, self.y, self.r)
+    }
+
     /// §3, steps 1–3, for finite `x > 0`.
     pub(crate) fn of(x: f64) -> Self {
         let (bits, scaled) = if x < f64::MIN_POSITIVE {
@@ -157,9 +163,7 @@ impl Reduced {
     /// within `2^−64` of `ln y` (`formal/ln/fast_a.g` and `fast_b.g` with
     /// `E = 0`). Shared with `log2`.
     pub(crate) fn ln_y_fast(&self) -> DoubleWord {
-        // z = y·R[i] − 1 exactly: the product by two_prod, p − 1 by Sterbenz.
-        let (p, q) = two_prod(self.y, self.r);
-        let ln_1p_z = ln_1p_double_word(DoubleWord::sum(p - 1.0, q));
+        let ln_1p_z = ln_1p_double_word(self.z());
         let (n_hi, n_lo) = NEG_LN_R_BITS[self.i];
         DoubleWord::sum(f64::from_bits(n_hi), f64::from_bits(n_lo)).add(ln_1p_z)
     }
@@ -174,6 +178,13 @@ impl Reduced {
         }
         let (negative, m, e) = NEG_LN_R_Q128[self.i];
         Q128::new(negative, m, e).add(ln_1p_z)
+    }
+
+    /// `z = y·R[i] − 1` exactly, as a double-word (§3): the product by
+    /// `two_prod`, `p − 1` by Sterbenz's lemma.
+    pub(crate) fn z(&self) -> DoubleWord {
+        let (p, q) = two_prod(self.y, self.r);
+        DoubleWord::sum(p - 1.0, q)
     }
 
     /// `z = y·R[i] − 1` exactly, from the significands in integer arithmetic
