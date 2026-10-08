@@ -259,3 +259,30 @@ Proof.
     by (unfold s; rewrite <- Eb, <- Hd; ring).
   exact Br.
 Qed.
+
+(** The twelve levels: [H_1 = hq r 12] is within [521·2^-135] of the exact
+    partial series [X_1] at the same [r]. *)
+Theorem series_ok r : NZ r -> Rabs (Q128.qval r) <= 0.0027078 ->
+  NZ (hq r 12) /\ Rabs (Q128.qval (hq r 12) - xq (Q128.qval r) 12) <= 521 * / 2 ^ 135.
+Proof.
+  intros Nr Hr.
+  assert (S0 : NZ (hq r 0) /\ Rabs (Q128.qval (hq r 0) - xq (Q128.qval r) 0) <= 0).
+  { cbn [hq xq]. rewrite q_one_val, Rminus_diag_eq, Rabs_R0 by reflexivity. split; [exact q_one_nz | lra]. }
+  Ltac lvl Nr Hr c L Sin Sout :=
+    let N := fresh "N" in let E := fresh "E" in destruct Sin as [N E];
+    pose proof (step _ c _ _ _ Nr Hr ltac:(lia) ltac:(rewrite INR_IZR_INZ; reflexivity) L N E
+                     ltac:(interval with (i_prec 64))) as Sout.
+  lvl Nr Hr 0%nat ExpAccurateLevels.level_12 S0 S1.
+  lvl Nr Hr 1%nat ExpAccurateLevels.level_11 S1 S2.
+  lvl Nr Hr 2%nat ExpAccurateLevels.level_10 S2 S3.
+  lvl Nr Hr 3%nat ExpAccurateLevels.level_09 S3 S4.
+  lvl Nr Hr 4%nat ExpAccurateLevels.level_08 S4 S5.
+  lvl Nr Hr 5%nat ExpAccurateLevels.level_07 S5 S6.
+  lvl Nr Hr 6%nat ExpAccurateLevels.level_06 S6 S7.
+  lvl Nr Hr 7%nat ExpAccurateLevels.level_05 S7 S8.
+  lvl Nr Hr 8%nat ExpAccurateLevels.level_04 S8 S9.
+  lvl Nr Hr 9%nat ExpAccurateLevels.level_03 S9 S10.
+  lvl Nr Hr 10%nat ExpAccurateLevels.level_02 S10 S11.
+  lvl Nr Hr 11%nat ExpAccurateLevels.level_01 S11 S12.
+  exact S12.
+Qed.
