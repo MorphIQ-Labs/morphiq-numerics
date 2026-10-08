@@ -128,7 +128,7 @@ echo "certificates in Coq: $certificates proved"
 # The kernels' proofs, beside the certificates' modules they apply.
 cp formal/exp/*.v formal/audit/KernelAudit.v "$work/gappa/"
 (cd "$work/gappa" \
-  && for proof in ExpTables ExpReduction ExpFast ExpAccurateLevels ExpAccurate; do
+  && for proof in ExpTables ExpReduction ExpFast ExpAccurateLevels ExpAccurate ExpSmall; do
        coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" "$proof.v" || exit 1
      done \
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" KernelAudit.v) > "$work/kernel-audit.log"

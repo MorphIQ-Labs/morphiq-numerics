@@ -213,7 +213,7 @@ fn pow2(k: i32) -> f64 {
 /// §6, small arguments, `2^−54 ≤ |x| < 2^−30`: `RN(1 + x + d)` with
 /// `d = e^x − 1 − x` to degree 5 in `Q128` (certified in `formal/exp/small.g`),
 /// the rounding decided exactly.
-fn small(x: f64) -> f64 {
+pub(crate) fn small(x: f64) -> f64 {
     let (h, w) = small_parts(x);
     // RN(h + w): h, unless |w| reaches half the gap on w's side of h, which
     // [LM] keeps it from equalling.
@@ -234,7 +234,7 @@ fn small(x: f64) -> f64 {
 
 /// `e^x = h + w` within `2^−178` (§6, small arguments): `(h, l) = two_sum(1, x)`
 /// and `w = l + d`.
-fn small_parts(x: f64) -> (f64, Q128) {
+pub(crate) fn small_parts(x: f64) -> (f64, Q128) {
     let (h, l) = two_sum(1.0, x);
     let xq = Q128::from_f64(x);
     let g5 = Q128::ONE.add(xq.mul(reciprocal(5)));

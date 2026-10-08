@@ -1,11 +1,12 @@
 //! Writes the internal cross-check corpus: `Q128` and `Q256` operations, the
 //! rounding tests (`ln::decide_with`, `exp::decide_scaled`), `exp`'s reduction,
-//! fast value (`exp::fast_at`) and accurate path (`Reduced::accurate_value`) on
-//! reproducible inputs, with this crate's results. `scripts/check_formal.sh`
-//! runs the proved transcriptions (`formal/q`, `formal/binary64/RoundingTest.v`,
-//! `formal/exp/ExpReduction.v`, `ExpFast.v` and `ExpAccurate.v`, extracted by
-//! `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
-//! identical results, which ties the proofs to this code.
+//! fast value (`exp::fast_at`), accurate path (`Reduced::accurate_value`) and
+//! small-argument path (`exp::small_parts`, `exp::small`) on reproducible
+//! inputs, with this crate's results. `scripts/check_formal.sh` runs the proved
+//! transcriptions (`formal/q`, `formal/binary64/RoundingTest.v`,
+//! `formal/exp/ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v` and `ExpSmall.v`,
+//! extracted by `formal/extraction/InternalCrosscheck.v`) on the same inputs
+//! and requires identical results, which ties the proofs to this code.
 //!
 //! Ignored by default; run with the output path in `MORPHIQ_INTERNAL_CORPUS`:
 //! `cargo test -p morphiq-numerics --lib internal_crosscheck -- --ignored`.
@@ -224,6 +225,20 @@ fn internal_crosscheck_corpus() {
             "accurate {:016x} {j} {k} : {}",
             x.to_bits(),
             q128(reduced.accurate_value())
+        )
+        .unwrap();
+        // The small-argument path, 2^−54 ≤ |x| < 2^−30: h, w and the result.
+        let e = rng.next_u64() % 24;
+        let x = (1.0 + unit(&mut rng)) * f64::from_bits((1023 - 54 + e) << 52);
+        let x = if rng.next_u64() & 1 == 1 { -x } else { x };
+        let (h, w) = crate::exp::small_parts(x);
+        writeln!(
+            out,
+            "small {:016x} : {:016x} {} {:016x}",
+            x.to_bits(),
+            h.to_bits(),
+            q128(w),
+            crate::exp::small(x).to_bits()
         )
         .unwrap();
 

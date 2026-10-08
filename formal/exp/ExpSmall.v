@@ -137,21 +137,21 @@ Proof.
   destruct (mul_m xq _ Nx N5) as [Nb5 [m5 [Hm5 Eb5]]].
   rewrite Vx, V5 in Eb5.
   assert (Bb5 : Rabs (Q128.qval (Q128.mul xq (ExpAccurate.q_recip 5))) <= 1)
-    by (rewrite Eb5; interval).
+    by (rewrite Eb5; interval with (i_prec 64)).
   destruct (one_plus _ Nb5 Bb5) as [Ng5 [s5 [Hs5 Eg5]]]. fold g5 in Ng5, Eg5. rewrite Eb5 in Eg5.
-  assert (G5 : 0.9 <= Q128.qval g5 <= 1.1) by (rewrite Eg5; apply Rabs_le_inv in Hs5; split; interval).
+  assert (G5 : 0.9 <= Q128.qval g5 <= 1.1) by (rewrite Eg5; apply Rabs_le_inv in Hs5; split; interval with (i_prec 64)).
   (* g4 *)
   destruct (mul_m xq _ Nx N4) as [Na4 [m4a [Hm4a Ea4]]]. rewrite Vx, V4 in Ea4.
   destruct (mul_m _ g5 Na4 Ng5) as [Nb4 [m4b [Hm4b Eb4]]]. rewrite Ea4 in Eb4.
   assert (Bb4 : Rabs (Q128.qval (Q128.mul (Q128.mul xq (ExpAccurate.q_recip 4)) g5)) <= 1)
-    by (rewrite Eb4; interval).
+    by (rewrite Eb4; interval with (i_prec 64)).
   destruct (one_plus _ Nb4 Bb4) as [Ng4 [s4 [Hs4 Eg4]]]. fold g4 in Ng4, Eg4. rewrite Eb4 in Eg4.
-  assert (G4 : 0.9 <= Q128.qval g4 <= 1.1) by (rewrite Eg4; apply Rabs_le_inv in Hs4; split; interval).
+  assert (G4 : 0.9 <= Q128.qval g4 <= 1.1) by (rewrite Eg4; apply Rabs_le_inv in Hs4; split; interval with (i_prec 64)).
   (* g3 *)
   destruct (mul_m xq _ Nx N3) as [Na3 [m3a [Hm3a Ea3]]]. rewrite Vx, V3 in Ea3.
   destruct (mul_m _ g4 Na3 Ng4) as [Nb3 [m3b [Hm3b Eb3]]]. rewrite Ea3 in Eb3.
   assert (Bb3 : Rabs (Q128.qval (Q128.mul (Q128.mul xq (ExpAccurate.q_recip 3)) g4)) <= 1)
-    by (rewrite Eb3; interval).
+    by (rewrite Eb3; interval with (i_prec 64)).
   destruct (one_plus _ Nb3 Bb3) as [Ng3 [s3 [Hs3 Eg3]]]. fold g3 in Ng3, Eg3. rewrite Eb3 in Eg3.
   (* d *)
   destruct (mul_m xq xq Nx Nx) as [Na2 [m2a [Hm2a Ea2]]]. rewrite Vx in Ea2.
@@ -189,7 +189,7 @@ Proof.
   assert (B1 : B ExpFast.c_one = 1).
   { rewrite ExpFast.c_one_val. assert (E : 2 ^ 52 = 4503599627370496) by ring. rewrite E. field. }
   assert (P1 : 1 <= bpow radix2 1020) by (change 1 with (bpow radix2 0); apply bpow_le; lia).
-  assert (U30 : / 2 ^ 30 < / 1000) by interval.
+  assert (U30 : / 2 ^ 30 < / 1000) by interval with (i_prec 64).
   pose proof (two_sum_ieee ExpFast.c_one x ExpFast.c_one_finite Fx
                 ltac:(rewrite B1, Rabs_R1; exact P1) ltac:(lra)) as TS.
   destruct (two_sum64 ExpFast.c_one x) as [h l]. destruct TS as [Fh [Fl [Bh Bhl]]].
@@ -205,7 +205,7 @@ Proof.
     pose proof (rnd_rel (1 + v) Z1) as R. rewrite (Rabs_pos_eq (1 + v)) in R by lra.
     change (bpow radix2 (-53)) with (bpow radix2 (- Z.of_nat 53)) in R. rewrite ExpAccurate.bpow_m in R.
     exact R. }
-  assert (U53 : / 2 ^ 53 < / 1000) by interval.
+  assert (U53 : / 2 ^ 53 < / 1000) by interval with (i_prec 64).
   apply Rabs_le_inv in Hr.
   assert (Hh : 0.99 < B h < 1.01) by (split; nra).
   destruct (ulp_range (B h) ltac:(lra)) as [Ul Uu].
@@ -218,9 +218,9 @@ Proof.
   (* d *)
   assert (Dpos : 0 < D).
   { unfold D, Dpoly.
-    assert (F : 0.9 <= 1 + v / 3 * (1 + v / 4 * (1 + v / 5)) <= 1.1) by (split; interval).
+    assert (F : 0.9 <= 1 + v / 3 * (1 + v / 4 * (1 + v / 5)) <= 1.1) by (split; interval with (i_prec 64)).
     assert (0 < v * v) by (apply Rsqr_pos_lt; exact Hx0). nra. }
-  assert (Db : D <= / 2 ^ 61 * 1.1) by (unfold D, Dpoly; interval).
+  assert (Db : D <= / 2 ^ 61 * 1.1) by (unfold D, Dpoly; interval with (i_prec 64)).
   assert (E2 : Rabs (Q128.qval d - D) <= / 2 ^ 122 * D).
   { replace (Q128.qval d - D) with ((Q128.qval d - D) / D * D) by (field; lra).
     rewrite Rabs_mult, (Rabs_pos_eq D) by lra. apply Rmult_le_compat_r; lra. }
@@ -232,9 +232,9 @@ Proof.
     by (unfold ExpAccurate.qf; rewrite ExpAccurate.from_f64_b64 by exact Fl; reflexivity).
   destruct (ExpAccurate.add_any _ _ Nl Nd) as [Nw E1]. rewrite Vl in E1.
   change (bpow radix2 (-126)) with (bpow radix2 (- Z.of_nat 126)) in E1. rewrite ExpAccurate.bpow_m in E1.
-  assert (U122 : / 2 ^ 122 < / 1000) by interval.
+  assert (U122 : / 2 ^ 122 < / 1000) by interval with (i_prec 64).
   assert (Qd : Rabs (Q128.qval d) <= / 2 ^ 53).
-  { apply Rabs_le_inv in E2. assert (/ 2 ^ 61 * 1.1 * (1 + / 1000) <= / 2 ^ 53) by interval.
+  { apply Rabs_le_inv in E2. assert (/ 2 ^ 61 * 1.1 * (1 + / 1000) <= / 2 ^ 53) by interval with (i_prec 64).
     apply Rabs_le. nra. }
   assert (Mx : Rmax (Rabs (B l)) (Rabs (Q128.qval d)) <= / 2 ^ 53) by (apply Rmax_lub; lra).
   assert (E1' : Rabs (Q128.qval (Q128.add (ExpAccurate.qf l) d) - (B l + Q128.qval d)) <= / 2 ^ 179).
@@ -244,8 +244,8 @@ Proof.
   set (w := Q128.add (ExpAccurate.qf l) d) in *.
   assert (E2' : Rabs (Q128.qval d - D) <= / 2 ^ 122 * (/ 2 ^ 61 * 1.1)).
   { apply Rle_trans with (1 := E2). apply Rmult_le_compat_l; [apply Rlt_le, Rinv_0_lt_compat, pow_lt; lra | exact Db]. }
-  assert (S1 : / 2 ^ 179 + / 2 ^ 122 * (/ 2 ^ 61 * 1.1) + / 2 ^ 189 <= / 2 ^ 178) by interval.
-  assert (S2 : / 2 ^ 61 * 1.1 + / 2 ^ 122 * (/ 2 ^ 61 * 1.1) + / 2 ^ 179 <= / 2 ^ 60) by interval.
+  assert (S1 : / 2 ^ 179 + / 2 ^ 122 * (/ 2 ^ 61 * 1.1) + / 2 ^ 189 <= / 2 ^ 178) by interval with (i_prec 64).
+  assert (S2 : / 2 ^ 61 * 1.1 + / 2 ^ 122 * (/ 2 ^ 61 * 1.1) + / 2 ^ 179 <= / 2 ^ 60) by interval with (i_prec 64).
   apply Rabs_le_inv in E1'. apply Rabs_le_inv in E2'. apply Rabs_le_inv in E3. apply Rabs_le_inv in Lh.
   repeat split; try assumption; try lra.
   all: apply Rabs_le; lra.
@@ -344,17 +344,17 @@ Theorem exp_small_ok x : finite x -> / 2 ^ 54 <= Rabs (B x) < / 2 ^ 30 ->
   finite (small x) /\ B (small x) = rndF (exp (B x)).
 Proof.
   intros Fx [Hx1 Hx2] Far.
-  assert (C178 : / 2 ^ 178 < / 2 ^ 158 * 0.99 / 2) by interval.
-  assert (C158 : / 2 ^ 158 < / 2) by interval.
-  assert (S60 : / 2 ^ 60 < / 2 ^ 53 / 4) by interval.
-  assert (C52 : / 2 ^ 52 < / 1000) by interval.
+  assert (C178 : / 2 ^ 178 < / 2 ^ 158 * 0.99 / 2) by interval with (i_prec 64).
+  assert (C158 : / 2 ^ 158 < / 2) by interval with (i_prec 64).
+  assert (S60 : / 2 ^ 60 < / 2 ^ 53 / 4) by interval with (i_prec 64).
+  assert (C52 : / 2 ^ 52 < / 1000) by interval with (i_prec 64).
   assert (Hx0 : B x <> 0).
   { intros E. rewrite E, Rabs_R0 in Hx1. assert (0 < / 2 ^ 54) by (apply Rinv_0_lt_compat, pow_lt; lra). lra. }
   pose proof (Rabs_le_inv _ _ (Rlt_le _ _ Hx2)) as Hx'.
   pose proof (small_parts_ok x Fx Hx0 (Rlt_le _ _ Hx2)) as SP.
   unfold small. destruct (small_parts x) as [h w]. destruct SP as [Fh [_ [Hh [Nw [Wb Err]]]]].
   unfold ExpAccurate.midpoint_far in Far.
-  assert (Pz : 0.99 < exp (B x)) by interval.
+  assert (Pz : 0.99 < exp (B x)) by interval with (i_prec 64).
   set (H := B h) in *. set (W := Q128.qval w) in *. set (z := exp (B x)) in *.
   change (FLT_exp (-1074) 53) with (FLT_exp emin prec) in Wb.
   (* [h + w] rounds as [e^x], and is no breakpoint *)

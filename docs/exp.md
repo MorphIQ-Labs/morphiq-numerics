@@ -308,6 +308,23 @@ code bit for bit on the internal cross-check corpus.
      `2^−178`. So the comparison, done exactly in integer arithmetic, decides
      correctly, and no tie can occur.
 
+**Machine-checked:** `formal/exp/ExpSmall.v` transcribes `small_parts` and `small`
+on binary64 and the proved `Q128` transcription, and proves them.
+- **`d_ok`:** `d` is within `2^−122` relatively of the degree-5 polynomial. That
+  is `small.g`'s theorem, with its hypotheses proved about the transcription.
+- **`small_parts_ok`:** `h = RN(1 + x)`, `|w| ≤ ulp(h)/2 + 2^−60`, and `h + w` is
+  within `2^−178` of `e^x`. The truncation bound `2^−189` is CoqInterval's.
+- **`exp_small_ok`:** for every finite `x` with `2^−54 ≤ |x| < 2^−30`, if `e^x`
+  keeps [LM]'s mantissa distance `2^−158` from every rounding breakpoint,
+  `small` returns `RN(e^x)`. That distance is the theorem's one stated
+  hypothesis (`midpoint_far`). The proof covers the test as the code computes
+  it: `ulp(h)` and the fraction test on `h`'s encoding, `cmp_abs` against the
+  halved gap, and `h.to_bits() ± 1` for the neighbour (`bits_up`, `bits_down`
+  in `formal/binary64/Encodings.v`).
+
+The formal job compares `h`, `w` and `small`'s result with the Rust code bit for
+bit on the internal cross-check corpus.
+
 ## 7. Certificates and generators
 
 | Artifact | Tool | Establishes |
