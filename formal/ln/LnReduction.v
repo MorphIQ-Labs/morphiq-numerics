@@ -6,7 +6,7 @@
     [z_exact] is the same value in Q128 ([z_exact_ok]). *)
 
 From Coq Require Import ZArith Reals Lia Lra Psatz.
-From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
+From Flocq Require Import Core Sterbenz IEEE754.Binary IEEE754.Bits.
 From Q Require QSpec Q128.
 From Q Require Import Q128Mul.
 From Binary64 Require Import Binary64Add Binary64Mul IEEE64 IEEE64Add IEEE64Mul IEEE64Eft Grid Encodings.
@@ -230,4 +230,157 @@ Proof.
     match goal with |- context [if ?c then ?a else ?b] => destruct (if c then a else b) as [y e] end.
     destruct C as [Li [Fy [[Iy1 Iy2] [Gy [Ev Er]]]]]. rewrite Z.add_0_r in Ev, Er.
     repeat split; try reflexivity; try assumption; lia.
+Qed.
+
+(** * The reduced argument [z = y·R[i] − 1] *)
+
+(** [|y·R[i] − 1| <= 2^-7], and [y·R[i] − 1] is on [2^-63]'s grid. *)
+Lemma z_range y i : (i < 128)%nat -> ln_lo i <= B y < ln_hi i -> on_grid (-53) (B y) ->
+  0 < B (ln_r i) /\ Rabs (B y * B (ln_r i) - 1) <= / 128 /\ on_grid (-63) (B y * B (ln_r i) - 1).
+Proof.
+  intros Hi Iy Gy. destruct (ln_r_table_ok i Hi) as [_ [Gr [[R1 R2] [Lo Hh]]]].
+  split; [lra | ]. split.
+  - apply Rabs_le. split; nra.
+  - apply grid_minus; [exact (grid_mult _ _ _ _ Gy Gr) | ].
+    exists (2 ^ 63)%Z. change (IZR (2 ^ 63)) with (bpow radix2 63). rewrite <- bpow_plus. reflexivity.
+Qed.
+
+(** [ln_y_fast]'s [z]: [(z_hi, z_lo)] is [y·R[i] − 1] exactly, a double-word
+    with [|z_lo| <= 2^-53·|z_hi|], at most [2^-7], and zero or at least
+    [2^-63] in magnitude. *)
+Theorem z_ok y i : (i < 128)%nat -> finite y -> ln_lo i <= B y < ln_hi i -> on_grid (-53) (B y) ->
+  let '(zh, zl) := reduce_z y (ln_r i) in
+  finite zh /\ finite zl /\ B zh + B zl = B y * B (ln_r i) - 1 /\ B zh = rndF (B zh + B zl) /\
+  Rabs (B zh + B zl) <= / 128 /\ Rabs (B zl) <= bpow radix2 (-53) * Rabs (B zh) /\
+  ((B zh = 0 /\ B zl = 0) \/ bpow radix2 (-63) <= Rabs (B zh)).
+Proof.
+  intros Hi Fy Iy Gy.
+  destruct (ln_r_table_ok i Hi) as [Fr [_ [[R1 R2] _]]].
+  destruct (z_range y i Hi Iy Gy) as [Rp [Zb Zg]].
+  destruct (ln_range i Hi) as [L1 [L2 _]].
+  destruct c_one_ok as [F1 B1].
+  set (r := ln_r i) in *.
+  pose proof (Rabs_le_inv _ _ Zb) as Zb'.
+  assert (Yr : 0.99 <= B y * B r <= 1.01) by lra.
+  (* the product, exactly *)
+  pose proof (two_prod_ieee 1 1 y r Fy Fr
+                ltac:(change (bpow radix2 1) with 2; rewrite Rabs_pos_eq by lra; lra)
+                ltac:(change (bpow radix2 1) with 2; rewrite Rabs_pos_eq by lra; lra)
+                ltac:(lia) ltac:(lia) ltac:(lia)
+                ltac:(right; rewrite Rabs_pos_eq by lra; apply Rle_trans with (bpow radix2 (-1));
+                      [apply bpow_le; lia | change (bpow radix2 (-1)) with (/ 2); lra])) as TP.
+  unfold reduce_z. destruct (two_prod64 y r) as [p q]. destruct TP as [Fp [Fq [Bp Bpq]]].
+  (* p − 1, exactly by Sterbenz's lemma *)
+  assert (P1 : / 2 <= B p <= 5 / 4).
+  { rewrite Bp. split.
+    - change (/ 2) with (bpow radix2 (-1)). apply round_ge_generic; [exact _ | exact _ | | change (bpow radix2 (-1)) with (/ 2); lra].
+      apply generic_format_FLT_bpow; [reflexivity | unfold emin; lia].
+    - apply round_le_generic; [exact _ | exact _ | | lra].
+      apply generic_format_FLT. exists (Float radix2 5 (-2)); [unfold F2R; simpl; lra | simpl; lia | simpl; unfold emin; lia]. }
+  assert (Fd : fmtF (B p - B c_one)).
+  { apply sterbenz; try exact _. all: try apply B_fmt. rewrite B1; lra. }
+  destruct (fsub_ok 1 0 p c_one Fp F1 ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia)
+              ltac:(unfold bnd; rewrite B1, Rmult_1_l; change (bpow radix2 0) with 1; apply Rabs_le; lra)) as [Fs Bs].
+  rewrite round_generic in Bs by (exact _ || exact Fd). rewrite B1 in Bs.
+  (* (z_hi, z_lo) = two_sum(p − 1, q) *)
+  pose proof (two_sum_ieee (fsub p c_one) q Fs Fq) as TS.
+  assert (Q : Rabs (B q) <= 1) by (apply Rabs_le; lra).
+  specialize (TS ltac:(rewrite Bs; apply Rle_trans with 1; [apply Rabs_le; lra | change 1 with (bpow radix2 0); apply bpow_le; lia])
+                 ltac:(apply Rle_trans with 1; [exact Q | change 1 with (bpow radix2 0); apply bpow_le; lia])).
+  destruct (two_sum64 (fsub p c_one) q) as [zh zl]. destruct TS as [Fzh [Fzl [Bzh Bz]]].
+  rewrite Bs in Bzh, Bz.
+  assert (Ez : B zh + B zl = B y * B r - 1) by lra.
+  rewrite Ez.
+  replace (B p - 1 + B q) with (B y * B r - 1) in Bzh by lra.
+  split; [exact Fzh | ]. split; [exact Fzl | ]. split; [reflexivity | ]. split; [exact Bzh | ]. split; [exact Zb | ].
+  destruct (Req_dec (B y * B r - 1) 0) as [Z0 | Z1].
+  - (* z = 0 *)
+    rewrite Z0, round_0 in Bzh by exact _.
+    assert (L0 : B zl = 0) by lra. rewrite Bzh, L0, Rabs_R0. split; [lra | left; split; reflexivity].
+  - (* |z| >= 2^-63, so |z_hi| >= 2^-63 *)
+    pose proof (grid_nonzero _ _ Zg Z1) as Gz.
+    assert (H63 : bpow radix2 (-63) <= Rabs (B zh)).
+    { rewrite Bzh. apply abs_round_ge_generic; [exact _ | exact _ | | exact Gz].
+      apply generic_format_FLT_bpow; [reflexivity | unfold emin; lia]. }
+    split; [ | right; exact H63].
+    assert (El : B zl = - (rndF (B y * B r - 1) - (B y * B r - 1))) by lra.
+    rewrite El, Rabs_Ropp.
+    apply Rle_trans with (/ 2 * ulp radix2 (FLT_exp emin prec) (rndF (B y * B r - 1))); [apply error_le_half_ulp_round; exact _ | ].
+    rewrite <- Bzh.
+    assert (U : ulp radix2 (FLT_exp emin prec) (B zh) <= Rabs (B zh) * bpow radix2 (1 - 53)).
+    { apply ulp_FLT_le. unfold emin, prec. apply Rle_trans with (2 := H63). apply bpow_le. lia. }
+    replace (bpow radix2 (1 - 53)) with (2 * bpow radix2 (-53)) in U
+      by (change 2 with (bpow radix2 1); rewrite <- bpow_plus; reflexivity).
+    lra.
+Qed.
+
+(** [IZR (2^n)] is [2^n]. *)
+Lemma IZR_pow2 n : (0 <= n)%Z -> IZR (2 ^ n) = bpow radix2 n.
+Proof.
+  intros H. destruct n as [ | p | p]; [reflexivity | | lia].
+  change (2 ^ Zpos p)%Z with (Zpower radix2 (Zpos p)). apply IZR_Zpower. lia.
+Qed.
+
+(** [significand(v)] for a positive normal [v] below [2]. *)
+Lemma significand_ok v : finite v -> / 2 <= B v <= 2 ->
+  let '(m, e) := significand v in
+  (2 ^ 52 <= m < 2 ^ 53)%Z /\ (-53 <= e <= -51)%Z /\ B v = IZR m * bpow radix2 e.
+Proof.
+  intros Fv [H1 H2].
+  assert (N : bpow radix2 (-1022) <= B v)
+    by (apply Rle_trans with (bpow radix2 (-1)); [apply bpow_le; lia | change (bpow radix2 (-1)) with (/ 2); lra]).
+  destruct (fields v Fv N) as [mx [ex [Mx [Ex [V [Sh La]]]]]].
+  unfold significand. rewrite Sh, La.
+  rewrite lor_disjoint_low by lia. replace (mx - 2 ^ 52 + 1 * 2 ^ 52)%Z with mx by ring.
+  replace (ex + 1075 - 1075)%Z with ex by ring.
+  pose proof (bpow_gt_0 radix2 ex) as Pe.
+  split; [exact Mx | ]. split; [ | exact V]. split.
+  - cut (-1 < ex + 53)%Z; [lia | ]. apply (lt_bpow radix2).
+    apply Rle_lt_trans with (B v); [change (bpow radix2 (-1)) with (/ 2); lra | ].
+    rewrite V, bpow_plus, (Rmult_comm (bpow radix2 ex)). apply Rmult_lt_compat_r; [exact Pe | ].
+    change (bpow radix2 53) with (IZR (2 ^ 53)). apply IZR_lt. lia.
+  - cut (ex + 52 < 2)%Z; [lia | ]. apply (lt_bpow radix2).
+    apply Rle_lt_trans with (B v).
+    + rewrite V, bpow_plus, (Rmult_comm (bpow radix2 ex)). apply Rmult_le_compat_r; [apply bpow_ge_0 | ].
+      change (bpow radix2 52) with (IZR (2 ^ 52)). apply IZR_le. lia.
+    + change (bpow radix2 2) with 4. lra.
+Qed.
+
+(** [Reduced::z_exact]: [y·R[i] − 1] in Q128, exactly, with its significand
+    normalized or zero. *)
+Theorem z_exact_ok y i : (i < 128)%nat -> finite y -> ln_lo i <= B y < ln_hi i ->
+  (Q128.m (z_exact y (ln_r i)) = 0%Z \/ QSpec.normalized 128 (Q128.m (z_exact y (ln_r i)))) /\
+  Q128.qval (z_exact y (ln_r i)) = B y * B (ln_r i) - 1.
+Proof.
+  intros Hi Fy Iy. destruct (ln_r_table_ok i Hi) as [Fr [_ [[R1 R2] _]]].
+  destruct (ln_range i Hi) as [L1 [L2 _]].
+  pose proof (significand_ok y Fy ltac:(split; lra)) as Sy.
+  pose proof (significand_ok (ln_r i) Fr ltac:(split; lra)) as Sr.
+  unfold z_exact. destruct (significand y) as [my ey]. destruct (significand (ln_r i)) as [mr er].
+  destruct Sy as [My [Ey Vy]]. destruct Sr as [Mr [Er Vr]].
+  assert (P : (0 <= my * mr < 2 ^ 106)%Z).
+  { split; [nia | ]. replace (2 ^ 106)%Z with (2 ^ 53 * 2 ^ 53)%Z by reflexivity.
+    apply Z.mul_lt_mono_nonneg; lia. }
+  rewrite Z.shiftl_1_l.
+  assert (Yr : B y * B (ln_r i) = IZR (my * mr) * bpow radix2 (ey + er))
+    by (rewrite Vy, Vr, mult_IZR, bpow_plus; ring).
+  assert (One : IZR (2 ^ (- (ey + er))) * bpow radix2 (ey + er) = 1)
+    by (rewrite IZR_pow2 by lia; rewrite <- bpow_plus; replace (- (ey + er) + (ey + er))%Z with 0%Z by ring; reflexivity).
+  assert (Ow : (0 < 2 ^ (- (ey + er)) <= 2 ^ 106)%Z)
+    by (split; [apply Z.pow_pos_nonneg; lia | apply Z.pow_le_mono_r; lia]).
+  destruct (Z.leb_spec (2 ^ (- (ey + er))) (my * mr)) as [Ge | Lt].
+  - assert (W : (0 <= my * mr - 2 ^ (- (ey + er)) < Q128.W)%Z) by (unfold Q128.W; lia).
+    split.
+    + pose proof (Q128.new_ok false _ (ey + er) W) as No. pose proof (QSpec.norm_ok 128 ltac:(lia) _ (ey + er) W) as V.
+      destruct (QSpec.norm 128 (my * mr - 2 ^ (- (ey + er))) (ey + er)) as [m' e']. injection No as N1 N2.
+      destruct V as [[[_ Z] | Nm] _]; [left; rewrite N1; exact Z | right; rewrite N1; exact Nm].
+    + rewrite Q128.new_val by exact W. unfold QSpec.val, F2R. cbn [Fnum Fexp].
+      rewrite Yr, minus_IZR. lra.
+  - assert (W : (0 <= 2 ^ (- (ey + er)) - my * mr < Q128.W)%Z) by (unfold Q128.W; lia).
+    split.
+    + pose proof (Q128.new_ok true _ (ey + er) W) as No. pose proof (QSpec.norm_ok 128 ltac:(lia) _ (ey + er) W) as V.
+      destruct (QSpec.norm 128 (2 ^ (- (ey + er)) - my * mr) (ey + er)) as [m' e']. injection No as N1 N2.
+      destruct V as [[[_ Z] | Nm] _]; [left; rewrite N1; exact Z | right; rewrite N1; exact Nm].
+    + rewrite Q128.new_val by exact W. unfold QSpec.val, F2R. cbn [Fnum Fexp].
+      rewrite Yr, opp_IZR, minus_IZR. lra.
 Qed.
