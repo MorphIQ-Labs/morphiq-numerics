@@ -9,7 +9,7 @@
 From Coq Require Import ZArith Reals Lia Lra Psatz List.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
 From Q Require QSpec Q128.
-From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Eft.
+From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Eft RoundingGaps RoundingCore RoundingTest.
 From Gappa Require Gappa_definitions Gappa_pred_bnd.
 From Interval Require Import Tactic.
 Require ExpTables ExpAccurate exp_small.
@@ -50,21 +50,23 @@ Qed.
 
 (** * The transcription *)
 
-(** [small_parts(x)]: [(h, l) = two_sum(1, x)], then [d] to degree 5 in Q128
-    and [w = l + d]. *)
-Definition small_parts (x : binary_float 53 1024) : binary_float 53 1024 * Q128.q128 :=
-  let '(h, l) := two_sum64 ExpFast.c_one x in
+(** [small_parts]'s [d = e^x - 1 - x] to degree 5, in Q128. *)
+Definition small_d (x : binary_float 53 1024) : Q128.q128 :=
   let xq := ExpAccurate.qf x in
   let g5 := Q128.add ExpAccurate.q_one (Q128.mul xq (ExpAccurate.q_recip 5)) in
   let g4 := Q128.add ExpAccurate.q_one (Q128.mul (Q128.mul xq (ExpAccurate.q_recip 4)) g5) in
   let g3 := Q128.add ExpAccurate.q_one (Q128.mul (Q128.mul xq (ExpAccurate.q_recip 3)) g4) in
-  let d := Q128.mul (Q128.mul (Q128.mul xq xq) (ExpAccurate.q_recip 2)) g3 in
-  (h, Q128.add (ExpAccurate.qf l) d).
+  Q128.mul (Q128.mul (Q128.mul xq xq) (ExpAccurate.q_recip 2)) g3.
+
+(** [small_parts(x)]: [(h, l) = two_sum(1, x)] and [w = l + d]. *)
+Definition small_parts (x : binary_float 53 1024) : binary_float 53 1024 * Q128.q128 :=
+  let '(h, l) := two_sum64 ExpFast.c_one x in
+  (h, Q128.add (ExpAccurate.qf l) (small_d x)).
 
 (** [d]'s exact counterpart. *)
 Definition Dpoly (x : R) : R := x * x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5))).
 
-(** A Q128 value [q] as a recip-times-[(1 + k)] with [|k| <= 2^-127]. *)
+(** The reciprocal [1/i] as [(1/i)·(1 + k)] with [|k| <= 2^-127]. *)
 Lemma recip_k i : (1 <= i <= 12)%nat ->
   ExpAccurate.NZ (ExpAccurate.q_recip i) /\
   exists k, Rabs k <= / 2 ^ 127 /\ Q128.qval (ExpAccurate.q_recip i) = 1 / INR i * (1 + k).
@@ -97,14 +99,15 @@ Qed.
 
 (** [d] is within [2^-122] relatively of [Dpoly x]. *)
 Lemma d_ok x : is_finite 53 1024 x = true -> B2R 53 1024 x <> 0 -> Rabs (B2R 53 1024 x) <= / 2 ^ 30 ->
-  let xq := ExpAccurate.qf x in
-  let g5 := Q128.add ExpAccurate.q_one (Q128.mul xq (ExpAccurate.q_recip 5)) in
-  let g4 := Q128.add ExpAccurate.q_one (Q128.mul (Q128.mul xq (ExpAccurate.q_recip 4)) g5) in
-  let g3 := Q128.add ExpAccurate.q_one (Q128.mul (Q128.mul xq (ExpAccurate.q_recip 3)) g4) in
-  let d := Q128.mul (Q128.mul (Q128.mul xq xq) (ExpAccurate.q_recip 2)) g3 in
-  ExpAccurate.NZ d /\ Rabs ((Q128.qval d - Dpoly (B2R 53 1024 x)) / Dpoly (B2R 53 1024 x)) <= / 2 ^ 122.
+  ExpAccurate.NZ (small_d x) /\
+  Rabs ((Q128.qval (small_d x) - Dpoly (B2R 53 1024 x)) / Dpoly (B2R 53 1024 x)) <= / 2 ^ 122.
 Proof.
-  intros Fx Hx0 Hx xq g5 g4 g3 d.
+  intros Fx Hx0 Hx. unfold small_d. cbv zeta.
+  set (xq := ExpAccurate.qf x).
+  set (g5 := Q128.add ExpAccurate.q_one (Q128.mul xq (ExpAccurate.q_recip 5))).
+  set (g4 := Q128.add ExpAccurate.q_one (Q128.mul (Q128.mul xq (ExpAccurate.q_recip 4)) g5)).
+  set (g3 := Q128.add ExpAccurate.q_one (Q128.mul (Q128.mul xq (ExpAccurate.q_recip 3)) g4)).
+  set (d := Q128.mul (Q128.mul (Q128.mul xq xq) (ExpAccurate.q_recip 2)) g3).
   set (v := B2R 53 1024 x) in *.
   assert (Nx : ExpAccurate.NZ xq) by apply ExpAccurate.from_f64_nz.
   assert (Vx : Q128.qval xq = v) by (unfold xq, ExpAccurate.qf; rewrite ExpAccurate.from_f64_b64 by exact Fx; reflexivity).
@@ -147,4 +150,92 @@ Proof.
   rewrite Ed, Eg3, Eg4, Eg5.
   exact (small_bound v k5 m5 s5 k4 m4a m4b s4 k3 m3a m3b s3 m2a k2 m2b m2c
            ltac:(apply Rabs_le; lra) Hx0 Hk2 Hk3 Hk4 Hk5 Hm5 Hm4a Hm4b Hm3a Hm3b Hm2a Hm2b Hm2c Hs5 Hs4 Hs3).
+Qed.
+
+(** * [h + w] *)
+
+(** Near [1], ulp is [2^-53] or [2^-52]. *)
+Lemma ulp_range v : / 2 <= v < 2 -> bpow radix2 (-53) <= ulp radix2 fexp64 v <= bpow radix2 (-52).
+Proof.
+  intros [H1 H2]. rewrite ulp_neq_0 by lra. unfold cexp, FLT_exp.
+  assert (M1 : (0 <= mag radix2 v)%Z).
+  { apply mag_ge_bpow. rewrite Rabs_pos_eq by lra. change (bpow radix2 (0 - 1)) with (/ 2). lra. }
+  assert (M2 : (mag radix2 v <= 1)%Z).
+  { apply mag_le_bpow; [lra | ]. rewrite Rabs_pos_eq by lra. change (bpow radix2 1) with 2. lra. }
+  split; apply bpow_le; lia.
+Qed.
+
+(** [small_parts(x)]: [h = RN(1 + x)], [|w|] at most half [h]'s ulp and
+    [2^-60] more, and [h + w] within [2^-178] of [e^x]. *)
+Theorem small_parts_ok x : finite x -> B x <> 0 -> Rabs (B x) <= / 2 ^ 30 ->
+  let '(h, w) := small_parts x in
+  finite h /\ B h = rndF (1 + B x) /\ / 2 < B h < 2 /\ ExpAccurate.NZ w /\
+  Rabs (Q128.qval w) <= / 2 * ulp radix2 fexp64 (B h) + / 2 ^ 60 /\
+  Rabs (B h + Q128.qval w - exp (B x)) <= / 2 ^ 178.
+Proof.
+  intros Fx Hx0 Hx. unfold small_parts.
+  destruct (d_ok x Fx Hx0 Hx) as [Nd Hd].
+  assert (B1 : B ExpFast.c_one = 1).
+  { rewrite ExpFast.c_one_val. assert (E : 2 ^ 52 = 4503599627370496) by ring. rewrite E. field. }
+  assert (P1 : 1 <= bpow radix2 1020) by (change 1 with (bpow radix2 0); apply bpow_le; lia).
+  assert (U30 : / 2 ^ 30 < / 1000) by interval.
+  pose proof (two_sum_ieee ExpFast.c_one x ExpFast.c_one_finite Fx
+                ltac:(rewrite B1, Rabs_R1; exact P1) ltac:(lra)) as TS.
+  destruct (two_sum64 ExpFast.c_one x) as [h l]. destruct TS as [Fh [Fl [Bh Bhl]]].
+  rewrite B1 in Bh, Bhl.
+  set (v := B x) in *. set (d := small_d x) in *. set (D := Dpoly v) in *.
+  pose proof Hx as Hx'. apply Rabs_le_inv in Hx'.
+  (* h *)
+  assert (Hr : Rabs (B h - (1 + v)) <= / 2 ^ 53 * (1 + v)).
+  { rewrite Bh, <- RNE_rndF.
+    assert (Z1 : bpow radix2 (-1022) <= Rabs (1 + v)).
+    { apply Rle_trans with (bpow radix2 (-1)); [apply bpow_le; lia | ].
+      rewrite Rabs_pos_eq by lra. change (bpow radix2 (-1)) with (/ 2). lra. }
+    pose proof (rnd_rel (1 + v) Z1) as R. rewrite (Rabs_pos_eq (1 + v)) in R by lra.
+    change (bpow radix2 (-53)) with (bpow radix2 (- Z.of_nat 53)) in R. rewrite ExpAccurate.bpow_m in R.
+    exact R. }
+  assert (U53 : / 2 ^ 53 < / 1000) by interval.
+  apply Rabs_le_inv in Hr.
+  assert (Hh : / 2 < B h < 2) by (split; nra).
+  destruct (ulp_range (B h) ltac:(lra)) as [Ul Uu].
+  change (bpow radix2 (-53)) with (bpow radix2 (- Z.of_nat 53)) in Ul.
+  change (bpow radix2 (-52)) with (bpow radix2 (- Z.of_nat 52)) in Uu.
+  rewrite ExpAccurate.bpow_m in Ul, Uu.
+  assert (Lh : Rabs (B l) <= / 2 * ulp radix2 fexp64 (B h)).
+  { assert (El : B l = - (B h - (1 + v))) by lra.
+    rewrite El, Rabs_Ropp, Bh. apply error_le_half_ulp_round; exact _. }
+  (* d *)
+  assert (Dpos : 0 < D).
+  { unfold D, Dpoly.
+    assert (F : 0.9 <= 1 + v / 3 * (1 + v / 4 * (1 + v / 5)) <= 1.1) by (split; interval).
+    assert (0 < v * v) by (apply Rsqr_pos_lt; exact Hx0). nra. }
+  assert (Db : D <= / 2 ^ 61 * 1.1) by (unfold D, Dpoly; interval).
+  assert (E2 : Rabs (Q128.qval d - D) <= / 2 ^ 122 * D).
+  { replace (Q128.qval d - D) with ((Q128.qval d - D) / D * D) by (field; lra).
+    rewrite Rabs_mult, (Rabs_pos_eq D) by lra. apply Rmult_le_compat_r; lra. }
+  assert (E3 : Rabs (D - (exp v - 1 - v)) <= / 2 ^ 189).
+  { unfold D, Dpoly. interval with (i_taylor v, i_degree 8, i_prec 300). }
+  (* w *)
+  assert (Nl : ExpAccurate.NZ (ExpAccurate.qf l)) by apply ExpAccurate.from_f64_nz.
+  assert (Vl : Q128.qval (ExpAccurate.qf l) = B l)
+    by (unfold ExpAccurate.qf; rewrite ExpAccurate.from_f64_b64 by exact Fl; reflexivity).
+  destruct (ExpAccurate.add_any _ _ Nl Nd) as [Nw E1]. rewrite Vl in E1.
+  change (bpow radix2 (-126)) with (bpow radix2 (- Z.of_nat 126)) in E1. rewrite ExpAccurate.bpow_m in E1.
+  assert (U122 : / 2 ^ 122 < / 1000) by interval.
+  assert (Qd : Rabs (Q128.qval d) <= / 2 ^ 53).
+  { apply Rabs_le_inv in E2. assert (/ 2 ^ 61 * 1.1 * (1 + / 1000) <= / 2 ^ 53) by interval.
+    apply Rabs_le. nra. }
+  assert (Mx : Rmax (Rabs (B l)) (Rabs (Q128.qval d)) <= / 2 ^ 53) by (apply Rmax_lub; lra).
+  assert (E1' : Rabs (Q128.qval (Q128.add (ExpAccurate.qf l) d) - (B l + Q128.qval d)) <= / 2 ^ 179).
+  { apply Rle_trans with (1 := E1). apply Rle_trans with (/ 2 ^ 126 * / 2 ^ 53).
+    - apply Rmult_le_compat_l; [apply Rlt_le, Rinv_0_lt_compat, pow_lt; lra | exact Mx].
+    - right. rewrite <- Rinv_mult_distr by (apply pow_nonzero; lra). rewrite <- pow_add. reflexivity. }
+  set (w := Q128.add (ExpAccurate.qf l) d) in *.
+  assert (E2' : Rabs (Q128.qval d - D) <= / 2 ^ 122 * (/ 2 ^ 61 * 1.1)).
+  { apply Rle_trans with (1 := E2). apply Rmult_le_compat_l; [apply Rlt_le, Rinv_0_lt_compat, pow_lt; lra | exact Db]. }
+  assert (S1 : / 2 ^ 179 + / 2 ^ 122 * (/ 2 ^ 61 * 1.1) + / 2 ^ 189 <= / 2 ^ 178) by interval.
+  assert (S2 : / 2 ^ 61 * 1.1 + / 2 ^ 122 * (/ 2 ^ 61 * 1.1) + / 2 ^ 179 <= / 2 ^ 60) by interval.
+  apply Rabs_le_inv in E1'. apply Rabs_le_inv in E2'. apply Rabs_le_inv in E3. apply Rabs_le_inv in Lh.
+  repeat split; try assumption; try lra.
+  all: apply Rabs_le; lra.
 Qed.
