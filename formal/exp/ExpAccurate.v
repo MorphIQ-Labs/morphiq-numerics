@@ -10,8 +10,9 @@
 From Coq Require Import ZArith Reals Lia Lra Psatz List.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
 From Q Require QSpec Q128.
+From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Mul IEEE64Eft Binary64Mul.
 From Interval Require Import Tactic.
-Require ExpTables ExpAccurateLevels.
+Require ExpTables ExpAccurateLevels ExpReduction.
 Import ListNotations ExpTables.
 
 Open Scope R_scope.
@@ -361,4 +362,198 @@ Proof.
   pose proof (ExpAccurateLevels.accurate_y_bound T X1 eT E1 mY HT ltac:(lra) HeT' EH HmY) as YB.
   replace (Q128.qval Y) with (T * (1 + eT) * (X1 + E1) * (1 + mY)) by (unfold Y; rewrite EY, EeT; unfold E1; ring).
   exact YB.
+Qed.
+
+(** * The reduced argument in Q128
+
+    [Reduced::accurate_value]'s [r]: [r1 − p2 − e2 − p3 − e3 − RN(n·L4)], each
+    binary64 term converted exactly and summed left to right. *)
+
+Definition qf (t : binary_float 53 1024) : Q128.q128 := Q128.from_f64 (bits_of_b64 t).
+
+Definition acc_r (n r1 p2 e2 : binary_float 53 1024) : Q128.q128 :=
+  let '(p3, e3) := two_prod64 n exp_l3 in
+  Q128.add (Q128.add (Q128.add (Q128.add (Q128.add (qf r1) (qf (fneg p2))) (qf (fneg e2)))
+    (qf (fneg p3))) (qf (fneg e3))) (qf (fneg (fmul n exp_l4))).
+
+(** One addition of a small term to a partial sum below [0.003]: the error
+    grows by at most [0.003·2^-126]. *)
+Lemma add_small a t (A e : R) : NZ a -> Rabs (Q128.qval a - A) <= e -> e <= / 1000000 -> Rabs A <= 0.0029 ->
+  finite t -> Rabs (B t) <= / 1000000 ->
+  NZ (Q128.add a (qf t)) /\ Rabs (Q128.qval (Q128.add a (qf t)) - (A + B t)) <= e + 3 / 1000 * / 2 ^ 126.
+Proof.
+  intros Na Ha He HA Ft Ht.
+  destruct (add_any a (qf t) Na (from_f64_nz _)) as [N E].
+  unfold qf in E |- *. rewrite from_f64_b64 in E by exact Ft.
+  split; [exact N | ].
+  change (bpow radix2 (-126)) with (bpow radix2 (- Z.of_nat 126)) in E. rewrite bpow_m in E.
+  assert (M : Rmax (Rabs (Q128.qval a)) (Rabs (B t)) <= 3 / 1000).
+  { apply Rmax_lub; [ | lra].
+    assert (Rabs (Q128.qval a) <= Rabs A + Rabs (Q128.qval a - A)).
+    { replace (Q128.qval a) with (A + (Q128.qval a - A)) at 1 by ring. apply Rabs_triang. }
+    lra. }
+  assert (P : 0 < / 2 ^ 126) by interval with (i_prec 64).
+  replace (Q128.qval (Q128.add a (Q128.from_f64 (bits_of_b64 t))) - (A + B t))
+    with ((Q128.qval (Q128.add a (Q128.from_f64 (bits_of_b64 t))) - (Q128.qval a + B t)) + (Q128.qval a - A))
+    by ring.
+  apply Rle_trans with (1 := Rabs_triang _ _).
+  assert (/ 2 ^ 126 * Rmax (Rabs (Q128.qval a)) (Rabs (B t)) <= 3 / 1000 * / 2 ^ 126)
+    by (rewrite Rmult_comm; apply Rmult_le_compat_r; lra).
+  lra.
+Qed.
+
+Lemma fneg_ok t : finite t -> finite (fneg t) /\ B (fneg t) = - B t.
+Proof. intros Ft. split; [unfold fneg, b64_opp; now rewrite is_finite_Bopp | apply B2R_Bopp]. Qed.
+
+(** [r] is within [2^-131] of the exact reduced argument [x − n·L], [L = ln 2 / 128]. *)
+Lemma acc_r_ok x n r1 p2 e2 k L :
+  finite n -> finite r1 -> finite p2 -> finite e2 ->
+  B n = IZR k -> (Z.abs k <= 137601)%Z ->
+  B r1 = B x - IZR k * ExpReduction.l1v -> B p2 = rndF (IZR k * ExpReduction.l2v) ->
+  B p2 + B e2 = IZR k * ExpReduction.l2v ->
+  Rabs (L - (ExpReduction.l1v + ExpReduction.l2v + ExpReduction.l3v + ExpReduction.l4v)) <= / 2 ^ 206 ->
+  Rabs (B x - IZR k * L) <= 0.0027076063 ->
+  NZ (acc_r n r1 p2 e2) /\ Rabs (Q128.qval (acc_r n r1 p2 e2) - (B x - IZR k * L)) <= / 2 ^ 131.
+Proof.
+  intros Fn Fr1 Fp2 Fe2 Bn Kb Er1 Bp2 Ep HL HR.
+  assert (Kr : Rabs (IZR k) <= 137601) by (rewrite <- abs_IZR; apply IZR_le; lia).
+  (* the constants as rationals *)
+  assert (V1 : ExpReduction.l1v = 23816355775 / 2 ^ 42).
+  { unfold ExpReduction.l1v. change (-42)%Z with (- Z.of_nat 42)%Z. rewrite bpow_m. reflexivity. }
+  assert (V2 : ExpReduction.l2v = - 7988006341064857 / 2 ^ 96).
+  { unfold ExpReduction.l2v, F2R. cbn [Fnum Fexp]. change (-96)%Z with (- Z.of_nat 96)%Z. rewrite bpow_m.
+    unfold Rdiv. ring. }
+  assert (V3 : ExpReduction.l3v = 6759741496705267 / 2 ^ 151).
+  { unfold ExpReduction.l3v, F2R. cbn [Fnum Fexp]. change (-151)%Z with (- Z.of_nat 151)%Z. rewrite bpow_m. reflexivity. }
+  assert (V4 : ExpReduction.l4v = 4725274267454307 / 2 ^ 205).
+  { unfold ExpReduction.l4v, F2R. cbn [Fnum Fexp]. change (-205)%Z with (- Z.of_nat 205)%Z. rewrite bpow_m. reflexivity. }
+  pose proof exp_l3_finite as F3. pose proof exp_l4_finite as F4.
+  assert (B3 : B exp_l3 = ExpReduction.l3v) by (rewrite exp_l3_val, V3; reflexivity).
+  assert (B4 : B exp_l4 = ExpReduction.l4v) by (rewrite exp_l4_val, V4; reflexivity).
+  (* p3 + e3 = n·L3 exactly *)
+  assert (Nb : Rabs (B n) <= bpow radix2 18) by (rewrite Bn; change (bpow radix2 18) with 262144; lra).
+  assert (L3b : Rabs (B exp_l3) <= bpow radix2 (-98)).
+  { rewrite B3, V3. change (-98)%Z with (- Z.of_nat 98)%Z. rewrite bpow_m. rewrite Rabs_pos_eq by interval with (i_prec 64).
+    interval with (i_prec 64). }
+  assert (Dom : in_two_prod_domain (B n) (B exp_l3)).
+  { destruct (Z.eq_dec k 0) as [K0 | K0]; [left; rewrite Bn, K0; ring | right].
+    rewrite Rabs_mult, Bn, B3, V3. assert (K1 : 1 <= Rabs (IZR k)) by (rewrite <- abs_IZR; apply IZR_le; lia).
+    apply Rle_trans with (1 * Rabs (6759741496705267 / 2 ^ 151)).
+    - rewrite Rmult_1_l, Rabs_pos_eq by interval with (i_prec 64).
+      change (-969)%Z with (- Z.of_nat 969)%Z. rewrite bpow_m. interval with (i_prec 64).
+    - apply Rmult_le_compat_r; [apply Rabs_pos | exact K1]. }
+  pose proof (two_prod_ieee 18 (-98) n exp_l3 Fn F3 Nb L3b ltac:(lia) ltac:(lia) ltac:(lia) Dom) as TP.
+  unfold acc_r. destruct (two_prod64 n exp_l3) as [p3 e3]. destruct TP as [Fp3 [Fe3 [Bp3 Be3]]].
+  rewrite Bn, B3 in Bp3, Be3.
+  (* RN(n·L4) *)
+  assert (U4 : Rabs (B n * B exp_l4) <= 1).
+  { rewrite Bn, B4, V4, Rabs_mult. apply Rle_trans with (137601 * Rabs (4725274267454307 / 2 ^ 205)).
+    - apply Rmult_le_compat_r; [apply Rabs_pos | exact Kr].
+    - rewrite Rabs_pos_eq by interval with (i_prec 64). interval with (i_prec 64). }
+  destruct (fmul_ok 1 0 n exp_l4 Fn F4 ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia)
+              ltac:(unfold bnd; change (IZR 1 * bpow radix2 0) with (1 * 1); lra)) as [Fm Bm].
+  rewrite Bn, B4 in Bm.
+  (* the terms' sizes *)
+  (* each term is a product below 10^-7 rounded, or that rounding's error *)
+  assert (Er : forall v, Rabs v <= / 10000000 -> Rabs (rndF v - v) <= / 1000000000).
+  { intros v Hv. pose proof (ExpReduction.rnd_abs_err v).
+    assert (/ 2 * bpow radix2 (-1074) <= / 10000000000)
+      by (change (-1074)%Z with (- Z.of_nat 1074)%Z; rewrite bpow_m; interval with (i_prec 64)).
+    assert (/ 9007199254740992 * Rabs v <= / 10000000000) by (apply Rle_trans with (/ 9007199254740992 * / 10000000); [apply Rmult_le_compat_l; lra | interval with (i_prec 64)]).
+    lra. }
+  assert (Tiny : forall v, Rabs v <= / 10000000 -> Rabs (rndF v) <= / 1000000).
+  { intros v Hv. pose proof (Er v Hv). pose proof (Rabs_triang_inv (rndF v) v). lra. }
+  assert (S2 : Rabs (IZR k * ExpReduction.l2v) <= / 10000000).
+  { rewrite Rabs_mult, V2. apply Rle_trans with (137601 * Rabs (- 7988006341064857 / 2 ^ 96)).
+    - apply Rmult_le_compat_r; [apply Rabs_pos | exact Kr].
+    - rewrite Rabs_left by interval with (i_prec 64). interval with (i_prec 64). }
+  assert (S3 : Rabs (IZR k * ExpReduction.l3v) <= / 10000000).
+  { rewrite Rabs_mult, V3. apply Rle_trans with (137601 * Rabs (6759741496705267 / 2 ^ 151)).
+    - apply Rmult_le_compat_r; [apply Rabs_pos | exact Kr].
+    - rewrite Rabs_pos_eq by interval with (i_prec 64). interval with (i_prec 64). }
+  assert (S4 : Rabs (IZR k * ExpReduction.l4v) <= / 10000000).
+  { rewrite Rabs_mult, V4. apply Rle_trans with (137601 * Rabs (4725274267454307 / 2 ^ 205)).
+    - apply Rmult_le_compat_r; [apply Rabs_pos | exact Kr].
+    - rewrite Rabs_pos_eq by interval with (i_prec 64). interval with (i_prec 64). }
+  assert (Hp2 : Rabs (B p2) <= / 1000000) by (rewrite Bp2; apply Tiny, S2).
+  assert (He2 : Rabs (B e2) <= / 1000000).
+  { replace (B e2) with (- (rndF (IZR k * ExpReduction.l2v) - IZR k * ExpReduction.l2v)) by (rewrite <- Bp2; lra).
+    rewrite Rabs_Ropp. pose proof (Er _ S2). lra. }
+  assert (Hp3 : Rabs (B p3) <= / 1000000) by (rewrite Bp3; apply Tiny, S3).
+  assert (He3 : Rabs (B e3) <= / 1000000).
+  { replace (B e3) with (- (rndF (IZR k * ExpReduction.l3v) - IZR k * ExpReduction.l3v)) by (rewrite <- Bp3; lra).
+    rewrite Rabs_Ropp. pose proof (Er _ S3). lra. }
+  assert (Hm4 : Rabs (B (fmul n exp_l4)) <= / 1000000) by (rewrite Bm; apply Tiny, S4).
+  (* r1 is below 0.00271 *)
+  assert (Hr1 : Rabs (B r1) <= 0.00271).
+  { rewrite Er1. replace (B x - IZR k * ExpReduction.l1v)
+      with ((B x - IZR k * L) + IZR k * (L - ExpReduction.l1v)) by ring.
+    apply Rle_trans with (1 := Rabs_triang _ _).
+    assert (Rabs (L - ExpReduction.l1v) <= / 10000000000000 * 1.1).
+    { replace (L - ExpReduction.l1v)
+        with ((L - (ExpReduction.l1v + ExpReduction.l2v + ExpReduction.l3v + ExpReduction.l4v))
+              + (ExpReduction.l2v + ExpReduction.l3v + ExpReduction.l4v)) by ring.
+      apply Rle_trans with (1 := Rabs_triang _ _). pose proof HL as HL'. rewrite V2, V3, V4 in HL' |- *.
+      assert (Rabs (- 7988006341064857 / 2 ^ 96 + 6759741496705267 / 2 ^ 151 + 4725274267454307 / 2 ^ 205)
+              <= 1.01 * / 10000000000000) by interval with (i_prec 100).
+      assert (/ 2 ^ 206 <= / 100000000000000000) by interval with (i_prec 64). lra. }
+    rewrite Rabs_mult. assert (Rabs (IZR k) * Rabs (L - ExpReduction.l1v) <= 137601 * (/ 10000000000000 * 1.1))
+      by (apply Rmult_le_compat; try apply Rabs_pos; assumption).
+    lra. }
+  (* the five additions *)
+  destruct (fneg_ok p2 Fp2) as [Fq2 Bq2]. destruct (fneg_ok e2 Fe2) as [Fq3 Bq3].
+  destruct (fneg_ok p3 Fp3) as [Fq4 Bq4]. destruct (fneg_ok e3 Fe3) as [Fq5 Bq5].
+  destruct (fneg_ok (fmul n exp_l4) Fm) as [Fq6 Bq6].
+  assert (A0 : NZ (qf r1) /\ Rabs (Q128.qval (qf r1) - B r1) <= / 2 ^ 130).
+  { split; [apply from_f64_nz | ]. unfold qf. rewrite from_f64_b64 by exact Fr1.
+    rewrite Rminus_diag_eq, Rabs_R0 by reflexivity. apply Rlt_le, Rinv_0_lt_compat, pow_lt. lra. }
+  set (d := 3 / 1000 * / 2 ^ 126).
+  assert (Dd : 0 <= d <= / 10000000) by (unfold d; split; interval with (i_prec 64)).
+  destruct A0 as [N0 E0].
+  assert (E0' : Rabs (Q128.qval (qf r1) - B r1) <= 0)
+    by (unfold qf; rewrite from_f64_b64 by exact Fr1; rewrite Rminus_diag_eq, Rabs_R0 by reflexivity; lra).
+  apply Rabs_le_inv in Hr1.
+  assert (Hq2 : Rabs (B (fneg p2)) <= / 1000000) by (rewrite Bq2, Rabs_Ropp; exact Hp2).
+  apply Rabs_le_inv in Hp2. apply Rabs_le_inv in He2. apply Rabs_le_inv in Hp3. apply Rabs_le_inv in He3.
+  apply Rabs_le_inv in Hm4.
+  destruct (add_small _ (fneg p2) (B r1) 0 N0 E0' ltac:(lra) ltac:(apply Rabs_le; lra) Fq2 Hq2) as [N1 E1].
+  fold d in E1. rewrite Bq2 in E1.
+  destruct (add_small _ (fneg e2) (B r1 + - B p2) (0 + d) N1 E1 ltac:(lra) ltac:(apply Rabs_le; lra)
+             Fq3 ltac:(rewrite Bq3, Rabs_Ropp; apply Rabs_le; lra)) as [N2 E2].
+  fold d in E2. rewrite Bq3 in E2.
+  destruct (add_small _ (fneg p3) (B r1 + - B p2 + - B e2) (0 + d + d) N2 E2 ltac:(lra) ltac:(apply Rabs_le; lra)
+             Fq4 ltac:(rewrite Bq4, Rabs_Ropp; apply Rabs_le; lra)) as [N3 E3].
+  fold d in E3. rewrite Bq4 in E3.
+  destruct (add_small _ (fneg e3) (B r1 + - B p2 + - B e2 + - B p3) (0 + d + d + d) N3 E3 ltac:(lra)
+             ltac:(apply Rabs_le; lra) Fq5 ltac:(rewrite Bq5, Rabs_Ropp; apply Rabs_le; lra)) as [N4 E4].
+  fold d in E4. rewrite Bq5 in E4.
+  destruct (add_small _ (fneg (fmul n exp_l4)) (B r1 + - B p2 + - B e2 + - B p3 + - B e3) (0 + d + d + d + d)
+             N4 E4 ltac:(lra) ltac:(apply Rabs_le; lra) Fq6 ltac:(rewrite Bq6, Rabs_Ropp; apply Rabs_le; lra))
+    as [N5 E5].
+  fold d in E5. rewrite Bq6 in E5.
+  split; [exact N5 | ].
+  (* the exact sum is x − n·(L1 + L2 + L3) − RN(n·L4), within 2^-186 of x − n·L *)
+  set (S := B r1 + - B p2 + - B e2 + - B p3 + - B e3 + - B (fmul n exp_l4)) in E5.
+  assert (Tail : Rabs (S - (B x - IZR k * L)) <= / 2 ^ 186).
+  { replace (S - (B x - IZR k * L))
+      with ((IZR k * ExpReduction.l4v - B (fmul n exp_l4))
+            + IZR k * (L - (ExpReduction.l1v + ExpReduction.l2v + ExpReduction.l3v + ExpReduction.l4v)))
+      by (unfold S; rewrite Er1; lra).
+    apply Rle_trans with (1 := Rabs_triang _ _).
+    pose proof (ExpReduction.rnd_abs_err (IZR k * ExpReduction.l4v)) as R4. rewrite <- Bm in R4.
+    rewrite Rabs_minus_sym in R4. rewrite Rabs_mult.
+    assert (Rabs (IZR k) * Rabs (L - (ExpReduction.l1v + ExpReduction.l2v + ExpReduction.l3v + ExpReduction.l4v))
+            <= 137601 * / 2 ^ 206) by (apply Rmult_le_compat; try apply Rabs_pos; assumption).
+    assert (Rabs (IZR k * ExpReduction.l4v) <= 137601 * (4725274267454307 / 2 ^ 205)).
+    { rewrite Rabs_mult, V4. apply Rmult_le_compat; try apply Rabs_pos; [exact Kr | ].
+      rewrite Rabs_pos_eq by interval with (i_prec 64). lra. }
+    assert (/ 9007199254740992 * (137601 * (4725274267454307 / 2 ^ 205)) + / 2 * bpow radix2 (-1074)
+            + 137601 * / 2 ^ 206 <= / 2 ^ 186).
+    { change (-1074)%Z with (- Z.of_nat 1074)%Z. rewrite bpow_m. interval with (i_prec 100). }
+    assert (0 <= / 9007199254740992) by lra. nra. }
+  set (Qv := Q128.qval _) in E5 |- *.
+  replace (Qv - (B x - IZR k * L)) with ((Qv - S) + (S - (B x - IZR k * L))) by ring.
+  apply Rle_trans with (1 := Rabs_triang _ _).
+  assert (0 + d + d + d + d + d + / 2 ^ 186 <= / 2 ^ 131) by (unfold d; interval with (i_prec 100)).
+  lra.
 Qed.
