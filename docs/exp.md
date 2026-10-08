@@ -265,6 +265,31 @@ mantissa distance below `2ε` ([LM] footnote 10), so the result is within
 `2^−122.9` mantissa distance, against `2^−113` needed (§2). Rounding the 128-bit
 result once therefore rounds `e^x` correctly.
 
+**Machine-checked:** `formal/exp/ExpAccurate.v` transcribes the general case,
+`accurate_value` and `accurate_at`, on the proved `Q128` transcription
+(`formal/q`), and proves it.
+- **`acc_r_ok`:** `r` is within `2^−131` of `x − n·ln 2/128`: five additions under
+  the addition contract, and the tail beyond `RN(n·L4)`.
+- **`series_ok`:** the twelve Horner levels compose to `H_1` within `521·2^−135` of
+  the series at the computed `r`. Each level is its certificate's theorem
+  (`ExpAccurateLevels.v`, which `generators/exp_accurate_certificates.py` writes
+  with the certificates), with its hypotheses proved about the transcription:
+  the contracts of `mul` and `add`, zero operands included, and the reciprocal's
+  error.
+- **`accurate_ok`:** `accurate_at` is within `2^−120` relatively of
+  `2^(j/128)·e^R·2^k`, composing `accurate_y.g`, the truncation (`2^−143`, by
+  CoqInterval) and the error of `r`. `2^−120` is what rounding once needs; the
+  sharper `2^−123.9` above isn't required.
+- **`exp_accurate_ok`:** for every finite `x` with `−745.1333 ≤ x < X_OVERFLOW`,
+  if `e^x` keeps [LM]'s mantissa distance `2^−113` from every rounding
+  breakpoint, the value the accurate path returns is `RN(e^x)`. That distance
+  is [LM] Property 1, a published computational result. It is the theorem's one
+  stated hypothesis (`midpoint_far`), not something Coq derives.
+
+`ExpTables.v` proves the `Q128` table `T_j` and the reciprocals `1/k` within
+`2^−127` with CoqInterval. The formal job compares `accurate_at` with the Rust
+code bit for bit on the internal cross-check corpus.
+
 **Small arguments** (`2^−54 ≤ |x| < 2^−30`), which need `2^−158`:
 1. `(h, l) = two_sum(1, x)`, exactly `1 + x`.
 2. `d = e^x − 1 − x ≈ (x·x·k2)·(1 + (x·k3)·(1 + (x·k4)·(1 + x·k5)))` in `Q128`,

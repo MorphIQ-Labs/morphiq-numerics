@@ -1,6 +1,6 @@
 (** The proved Q128 and Q256 transcriptions (formal/q), rounding tests
-    (formal/binary64/RoundingTest.v), and exp's reduction and fast value
-    (formal/exp/ExpReduction.v, formal/exp/ExpFast.v), extracted to OCaml so
+    (formal/binary64/RoundingTest.v), and exp's reduction, fast value and accurate path
+    (formal/exp/ExpReduction.v, ExpFast.v, ExpAccurate.v), extracted to OCaml so
     formal/extraction/internaldriver.ml can run them on the internal cross-check
     corpus and compare with the Rust code bit for bit. A value travels as its sign,
     its exponent and its significand's 64-bit limbs, least significant first. *)
@@ -9,7 +9,7 @@ From Coq Require Import ZArith List Extraction ExtrOcamlBasic.
 From Flocq Require Import IEEE754.Binary IEEE754.Bits.
 From Q Require Import Limbs Digits64 Q128 Q256.
 From Binary64 Require Import IEEE64 RoundingTest.
-Require ExpReduction ExpFast.
+Require ExpReduction ExpFast ExpAccurate.
 Import ListNotations.
 
 Definition limbs (k : nat) (x : Z) : list Z := map (fun i => dig x (Z.of_nat i)) (seq 0 k).
@@ -44,5 +44,11 @@ Definition x_fast rh rl j :=
   let '(yh, yl) := ExpFast.fast_at (b64_of_bits rh) (b64_of_bits rl) (Z.to_nat j) in
   map bits_of_b64 [yh; yl].
 
-Extraction "internalcrosscheck.ml" x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
+(** exp's accurate path (ExpAccurate.v): the 128-bit value at [x]'s reduced
+    argument, for the table index and scale the Rust code computed. *)
+Definition x_accurate x j k :=
+  let '(n, r1, p2, e2, _, _) := ExpReduction.reduce (b64_of_bits x) in
+  q128_out (ExpAccurate.accurate_at (ExpAccurate.acc_r n r1 p2 e2) (Z.to_nat j) k).
+
+Extraction "internalcrosscheck.ml" x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
   x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs.

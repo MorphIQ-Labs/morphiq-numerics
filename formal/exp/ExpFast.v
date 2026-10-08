@@ -723,6 +723,34 @@ Proof.
   rewrite plus_IZR, mult_IZR, INR_IZR_INZ. simpl (IZR radix2). field.
 Qed.
 
+(** Below [X_OVERFLOW], [e^x] is at most [2^1024·(1 − 2^-46)]: [x] is then at
+    most [X_OVERFLOW]'s predecessor, and [e^(pred X_OVERFLOW)] is
+    [2^1024·(1 − 2^-45.26)]. *)
+Lemma exp_below_overflow x : finite x -> B x < B c_x_overflow -> exp (B x) <= 2 ^ 1024 * (1 - / 2 ^ 46).
+Proof.
+  intros Fx Hhi.
+  assert (Xp : B x <= B c_x_overflow - / 2 ^ 43).
+  { destruct (Rlt_or_le (B x) 512) as [S | S].
+    - rewrite c_x_overflow_val. interval with (i_prec 80).
+    - assert (G : on_grid (- Z.of_nat 43) (B c_x_overflow - B x)).
+      { apply grid_minus.
+        - rewrite c_x_overflow_val. apply val_grid. lia.
+        - apply (grid_fmt_bound (FLT_exp emin prec) 9); [intros e; unfold FLT_exp, emin, prec; lia | apply B_fmt | ].
+          right. rewrite Rabs_pos_eq by lra. change (bpow radix2 9) with 512. lra. }
+      assert (NZ : B c_x_overflow - B x <> 0) by lra.
+      pose proof (grid_nonzero _ _ G NZ) as Gn. rewrite bpow_m, Rabs_pos_eq in Gn by lra. lra. }
+  { apply Rle_trans with (exp (B c_x_overflow - / 2 ^ 43)).
+    - destruct (Rle_lt_or_eq_dec _ _ Xp) as [L1 | E1]; [apply Rlt_le, exp_increasing, L1 | rewrite E1; lra].
+    - assert (P1024 : exp (1024 * ln 2) = 2 ^ 1024).
+      { rewrite <- (Rpower_pow 1024 2) by lra. unfold Rpower. f_equal.
+        rewrite INR_IZR_INZ. reflexivity. }
+      set (a := B c_x_overflow - / 2 ^ 43).
+      replace (exp a) with (exp (a - 1024 * ln 2) * 2 ^ 1024)
+        by (rewrite <- P1024, <- exp_plus; f_equal; ring).
+      rewrite Rmult_comm. apply Rmult_le_compat_l; [apply pow_le; lra | ].
+      unfold a. rewrite c_x_overflow_val. interval with (i_prec 120). }
+Qed.
+
 (** The fast path end to end: for every finite [x] that exp(x) reduces and
     whose fast result is normal ([k >= -1021]), when the rounding test passes,
     the returned value is [RN(e^x)]. *)
@@ -761,28 +789,8 @@ Proof.
     assert (IZR k0 < 131074).
     { destruct (Rle_or_lt (IZR k0) 0) as [N | P]; [lra | nra]. }
     rewrite Hk0 in H0. apply lt_IZR in H0. lia. }
-  (* y_hi·2^k < 2^1024: x is at most X_OVERFLOW's predecessor, so e^x has room. *)
-  assert (Xp : B x <= B c_x_overflow - / 2 ^ 43).
-  { destruct (Rlt_or_le (B x) 512) as [S | S].
-    - rewrite c_x_overflow_val. interval with (i_prec 80).
-    - assert (G : on_grid (- Z.of_nat 43) (B c_x_overflow - B x)).
-      { apply grid_minus.
-        - rewrite c_x_overflow_val. apply val_grid. lia.
-        - apply (grid_fmt_bound (FLT_exp emin prec) 9); [intros e; unfold FLT_exp, emin, prec; lia | apply B_fmt | ].
-          right. rewrite Rabs_pos_eq by lra. change (bpow radix2 9) with 512. lra. }
-      assert (NZ : B c_x_overflow - B x <> 0) by lra.
-      pose proof (grid_nonzero _ _ G NZ) as Gn. rewrite bpow_m, Rabs_pos_eq in Gn by lra. lra. }
-  assert (Eb : exp (B x) <= 2 ^ 1024 * (1 - / 2 ^ 46)).
-  { apply Rle_trans with (exp (B c_x_overflow - / 2 ^ 43)).
-    - destruct (Rle_lt_or_eq_dec _ _ Xp) as [L1 | E1]; [apply Rlt_le, exp_increasing, L1 | rewrite E1; lra].
-    - assert (P1024 : exp (1024 * ln 2) = 2 ^ 1024).
-      { rewrite <- (Rpower_pow 1024 2) by lra. unfold Rpower. f_equal.
-        rewrite INR_IZR_INZ. reflexivity. }
-      set (a := B c_x_overflow - / 2 ^ 43).
-      replace (exp a) with (exp (a - 1024 * ln 2) * 2 ^ 1024)
-        by (rewrite <- P1024, <- exp_plus; f_equal; ring).
-      rewrite Rmult_comm. apply Rmult_le_compat_l; [apply pow_le; lra | ].
-      unfold a. rewrite c_x_overflow_val. interval with (i_prec 120). }
+  (* y_hi·2^k < 2^1024: e^x has room below the overflow threshold. *)
+  pose proof (exp_below_overflow x Fx Hhi) as Eb.
   assert (Zp : 0 < Z) by (unfold Z; apply Rmult_lt_0_compat; apply exp_pos).
   assert (T1 : 1 <= exp (INR j * ln 2 / 128)).
   { assert (0 < ln 2) by interval with (i_prec 64). pose proof (pos_INR j).

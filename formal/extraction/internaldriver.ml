@@ -1,5 +1,5 @@
 (* Runs the extracted Q128 and Q256 transcriptions, rounding tests, and exp's
-   reduction and fast value (InternalCrosscheck.v) on the internal cross-check
+   reduction, fast value and accurate path (InternalCrosscheck.v) on the internal cross-check
    corpus and compares each result with the Rust library's.
 
    Each line is "op args : result". A value is "n e k l1 .. lk": its sign
@@ -85,6 +85,12 @@ let compute op args =
       (match args with
        | [x] -> String.concat " " (List.map show_bits (x_reduce (z_of_u64 (hex x))))
        | _ -> failwith "reduce takes one word")
+  | "accurate" ->
+      (match args with
+       | [x; j; k] ->
+           let ((n, e), l) = x_accurate (z_of_u64 (hex x)) (z_of_int (int_of_string j)) (z_of_int (int_of_string k)) in
+           show (n, e, l)
+       | _ -> failwith "accurate takes a word, a table index and a scale")
   | "fast" ->
       (match args with
        | [rh; rl; j] ->
