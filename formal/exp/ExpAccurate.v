@@ -311,3 +311,54 @@ Proof.
   lvl Nr Hr 11%nat ExpAccurateLevels.level_01 S11 S12.
   exact S12.
 Qed.
+
+(** * The product with [T_j]
+
+    [accurate_at(r, j, k)]: the series, times [T_j] as [Q128::new(false,
+    T_Q128[j], -127)], scaled by [2^k]. *)
+
+Definition q_t (j : nat) : Q128.q128 := Q128.new false (exp_tq j) (-127).
+
+Definition accurate_at (r : Q128.q128) (j : nat) (k : Z) : Q128.q128 :=
+  Q128.mul_pow2 (Q128.mul (q_t j) (hq r 12)) k.
+
+Lemma tj_range j : (j < 128)%nat -> 1 <= exp (INR j * ln 2 / 128) <= 2.
+Proof.
+  intros Hj. assert (J : 0 <= INR j <= 127).
+  { split; [apply pos_INR | ].
+    replace 127 with (INR 127) by (rewrite INR_IZR_INZ; reflexivity). apply le_INR. lia. }
+  split.
+  - assert (0 <= INR j * ln 2 / 128) by (assert (0 < ln 2) by interval with (i_prec 64); nra).
+    pose proof (exp_ineq1_le (INR j * ln 2 / 128)). lra.
+  - interval with (i_prec 64).
+Qed.
+
+(** [Y = T_j·H_1] is within [2^-124] relatively of [2^(j/128)·X_1]. *)
+Lemma y_ok r j : NZ r -> Rabs (Q128.qval r) <= 0.0027078 -> (j < 128)%nat ->
+  let T := exp (INR j * ln 2 / 128) in
+  let Y := Q128.mul (q_t j) (hq r 12) in
+  NZ Y /\ Rabs ((Q128.qval Y - T * xq (Q128.qval r) 12) / (T * xq (Q128.qval r) 12)) <= / 2 ^ 124.
+Proof.
+  intros Nr Hr Hj T Y.
+  destruct (series_ok r Nr Hr) as [NH EH].
+  destruct (exp_tq_table_ok j Hj) as [Hm HeT]. change (exp (INR j * ln 2 / 128)) with T in HeT.
+  assert (W : (0 <= exp_tq j < Q128.W)%Z) by (unfold Q128.W; lia).
+  pose proof (new_nz false (exp_tq j) (-127) W) as NT.
+  assert (VT : Q128.qval (q_t j) = IZR (exp_tq j) / 2 ^ 127).
+  { unfold q_t. rewrite Q128.new_val by exact W. unfold QSpec.val, F2R. cbn [Fnum Fexp].
+    change (-127)%Z with (- Z.of_nat 127)%Z. rewrite bpow_m. reflexivity. }
+  pose proof (tj_range j Hj) as HT. fold T in HT.
+  set (eT := Q128.qval (q_t j) / T - 1).
+  assert (EeT : Q128.qval (q_t j) = T * (1 + eT)) by (unfold eT; field; lra).
+  assert (HeT' : Rabs eT <= / 2 ^ 127).
+  { replace eT with ((IZR (exp_tq j) / 2 ^ 127 - T) / T) by (unfold eT; rewrite VT; field; lra). exact HeT. }
+  destruct (mul_any (q_t j) (hq r 12) NT NH) as [NY [mY [HmY EY]]].
+  change (bpow radix2 (-127)) with (bpow radix2 (- Z.of_nat 127)) in HmY. rewrite bpow_m in HmY.
+  split; [exact NY | ].
+  set (X1 := xq (Q128.qval r) 12) in *.
+  set (E1 := Q128.qval (hq r 12) - X1).
+  pose proof (xq_range (Q128.qval r) 12 Hr ltac:(lia)) as XR. fold X1 in XR. apply Rabs_le_inv in XR.
+  pose proof (ExpAccurateLevels.accurate_y_bound T X1 eT E1 mY HT ltac:(lra) HeT' EH HmY) as YB.
+  replace (Q128.qval Y) with (T * (1 + eT) * (X1 + E1) * (1 + mY)) by (unfold Y; rewrite EY, EeT; unfold E1; ring).
+  exact YB.
+Qed.
