@@ -115,7 +115,7 @@ def hex_rational(s):
     return num, k
 
 
-def coq_tables(l_split, poly, poly_bound, table_dw):
+def coq_tables(l_split, poly, poly_bound, table_dw, table_q, reciprocals):
     """formal/exp/ExpTables.v: the fast path's constants and their bounds."""
     num, k = hex_rational(poly_bound)
     c = ['exp_c3', 'exp_c4', 'exp_c5', 'exp_c6']
@@ -217,6 +217,73 @@ def coq_tables(l_split, poly, poly_bound, table_dw):
         *[f'  destruct j as [|j]; [exact exp_t_ok_{j} | ].' for j in range(128)],
         '  lia.',
         'Qed.',
+        '',
+        '(** The accurate path\'s [T_j = 2^(j/128)] as a 128-bit significand [m], value',
+        '    [m·2^-127], top bit set, within [2^-127] relatively ([eT] in',
+        '    formal/exp/accurate_y.g). *)',
+        'Definition exp_tq_bits : list Z := [',
+        *[f'  {m}%Z{";" if j < 127 else ""}' for j, m in enumerate(table_q)],
+        '].',
+        'Definition exp_tq (j : nat) : Z := nth j exp_tq_bits 0%Z.',
+        '',
+        'Definition exp_tq_ok (j : nat) : Prop :=',
+        '  (2 ^ 127 <= exp_tq j < 2 ^ 128)%Z /\\',
+        '  Rabs ((IZR (exp_tq j) / 2 ^ 127 - exp (INR j * ln 2 / 128)) / exp (INR j * ln 2 / 128)) <= / 2 ^ 127.',
+        '',
+    ]
+    for j, m in enumerate(table_q):
+        assert 2**127 <= m < 2**128
+        lines += [
+            f'Lemma exp_tq_ok_{j} : exp_tq_ok {j}.',
+            'Proof.',
+            '  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].',
+            '  split; [lia | ].',
+            f'  rewrite INR_IZR_INZ; change (Z.of_nat {j}) with {j}%Z.',
+            '  interval with (i_prec 200).',
+            'Qed.',
+        ]
+    lines += [
+        '',
+        'Theorem exp_tq_table_ok j : (j < 128)%nat -> exp_tq_ok j.',
+        'Proof.',
+        '  intros H.',
+        *[f'  destruct j as [|j]; [exact exp_tq_ok_{j} | ].' for j in range(128)],
+        '  lia.',
+        'Qed.',
+        '',
+        '(** [1/k], [k = 1..12], as a 128-bit significand [m] and exponent [-s]: value',
+        '    [m·2^-s], top bit set, within [2^-127] relatively ([k] in',
+        '    formal/exp/accurate_level_*.g). *)',
+        'Definition exp_recip_bits : list (Z * nat) := [',
+        *[f'  ({m}%Z, {-e}%nat){";" if i < 11 else ""}' for i, (m, e) in enumerate(reciprocals)],
+        '].',
+        'Definition exp_recip (k : nat) : Z * nat := nth (k - 1) exp_recip_bits (0%Z, 0%nat).',
+        '',
+        'Definition exp_recip_ok (k : nat) : Prop :=',
+        '  (2 ^ 127 <= fst (exp_recip k) < 2 ^ 128)%Z /\\',
+        '  Rabs (IZR (fst (exp_recip k)) / 2 ^ snd (exp_recip k) * INR k - 1) <= / 2 ^ 127.',
+        '',
+    ]
+    for i, (m, e) in enumerate(reciprocals, 1):
+        assert 2**127 <= m < 2**128 and e < 0
+        lines += [
+            f'Lemma exp_recip_ok_{i} : exp_recip_ok {i}.',
+            'Proof.',
+            '  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].',
+            '  split; [lia | ].',
+            f'  rewrite INR_IZR_INZ; change (Z.of_nat {i}) with {i}%Z.',
+            '  interval with (i_prec 200).',
+            'Qed.',
+        ]
+    lines += [
+        '',
+        'Theorem exp_recip_table_ok k : (1 <= k <= 12)%nat -> exp_recip_ok k.',
+        'Proof.',
+        '  intros H.',
+        '  destruct k as [|k]; [lia | ].',
+        *[f'  destruct k as [|k]; [exact exp_recip_ok_{i} | ].' for i in range(1, 13)],
+        '  lia.',
+        'Qed.',
     ]
     return '\n'.join(lines) + '\n'
 
@@ -315,7 +382,7 @@ def generate():
     ]
     return {
         OUTPUT: '\n'.join(lines) + '\n',
-        COQ_OUTPUT: coq_tables((l1, l2, l3, l4), poly, poly_bound, table_dw),
+        COQ_OUTPUT: coq_tables((l1, l2, l3, l4), poly, poly_bound, table_dw, table_q, reciprocals),
     }
 
 

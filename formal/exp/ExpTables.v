@@ -1629,3 +1629,1300 @@ Proof.
   destruct j as [|j]; [exact exp_t_ok_127 | ].
   lia.
 Qed.
+
+(** The accurate path's [T_j = 2^(j/128)] as a 128-bit significand [m], value
+    [m·2^-127], top bit set, within [2^-127] relatively ([eT] in
+    formal/exp/accurate_y.g). *)
+Definition exp_tq_bits : list Z := [
+  170141183460469231731687303715884105728%Z;
+  171065033261874822595940777772823543072%Z;
+  171993899476345128343537119045365325557%Z;
+  172927809342507031348432869633015363432%Z;
+  173866790246890464404407762706616159231%Z;
+  174810869724731509663126252247200298628%Z;
+  175760075460779858320016513849272112514%Z;
+  176714435290110654726396343327124732509%Z;
+  177673977198940748734846910156470796722%Z;
+  178638729325449380214104983772752463190%Z;
+  179608719960603319799715833212640078166%Z;
+  180583977548986490077366315890632763559%Z;
+  181564530689634091527204551507873002851%Z;
+  182550408136871257689552875062520019860%Z;
+  183541638801156264145238352458220470466%Z;
+  184538251749928316037303918111582190741%Z;
+  185540276208459938995127072211809418384%Z;
+  186547741560713998456965993119841707198%Z;
+  187560677350205372522678836423290891574%Z;
+  188579113280867303604824886494904384726%Z;
+  189603079217922454283560100755503568070%Z;
+  190632605188758692908688464665597913127%Z;
+  191667721383809634630928502058329737186%Z;
+  192708458157439963683905328040784845583%Z;
+  193754846028835562878586879676558002648%Z;
+  194806915682898476412852524570078383438%Z;
+  195864697971146732240617263178179563239%Z;
+  196928223912619050387439363498877599725%Z;
+  197997524694784463742817675621853945428%Z;
+  199072631674456878003441270051244360225%Z;
+  200153576378714597586492652124699894469%Z;
+  201240390505824844477730872587051456433%Z;
+  202333105926173297125496651828617737974%Z;
+  203431754683198676638992456051419475698%Z;
+  204536368994332407697200624579210771631%Z;
+  205646981251943381723616489017548850871%Z;
+  206763624024287850031595310903942987551%Z;
+  207886330056464474795546182466874386911%Z;
+  209015132271374565854457196561826421515%Z;
+  210150063770687531506308632151678761712%Z;
+  211291157835811571604829080310840425937%Z;
+  212438447928869641423777836334709202017%Z;
+  213591967693680714908500014151756667305%Z;
+  214751750956746376089903232366178353393%Z;
+  215917831728242767592250934017081204392%Z;
+  217090244203017925323262016382739148704%Z;
+  218269022761594528592954069621697274351%Z;
+  219454201971178095066472785476732527375%Z;
+  220645816586670650115817656573116837915%Z;
+  221843901551689900295908625206017671769%Z;
+  223048491999593940831844565543762752175%Z;
+  224259623254511527166487128046501415028%Z;
+  225477330832377940780667298486584212083%Z;
+  226701650441976479662361810971034597682%Z;
+  227932617985985603966127115501601423481%Z;
+  229170269562031767569914772679449736778%Z;
+  230414641463747966403128794248390520516%Z;
+  231665770181838034587427457757525115372%Z;
+  232923692405146719600324412745563983923%Z;
+  234188445021735567841111407232729062005%Z;
+  235460065119964652149012666518444531086%Z;
+  236738589989580172994793847874596794888%Z;
+  238024057122807965239291598376410960284%Z;
+  239316504215452942525508109785451692896%Z;
+  240615969168004511545033772477625056927%Z;
+  241922490086747988594625185854181211894%Z;
+  243236105284882051014780519171304462938%Z;
+  244556853283642256279124695835041726414%Z;
+  245884772813430661681348285520943998370%Z;
+  247219902814951577745341549758707930481%Z;
+  248562282440353488664034043970094072716%Z;
+  249911951054377173253295806948050327903%Z;
+  251268948235510060089083770641341984634%Z;
+  252633313777146850678831930883129301358%Z;
+  254005087688756444701891394347232966737%Z;
+  255384310197055201538632048615235212163%Z;
+  256771021747186572493626710141645653941%Z;
+  258165263003907138305156637890219514760%Z;
+  259567074852779086721109736845575993922%Z;
+  260976498401369165110195123590922154132%Z;
+  262393574980454143267275523703833468727%Z;
+  263818346145232821762527785947461763669%Z;
+  265250853676544621376087229448197252990%Z;
+  266691139582094789352819215975011778785%Z;
+  268139246097686258405896919356168825214%Z;
+  269595215688458194592953438000777772607%Z;
+  271059091050131270384724885347089774301%Z;
+  272530915110259699443314648811757761933%Z;
+  274010731029490069825493413672447559405%Z;
+  275498582202827012525810618890372253821%Z;
+  276994512260905742474736593352467469570%Z;
+  278498565071271509308586591312165905405%Z;
+  280010784739665995430604214776763400232%Z;
+  281531215611320699086308220161760740299%Z;
+  283059902272257340381039430905991933019%Z;
+  284596889550595328373589423552789887474%Z;
+  286142222517866327586855861304318312414%Z;
+  287695946490335962484656888293481580335%Z;
+  289258107030332698673154974806083447724%Z;
+  290828749947583939795795156590342846649%Z;
+  292407921300559379302259911706322512484%Z;
+  293995667397821646484689171099722683577%Z;
+  295592034799384286388315402930842134617%Z;
+  297197070318077113418726618223830257616%Z;
+  298810821020918978684200823256618578890%Z;
+  300433334230497991328960233165493184947%Z;
+  302064657526359234331778836797853273837%Z;
+  303704838746400015464149074837288087259%Z;
+  305353925988272694323178906376946299117%Z;
+  307011967610795126576555873154767988912%Z;
+  308679012235368766780286440496262334430%Z;
+  310355108747404471354503449921217179046%Z;
+  312040306297756043528438546211487503611%Z;
+  313734654304161562292686563119818614262%Z;
+  315438202452692537625151724391204911890%Z;
+  317151000699210934486567834085183572369%Z;
+  318873099270834108312233122392550783251%Z;
+  320604548667407694958601846839678481396%Z;
+  322345399662986498296635927316317633099%Z;
+  324095703307323418878347657038424943700%Z;
+  325855510927366467338765757798166302659%Z;
+  327624874128763906432638651434630882064%Z;
+  329403844797377565843557752703282034411%Z;
+  331192475100804374142846841702545253207%Z;
+  332990817489906152516528174760363655117%Z;
+  334798924700347715120949007381709906663%Z;
+  336616849754143321171240736068313607683%Z;
+  338444645961211524111694060679677685513%Z
+].
+Definition exp_tq (j : nat) : Z := nth j exp_tq_bits 0%Z.
+
+Definition exp_tq_ok (j : nat) : Prop :=
+  (2 ^ 127 <= exp_tq j < 2 ^ 128)%Z /\
+  Rabs ((IZR (exp_tq j) / 2 ^ 127 - exp (INR j * ln 2 / 128)) / exp (INR j * ln 2 / 128)) <= / 2 ^ 127.
+
+Lemma exp_tq_ok_0 : exp_tq_ok 0.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 0) with 0%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_1 : exp_tq_ok 1.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 1) with 1%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_2 : exp_tq_ok 2.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 2) with 2%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_3 : exp_tq_ok 3.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 3) with 3%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_4 : exp_tq_ok 4.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 4) with 4%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_5 : exp_tq_ok 5.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 5) with 5%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_6 : exp_tq_ok 6.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 6) with 6%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_7 : exp_tq_ok 7.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 7) with 7%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_8 : exp_tq_ok 8.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 8) with 8%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_9 : exp_tq_ok 9.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 9) with 9%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_10 : exp_tq_ok 10.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 10) with 10%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_11 : exp_tq_ok 11.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 11) with 11%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_12 : exp_tq_ok 12.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 12) with 12%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_13 : exp_tq_ok 13.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 13) with 13%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_14 : exp_tq_ok 14.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 14) with 14%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_15 : exp_tq_ok 15.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 15) with 15%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_16 : exp_tq_ok 16.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 16) with 16%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_17 : exp_tq_ok 17.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 17) with 17%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_18 : exp_tq_ok 18.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 18) with 18%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_19 : exp_tq_ok 19.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 19) with 19%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_20 : exp_tq_ok 20.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 20) with 20%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_21 : exp_tq_ok 21.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 21) with 21%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_22 : exp_tq_ok 22.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 22) with 22%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_23 : exp_tq_ok 23.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 23) with 23%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_24 : exp_tq_ok 24.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 24) with 24%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_25 : exp_tq_ok 25.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 25) with 25%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_26 : exp_tq_ok 26.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 26) with 26%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_27 : exp_tq_ok 27.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 27) with 27%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_28 : exp_tq_ok 28.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 28) with 28%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_29 : exp_tq_ok 29.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 29) with 29%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_30 : exp_tq_ok 30.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 30) with 30%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_31 : exp_tq_ok 31.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 31) with 31%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_32 : exp_tq_ok 32.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 32) with 32%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_33 : exp_tq_ok 33.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 33) with 33%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_34 : exp_tq_ok 34.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 34) with 34%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_35 : exp_tq_ok 35.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 35) with 35%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_36 : exp_tq_ok 36.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 36) with 36%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_37 : exp_tq_ok 37.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 37) with 37%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_38 : exp_tq_ok 38.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 38) with 38%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_39 : exp_tq_ok 39.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 39) with 39%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_40 : exp_tq_ok 40.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 40) with 40%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_41 : exp_tq_ok 41.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 41) with 41%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_42 : exp_tq_ok 42.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 42) with 42%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_43 : exp_tq_ok 43.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 43) with 43%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_44 : exp_tq_ok 44.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 44) with 44%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_45 : exp_tq_ok 45.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 45) with 45%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_46 : exp_tq_ok 46.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 46) with 46%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_47 : exp_tq_ok 47.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 47) with 47%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_48 : exp_tq_ok 48.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 48) with 48%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_49 : exp_tq_ok 49.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 49) with 49%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_50 : exp_tq_ok 50.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 50) with 50%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_51 : exp_tq_ok 51.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 51) with 51%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_52 : exp_tq_ok 52.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 52) with 52%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_53 : exp_tq_ok 53.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 53) with 53%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_54 : exp_tq_ok 54.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 54) with 54%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_55 : exp_tq_ok 55.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 55) with 55%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_56 : exp_tq_ok 56.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 56) with 56%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_57 : exp_tq_ok 57.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 57) with 57%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_58 : exp_tq_ok 58.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 58) with 58%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_59 : exp_tq_ok 59.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 59) with 59%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_60 : exp_tq_ok 60.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 60) with 60%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_61 : exp_tq_ok 61.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 61) with 61%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_62 : exp_tq_ok 62.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 62) with 62%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_63 : exp_tq_ok 63.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 63) with 63%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_64 : exp_tq_ok 64.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 64) with 64%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_65 : exp_tq_ok 65.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 65) with 65%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_66 : exp_tq_ok 66.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 66) with 66%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_67 : exp_tq_ok 67.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 67) with 67%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_68 : exp_tq_ok 68.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 68) with 68%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_69 : exp_tq_ok 69.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 69) with 69%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_70 : exp_tq_ok 70.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 70) with 70%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_71 : exp_tq_ok 71.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 71) with 71%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_72 : exp_tq_ok 72.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 72) with 72%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_73 : exp_tq_ok 73.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 73) with 73%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_74 : exp_tq_ok 74.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 74) with 74%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_75 : exp_tq_ok 75.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 75) with 75%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_76 : exp_tq_ok 76.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 76) with 76%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_77 : exp_tq_ok 77.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 77) with 77%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_78 : exp_tq_ok 78.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 78) with 78%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_79 : exp_tq_ok 79.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 79) with 79%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_80 : exp_tq_ok 80.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 80) with 80%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_81 : exp_tq_ok 81.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 81) with 81%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_82 : exp_tq_ok 82.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 82) with 82%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_83 : exp_tq_ok 83.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 83) with 83%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_84 : exp_tq_ok 84.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 84) with 84%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_85 : exp_tq_ok 85.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 85) with 85%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_86 : exp_tq_ok 86.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 86) with 86%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_87 : exp_tq_ok 87.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 87) with 87%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_88 : exp_tq_ok 88.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 88) with 88%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_89 : exp_tq_ok 89.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 89) with 89%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_90 : exp_tq_ok 90.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 90) with 90%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_91 : exp_tq_ok 91.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 91) with 91%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_92 : exp_tq_ok 92.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 92) with 92%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_93 : exp_tq_ok 93.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 93) with 93%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_94 : exp_tq_ok 94.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 94) with 94%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_95 : exp_tq_ok 95.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 95) with 95%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_96 : exp_tq_ok 96.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 96) with 96%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_97 : exp_tq_ok 97.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 97) with 97%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_98 : exp_tq_ok 98.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 98) with 98%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_99 : exp_tq_ok 99.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 99) with 99%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_100 : exp_tq_ok 100.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 100) with 100%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_101 : exp_tq_ok 101.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 101) with 101%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_102 : exp_tq_ok 102.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 102) with 102%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_103 : exp_tq_ok 103.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 103) with 103%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_104 : exp_tq_ok 104.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 104) with 104%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_105 : exp_tq_ok 105.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 105) with 105%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_106 : exp_tq_ok 106.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 106) with 106%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_107 : exp_tq_ok 107.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 107) with 107%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_108 : exp_tq_ok 108.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 108) with 108%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_109 : exp_tq_ok 109.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 109) with 109%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_110 : exp_tq_ok 110.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 110) with 110%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_111 : exp_tq_ok 111.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 111) with 111%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_112 : exp_tq_ok 112.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 112) with 112%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_113 : exp_tq_ok 113.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 113) with 113%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_114 : exp_tq_ok 114.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 114) with 114%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_115 : exp_tq_ok 115.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 115) with 115%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_116 : exp_tq_ok 116.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 116) with 116%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_117 : exp_tq_ok 117.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 117) with 117%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_118 : exp_tq_ok 118.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 118) with 118%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_119 : exp_tq_ok 119.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 119) with 119%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_120 : exp_tq_ok 120.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 120) with 120%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_121 : exp_tq_ok 121.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 121) with 121%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_122 : exp_tq_ok 122.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 122) with 122%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_123 : exp_tq_ok 123.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 123) with 123%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_124 : exp_tq_ok 124.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 124) with 124%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_125 : exp_tq_ok 125.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 125) with 125%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_126 : exp_tq_ok 126.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 126) with 126%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_tq_ok_127 : exp_tq_ok 127.
+Proof.
+  unfold exp_tq_ok, exp_tq; cbn [nth exp_tq_bits].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 127) with 127%Z.
+  interval with (i_prec 200).
+Qed.
+
+Theorem exp_tq_table_ok j : (j < 128)%nat -> exp_tq_ok j.
+Proof.
+  intros H.
+  destruct j as [|j]; [exact exp_tq_ok_0 | ].
+  destruct j as [|j]; [exact exp_tq_ok_1 | ].
+  destruct j as [|j]; [exact exp_tq_ok_2 | ].
+  destruct j as [|j]; [exact exp_tq_ok_3 | ].
+  destruct j as [|j]; [exact exp_tq_ok_4 | ].
+  destruct j as [|j]; [exact exp_tq_ok_5 | ].
+  destruct j as [|j]; [exact exp_tq_ok_6 | ].
+  destruct j as [|j]; [exact exp_tq_ok_7 | ].
+  destruct j as [|j]; [exact exp_tq_ok_8 | ].
+  destruct j as [|j]; [exact exp_tq_ok_9 | ].
+  destruct j as [|j]; [exact exp_tq_ok_10 | ].
+  destruct j as [|j]; [exact exp_tq_ok_11 | ].
+  destruct j as [|j]; [exact exp_tq_ok_12 | ].
+  destruct j as [|j]; [exact exp_tq_ok_13 | ].
+  destruct j as [|j]; [exact exp_tq_ok_14 | ].
+  destruct j as [|j]; [exact exp_tq_ok_15 | ].
+  destruct j as [|j]; [exact exp_tq_ok_16 | ].
+  destruct j as [|j]; [exact exp_tq_ok_17 | ].
+  destruct j as [|j]; [exact exp_tq_ok_18 | ].
+  destruct j as [|j]; [exact exp_tq_ok_19 | ].
+  destruct j as [|j]; [exact exp_tq_ok_20 | ].
+  destruct j as [|j]; [exact exp_tq_ok_21 | ].
+  destruct j as [|j]; [exact exp_tq_ok_22 | ].
+  destruct j as [|j]; [exact exp_tq_ok_23 | ].
+  destruct j as [|j]; [exact exp_tq_ok_24 | ].
+  destruct j as [|j]; [exact exp_tq_ok_25 | ].
+  destruct j as [|j]; [exact exp_tq_ok_26 | ].
+  destruct j as [|j]; [exact exp_tq_ok_27 | ].
+  destruct j as [|j]; [exact exp_tq_ok_28 | ].
+  destruct j as [|j]; [exact exp_tq_ok_29 | ].
+  destruct j as [|j]; [exact exp_tq_ok_30 | ].
+  destruct j as [|j]; [exact exp_tq_ok_31 | ].
+  destruct j as [|j]; [exact exp_tq_ok_32 | ].
+  destruct j as [|j]; [exact exp_tq_ok_33 | ].
+  destruct j as [|j]; [exact exp_tq_ok_34 | ].
+  destruct j as [|j]; [exact exp_tq_ok_35 | ].
+  destruct j as [|j]; [exact exp_tq_ok_36 | ].
+  destruct j as [|j]; [exact exp_tq_ok_37 | ].
+  destruct j as [|j]; [exact exp_tq_ok_38 | ].
+  destruct j as [|j]; [exact exp_tq_ok_39 | ].
+  destruct j as [|j]; [exact exp_tq_ok_40 | ].
+  destruct j as [|j]; [exact exp_tq_ok_41 | ].
+  destruct j as [|j]; [exact exp_tq_ok_42 | ].
+  destruct j as [|j]; [exact exp_tq_ok_43 | ].
+  destruct j as [|j]; [exact exp_tq_ok_44 | ].
+  destruct j as [|j]; [exact exp_tq_ok_45 | ].
+  destruct j as [|j]; [exact exp_tq_ok_46 | ].
+  destruct j as [|j]; [exact exp_tq_ok_47 | ].
+  destruct j as [|j]; [exact exp_tq_ok_48 | ].
+  destruct j as [|j]; [exact exp_tq_ok_49 | ].
+  destruct j as [|j]; [exact exp_tq_ok_50 | ].
+  destruct j as [|j]; [exact exp_tq_ok_51 | ].
+  destruct j as [|j]; [exact exp_tq_ok_52 | ].
+  destruct j as [|j]; [exact exp_tq_ok_53 | ].
+  destruct j as [|j]; [exact exp_tq_ok_54 | ].
+  destruct j as [|j]; [exact exp_tq_ok_55 | ].
+  destruct j as [|j]; [exact exp_tq_ok_56 | ].
+  destruct j as [|j]; [exact exp_tq_ok_57 | ].
+  destruct j as [|j]; [exact exp_tq_ok_58 | ].
+  destruct j as [|j]; [exact exp_tq_ok_59 | ].
+  destruct j as [|j]; [exact exp_tq_ok_60 | ].
+  destruct j as [|j]; [exact exp_tq_ok_61 | ].
+  destruct j as [|j]; [exact exp_tq_ok_62 | ].
+  destruct j as [|j]; [exact exp_tq_ok_63 | ].
+  destruct j as [|j]; [exact exp_tq_ok_64 | ].
+  destruct j as [|j]; [exact exp_tq_ok_65 | ].
+  destruct j as [|j]; [exact exp_tq_ok_66 | ].
+  destruct j as [|j]; [exact exp_tq_ok_67 | ].
+  destruct j as [|j]; [exact exp_tq_ok_68 | ].
+  destruct j as [|j]; [exact exp_tq_ok_69 | ].
+  destruct j as [|j]; [exact exp_tq_ok_70 | ].
+  destruct j as [|j]; [exact exp_tq_ok_71 | ].
+  destruct j as [|j]; [exact exp_tq_ok_72 | ].
+  destruct j as [|j]; [exact exp_tq_ok_73 | ].
+  destruct j as [|j]; [exact exp_tq_ok_74 | ].
+  destruct j as [|j]; [exact exp_tq_ok_75 | ].
+  destruct j as [|j]; [exact exp_tq_ok_76 | ].
+  destruct j as [|j]; [exact exp_tq_ok_77 | ].
+  destruct j as [|j]; [exact exp_tq_ok_78 | ].
+  destruct j as [|j]; [exact exp_tq_ok_79 | ].
+  destruct j as [|j]; [exact exp_tq_ok_80 | ].
+  destruct j as [|j]; [exact exp_tq_ok_81 | ].
+  destruct j as [|j]; [exact exp_tq_ok_82 | ].
+  destruct j as [|j]; [exact exp_tq_ok_83 | ].
+  destruct j as [|j]; [exact exp_tq_ok_84 | ].
+  destruct j as [|j]; [exact exp_tq_ok_85 | ].
+  destruct j as [|j]; [exact exp_tq_ok_86 | ].
+  destruct j as [|j]; [exact exp_tq_ok_87 | ].
+  destruct j as [|j]; [exact exp_tq_ok_88 | ].
+  destruct j as [|j]; [exact exp_tq_ok_89 | ].
+  destruct j as [|j]; [exact exp_tq_ok_90 | ].
+  destruct j as [|j]; [exact exp_tq_ok_91 | ].
+  destruct j as [|j]; [exact exp_tq_ok_92 | ].
+  destruct j as [|j]; [exact exp_tq_ok_93 | ].
+  destruct j as [|j]; [exact exp_tq_ok_94 | ].
+  destruct j as [|j]; [exact exp_tq_ok_95 | ].
+  destruct j as [|j]; [exact exp_tq_ok_96 | ].
+  destruct j as [|j]; [exact exp_tq_ok_97 | ].
+  destruct j as [|j]; [exact exp_tq_ok_98 | ].
+  destruct j as [|j]; [exact exp_tq_ok_99 | ].
+  destruct j as [|j]; [exact exp_tq_ok_100 | ].
+  destruct j as [|j]; [exact exp_tq_ok_101 | ].
+  destruct j as [|j]; [exact exp_tq_ok_102 | ].
+  destruct j as [|j]; [exact exp_tq_ok_103 | ].
+  destruct j as [|j]; [exact exp_tq_ok_104 | ].
+  destruct j as [|j]; [exact exp_tq_ok_105 | ].
+  destruct j as [|j]; [exact exp_tq_ok_106 | ].
+  destruct j as [|j]; [exact exp_tq_ok_107 | ].
+  destruct j as [|j]; [exact exp_tq_ok_108 | ].
+  destruct j as [|j]; [exact exp_tq_ok_109 | ].
+  destruct j as [|j]; [exact exp_tq_ok_110 | ].
+  destruct j as [|j]; [exact exp_tq_ok_111 | ].
+  destruct j as [|j]; [exact exp_tq_ok_112 | ].
+  destruct j as [|j]; [exact exp_tq_ok_113 | ].
+  destruct j as [|j]; [exact exp_tq_ok_114 | ].
+  destruct j as [|j]; [exact exp_tq_ok_115 | ].
+  destruct j as [|j]; [exact exp_tq_ok_116 | ].
+  destruct j as [|j]; [exact exp_tq_ok_117 | ].
+  destruct j as [|j]; [exact exp_tq_ok_118 | ].
+  destruct j as [|j]; [exact exp_tq_ok_119 | ].
+  destruct j as [|j]; [exact exp_tq_ok_120 | ].
+  destruct j as [|j]; [exact exp_tq_ok_121 | ].
+  destruct j as [|j]; [exact exp_tq_ok_122 | ].
+  destruct j as [|j]; [exact exp_tq_ok_123 | ].
+  destruct j as [|j]; [exact exp_tq_ok_124 | ].
+  destruct j as [|j]; [exact exp_tq_ok_125 | ].
+  destruct j as [|j]; [exact exp_tq_ok_126 | ].
+  destruct j as [|j]; [exact exp_tq_ok_127 | ].
+  lia.
+Qed.
+
+(** [1/k], [k = 1..12], as a 128-bit significand [m] and exponent [-s]: value
+    [m·2^-s], top bit set, within [2^-127] relatively ([k] in
+    formal/exp/accurate_level_*.g). *)
+Definition exp_recip_bits : list (Z * nat) := [
+  (170141183460469231731687303715884105728%Z, 127%nat);
+  (170141183460469231731687303715884105728%Z, 128%nat);
+  (226854911280625642308916404954512140971%Z, 129%nat);
+  (170141183460469231731687303715884105728%Z, 129%nat);
+  (272225893536750770770699685945414569165%Z, 130%nat);
+  (226854911280625642308916404954512140971%Z, 130%nat);
+  (194447066811964836264785489961010406546%Z, 130%nat);
+  (170141183460469231731687303715884105728%Z, 130%nat);
+  (302473215040834189745221873272682854628%Z, 131%nat);
+  (272225893536750770770699685945414569165%Z, 131%nat);
+  (247478085033409791609726987223104153786%Z, 131%nat);
+  (226854911280625642308916404954512140971%Z, 131%nat)
+].
+Definition exp_recip (k : nat) : Z * nat := nth (k - 1) exp_recip_bits (0%Z, 0%nat).
+
+Definition exp_recip_ok (k : nat) : Prop :=
+  (2 ^ 127 <= fst (exp_recip k) < 2 ^ 128)%Z /\
+  Rabs (IZR (fst (exp_recip k)) / 2 ^ snd (exp_recip k) * INR k - 1) <= / 2 ^ 127.
+
+Lemma exp_recip_ok_1 : exp_recip_ok 1.
+Proof.
+  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 1) with 1%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_recip_ok_2 : exp_recip_ok 2.
+Proof.
+  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 2) with 2%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_recip_ok_3 : exp_recip_ok 3.
+Proof.
+  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 3) with 3%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_recip_ok_4 : exp_recip_ok 4.
+Proof.
+  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 4) with 4%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_recip_ok_5 : exp_recip_ok 5.
+Proof.
+  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 5) with 5%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_recip_ok_6 : exp_recip_ok 6.
+Proof.
+  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 6) with 6%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_recip_ok_7 : exp_recip_ok 7.
+Proof.
+  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 7) with 7%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_recip_ok_8 : exp_recip_ok 8.
+Proof.
+  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 8) with 8%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_recip_ok_9 : exp_recip_ok 9.
+Proof.
+  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 9) with 9%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_recip_ok_10 : exp_recip_ok 10.
+Proof.
+  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 10) with 10%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_recip_ok_11 : exp_recip_ok 11.
+Proof.
+  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 11) with 11%Z.
+  interval with (i_prec 200).
+Qed.
+Lemma exp_recip_ok_12 : exp_recip_ok 12.
+Proof.
+  unfold exp_recip_ok, exp_recip; cbn [nth exp_recip_bits fst snd Nat.sub].
+  split; [lia | ].
+  rewrite INR_IZR_INZ; change (Z.of_nat 12) with 12%Z.
+  interval with (i_prec 200).
+Qed.
+
+Theorem exp_recip_table_ok k : (1 <= k <= 12)%nat -> exp_recip_ok k.
+Proof.
+  intros H.
+  destruct k as [|k]; [lia | ].
+  destruct k as [|k]; [exact exp_recip_ok_1 | ].
+  destruct k as [|k]; [exact exp_recip_ok_2 | ].
+  destruct k as [|k]; [exact exp_recip_ok_3 | ].
+  destruct k as [|k]; [exact exp_recip_ok_4 | ].
+  destruct k as [|k]; [exact exp_recip_ok_5 | ].
+  destruct k as [|k]; [exact exp_recip_ok_6 | ].
+  destruct k as [|k]; [exact exp_recip_ok_7 | ].
+  destruct k as [|k]; [exact exp_recip_ok_8 | ].
+  destruct k as [|k]; [exact exp_recip_ok_9 | ].
+  destruct k as [|k]; [exact exp_recip_ok_10 | ].
+  destruct k as [|k]; [exact exp_recip_ok_11 | ].
+  destruct k as [|k]; [exact exp_recip_ok_12 | ].
+  lia.
+Qed.
