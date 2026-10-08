@@ -569,22 +569,15 @@ Definition midpoint_far (z d : R) : Prop :=
   forall u, fmtF u -> 0 <= u ->
     d * bpow radix2 (mag radix2 z - 1) <= Rabs (z - (u + succ radix2 (FLT_exp emin prec) u) / 2).
 
-(** A [y] within [2^-120] relatively of such a [z] rounds as [z] does. *)
-Lemma same_rounding z y : 0 < z -> midpoint_far z (/ 2 ^ 113) -> Rabs (y - z) <= / 2 ^ 120 * z ->
-  rndF y = rndF z.
+(** A [y] closer to [z] than [z] is to every breakpoint rounds as [z] does. *)
+Lemma same_rounding_abs z y dl : 0 < z -> dl <= / 2 * z ->
+  (forall u, fmtF u -> 0 <= u -> dl <= Rabs (z - (u + succ radix2 (FLT_exp emin prec) u) / 2)) ->
+  Rabs (y - z) < dl -> rndF y = rndF z.
 Proof.
-  intros Pz Far Hyz.
+  intros Pz Dz Far Close.
   set (u := rndF z).
   assert (Fu : fmtF u) by (apply generic_format_round; auto with typeclass_instances).
   assert (U0 : 0 <= u) by (apply round_ge_generic; [exact _ | exact _ | apply generic_format_0 | lra]).
-  set (dl := / 2 ^ 113 * bpow radix2 (mag radix2 z - 1)).
-  assert (Close : Rabs (y - z) < dl).
-  { pose proof (bpow_mag_gt radix2 z) as M. rewrite Rabs_pos_eq in M by lra.
-    assert (B2 : bpow radix2 (mag radix2 z) = 2 * bpow radix2 (mag radix2 z - 1)).
-    { change 2 with (bpow radix2 1). rewrite <- bpow_plus. f_equal. ring. }
-    unfold dl. rewrite B2 in M.
-    assert (0 < / 2 ^ 120 < / 2 ^ 113 / 4) by (split; interval with (i_prec 64)).
-    pose proof (bpow_gt_0 radix2 (mag radix2 z - 1)). nra. }
   apply Rabs_lt_inv in Close.
   apply Rle_antisym.
   - (* below the midpoint above u *)
@@ -598,16 +591,11 @@ Proof.
       { destruct (Req_dec u 0) as [Z0 | NZ0]; [ | apply succ_gt_id, NZ0].
         rewrite Z0, succ_0, (ulp_FLT_0 radix2 emin prec). apply bpow_gt_0. }
       assert (succ radix2 (FLT_exp emin prec) u <= u) by (apply G; lra). lra. }
-    pose proof (Far u Fu U0) as F1. fold dl in F1.
+    pose proof (Far u Fu U0) as F1.
     rewrite Rabs_left1 in F1 by lra. lra.
   - (* above the midpoint below u *)
     destruct (Req_dec u 0) as [Z0 | NZ0].
-    { rewrite Z0. apply round_ge_generic; [exact _ | exact _ | apply generic_format_0 | ].
-      assert (dl <= / 2 * z).
-      { pose proof (bpow_mag_le radix2 z ltac:(lra)) as M. rewrite Rabs_pos_eq in M by lra.
-        unfold dl. assert (0 < / 2 ^ 113 < / 2) by (split; interval with (i_prec 64)).
-        pose proof (bpow_gt_0 radix2 (mag radix2 z - 1)). nra. }
-      lra. }
+    { rewrite Z0. apply round_ge_generic; [exact _ | exact _ | apply generic_format_0 | ]. lra. }
     assert (Pu : 0 < u) by lra.
     set (p := pred radix2 (FLT_exp emin prec) u).
     assert (Fp : fmtF p) by (apply generic_format_pred; [exact _ | exact Fu]).
@@ -619,8 +607,32 @@ Proof.
       pose proof (round_N_le_midp radix2 (FLT_exp emin prec) ne p z Fp) as G. rewrite Sp in G.
       pose proof (pred_lt_id radix2 (FLT_exp emin prec) u NZ0) as Lt. fold p in Lt.
       assert (u <= p) by (apply G; lra). lra. }
-    pose proof (Far p Fp P0) as F1. fold dl in F1. rewrite Sp in F1.
+    pose proof (Far p Fp P0) as F1. rewrite Sp in F1.
     rewrite Rabs_pos_eq in F1 by lra. fold p. lra.
+Qed.
+
+(** [midpoint_far]'s distance as an absolute one: [d·2^(E-1)], between
+    [d·z/2] and [d·z]. *)
+Lemma far_abs z d : 0 < z -> 0 < d ->
+  d * z / 2 < d * bpow radix2 (mag radix2 z - 1) <= d * z.
+Proof.
+  intros Pz Pd.
+  pose proof (bpow_mag_gt radix2 z) as M1. pose proof (bpow_mag_le radix2 z ltac:(lra)) as M2.
+  rewrite Rabs_pos_eq in M1, M2 by lra.
+  assert (B2 : bpow radix2 (mag radix2 z) = 2 * bpow radix2 (mag radix2 z - 1)).
+  { change 2 with (bpow radix2 1). rewrite <- bpow_plus. f_equal. ring. }
+  rewrite B2 in M1. split; nra.
+Qed.
+
+(** A [y] within [2^-120] relatively of such a [z] rounds as [z] does. *)
+Lemma same_rounding z y : 0 < z -> midpoint_far z (/ 2 ^ 113) -> Rabs (y - z) <= / 2 ^ 120 * z ->
+  rndF y = rndF z.
+Proof.
+  intros Pz Far Hyz.
+  assert (D : 0 < / 2 ^ 120 < / 2 ^ 113 / 2 /\ / 2 ^ 113 < / 2) by (repeat split; interval with (i_prec 64)).
+  destruct (far_abs z (/ 2 ^ 113) Pz ltac:(lra)) as [F1 F2].
+  apply (same_rounding_abs z y (/ 2 ^ 113 * bpow radix2 (mag radix2 z - 1)) Pz); [nra | exact Far | ].
+  assert (/ 2 ^ 120 * z < / 2 ^ 113 * z / 2) by nra. lra.
 Qed.
 
 (** * The accurate path end to end *)
