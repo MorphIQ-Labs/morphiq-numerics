@@ -6,10 +6,10 @@
     [small] returns [RN(e^x)] ([exp_small_ok]). [d]'s evaluation is
     formal/exp/small.g's theorem; this file proves its hypotheses. *)
 
-From Coq Require Import ZArith Reals Lia Lra Psatz List.
+From Coq Require Import ZArith Reals Lia Lra Psatz List Bool.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
 From Q Require QSpec Q128.
-From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Eft RoundingGaps RoundingCore RoundingTest.
+From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Eft RoundingGaps RoundingCore RoundingTest Encodings.
 From Gappa Require Gappa_definitions Gappa_pred_bnd.
 From Interval Require Import Tactic.
 Require ExpTables ExpAccurate exp_small.
@@ -62,6 +62,17 @@ Definition small_d (x : binary_float 53 1024) : Q128.q128 :=
 Definition small_parts (x : binary_float 53 1024) : binary_float 53 1024 * Q128.q128 :=
   let '(h, l) := two_sum64 ExpFast.c_one x in
   (h, Q128.add (ExpAccurate.qf l) (small_d x)).
+
+(** [small(x)]: [RN(h + w)], [h] unless [|w|] reaches half the gap on [w]'s
+    side of [h]. *)
+Definition small (x : binary_float 53 1024) : binary_float 53 1024 :=
+  let '(h, w) := small_parts x in
+  let up := negb (Q128.neg w && negb (Q128.m w =? 0)%Z) in
+  let gap := if negb up && fraction_zero h then fmul (ulp_f h) half else ulp_f h in
+  match Q128.cmp_abs w (ExpAccurate.qf (fmul gap half)) with
+  | Lt => h
+  | _ => if up then b64_of_bits (bits_of_b64 h + 1) else b64_of_bits (bits_of_b64 h - 1)
+  end.
 
 (** [d]'s exact counterpart. *)
 Definition Dpoly (x : R) : R := x * x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5))).
@@ -169,7 +180,7 @@ Qed.
     [2^-60] more, and [h + w] within [2^-178] of [e^x]. *)
 Theorem small_parts_ok x : finite x -> B x <> 0 -> Rabs (B x) <= / 2 ^ 30 ->
   let '(h, w) := small_parts x in
-  finite h /\ B h = rndF (1 + B x) /\ / 2 < B h < 2 /\ ExpAccurate.NZ w /\
+  finite h /\ B h = rndF (1 + B x) /\ 0.99 < B h < 1.01 /\ ExpAccurate.NZ w /\
   Rabs (Q128.qval w) <= / 2 * ulp radix2 fexp64 (B h) + / 2 ^ 60 /\
   Rabs (B h + Q128.qval w - exp (B x)) <= / 2 ^ 178.
 Proof.
@@ -196,7 +207,7 @@ Proof.
     exact R. }
   assert (U53 : / 2 ^ 53 < / 1000) by interval.
   apply Rabs_le_inv in Hr.
-  assert (Hh : / 2 < B h < 2) by (split; nra).
+  assert (Hh : 0.99 < B h < 1.01) by (split; nra).
   destruct (ulp_range (B h) ltac:(lra)) as [Ul Uu].
   change (bpow radix2 (-53)) with (bpow radix2 (- Z.of_nat 53)) in Ul.
   change (bpow radix2 (-52)) with (bpow radix2 (- Z.of_nat 52)) in Uu.
@@ -238,4 +249,215 @@ Proof.
   apply Rabs_le_inv in E1'. apply Rabs_le_inv in E2'. apply Rabs_le_inv in E3. apply Rabs_le_inv in Lh.
   repeat split; try assumption; try lra.
   all: apply Rabs_le; lra.
+Qed.
+
+(** * The rounding decision *)
+
+(** [h]'s gaps: [ulp(h)] is [2^e], [e] in [-53, -52], the gap below [h] is
+    [2^(e-1)] at a power of two and [2^e] otherwise. *)
+Lemma gap_ok h : finite h -> 0.99 < B h < 1.01 ->
+  exists e, (-53 <= e <= -52)%Z /\ finite (ulp_f h) /\ B (ulp_f h) = bpow radix2 e /\
+    ulp radix2 fexp64 (B h) = bpow radix2 e /\
+    (fraction_zero h = true -> B h - pred radix2 fexp64 (B h) = bpow radix2 (e - 1)) /\
+    (fraction_zero h = false -> B h - pred radix2 fexp64 (B h) = bpow radix2 e).
+Proof.
+  intros Fh Hh.
+  assert (N : bpow radix2 (-1022) <= B h).
+  { apply Rle_trans with (bpow radix2 (-1)); [apply bpow_le; lia | ]. change (bpow radix2 (-1)) with (/ 2). lra. }
+  destruct (pos_normal h Fh N) as [mx [ex [Hx [Eh [Mx [Ex [V [M [Ulp _]]]]]]]]].
+  pose proof (bpow_gt_0 radix2 ex) as Pe.
+  assert (Ee : (-53 <= ex <= -52)%Z).
+  { split.
+    - assert (L : bpow radix2 (-1) < bpow radix2 (53 + ex)).
+      { change (bpow radix2 (-1)) with (/ 2). rewrite bpow_plus. apply Rlt_trans with (B h); [lra | ].
+        rewrite V. apply Rmult_lt_compat_r; [lra | ].
+        replace (bpow radix2 53) with (IZR (2 ^ 53)) by reflexivity. apply IZR_lt. lia. }
+      apply lt_bpow in L. lia.
+    - assert (L : bpow radix2 (52 + ex) < bpow radix2 1).
+      { rewrite bpow_plus. apply Rle_lt_trans with (B h); [ | change (bpow radix2 1) with 2; lra].
+        rewrite V. apply Rmult_le_compat_r; [lra | ].
+        replace (bpow radix2 52) with (IZR (2 ^ 52)) by reflexivity. apply IZR_le. lia. }
+      apply lt_bpow in L. lia. }
+  exists ex.
+  assert (Uf : ulp_f h = binary_normalize 53 1024 eq_refl eq_refl mode_NE 1 ex false) by (rewrite Eh; reflexivity).
+  destruct (pow2_f ex ltac:(lia)) as [Bu Fu]. rewrite <- Uf in Bu, Fu.
+  assert (Fz : fraction_zero h = (Zpos mx mod 2 ^ 52 =? 0)%Z) by (rewrite Eh; reflexivity).
+  assert (Pos : 0 < B h) by lra.
+  split; [lia | ]. split; [exact Fu | ]. split; [exact Bu | ]. split; [exact Ulp | ].
+  rewrite Fz. split.
+  - intros Z0. apply Z.eqb_eq in Z0.
+    assert (Bot : Zpos mx = (2 ^ 52)%Z) by (pose proof (Z.div_mod (Zpos mx) (2 ^ 52) ltac:(lia)); lia).
+    rewrite pred_eq_pos by lra. unfold pred_pos. rewrite M.
+    assert (P2 : B h = bpow radix2 (ex + 53 - 1)).
+    { rewrite V, Bot. replace (ex + 53 - 1)%Z with (52 + ex)%Z by ring. rewrite bpow_plus. reflexivity. }
+    rewrite (Req_bool_true _ _ P2). unfold FLT_exp.
+    replace (Z.max (ex + 53 - 1 - 53) (-1074)) with (ex - 1)%Z by lia. ring.
+  - intros Z1. apply Z.eqb_neq in Z1.
+    rewrite pred_eq_pos by lra. unfold pred_pos. rewrite M.
+    assert (NP : B h <> bpow radix2 (ex + 53 - 1)).
+    { rewrite V. replace (ex + 53 - 1)%Z with (52 + ex)%Z by ring. rewrite bpow_plus. intros E.
+      apply Rmult_eq_reg_r in E; [ | lra]. replace (bpow radix2 52) with (IZR (2 ^ 52)) in E by reflexivity.
+      apply eq_IZR in E. rewrite E in Z1. apply Z1. reflexivity. }
+    rewrite (Req_bool_false _ _ NP), Ulp. ring.
+Qed.
+
+Lemma bpow_m1 e : bpow radix2 (e - 1) = bpow radix2 e / 2.
+Proof. unfold Zminus. rewrite bpow_plus. reflexivity. Qed.
+
+(** [cmp_abs] compares magnitudes exactly, zero included. *)
+Lemma cmp_lt a b : ExpAccurate.NZ a -> ExpAccurate.NZ b -> 0 < Rabs (Q128.qval b) ->
+  (Q128.cmp_abs a b = Lt <-> Rabs (Q128.qval a) < Rabs (Q128.qval b)).
+Proof.
+  intros Na Nb Pb. rewrite <- (ExpAccurate.mag_abs a Na), <- (ExpAccurate.mag_abs b Nb) in *.
+  destruct Nb as [Zb | Nb'].
+  { exfalso. unfold Q128.mag in Pb. rewrite Zb, F2R_0 in Pb. lra. }
+  assert (Mb : (Q128.m b =? 0)%Z = false).
+  { apply Z.eqb_neq. unfold QSpec.normalized in Nb'. assert (0 < 2 ^ (128 - 1))%Z by (apply Z.pow_pos_nonneg; lia). lia. }
+  destruct Na as [Za | Na'].
+  { unfold Q128.cmp_abs. rewrite Za, Mb. cbn. unfold Q128.mag at 1. rewrite Za, F2R_0.
+    split; [intros _; exact Pb | reflexivity]. }
+  pose proof (Q128.cmp_abs_ok a b Na' Nb') as C.
+  destruct (Q128.cmp_abs a b); split; intros L; try reflexivity; try discriminate; lra.
+Qed.
+
+(** [!w.is_negative()] is [w >= 0]. *)
+Lemma up_sign w : ExpAccurate.NZ w ->
+  if negb (Q128.neg w && negb (Q128.m w =? 0)%Z) then 0 <= Q128.qval w else Q128.qval w < 0.
+Proof.
+  intros Nw. pose proof (ExpAccurate.NZ_nonneg w Nw) as M0.
+  unfold Q128.qval, QSpec.val.
+  destruct (Q128.neg w); destruct (Z.eqb_spec (Q128.m w) 0) as [Z0 | Z1]; cbn [andb negb].
+  - rewrite Z0. unfold F2R. simpl. lra.
+  - apply F2R_lt_0. simpl. lia.
+  - apply F2R_ge_0. simpl. lia.
+  - apply F2R_ge_0. simpl. lia.
+Qed.
+
+(** * The small-argument path end to end
+
+    [LM] guarantees [e^x] keeps a mantissa distance of [2^-158] from every
+    rounding breakpoint for [2^-54 <= |x| < 2^-30] (docs/exp.md, section 6).
+    [h + w] is within [2^-178] of [e^x], so it rounds as [e^x] does and is no
+    breakpoint itself, and [small] decides its rounding exactly. *)
+Theorem exp_small_ok x : finite x -> / 2 ^ 54 <= Rabs (B x) < / 2 ^ 30 ->
+  ExpAccurate.midpoint_far (exp (B x)) (/ 2 ^ 158) ->
+  finite (small x) /\ B (small x) = rndF (exp (B x)).
+Proof.
+  intros Fx [Hx1 Hx2] Far.
+  assert (C178 : / 2 ^ 178 < / 2 ^ 158 * 0.99 / 2) by interval.
+  assert (C158 : / 2 ^ 158 < / 2) by interval.
+  assert (S60 : / 2 ^ 60 < / 2 ^ 53 / 4) by interval.
+  assert (C52 : / 2 ^ 52 < / 1000) by interval.
+  assert (Hx0 : B x <> 0).
+  { intros E. rewrite E, Rabs_R0 in Hx1. assert (0 < / 2 ^ 54) by (apply Rinv_0_lt_compat, pow_lt; lra). lra. }
+  pose proof (Rabs_le_inv _ _ (Rlt_le _ _ Hx2)) as Hx'.
+  pose proof (small_parts_ok x Fx Hx0 (Rlt_le _ _ Hx2)) as SP.
+  unfold small. destruct (small_parts x) as [h w]. destruct SP as [Fh [_ [Hh [Nw [Wb Err]]]]].
+  unfold ExpAccurate.midpoint_far in Far.
+  assert (Pz : 0.99 < exp (B x)) by interval.
+  set (H := B h) in *. set (W := Q128.qval w) in *. set (z := exp (B x)) in *.
+  change (FLT_exp (-1074) 53) with (FLT_exp emin prec) in Wb.
+  (* [h + w] rounds as [e^x], and is no breakpoint *)
+  assert (P158 : 0 < / 2 ^ 158) by (apply Rinv_0_lt_compat, pow_lt; lra).
+  destruct (ExpAccurate.far_abs z (/ 2 ^ 158) ltac:(lra) P158) as [D1 D2].
+  set (dl := / 2 ^ 158 * bpow radix2 (mag radix2 z - 1)) in *.
+  assert (Close : Rabs (H + W - z) < dl).
+  { nra. }
+  assert (RZ : rndF (H + W) = rndF z).
+  { apply (ExpAccurate.same_rounding_abs z (H + W) dl); [lra | nra | exact Far | exact Close]. }
+  assert (NoMid : forall u, fmtF u -> 0 <= u -> H + W <> (u + succ radix2 (FLT_exp emin prec) u) / 2).
+  { intros u Fu U0 E. pose proof (Far u Fu U0) as F. rewrite <- E, Rabs_minus_sym in F. lra. }
+  rewrite <- RZ.
+  (* the gaps around [h] *)
+  destruct (gap_ok h Fh Hh) as [e [Ee [Fu [Bu [Ulp [Gz Gnz]]]]]].
+  change (FLT_exp (-1074) 53) with (FLT_exp emin prec) in Ulp, Gz, Gnz. fold H in Ulp, Gz, Gnz.
+  rewrite Ulp in Wb.
+  pose proof (bpow_gt_0 radix2 e) as Pe.
+  pose proof (bpow_m1 e) as E1. pose proof (bpow_m1 (e - 1)) as E2. rewrite E1 in E2.
+  assert (Ue : / 2 ^ 53 <= bpow radix2 e <= / 2 ^ 52).
+  { rewrite <- (ExpAccurate.bpow_m 53), <- (ExpAccurate.bpow_m 52). split; apply bpow_le; simpl; lia. }
+  assert (FH : fmtF H) by apply B_fmt.
+  assert (Sh : succ radix2 (FLT_exp emin prec) H = H + bpow radix2 e) by (rewrite succ_eq_pos by lra; rewrite Ulp; ring).
+  pose proof (generic_format_succ radix2 (FLT_exp emin prec) H FH) as FsH.
+  set (pH := pred radix2 (FLT_exp emin prec) H) in *.
+  assert (Gp : bpow radix2 e / 2 <= H - pH <= bpow radix2 e).
+  { destruct (fraction_zero h); [rewrite (Gz eq_refl) | rewrite (Gnz eq_refl)]; lra. }
+  assert (FpH : fmtF pH) by (apply generic_format_pred; [exact _ | exact FH]).
+  assert (SpH : succ radix2 (FLT_exp emin prec) pH = H) by (apply succ_pred; [exact _ | exact FH]).
+  assert (UpH : ulp radix2 (FLT_exp emin prec) pH = H - pH).
+  { pose proof (succ_eq_pos radix2 (FLT_exp emin prec) pH ltac:(lra)) as S. rewrite SpH in S. lra. }
+  set (ppH := pred radix2 (FLT_exp emin prec) pH).
+  assert (PH0 : 0 < pH) by lra.
+  assert (Spp : ppH + ulp radix2 (FLT_exp emin prec) ppH = pH)
+    by exact (pred_plus_ulp radix2 (FLT_exp emin prec) pH PH0 FpH).
+  assert (Upp : ulp radix2 (FLT_exp emin prec) ppH <= ulp radix2 (FLT_exp emin prec) pH).
+  { apply ulp_le_pos. all: try exact _.
+    - apply pred_ge_0; [exact _ | lra | exact FpH].
+    - apply pred_le_id. }
+  assert (Upp' : / 2 ^ 53 <= ulp radix2 (FLT_exp emin prec) ppH).
+  { pose proof (ulp_ge_0 radix2 (FLT_exp emin prec) ppH).
+    destruct (ulp_range ppH ltac:(split; lra)) as [U _].
+    change (bpow radix2 (-53)) with (bpow radix2 (- Z.of_nat 53)) in U. rewrite ExpAccurate.bpow_m in U. exact U. }
+  (* the four cases *)
+  pose proof (up_sign w Nw) as Sg. fold W in Sg.
+  destruct (negb (Q128.neg w && negb (Q128.m w =? 0)%Z)); cbn [negb andb].
+  - (* [w >= 0]: [h], or the number above it *)
+    destruct (half_f (ulp_f h) e Fu Bu ltac:(lia)) as [Fg Bg].
+    set (q := ExpAccurate.qf (fmul (ulp_f h) half)).
+    assert (Nq : ExpAccurate.NZ q) by apply ExpAccurate.from_f64_nz.
+    assert (Vq : Q128.qval q = bpow radix2 e / 2).
+    { unfold q, ExpAccurate.qf. rewrite ExpAccurate.from_f64_b64 by exact Fg. rewrite <- E1. exact Bg. }
+    pose proof (cmp_lt w q Nw Nq ltac:(rewrite Vq, Rabs_pos_eq; lra)) as C. fold W in C.
+    rewrite Vq, (Rabs_pos_eq (bpow radix2 e / 2)), (Rabs_pos_eq W) in C by lra.
+    assert (Up : bpow radix2 e / 2 <= W -> finite (b64_of_bits (bits_of_b64 h + 1)) /\
+                   B (b64_of_bits (bits_of_b64 h + 1)) = rndF (H + W)).
+    { intros L. destruct (bits_up h Fh) as [Fn Bn].
+      { change (B h) with H. split; [apply Rle_trans with (bpow radix2 (-1)); [apply bpow_le; lia | change (bpow radix2 (-1)) with (/ 2); lra] | ].
+        apply Rlt_le_trans with 2; [lra | ]. change 2 with (bpow radix2 1). apply bpow_le. lia. }
+      change (FLT_exp (-1074) 53) with (FLT_exp emin prec) in Bn. fold H in Bn.
+      split; [exact Fn | ]. rewrite Bn. apply Rle_antisym.
+      - apply round_N_ge_midp; try exact _; [exact FsH | ].
+        rewrite pred_succ by (exact _ || exact FH). rewrite Sh.
+        pose proof (NoMid H FH ltac:(lra)) as NM. rewrite Sh in NM.
+        destruct (Rle_lt_or_eq_dec _ _ L) as [L' | L']; [lra | exfalso; apply NM; lra].
+      - apply round_le_generic; [exact _ | exact _ | exact FsH | ].
+        rewrite Sh. apply Rabs_le_inv in Wb. lra. }
+    destruct (Q128.cmp_abs w q) eqn:Cm.
+    + apply Up. apply Rnot_lt_le. intros L. apply C in L. discriminate.
+    + split; [exact Fh | ]. change (B h) with H. apply Rle_antisym.
+      * apply round_ge_generic; [exact _ | exact _ | exact FH | lra].
+      * apply round_N_le_midp; try exact _; [exact FH | ]. rewrite Sh. pose proof (proj1 C eq_refl). lra.
+    + apply Up. apply Rnot_lt_le. intros L. apply C in L. discriminate.
+  - (* [w < 0]: [h], or the number below it *)
+    set (q := ExpAccurate.qf (fmul (if fraction_zero h then fmul (ulp_f h) half else ulp_f h) half)).
+    assert (Q : ExpAccurate.NZ q /\ Q128.qval q = (H - pH) / 2).
+    { split; [apply ExpAccurate.from_f64_nz | ]. unfold q.
+      destruct (fraction_zero h).
+      - destruct (half_f (ulp_f h) e Fu Bu ltac:(lia)) as [Fg Bg].
+        destruct (half_f _ (e - 1) Fg Bg ltac:(lia)) as [Fg2 Bg2].
+        unfold ExpAccurate.qf. rewrite ExpAccurate.from_f64_b64 by exact Fg2.
+        now rewrite Bg2, (Gz eq_refl), E1, E2.
+      - destruct (half_f (ulp_f h) e Fu Bu ltac:(lia)) as [Fg Bg].
+        unfold ExpAccurate.qf. rewrite ExpAccurate.from_f64_b64 by exact Fg.
+        rewrite Bg, (Gnz eq_refl), E1. reflexivity. }
+    destruct Q as [Nq Vq].
+    pose proof (cmp_lt w q Nw Nq ltac:(rewrite Vq, Rabs_pos_eq; lra)) as C. fold W in C.
+    rewrite Vq, (Rabs_pos_eq ((H - pH) / 2)), (Rabs_left W) in C by lra.
+    assert (Dn : (H - pH) / 2 <= - W -> finite (b64_of_bits (bits_of_b64 h - 1)) /\
+                   B (b64_of_bits (bits_of_b64 h - 1)) = rndF (H + W)).
+    { intros L. destruct (bits_down h Fh) as [Fn Bn].
+      { change (B h) with H. apply Rle_trans with (bpow radix2 (-1)); [apply bpow_le; lia | change (bpow radix2 (-1)) with (/ 2); lra]. }
+      change (FLT_exp (-1074) 53) with (FLT_exp emin prec) in Bn. fold H pH in Bn.
+      split; [exact Fn | ]. rewrite Bn. apply Rle_antisym.
+      - apply round_N_ge_midp; try exact _; [exact FpH | ]. fold ppH.
+        apply Rabs_le_inv in Wb. lra.
+      - apply round_N_le_midp; try exact _; [exact FpH | ]. rewrite SpH.
+        pose proof (NoMid pH FpH ltac:(lra)) as NM. rewrite SpH in NM.
+        destruct (Rle_lt_or_eq_dec _ _ L) as [L' | L']; [lra | exfalso; apply NM; lra]. }
+    destruct (Q128.cmp_abs w q) eqn:Cm.
+    + apply Dn. apply Rnot_lt_le. intros L. apply C in L. discriminate.
+    + split; [exact Fh | ]. change (B h) with H. apply Rle_antisym.
+      * apply round_N_ge_midp; try exact _; [exact FH | ]. fold pH. pose proof (proj1 C eq_refl). lra.
+      * apply round_le_generic; [exact _ | exact _ | exact FH | lra].
+    + apply Dn. apply Rnot_lt_le. intros L. apply C in L. discriminate.
 Qed.

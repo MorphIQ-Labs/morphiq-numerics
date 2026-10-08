@@ -71,10 +71,13 @@ Proof.
   f_equal. f_equal. change (2 ^ (11 - 1))%Z with 1024%Z. ring.
 Qed.
 
-(** A positive normal number's fields, and its encoding. *)
+(** A positive normal number's fields, its magnitude and ulp, and its
+    encoding. *)
 Lemma pos_normal h : finite h -> bpow radix2 (-1022) <= B h ->
-  exists mx ex, (2 ^ 52 <= Zpos mx < 2 ^ 53)%Z /\ (-1074 <= ex <= 971)%Z /\
+  exists mx ex Hx, h = B754_finite 53 1024 false mx ex Hx /\
+    (2 ^ 52 <= Zpos mx < 2 ^ 53)%Z /\ (-1074 <= ex <= 971)%Z /\
     B h = IZR (Zpos mx) * bpow radix2 ex /\
+    mag radix2 (B h) = (ex + 53)%Z :> Z /\ ulp radix2 (FLT_exp (-1074) 53) (B h) = bpow radix2 ex /\
     bits_of_b64 h = join_bits 52 11 false (Zpos mx - 2 ^ 52) (ex + 1075).
 Proof.
   intros Fh Hh. destruct h as [s | s | s pl Hpl | s mx ex Hx]; try discriminate.
@@ -112,7 +115,15 @@ Proof.
   { cut (-1075 < ex)%Z; [lia | ]. apply (lt_bpow radix2). apply Rle_lt_trans with (2 := U1).
     replace (-1075)%Z with (-1022 + -53)%Z by reflexivity. rewrite bpow_plus.
     apply Rmult_le_compat_r; [apply bpow_ge_0 | exact Hh]. }
-  exists mx, ex. split; [exact Mx | ]. split; [lia | ]. split; [exact V | ].
+  assert (M : mag radix2 v = (ex + 53)%Z :> Z).
+  { apply mag_unique. rewrite Rabs_pos_eq by lra. rewrite V.
+    replace (ex + 53 - 1)%Z with (52 + ex)%Z by ring. replace (ex + 53)%Z with (53 + ex)%Z by ring.
+    rewrite !bpow_plus.
+    split; [apply Rmult_le_compat_r; [lra | ] | apply Rmult_lt_compat_r; [lra | ]].
+    - replace (bpow radix2 52) with (IZR (2 ^ 52)) by reflexivity. apply IZR_le. lia.
+    - replace (bpow radix2 53) with (IZR (2 ^ 53)) by reflexivity. apply IZR_lt. lia. }
+  exists mx, ex, Hx. split; [reflexivity | ]. split; [exact Mx | ]. split; [lia | ].
+  split; [exact V | ]. split; [exact M | ]. split; [exact Ulp | ].
   unfold bits_of_b64, bits_of_binary_float. change (Zpower 2 52) with (2 ^ 52)%Z.
   replace (Zle_bool 0 (Zpos mx - 2 ^ 52)) with true by (symmetry; apply Zle_imp_le_bool; lia).
   f_equal. replace (3 - 2 ^ (11 - 1) - (52 + 1))%Z with (-1074)%Z by reflexivity. ring.
@@ -123,21 +134,12 @@ Theorem bits_up h : finite h -> bpow radix2 (-1022) <= B h < bpow radix2 1023 ->
   finite (b64_of_bits (bits_of_b64 h + 1)) /\
   B (b64_of_bits (bits_of_b64 h + 1)) = succ radix2 (FLT_exp (-1074) 53) (B h).
 Proof.
-  intros Fh [H1 H2]. destruct (pos_normal h Fh H1) as [mx [ex [Mx [Ex [V Bits]]]]].
+  intros Fh [H1 H2]. destruct (pos_normal h Fh H1) as [mx [ex [Hx [_ [Mx [Ex [V [_ [Ulp Bits]]]]]]]]].
   assert (Pe : 0 < bpow radix2 ex) by apply bpow_gt_0.
   assert (Pos : 0 < B h) by (pose proof (bpow_gt_0 radix2 (-1022)); lra).
   (* succ h = h + ulp h = (mx + 1)·2^ex *)
-  assert (S : succ radix2 (FLT_exp (-1074) 53) (B h) = IZR (Zpos mx + 1) * bpow radix2 ex).
-  { rewrite succ_eq_pos by lra. rewrite ulp_neq_0 by lra. unfold cexp.
-    assert (M : mag radix2 (B h) = (ex + 53)%Z :> Z).
-    { apply mag_unique. rewrite Rabs_pos_eq by lra. rewrite V.
-      replace (ex + 53 - 1)%Z with (52 + ex)%Z by ring. replace (ex + 53)%Z with (53 + ex)%Z by ring.
-      rewrite !bpow_plus.
-      split; [apply Rmult_le_compat_r; [lra | ] | apply Rmult_lt_compat_r; [lra | ]].
-      - replace (bpow radix2 52) with (IZR (2 ^ 52)) by reflexivity. apply IZR_le. lia.
-      - replace (bpow radix2 53) with (IZR (2 ^ 53)) by reflexivity. apply IZR_lt. lia. }
-    rewrite M. unfold FLT_exp. replace (Z.max (ex + 53 - 53) (-1074)) with ex by lia.
-    rewrite V, plus_IZR. ring. }
+  assert (S : succ radix2 (FLT_exp (-1074) 53) (B h) = IZR (Zpos mx + 1) * bpow radix2 ex)
+    by (rewrite succ_eq_pos by lra; rewrite Ulp, V, plus_IZR; ring).
   rewrite Bits, join_eq, S.
   destruct (Z.eq_dec (Zpos mx) (2 ^ 53 - 1)) as [Top | Mid].
   - (* the significand field carries into the exponent field *)
@@ -163,16 +165,9 @@ Theorem bits_down h : finite h -> bpow radix2 (-1021) <= B h ->
 Proof.
   intros Fh H1.
   assert (H0 : bpow radix2 (-1022) <= B h) by (apply Rle_trans with (2 := H1); apply bpow_le; lia).
-  destruct (pos_normal h Fh H0) as [mx [ex [Mx [Ex [V Bits]]]]].
+  destruct (pos_normal h Fh H0) as [mx [ex [Hx [_ [Mx [Ex [V [M [Ulp Bits]]]]]]]]].
   assert (Pe : 0 < bpow radix2 ex) by apply bpow_gt_0.
   assert (Pos : 0 < B h) by (pose proof (bpow_gt_0 radix2 (-1022)); lra).
-  assert (M : mag radix2 (B h) = (ex + 53)%Z :> Z).
-  { apply mag_unique. rewrite Rabs_pos_eq by lra. rewrite V.
-    replace (ex + 53 - 1)%Z with (52 + ex)%Z by ring. replace (ex + 53)%Z with (53 + ex)%Z by ring.
-    rewrite !bpow_plus.
-    split; [apply Rmult_le_compat_r; [lra | ] | apply Rmult_lt_compat_r; [lra | ]].
-    - replace (bpow radix2 52) with (IZR (2 ^ 52)) by reflexivity. apply IZR_le. lia.
-    - replace (bpow radix2 53) with (IZR (2 ^ 53)) by reflexivity. apply IZR_lt. lia. }
   rewrite Bits, join_eq. rewrite pred_eq_pos by lra. unfold pred_pos. rewrite M.
   replace (ex + 53 - 1)%Z with (52 + ex)%Z by ring.
   destruct (Z.eq_dec (Zpos mx) (2 ^ 52)) as [Bot | Mid].
@@ -198,7 +193,5 @@ Proof.
     replace ((ex + 1075) * 2 ^ 52 + (Zpos mx - 2 ^ 52) - 1)%Z with ((ex + 1075) * 2 ^ 52 + (Zpos mx - 2 ^ 52 - 1))%Z by ring.
     rewrite <- join_eq. destruct (join_val (Zpos mx - 2 ^ 52 - 1) (ex + 1075) ltac:(lia) ltac:(lia)) as [F E].
     split; [exact F | ]. rewrite E. replace (ex + 1075 - 1075)%Z with ex by ring.
-    rewrite ulp_neq_0 by lra. unfold cexp. rewrite M. unfold FLT_exp.
-    replace (Z.max (ex + 53 - 53) (-1074)) with ex by lia.
-    rewrite V. replace (Zpos mx - 2 ^ 52 - 1 + 2 ^ 52)%Z with (Zpos mx - 1)%Z by ring. rewrite minus_IZR. ring.
+    rewrite Ulp, V. replace (Zpos mx - 2 ^ 52 - 1 + 2 ^ 52)%Z with (Zpos mx - 1)%Z by ring. rewrite minus_IZR. ring.
 Qed.
