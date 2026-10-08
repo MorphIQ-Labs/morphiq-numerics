@@ -12,7 +12,7 @@ From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
 From Q Require QSpec Q128.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Mul IEEE64Eft Binary64Mul.
 From Interval Require Import Tactic.
-Require ExpTables ExpAccurateLevels ExpReduction.
+Require ExpTables ExpAccurateLevels ExpReduction ExpFast.
 Import ListNotations ExpTables.
 
 Open Scope R_scope.
@@ -621,4 +621,150 @@ Proof.
       assert (u <= p) by (apply G; lra). lra. }
     pose proof (Far p Fp P0) as F1. fold dl in F1. rewrite Sp in F1.
     rewrite Rabs_pos_eq in F1 by lra. fold p. lra.
+Qed.
+
+(** * The accurate path end to end *)
+
+(** The series to degree 12 is within [2^-143] of [e^r]. *)
+Lemma trunc_ok r : Rabs r <= 0.0027078 -> Rabs (xq r 12 - exp r) <= / 2 ^ 143.
+Proof.
+  intros H. cbn [xq INR Nat.sub].
+  interval with (i_taylor r, i_degree 15, i_bisect r, i_prec 220, i_depth 8).
+Qed.
+
+(** [Q128::to_f64] rounds its value once. *)
+Lemma to_f64_val q : QSpec.normalized 128 (Q128.m q) -> Rabs (rndF (Q128.qval q)) < bpow radix2 1024 ->
+  B (Q128.to_f64 q) = rndF (Q128.qval q).
+Proof.
+  intros Nq Ov. rewrite Q128.to_f64_ok by exact Nq. unfold QRound.bn.
+  pose proof (binary_normalize_correct 53 1024 eq_refl eq_refl mode_NE
+                (QRound.signed (Q128.neg q) (Q128.m q)) (Q128.e q) (Q128.neg q)) as C.
+  rewrite Rlt_bool_true in C by exact Ov.
+  destruct C as [C _]. exact C.
+Qed.
+
+(** [accurate_at] at a reduced argument within [2^-131] of [R] is within
+    [2^-120] relatively of [2^(j/128)·e^R·2^k] (docs/exp.md, section 6, proves
+    [2^-123.9]; [2^-120] is what rounding once needs). *)
+Theorem accurate_ok r j k (R : R) :
+  NZ r -> Rabs (Q128.qval r - R) <= / 2 ^ 131 -> Rabs R <= 0.0027076063 -> (j < 128)%nat ->
+  let Z := exp (INR j * ln 2 / 128) * exp R * bpow radix2 k in
+  QSpec.normalized 128 (Q128.m (accurate_at r j k)) /\
+  Rabs (Q128.qval (accurate_at r j k) - Z) <= / 2 ^ 120 * Z.
+Proof.
+  intros Nr Er HR Hj Z.
+  assert (U131 : 0 < / 2 ^ 131 < / 1000000000) by (split; interval with (i_prec 64)).
+  assert (Hr : Rabs (Q128.qval r) <= 0.0027078).
+  { apply Rabs_le_inv in Er. apply Rabs_le_inv in HR. apply Rabs_le. lra. }
+  destruct (y_ok r j Nr Hr Hj) as [NY YB]. cbv zeta in YB.
+  set (T := exp (INR j * ln 2 / 128)) in *. set (X1 := xq (Q128.qval r) 12) in *.
+  set (Y := Q128.mul (q_t j) (hq r 12)) in *.
+  pose proof (tj_range j Hj) as HT. fold T in HT.
+  pose proof (trunc_ok _ Hr) as TR. fold X1 in TR.
+  assert (eR : 0.997 <= exp R <= 1.003) by (apply Rabs_le_inv in HR; split; interval with (i_prec 64)).
+  assert (er : Rabs (exp (Q128.qval r) - exp R) <= / 2 ^ 130 * exp R).
+  { replace (exp (Q128.qval r) - exp R) with ((exp (Q128.qval r - R) - 1) * exp R)
+      by (rewrite Rmult_minus_distr_r, <- exp_plus; replace (Q128.qval r - R + R) with (Q128.qval r) by ring; ring).
+    rewrite Rabs_mult, (Rabs_pos_eq (exp R)) by lra.
+    apply Rmult_le_compat_r; [lra | ].
+    set (d := Q128.qval r - R) in *. apply Rabs_le_inv in Er.
+    assert (D : - / 2 ^ 131 <= d <= / 2 ^ 131) by exact Er. interval with (i_prec 200). }
+  assert (X1p : 0.99 <= X1 <= 1.01).
+  { pose proof (xq_range (Q128.qval r) 12 Hr ltac:(lia)) as XR. fold X1 in XR. apply Rabs_le_inv in XR. lra. }
+  (* |Y − T·e^R| <= 2^-121·T·e^R *)
+  assert (TX : 0 < T * X1) by nra.
+  assert (A1 : Rabs (Q128.qval Y - T * X1) <= / 2 ^ 124 * (T * X1)).
+  { replace (Q128.qval Y - T * X1) with ((Q128.qval Y - T * X1) / (T * X1) * (T * X1)) by (field; lra).
+    rewrite Rabs_mult, (Rabs_pos_eq (T * X1)) by lra. apply Rmult_le_compat_r; lra. }
+  assert (A2 : T * X1 <= 1.02 * (T * exp R)).
+  { apply Rabs_le_inv in TR. apply Rabs_le_inv in er. nra. }
+  assert (A3 : Rabs (T * X1 - T * exp (Q128.qval r)) <= / 2 ^ 142 * (T * exp R)).
+  { replace (T * X1 - T * exp (Q128.qval r)) with (T * (X1 - exp (Q128.qval r))) by ring.
+    rewrite Rabs_mult, (Rabs_pos_eq T) by lra.
+    assert (/ 2 ^ 143 <= / 2 ^ 142 * 0.997) by interval with (i_prec 64).
+    assert (0 < / 2 ^ 142) by interval with (i_prec 64). nra. }
+  assert (A4 : Rabs (T * exp (Q128.qval r) - T * exp R) <= / 2 ^ 130 * (T * exp R)).
+  { replace (T * exp (Q128.qval r) - T * exp R) with (T * (exp (Q128.qval r) - exp R)) by ring.
+    rewrite Rabs_mult, (Rabs_pos_eq T) by lra.
+    assert (0 < / 2 ^ 130) by interval with (i_prec 64). nra. }
+  assert (C : / 2 ^ 124 * 1.02 + / 2 ^ 142 + / 2 ^ 130 <= / 2 ^ 120) by interval with (i_prec 64).
+  assert (AY : Rabs (Q128.qval Y - T * exp R) <= / 2 ^ 120 * (T * exp R)).
+  { replace (Q128.qval Y - T * exp R)
+      with ((Q128.qval Y - T * X1) + (T * X1 - T * exp (Q128.qval r)) + (T * exp (Q128.qval r) - T * exp R))
+      by ring.
+    apply Rle_trans with (Rabs (Q128.qval Y - T * X1) + Rabs (T * X1 - T * exp (Q128.qval r))
+                          + Rabs (T * exp (Q128.qval r) - T * exp R)).
+    { apply Rle_trans with (1 := Rabs_triang _ _). apply Rplus_le_compat_r. apply Rabs_triang. }
+    assert (0 < T * exp R) by nra. assert (0 < / 2 ^ 124) by interval with (i_prec 64). nra. }
+  (* scaling by 2^k *)
+  assert (NYn : QSpec.normalized 128 (Q128.m Y)).
+  { destruct NY as [Z0 | Nn]; [ | exact Nn]. exfalso.
+    rewrite (qval_zero Y Z0) in AY. assert (0 < T * exp R) by nra.
+    assert (/ 2 ^ 120 < 1) by interval with (i_prec 64).
+    rewrite Rminus_0_l, Rabs_Ropp, Rabs_pos_eq in AY by lra. nra. }
+  assert (Mm : Q128.m (accurate_at r j k) = Q128.m Y).
+  { unfold accurate_at, Q128.mul_pow2. fold Y. destruct (Q128.m Y =? 0)%Z; reflexivity. }
+  split; [rewrite Mm; exact NYn | ].
+  unfold accurate_at. rewrite Q128.mul_pow2_ok. fold Y. unfold Z.
+  replace (Q128.qval Y * bpow radix2 k - T * exp R * bpow radix2 k)
+    with ((Q128.qval Y - T * exp R) * bpow radix2 k) by ring.
+  pose proof (bpow_gt_0 radix2 k). rewrite Rabs_mult, (Rabs_pos_eq (bpow radix2 k)) by lra.
+  replace (/ 2 ^ 120 * (T * exp R * bpow radix2 k)) with (/ 2 ^ 120 * (T * exp R) * bpow radix2 k) by ring.
+  apply Rmult_le_compat_r; lra.
+Qed.
+
+(** The accurate path end to end: for every finite [x] that exp(x) reduces,
+    below the overflow threshold, if [e^x] keeps [LM]'s mantissa distance
+    [2^-113] from every rounding breakpoint, the value [Reduced::accurate]
+    returns is [RN(e^x)]. *)
+Theorem exp_accurate_ok x k j v :
+  finite x -> -745.1333 <= B x -> B x < B ExpFast.c_x_overflow -> (j < 128)%nat ->
+  midpoint_far (exp (B x)) (/ 2 ^ 113) ->
+  let '(n, r1, p2, e2, rh, rl) := ExpReduction.reduce x in
+  B n = IZR (128 * k + Z.of_nat j) ->
+  v = Q128.to_f64 (accurate_at (acc_r n r1 p2 e2) j k) ->
+  B v = rndF (exp (B x)).
+Proof.
+  intros Fx Hlo Hhi Hj Far.
+  set (dL := ln 2 / 128 - (ExpReduction.l1v + ExpReduction.l2v + ExpReduction.l3v + ExpReduction.l4v)).
+  pose proof ExpFast.l_split_dL as HdL. fold dL in HdL.
+  assert (Xo : B ExpFast.c_x_overflow <= 709.783) by (rewrite ExpFast.c_x_overflow_val; interval with (i_prec 64)).
+  pose proof (ExpReduction.reduce_ok x dL Fx ltac:(split; lra) HdL) as RO. cbv zeta in RO.
+  destruct (ExpReduction.reduce x) as [[[[[n r1] p2] e2] rh] rl].
+  intros Hn Hv.
+  destruct RO as [k0 [Bn [Kb [Fn [Fr1 [Fp2 [Fe2 [_ [_ [Er1 [Bp2 [Ep [HR _]]]]]]]]]]]]].
+  assert (Hk0 : k0 = (128 * k + Z.of_nat j)%Z) by (apply eq_IZR; rewrite <- Bn; exact Hn).
+  set (L := ExpReduction.l1v + ExpReduction.l2v + ExpReduction.l3v + ExpReduction.l4v + dL) in *.
+  assert (EL : L = ln 2 / 128) by (unfold L, dL; ring).
+  assert (HL : Rabs (L - (ExpReduction.l1v + ExpReduction.l2v + ExpReduction.l3v + ExpReduction.l4v))
+               <= / 2 ^ 206).
+  { replace (L - _) with dL by (unfold L; ring).
+    change (bpow radix2 (-206)) with (bpow radix2 (- Z.of_nat 206)) in HdL. rewrite bpow_m in HdL. exact HdL. }
+  destruct (acc_r_ok x n r1 p2 e2 k0 L Fn Fr1 Fp2 Fe2 Bn Kb Er1 Bp2 Ep HL HR) as [Nr Er].
+  destruct (accurate_ok (acc_r n r1 p2 e2) j k (B x - IZR k0 * L) Nr Er HR Hj) as [NA EA].
+  cbv zeta in EA.
+  (* e^x = 2^(j/128)·e^R·2^k *)
+  assert (Ex : exp (INR j * ln 2 / 128) * exp (B x - IZR k0 * L) * bpow radix2 k = exp (B x)).
+  { rewrite <- ExpFast.exp_split. f_equal. rewrite Hk0, EL. ring. }
+  rewrite Ex in EA.
+  pose proof (same_rounding (exp (B x)) _ (exp_pos _) Far EA) as SR.
+  (* no overflow: e^x is below the largest binary64 number *)
+  assert (Ov : Rabs (rndF (Q128.qval (accurate_at (acc_r n r1 p2 e2) j k))) < bpow radix2 1024).
+  { rewrite SR. pose proof (ExpFast.exp_below_overflow x Fx Hhi) as Eb.
+    set (mx := IZR (2 ^ 53 - 1) * bpow radix2 971).
+    assert (Fmx : fmtF mx).
+    { apply generic_format_FLT. exists (Float radix2 (2 ^ 53 - 1) 971);
+        [reflexivity | unfold prec; simpl; lia | unfold emin; simpl; lia]. }
+    assert (B971 : bpow radix2 971 = 2 ^ 971)
+      by (change 971%Z with (Z.of_nat 971); rewrite bpow_powerRZ, <- pow_powerRZ; reflexivity).
+    assert (Mx : mx = 9007199254740991 * 2 ^ 971) by (unfold mx; rewrite B971; reflexivity).
+    assert (Le : Rabs (exp (B x)) <= mx).
+    { rewrite Rabs_pos_eq by (apply Rlt_le, exp_pos). rewrite Mx.
+      apply Rle_trans with (1 := Eb). interval with (i_prec 64). }
+    pose proof (abs_round_le_generic radix2 (FLT_exp emin prec) (Znearest ne) _ _ Fmx Le) as R1.
+    apply Rle_lt_trans with (1 := R1). rewrite Mx.
+    replace (bpow radix2 1024) with (2 ^ 1024)
+      by (change 1024%Z with (Z.of_nat 1024); rewrite bpow_powerRZ, <- pow_powerRZ; reflexivity).
+    interval with (i_prec 64). }
+  rewrite Hv, (to_f64_val _ NA Ov). exact SR.
 Qed.
