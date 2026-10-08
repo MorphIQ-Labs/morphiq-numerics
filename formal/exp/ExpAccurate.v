@@ -557,3 +557,68 @@ Proof.
   assert (0 + d + d + d + d + d + / 2 ^ 186 <= / 2 ^ 131) by (unfold d; interval with (i_prec 100)).
   lra.
 Qed.
+
+(** * Rounding once
+
+    [LM] Property 1: [e^x] keeps a mantissa distance of at least [2^-113] from
+    every rounding breakpoint, the midpoints between consecutive binary64
+    numbers, for [|x| >= 2^-30] (docs/exp.md, section 2). Mantissa distance is
+    measured against [2^(E-1)] for [z] in [[2^(E-1), 2^E)]. *)
+
+Definition midpoint_far (z d : R) : Prop :=
+  forall u, fmtF u -> 0 <= u ->
+    d * bpow radix2 (mag radix2 z - 1) <= Rabs (z - (u + succ radix2 (FLT_exp emin prec) u) / 2).
+
+(** A [y] within [2^-120] relatively of such a [z] rounds as [z] does. *)
+Lemma same_rounding z y : 0 < z -> midpoint_far z (/ 2 ^ 113) -> Rabs (y - z) <= / 2 ^ 120 * z ->
+  rndF y = rndF z.
+Proof.
+  intros Pz Far Hyz.
+  set (u := rndF z).
+  assert (Fu : fmtF u) by (apply generic_format_round; auto with typeclass_instances).
+  assert (U0 : 0 <= u) by (apply round_ge_generic; [exact _ | exact _ | apply generic_format_0 | lra]).
+  set (dl := / 2 ^ 113 * bpow radix2 (mag radix2 z - 1)).
+  assert (Close : Rabs (y - z) < dl).
+  { pose proof (bpow_mag_gt radix2 z) as M. rewrite Rabs_pos_eq in M by lra.
+    assert (B2 : bpow radix2 (mag radix2 z) = 2 * bpow radix2 (mag radix2 z - 1)).
+    { change 2 with (bpow radix2 1). rewrite <- bpow_plus. f_equal. ring. }
+    unfold dl. rewrite B2 in M.
+    assert (0 < / 2 ^ 120 < / 2 ^ 113 / 4) by (split; interval with (i_prec 64)).
+    pose proof (bpow_gt_0 radix2 (mag radix2 z - 1)). nra. }
+  apply Rabs_lt_inv in Close.
+  apply Rle_antisym.
+  - (* below the midpoint above u *)
+    apply round_N_le_midp; [exact _ | exact Fu | ].
+    assert (Zm : z <= (u + succ radix2 (FLT_exp emin prec) u) / 2).
+    { apply Rnot_lt_le. intros Hgt.
+      assert (Fs : fmtF (succ radix2 (FLT_exp emin prec) u)) by (apply generic_format_succ; [exact _ | exact Fu]).
+      pose proof (round_N_ge_midp radix2 (FLT_exp emin prec) ne _ z Fs) as G.
+      rewrite pred_succ in G by (exact _ || exact Fu).
+      assert (Lt : u < succ radix2 (FLT_exp emin prec) u).
+      { destruct (Req_dec u 0) as [Z0 | NZ0]; [ | apply succ_gt_id, NZ0].
+        rewrite Z0, succ_0, (ulp_FLT_0 radix2 emin prec). apply bpow_gt_0. }
+      assert (succ radix2 (FLT_exp emin prec) u <= u) by (apply G; lra). lra. }
+    pose proof (Far u Fu U0) as F1. fold dl in F1.
+    rewrite Rabs_left1 in F1 by lra. lra.
+  - (* above the midpoint below u *)
+    destruct (Req_dec u 0) as [Z0 | NZ0].
+    { rewrite Z0. apply round_ge_generic; [exact _ | exact _ | apply generic_format_0 | ].
+      assert (dl <= / 2 * z).
+      { pose proof (bpow_mag_le radix2 z ltac:(lra)) as M. rewrite Rabs_pos_eq in M by lra.
+        unfold dl. assert (0 < / 2 ^ 113 < / 2) by (split; interval with (i_prec 64)).
+        pose proof (bpow_gt_0 radix2 (mag radix2 z - 1)). nra. }
+      lra. }
+    assert (Pu : 0 < u) by lra.
+    set (p := pred radix2 (FLT_exp emin prec) u).
+    assert (Fp : fmtF p) by (apply generic_format_pred; [exact _ | exact Fu]).
+    assert (P0 : 0 <= p) by (apply pred_ge_0; [exact _ | exact Pu | exact Fu]).
+    assert (Sp : succ radix2 (FLT_exp emin prec) p = u) by (apply succ_pred; [exact _ | exact Fu]).
+    apply round_N_ge_midp; [exact _ | exact Fu | ].
+    assert (Zm : (p + u) / 2 <= z).
+    { apply Rnot_lt_le. intros Hlt.
+      pose proof (round_N_le_midp radix2 (FLT_exp emin prec) ne p z Fp) as G. rewrite Sp in G.
+      pose proof (pred_lt_id radix2 (FLT_exp emin prec) u NZ0) as Lt. fold p in Lt.
+      assert (u <= p) by (apply G; lra). lra. }
+    pose proof (Far p Fp P0) as F1. fold dl in F1. rewrite Sp in F1.
+    rewrite Rabs_pos_eq in F1 by lra. fold p. lra.
+Qed.
