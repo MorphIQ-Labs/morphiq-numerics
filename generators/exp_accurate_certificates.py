@@ -61,9 +61,62 @@ def level(i, prev):
     return lines
 
 
+def coq_bound(b):
+    """A bound m * 2^-e, or 0, as a Coq real."""
+    return '0' if b is None else f'{b[0]} * / 2 ^ {b[1]}'
+
+
+COQ_HEADER = [
+    '(** The accurate path\'s certificates over reals, written by',
+    '    generators/exp_accurate_certificates.py with the same bounds it writes into',
+    '    formal/exp/accurate_level_*.g and accurate_y.g; do not edit. Each theorem is',
+    '    its certificate\'s, applied through the Coq proof Gappa writes for it. *)',
+    '',
+    'From Coq Require Import ZArith Reals Lia Lra.',
+    'From Flocq Require Import Core.',
+    'From Gappa Require Gappa_definitions Gappa_pred_bnd.',
+    'Require ' + ' '.join(f'exp_accurate_level_{i:02}' for i in range(1, 13)) + ' exp_accurate_y.',
+    '',
+    'Open Scope R_scope.',
+    '',
+    '(** Reduces a Gappa interval to numerals, leaving the real operators. *)',
+    'Ltac gappa_num := cbv beta iota zeta delta -[Rle Rlt Rabs IZR bpow Rdiv Rminus Rinv Ropp pow Rplus Rmult].',
+    'Ltac gappa_num_in H := cbv beta iota zeta delta -[Rle Rlt Rabs IZR bpow Rdiv Rminus Rinv Ropp pow Rplus Rmult] in H.',
+    '',
+    '(** A certificate [l1 : hypotheses /\\\\ ~ conclusion -> False], read as',
+    '    [hypotheses -> conclusion]. *)',
+    'Ltac bridge l1 bound :=',
+    '  apply Rnot_lt_le; intros Hlt; apply l1;',
+    '  repeat split; try (gappa_num; simpl; lra);',
+    '  intros Hb; gappa_num_in Hb; cbv [Gappa_pred_bnd.Float1] in Hb;',
+    '  apply (Rlt_irrefl bound); apply Rlt_le_trans with (1 := Hlt);',
+    '  apply Rabs_le; simpl in Hb |- *; lra.',
+]
+
+
+def coq_level(i, prev, cur):
+    name = f'exp_accurate_level_{i:02}'
+    return [
+        '',
+        f'(** Level {i}: [H_{i} = 1 + (r·k_{i})·H_{i + 1}] against [X_{i} = 1 + (r/{i})·X_{i + 1}]. *)',
+        f'Theorem level_{i:02} r k ma Xn En mb s :',
+        f'  Rabs r <= 0.0027078 -> 0.99 <= Xn <= 1.01 -> Rabs En <= {coq_bound(prev)} ->',
+        '  Rabs k <= / 2 ^ 127 -> - / 2 ^ 127 <= ma <= 0 -> - / 2 ^ 127 <= mb <= 0 -> Rabs s <= / 2 ^ 126 ->',
+        f'  Rabs (1 + (r * (1 / {i} * (1 + k))) * (1 + ma) * (Xn + En) * (1 + mb) + s - (1 + r / {i} * Xn))',
+        f'    <= {coq_bound(cur)}.',
+        'Proof.',
+        '  intros Hr HX HE Hk Hma Hmb Hs.',
+        '  apply Rabs_le_inv in Hr. apply Rabs_le_inv in HE. apply Rabs_le_inv in Hk. apply Rabs_le_inv in Hs.',
+        f'  bridge ({name}.l1 r k ma Xn En mb s) ({coq_bound(cur)}).',
+        'Qed.',
+    ]
+
+
 def generate():
     files = {}
+    coq = list(COQ_HEADER)
     e_prev = Fraction(0)
+    up_prev = None
     for i in range(12, 0, -1):
         h_max = X_RANGE[1] + e_prev
         e_i = A / i * (e_prev + h_max * 3 * Fraction(1, 2**127)) + Fraction(1, 2**126)
@@ -72,7 +125,22 @@ def generate():
         prev = '0' if e_prev == 0 else literal(*up_prev)
         text = '\n'.join(level(i, prev)).replace('{E}', bound) + '\n'
         files[f'accurate_level_{i:02}.g'] = text
+        coq += coq_level(i, up_prev, (m, e))
         e_prev, up_prev = Fraction(m, 2**e), (m, e)
+    coq += [
+        '',
+        '(** [Y = T_j·H_1] against [T_j·X_1]: within [2^-124] relatively. *)',
+        'Theorem accurate_y_bound Tj X1 eT E1 mY :',
+        '  1 <= Tj <= 2 -> 0.997 <= X1 <= 1.003 -> Rabs eT <= / 2 ^ 127 ->',
+        f'  Rabs E1 <= {coq_bound(up_prev)} -> - / 2 ^ 127 <= mY <= 0 ->',
+        '  Rabs ((Tj * (1 + eT) * (X1 + E1) * (1 + mY) - Tj * X1) / (Tj * X1)) <= / 2 ^ 124.',
+        'Proof.',
+        '  intros HT HX He HE Hm.',
+        '  apply Rabs_le_inv in He. apply Rabs_le_inv in HE.',
+        '  bridge (exp_accurate_y.l1 Tj X1 eT E1 mY) (/ 2 ^ 124).',
+        'Qed.',
+    ]
+    files['ExpAccurateLevels.v'] = '\n'.join(coq) + '\n'
     files['accurate_y.g'] = '\n'.join([
         '# The accurate path\'s result Y = T_j * H_1 against T_j * X_1',
         '# (generators/exp_accurate_certificates.py).',
