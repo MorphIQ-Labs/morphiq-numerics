@@ -23,6 +23,10 @@ for `exp` and `ln`; correct rounding where its rounding test decides, and
   or the rounding test doesn't decide, calls the scalar function itself, and
   so do the last `len mod LANES` elements. A one-lane backend loops the scalar
   function.
+- **Within the crate,** `log_space::log_sum_exp` evaluates its terms'
+  exponentials with `exp_slice`, and `log_space::log_sum_exp_pairs` its pairs'
+  exponentials and logarithms with `exp_slice` and `ln_1p_slice`, so they
+  return the same bits too ([log_space.md](log_space.md), decision 7).
 - **The `std` feature** turns on runtime CPU detection. It changes which
   backend runs, so speed, never a result. The library stays `no_std`.
 

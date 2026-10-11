@@ -1,6 +1,6 @@
 # `log_sum_exp` and `log_diff_exp`: sums and differences in log space
 
-`morphiq_numerics::log_space::{log_sum_exp, log_diff_exp}`
+`morphiq_numerics::log_space::{log_sum_exp, log_sum_exp_pairs, log_diff_exp}`
 (`crates/morphiq-numerics/src/log_space/`) follow this derivation step for
 step. They compute logarithms of sums and differences of exponentials without
 leaving log space. Zero mass is
@@ -75,6 +75,15 @@ treated as zero mass, however small `e^(xᵢ)` would be in binary64.
 The result never overflows. It is at most `max(x) + ln n`, and for
 `max(x) ≤ f64::MAX` that rounds to at most `f64::MAX`, because
 `ln n ≪ ulp(f64::MAX)/2`.
+
+### `log_sum_exp_pairs<const N: usize>(x: &[[f64; 2]; N]) -> [f64; N]`
+
+Element `i` of the result is `log_sum_exp(&x[i])`, bit for bit, on every
+target and with or without the `simd` feature. It adds no claim of its own:
+each element inherits `log_sum_exp`'s table above and its bound. It exists so
+that the independent pairs of a two-state recursion's step can share SIMD
+lanes (decision 7). Its working storage is a few `[f64; N]` arrays on the
+stack, so `N` is meant to be small.
 
 ### `log_diff_exp(a: f64, b: f64) -> f64`
 
@@ -170,6 +179,29 @@ Proposition 4.5's bound applies unchanged. The summands are bounded by
 **Decision 5: summation order is index order, skipping `j`.** The result is
 deterministic for a given slice. A permutation of the slice changes it by at
 most the bound, not necessarily by zero.
+
+**Decision 7: lane evaluation returns the same bits.** With the `simd`
+feature, the exponentials of step 3, and `log_sum_exp_pairs`' `ln_1p`s of
+step 5, are evaluated by `exp_slice` and `ln_1p_slice`, which return `exp`'s
+and `ln_1p`'s bits on every backend ([lanes.md](lanes.md) §1). Nothing else
+changes:
+- **`log_sum_exp`** reduces the other finite terms in index order, as step 2
+  does, into chunks of 32 pairs `(dhᵢ, dlᵢ)`. It evaluates each chunk's
+  `exp(dhᵢ)` together, and then passes every term to Sum2 in index order,
+  skipping each `ehᵢ = 0` before its `dlᵢ` is used, as decision 3 does. Every
+  summand, and the order in which it is added, is step 4's, so `t̂` and the
+  result are the same bits. A slice of at most two elements has at most one
+  other term, which gains nothing from lanes, so it keeps the scalar loop.
+- **`log_sum_exp_pairs`** performs steps 1 and 2 per pair, then evaluates
+  every pair's `exp(dh)` together, forms each pair's `t̂` by step 4, and
+  evaluates every `ln_1p(t̂)` together. A pair without a second finite term
+  carries `dh = −∞`, whose exponential is `+0`, so its `t̂` is 0 and step 5
+  returns `m`, as `log_sum_exp` does. A pair decided by step 1 (a NaN, `+∞`
+  or no finite element) keeps step 1's result, and its lane values are
+  discarded.
+
+Without the `simd` feature `log_sum_exp` loops `exp` term by term and
+`log_sum_exp_pairs` calls `log_sum_exp` on each pair.
 
 ## 4. `log_sum_exp`: error bound
 
@@ -311,6 +343,10 @@ These implement the requirements recorded on #44:
   step of Sum2. One `ln_1p` follows. That is `O(n)` time with no allocation.
   For `n = 2` it is one `exp`, one `ln_1p` and a handful of exact
   operations.
+- **`log_sum_exp_pairs`:** per pair, `log_sum_exp`'s work for `n = 2`. With
+  the `simd` feature the `N` exponentials and the `N` logarithms each run in
+  lanes. No allocation; its arrays are on the stack. `log_sum_exp`'s
+  chunks are too, three arrays of 32.
 - **`log_diff_exp`:** one `two_sum`, then one `expm1` and one `ln`
   (region A), or one `exp` and one `ln_1p` (region B). Constant time.
 
@@ -377,17 +413,39 @@ dominate the cost.
 3. **Bound arithmetic.** `generators/log_space_bounds.py --check` verifies the
    composed bounds of §4 and §6 in exact rational arithmetic. It runs with
    the generators (`scripts/check_generators.sh`).
-4. **Determinism.** Both functions are in the determinism digest
-   ([determinism.md](determinism.md)).
-5. **Mutation.** cargo-mutants 27.1.0 over `log_space/mod.rs` catches 43 of
-   45 mutants. The other two are equivalent: each changes only a choice this
-   contract leaves free, so no test anchored outside the implementation can
-   tell them apart.
+4. **Determinism.** All three functions are in the determinism digest
+   ([determinism.md](determinism.md)), which every CI target computes with
+   and without the `simd` feature. Its `log_sum_exp` section includes slices
+   of 9 to 100 elements, so terms fill and cross the chunks of decision 7.
+5. **Lane evaluation** (decision 7; `log_space/tests.rs`, run on AVX-512F
+   under Intel's emulator as well as on the test hosts, [lanes.md](lanes.md)
+   §6):
+   - `log_sum_exp` equals §3's steps with a scalar `exp` per term, bit for
+     bit, on every fixture input and on slices of every length from 0 to 100
+     at four gap scales, with zero mass, ties, underflowing terms, NaN and
+     `+∞` placed around the chunk boundaries, and a slice of 10,000;
+   - `log_sum_exp_pairs` equals `log_sum_exp` on each pair, bit for bit, in
+     batches of 1, 2, 3, 8 and 17: every pairing of twelve special values,
+     the fixture's pairs, and 40,000 random pairs.
+
+   Sum2's result rarely depends on the order of its summands: reversing each
+   chunk changed no result on 240,000 random slices. So these tests cannot
+   detect an order change; decision 7's same order is a property of the code,
+   which adds each chunk's terms in index order.
+6. **Mutation.** cargo-mutants 27.1.0 over `log_space/mod.rs`, run once with
+   the `simd` feature and once without (each run compiles only its own
+   `terms` and `log_sum_exp_pairs` path), generates 85 mutants. 82 are caught
+   by the run that compiles them. The other three are equivalent: each
+   changes only a choice this contract leaves free, so no test anchored
+   outside the implementation can tell them apart.
    - `v > m` against `v ≥ m` picks the first or the last index of a tied
      maximum (decision 5). The other tied element contributes `e^0 = 1`
      either way.
    - `dh > T` against `dh ≥ T` is the region boundary (decision 6), where
      both regions meet the bound.
+   - Inverting the lane `terms`' test for slices of at most two elements
+     only exchanges which of two evaluations runs, and both return the same
+     bits (decision 7).
 
 ## 10. Out of scope here
 
