@@ -18,8 +18,8 @@ for `exp` and `ln`; correct rounding where its rounding test decides, and
 - **Without `simd`** each loops its scalar function.
 - **With `simd`** each runs in lanes ([arch.md](arch.md)). Every lane performs
   the scalar function's fast path operation for operation: its
-  special-argument screen, its argument reduction, its double-word evaluation
-  and its rounding test (§4, §5). A lane the screen sends elsewhere, or the
+  special-argument screen, its argument reduction, its evaluation and its
+  rounding test (§4, §5). A lane the screen sends elsewhere, or the
   rounding test doesn't decide, calls the scalar function itself.
 - **The backend cascade.** The slice runs through the backends the CPU has,
   widest first: AVX-512F, AVX2 and SSE2 on x86-64, and NEON on aarch64. Each
@@ -44,8 +44,9 @@ same double-word `Y`, word for word, and the same rounding test on it. If the
 test passes, the scalar function's fast path passes it too and returns the
 same value; if not, the lane calls the scalar function. The one operation that
 differs between backends is `two_prod`'s error term, which §2 shows is the
-same bits wherever a kernel uses it, and the one computation written
-differently is the rounding test's gap, which §3 shows is the same value.
+same bits wherever a kernel uses it. The computations written differently are
+`ln`'s rounding test's gap, which §3 shows is the same value, and `exp`'s test
+and scaling, which §4 shows return the same bits.
 
 This doesn't rest on correct rounding. (It would follow from it too for `exp`
 and `ln`: two correctly rounded evaluations agree whatever their operations.
@@ -92,8 +93,6 @@ for it:
 
 | Call | Operands | Why on `D` |
 |---|---|---|
-| `exp`: `two_prod(n, L2)` | an integer `\|n\| ≤ 137,601`; `\|L2\| < 2^−43` | product zero or above `2^−45` ([exp.md](exp.md) §3) |
-| `exp`: `T_j.mul(E)` | `T_j ∈ [1, 2)`, `E` within `2^−8` of 1 | ([exp.md](exp.md) §4) |
 | `ln`, `ln_1p`: `two_prod(y, R[i])` | `y ∈ [0.707, 1.415)`, `R[i]` within 0.8% of `1/y` | ([ln.md](ln.md) §3) |
 | `ln`, `ln_1p`: `two_prod(z_hi, z_hi)` | `z_hi = 0` or `\|z_hi\| ≥ 2^−64` (case A: `\|x\| ≥ 2^−54`) | square zero or at least `2^−128` ([ln.md](ln.md) §3, §7) |
 
@@ -104,11 +103,15 @@ The test `lane_two_prod_is_efts_two_prod` compares the lane product with
 `eft::two_prod` bit for bit: on random encodings without FMA, and on `D`, with
 zeros of both signs, with it.
 
+`exp`'s lane kernel uses no `two_prod`: its stages' only product that must be
+exact, stage B's `A·r_h`, is exact as a plain product ([exp.md](exp.md) §6),
+so no backend uses a fused multiply-add for `exp`.
+
 ## 3. The rounding test's gap
 
-`ln::decide_with` (which `exp::decide_scaled` matches for `y_hi > 0`) returns
-`y_hi` when `RN(|y_lo| + RN(eps·|y_hi|)) < g/2`, where `g` is `ulp(|y_hi|)`,
-halved when `|y_hi|` is a power of two ([exp.md](exp.md) §5). The lane test
+`ln::decide_with` returns `y_hi` when `RN(|y_lo| + RN(eps·|y_hi|)) < g/2`,
+where `g` is `ulp(|y_hi|)`, halved when `|y_hi|` is a power of two
+([exp.md](exp.md) §8.3). The lane test
 performs the same three operations and the same comparison, and computes `g`
 from the exponent field instead of calling `ulp`:
 - for a biased exponent `B > 52`, `ulp` returns the encoding `(B − 52) << 52`,
@@ -118,25 +121,31 @@ from the exponent field instead of calling `ulp`:
 So the lane computes the same `g` for `|y_hi| ≥ 2^−969` (`B ≥ 54`), and below
 that it reports "not decided", which sends the lane to the scalar function.
 For infinities and NaNs both tests fail. No lane reaches either case in
-practice: `exp`'s `y_hi` lies in `[3/4, 4]`, and `ln`'s and `ln_1p`'s results
-exceed `2^−55` in magnitude.
+practice: `ln`'s and `ln_1p`'s results exceed `2^−55` in magnitude.
 
 ## 4. `exp`
 
-Per lane, as `exp` and `Reduced::of` write them:
-1. **The screen** (in scalar code, per lane): NaN, `x ≥ X_OVERFLOW`,
-   `x ≤ X_ZERO` and `−2^−54 ≤ x < 2^−53` go to `exp` ([exp.md](exp.md) §1).
-2. **The reduction** in lanes: `n = (x·INV_L + S) − S`, `r1 = x − n·L1`,
-   `(p2, e2) = two_prod(n, L2)`, `(s, t) = two_sum(r1, −p2)`,
-   `rr = (t − e2) − n·L3`, `r = two_sum(s, rr)`.
-3. **The index and scale** per lane: `n` converted to an integer exactly,
-   `j = n mod 128`, `k`; the table pair `T_j` is loaded per lane (no gather);
-   `2^k` from its encoding. Lanes with `k < −1021` go to `exp`, as its fast path
-   excludes them ([exp.md](exp.md) §4, decision 3), and so do lanes with
-   `k = 1024`, which `exp` scales in two steps.
-4. **`fast_at`** in lanes: the Horner polynomial, `add_f64`, `add` to 1, and the
-   product with `T_j`, each double-word operation as `double_word.rs` writes it.
-5. **`decide_scaled`** in lanes (§3), and `y_hi·2^k`.
+Per lane, as `exp` and `Stages::of` write them ([exp.md](exp.md) §3–§7):
+1. **The screen** in lanes: `|x| < 704`, as an ordered comparison of `|x|`
+   with 704. It holds exactly where `exp`'s comparison of encodings does: both
+   are false for NaN. Lanes that fail it go to `exp`.
+2. **The reduction** in lanes: `n = (x·INV_N + S) − S` and `r1 = x − n·S_L1`.
+   Per lane, as `Stages::of` computes them: `n` as an integer from `t`'s
+   encoding, `j = n & 511`, `k = n >> 9`, the table pair `T_j` (no gather)
+   and `2^k` from its encoding.
+3. **Stage A** in lanes, as `Stages::a_value` computes it, and its test.
+4. **Stage B** in lanes, as `Stages::b_value` computes it, the mask of
+   `T_j`'s low 32 bits included, and its test, when a lane in the chunk is
+   undecided by stage A; a select takes stage B's result on those lanes.
+5. **The scaling** by `2^k` in lanes.
+
+**The test and the scaling, written differently, return the same bits.**
+`exp`'s test compares `low = RN(y + RN(l − E))` with `high = RN(y + RN(l + E))`
+as numbers; the lanes compare their encodings. On every lane past the screen
+both are positive normal numbers (`y + l` lies near `[1, 2]`), and two such
+numbers are equal exactly when their encodings are. `exp` scales by adding `k`
+to the exponent field; the lanes multiply by `2^k`. The product is exact and
+normal (`|k| ≤ 1016`), so it is the same number, with the same encoding.
 
 ## 5. `ln` and `ln_1p`
 
@@ -194,8 +203,9 @@ Per lane, as `exp` and `Reduced::of` write them:
   offsets.
 - **The fast values word for word** (`exp/lanes/tests.rs`,
   `ln/lanes/tests.rs`): on the same corpora, every lane the scalar function
-  would try its fast path on has the scalar fast value's bits, `y_hi` and
-  `y_lo`. This shows the kernels transcribe the scalar operations, which the
+  would try its fast path on has the scalar fast value's bits: for `exp`, both
+  stages' `(y, l)` on every lane past the screen, stage B's on every lane and
+  not only those stage A leaves; for `ln` and `ln_1p`, `y_hi` and `y_lo`. This shows the kernels transcribe the scalar operations, which the
   final results alone could not: a different but accurate sequence would
   usually round alike.
 - **Every cascade** (`every_lanes_cascade_returns_the_scalar_bits`): each
@@ -227,8 +237,10 @@ The kernels are `O(n)` in the slice length and allocate nothing; each chunk of
 `LANES` elements uses fixed-size arrays on the stack. The per-lane scalar
 parts are the screens, the table indices and the table loads; no gather
 instruction is used. Lanes sent to the scalar function cost a scalar
-evaluation on top: about `2^−15.4` of `exp`'s arguments and `2^−9.4` of `ln`'s
-([exp.md](exp.md) §8, [ln.md](ln.md) §9), plus the screened ones.
+evaluation on top: about `2^−16.9` of `exp`'s arguments and `2^−9.4` of `ln`'s
+([exp.md](exp.md) §7, [ln.md](ln.md) §9), plus the screened ones. `exp`'s
+stage B runs on a chunk only when stage A leaves one of its lanes undecided,
+about one argument in 2^7.3.
 
 The cascade adds at most one detection check and one feature-enabled call per
 backend. On aarch64 it has one backend, NEON, so the NEON figures below are

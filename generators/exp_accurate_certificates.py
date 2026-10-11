@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes the accurate path's Gappa certificates (docs/exp.md, section 6), one
+"""Writes the accurate path's Gappa certificates (docs/exp.md, section 8.4), one
 per Horner level, so each stays small for Gappa.
 
 The series is H_13 = 1, H_i = 1 + (r * k_i) * H_(i+1) for i = 12..1, in
@@ -9,7 +9,7 @@ bounds E_i are computed here with a margin and written into the certificates as
 literals, so Gappa checks each one. formal/exp/accurate_y.g then bounds
 Y = T_j * H_1 against T_j * X_1.
 
-Each Q128 operation is modelled by its contract (docs/exp.md, section 6):
+Each Q128 operation is modelled by its contract (docs/exp.md, section 8.4):
 multiplication relative error in [-2^-127, 0]; addition absolute error at most
 2^-126 * max(|a|, |b|), here max = 1. k_i = 1/i and T_j carry relative error
 below 2^-127 (generators/exp_constants.py).

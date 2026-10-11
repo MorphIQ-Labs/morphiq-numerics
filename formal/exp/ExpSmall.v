@@ -1,5 +1,5 @@
 (** exp/mod.rs's accurate path for small arguments, [2^-54 <= |x| < 2^-30]
-    ([small_parts] and [small], docs/exp.md, section 6), transcribed on binary64
+    ([small_parts] and [small], docs/exp.md, section 8.4), transcribed on binary64
     and the proved Q128 transcription (formal/q), and proved: [h + w] is within
     [2^-178] of [e^x] ([small_parts_ok]), and when [e^x] keeps the mantissa
     distance [LM] guarantees here, [2^-158], from every rounding breakpoint,
@@ -336,7 +336,7 @@ Qed.
 (** * The small-argument path end to end
 
     [LM] guarantees [e^x] keeps a mantissa distance of [2^-158] from every
-    rounding breakpoint for [2^-54 <= |x| < 2^-30] (docs/exp.md, section 6).
+    rounding breakpoint for [2^-54 <= |x| < 2^-30] (docs/exp.md, section 8.4).
     [h + w] is within [2^-178] of [e^x], so it rounds as [e^x] does and is no
     breakpoint itself, and [small] decides its rounding exactly. *)
 Theorem exp_small_ok x : finite x -> / 2 ^ 54 <= Rabs (B x) < / 2 ^ 30 ->

@@ -2,8 +2,8 @@
 
 `morphiq_numerics::elementary::expm1` (`crates/morphiq-numerics/src/expm1/`)
 follows this derivation. Near zero it evaluates its own polynomial and series,
-because `e^x − 1` cancels there. Elsewhere it uses [exp.md](exp.md)'s reduction
-and paths, and subtracts before scaling. Every bound is certified (§7).
+because `e^x − 1` cancels there. Elsewhere it uses the reduction and paths of
+`exp`'s fallback ([exp.md](exp.md) §8), and subtracts before scaling. Every bound is certified (§7).
 
 `expm1(x)` is `e^x − 1`:
 - correctly rounded whenever its rounding test decides;
@@ -12,8 +12,8 @@ and paths, and subtracts before scaling. Every bound is certified (§7).
 
 ## Sources
 
-- **[exp]** [exp.md](exp.md): the reduction `x = k·ln 2 + j/128·ln 2 + r`, its
-  fast path and its `Q128` accurate path.
+- **[exp]** [exp.md](exp.md) §8: the reduction `x = k·ln 2 + j/128·ln 2 + r`,
+  the fast value and the `Q128` accurate path of `exp`'s fallback.
 - **[ln]** [ln.md](ln.md) §5: the rounding test, here with its own `ε₁`.
 - **[LM]** Lefèvre and Muller (2003) give no worst cases for `expm1`, so its
   bound is stated, as `ln_1p`'s is.

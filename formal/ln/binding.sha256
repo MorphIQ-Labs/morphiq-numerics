@@ -1,4 +1,4 @@
-57f7769e1f76a40e27afe2b13a024cf0f2fe0867b8d7d3d7589dd3408f599a51  docs/ln.md
+fa26ca78d29aef53bbaa8fcbf20a34b312e58ef81461519c741e06a5fde96e43  docs/ln.md
 b1be8dc6a7c93011aefb04db102246b5a9559ca075092d00c67a1e8c6a95e8d6  crates/morphiq-numerics/src/ln/tables.rs
 3952d0df62f560a7d1fe01d61f1a807e6bd0fbc405febd0d3d3999f704395d4c  generators/ln_poly.sollya
 c310d05e6ea0040742a50bb6a48636264561ca48f778cb605f5b57cac50abc74  generators/ln_poly.out
@@ -29,4 +29,4 @@ ba6ed652e50e369ded180209c0c5577e2749d6659d779196832e34ea839b9a3c  formal/ln/fast
 4b7a770278cc891a9027059aa8cfe8dfd54c801a83e88b3926a21f4edae83732  formal/ln/p.g
 468c79118a5c3812daed183d597ebe8291be1a7d51324b063dd039c4bf22d0ad  formal/ln/tail.g
 bd4d3f90f1026678b5e71295b22d4a0873aa113b470aa498407ffeb55da4c64b  crates/morphiq-numerics/src/ln/mod.rs
-60fa18684beeffd5ac3ce0aafef07d51b6f19664c065ea5b7216603df36c7ecf  crates/morphiq-numerics/src/q128.rs
+476d59168b6cb10930d0a64a2d793fa2a6a415ad96ca27cbc8e482e08b5d824f  crates/morphiq-numerics/src/q128.rs

@@ -25,7 +25,7 @@ whenever its fast path decides the rounding, and otherwise within a proved bound
   when its result provably rounds correctly.
 - **[DW]** This crate's double-word arithmetic ([double-word.md](double-word.md)):
   its operations have machine-checked error bounds in IEEE 754 arithmetic.
-- **[exp]** [exp.md](exp.md): the rounding test (§5) and the `Q128` type (§6),
+- **[exp]** [exp.md](exp.md): the rounding test (§8.3) and the `Q128` type (§8.4),
   shared with `exp`.
 
 Issue #30 cites Tang's table-driven logarithm (*ACM TOMS* 16(4), 1990). This

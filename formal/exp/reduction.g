@@ -1,4 +1,4 @@
-# The fast path's reduced argument (docs/exp.md, section 3, step 4): the
+# The fast path's reduced argument (docs/exp.md, section 8.1, step 4): the
 # error of the double-word (r_hi, r_lo) against the exact r = x - n*L, for
 # every integer |n| <= 137601 and every exact |r| <= A.
 #

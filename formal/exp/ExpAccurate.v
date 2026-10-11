@@ -1,5 +1,5 @@
 (** exp/mod.rs's accurate path, general case ([Reduced::accurate_value] and
-    [accurate_at], docs/exp.md, section 6), transcribed on the proved Q128
+    [accurate_at], docs/exp.md, section 8.4), transcribed on the proved Q128
     transcription (formal/q) and proved: the 128-bit result is within
     [2^-123.9] relatively of [e^x] ([accurate_ok]), so when [e^x] keeps the
     mantissa distance [LM] guarantees from every rounding breakpoint, rounding
@@ -656,7 +656,7 @@ Proof.
 Qed.
 
 (** [accurate_at] at a reduced argument within [2^-131] of [R] is within
-    [2^-120] relatively of [2^(j/128)·e^R·2^k] (docs/exp.md, section 6, proves
+    [2^-120] relatively of [2^(j/128)·e^R·2^k] (docs/exp.md, section 8.4, proves
     [2^-123.9]; [2^-120] is what rounding once needs). *)
 Theorem accurate_ok r j k (R : R) :
   NZ r -> Rabs (Q128.qval r - R) <= / 2 ^ 131 -> Rabs R <= 0.0027076063 -> (j < 128)%nat ->

@@ -1,4 +1,4 @@
-# The fast path's polynomial evaluation (docs/exp.md, section 4, step 1), with
+# The fast path's polynomial evaluation (docs/exp.md, section 8.2, step 1), with
 # every operation rounded to binary64, nearest-even:
 #   q = r^2 * (1/2 + r*(c3 + r*(c4 + r*(c5 + r*c6))))
 # against the same polynomial evaluated exactly, for every binary64 r with

@@ -17,7 +17,7 @@ numbered **decision** is a design choice open to review. Here `u = 2^−53`,
   - `DoubleWord::add` (AccurateDWPlusDW, Joldes, Muller & Popescu 2017,
     Algorithm 6) has relative error at most `3u² + 13u³` for operands up to
     `2^1016`.
-- **[exp §5]** `morphiq-numerics`' rounding test ([exp.md] §5), machine-checked
+- **[exp §8.3]** `morphiq-numerics`' rounding test ([exp.md] §8.3), machine-checked
   in `formal/binary64/RoundingTest.v` (`decide_with_ok`) for error bounds
   `2^−80 ≤ ε₁ ≤ 2^−60`.
 - **[gen]** `generators/log_norm_pdf_constants.py`: `C` as the double-word
@@ -82,7 +82,7 @@ With `a = |x|`:
    is correctly rounded.
 
 **Decision 2: reuse the machine-checked rounding test at `ε₁ = 2^−80`.**
-Because `ε < 2^−103 ≤ 2^−80`, the test of [exp §5] with `ε₁ = 2^−80`, its
+Because `ε < 2^−103 ≤ 2^−80`, the test of [exp §8.3] with `ε₁ = 2^−80`, its
 proved range's lower end, is valid as it stands:
 
 ```text

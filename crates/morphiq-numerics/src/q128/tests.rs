@@ -1,4 +1,4 @@
-//! `Q128` against its contract (`docs/exp.md` §6), decided exactly with
+//! `Q128` against its contract (`docs/exp.md` §8.4), decided exactly with
 //! big-integer arithmetic that shares nothing with the type.
 
 use super::Q128;

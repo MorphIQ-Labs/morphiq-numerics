@@ -1,4 +1,4 @@
-(** exp/mod.rs's fast value [fast_at] (docs/exp.md, section 4), transcribed on
+(** exp/mod.rs's fast value [fast_at] (docs/exp.md, section 8.2), transcribed on
     binary64 and proved: for the reduced argument [(r_hi, r_lo)] of
     [ExpReduction.reduce] and every table index [j], the double-word [Y] is
     within [2^-69] relatively of [T_j·e^R], where [T_j = 2^(j/128)] and [R] is

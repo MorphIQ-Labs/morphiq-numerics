@@ -1,4 +1,4 @@
-(** exp/mod.rs's argument reduction [Reduced::of] (docs/exp.md, section 3),
+(** exp/mod.rs's argument reduction [Reduced::of] (docs/exp.md, section 8.1),
     transcribed on binary64 and proved: [n] is the integer nearest [x/L] up to
     the rounding of [x·INV_L], [r1 = x − n·L1] and [p2 + e2 = n·L2] exactly, and
     [(r_hi, r_lo)] is within [2^−113] of [x − n·L] ([reduce_ok]). The last bound

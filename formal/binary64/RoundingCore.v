@@ -1,6 +1,6 @@
 (** The rounding test's real-number core: when [|l| + RN(eps·h) < g/2], with
     [g] at most both gaps around a positive [h], every real within [ε₁] of
-    [h + l] rounds to [h] (docs/exp.md §5). *)
+    [h + l] rounds to [h] (docs/exp.md §8.3). *)
 
 From Coq Require Import ZArith Reals Lia Lra Psatz.
 From Flocq Require Import Core Relative.

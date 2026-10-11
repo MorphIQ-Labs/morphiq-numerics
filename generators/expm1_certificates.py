@@ -30,7 +30,7 @@ DW_ADD = '776b-114'  # 3u^2/(1 - 4u), widened (docs/double-word.md)
 TAIL = '1b-50'
 POLY = '13b-66'  # 2^-62.3: the tail's 2^-50 weighted by x^2/6 <= 2^-12.6
 EXP_FAST = '1b-69'  # exp's fast path at the reduced argument (formal/exp/fast.g)
-EXP_ACCURATE = '1097b-134'  # exp's accurate path, below 2^-123.9 (docs/exp.md, section 6)
+EXP_ACCURATE = '1097b-134'  # exp's accurate path, below 2^-123.9 (docs/exp.md, section 8.4)
 FAST = '1b-62'  # expm1's eps_1 (docs/expm1.md, section 6)
 ACCURATE_SMALL = '1b-123'
 ACCURATE_GENERAL = '1b-118'
