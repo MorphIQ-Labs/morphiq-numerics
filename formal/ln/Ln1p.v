@@ -5,8 +5,9 @@
     its accurate path rounds it once (LnAccurate.v, [ln_1p_acc_ok]); so that
     path returns [v] too, bit for bit. Today's double-word path, when its own
     test passes, returns [RN(ln(1 + x))] by its contract, which is [v]: every
-    path [ln_1p] took before returns the bits the stages return. The screens,
-    which stages.rs applies before either stage, enter as hypotheses. *)
+    path [ln_1p] took before returns the bits the stages return.
+    [ln_1p_stages] runs the screens (Ln1pScreen.v) and the stages as [ln_1p]
+    runs them, and [ln_1p_stages_ok] states this for whatever it returns. *)
 
 From Coq Require Import ZArith Reals Lia Lra Psatz.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
@@ -14,7 +15,7 @@ From Binary64 Require Import Binary64Add IEEE64.
 From Interval Require Import Tactic.
 From Q Require QSpec Q128.
 Require LnAccurate.
-Require Import Ln1pLemmas Ln1pApprox Ln1pStageH Ln1pStageB.
+Require Import Ln1pLemmas Ln1pApprox Ln1pScreen Ln1pStageH Ln1pStageB.
 
 Open Scope R_scope.
 
@@ -81,4 +82,31 @@ Theorem ln_1p_stage_b_bits x v : finite x -> bpow radix2 (-54) <= Rabs (B x) -> 
 Proof.
   intros Fx Hx Hr Hd. destruct (stage_b_ok x v Fx Hx Hr Hd) as [_ [Bv All]].
   split; [exact Bv | exact (same_bits x v Fx (proj1 Hr) Hx Bv All)].
+Qed.
+
+(** [ln_1p]'s stages as [ln_1p] runs them (ln/mod.rs): stage H behind its
+    screen, then stage B behind its own; [None] sends [x] to
+    [ln_1p_reference]. *)
+Definition ln_1p_stages (x : f64) : option f64 :=
+  match (if h_screen x then stage_h x else None) with
+  | Some v => Some v
+  | None => if b_screen x then stage_b x else None
+  end.
+
+(** Whatever the stages return is [RN(ln(1 + x))] and the bits of [ln_1p]'s
+    accurate path, for every [x]. *)
+Theorem ln_1p_stages_ok x v : ln_1p_stages x = Some v ->
+  finite x /\ B v = rndF (ln (1 + B x)) /\ v = Q128.to_f64 (LnAccurate.ln_1p_acc x).
+Proof.
+  unfold ln_1p_stages. intros H.
+  assert (Bpart : (if b_screen x then stage_b x else None) = Some v ->
+                  finite x /\ B v = rndF (ln (1 + B x)) /\ v = Q128.to_f64 (LnAccurate.ln_1p_acc x)).
+  { intros Hb. destruct (b_screen x) eqn:Sb; [ | discriminate].
+    destruct (b_screen_ok x Sb) as [Fx [Hx Hr]].
+    destruct (ln_1p_stage_b_bits x v Fx Hx Hr Hb) as [B1 B2]. auto. }
+  destruct (h_screen x) eqn:Sh; [ | exact (Bpart H)].
+  destruct (stage_h x) as [w | ] eqn:Hh; [ | exact (Bpart H)].
+  injection H as E. subst w.
+  destruct (h_screen_ok x Sh) as [Fx [Hx Hr]].
+  destruct (ln_1p_stage_h_bits x v Fx Hx Hr Hh) as [B1 B2]. auto.
 Qed.

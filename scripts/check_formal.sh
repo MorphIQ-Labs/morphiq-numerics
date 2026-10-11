@@ -132,7 +132,7 @@ cp formal/exp/*.v formal/ln/*.v formal/audit/KernelAudit.v "$work/gappa/"
   && for proof in ExpTables ExpReduction ExpFast ExpAccurateLevels ExpAccurate ExpSmall \
        TableCheck ExpStageTables StageGappa ExpStageReduction ExpStageA ExpStageB \
        LnCheck LnTables LnTableCheck LnReduction LnAccurateLevels LnAccurate \
-       Ln1pCheck Ln1pTables Ln1pCertificates Ln1pApprox Ln1pReduction Ln1pTest Ln1pLemmas Ln1pStageH Ln1pStageB Ln1p; do
+       Ln1pCheck Ln1pTables Ln1pCertificates Ln1pApprox Ln1pReduction Ln1pTest Ln1pLemmas Ln1pStageH Ln1pStageB Ln1pScreen Ln1p; do
        coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" "$proof.v" || exit 1
      done \
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" KernelAudit.v) > "$work/kernel-audit.log"

@@ -5,14 +5,15 @@
 //! small-argument path (`exp::small_parts`, `exp::small`), and `ln`'s
 //! reduction (`ln::Reduced::of`, `z`, `z_exact`), the accurate values of `ln`
 //! and `ln_1p` (`Reduced::accurate_value`, `z_prime`, `ln::split`,
-//! `ln::small_accurate`) and `ln_1p`'s stages H and B
-//! (`ln::stages::stage_h_parts`, `stage_b_parts`) on reproducible inputs, with
+//! `ln::small_accurate`) and `ln_1p`'s screens and stages H and B
+//! (`ln::stages::stage_h_screen`, `stage_b_screen`, `stage_h_parts`,
+//! `stage_b_parts`) on reproducible inputs, with
 //! this crate's results. `scripts/check_formal.sh` runs the proved
 //! transcriptions (`formal/q`, `formal/binary64/RoundingTest.v`,
 //! `formal/exp/ExpStageReduction.v`, `ExpStageA.v`, `ExpStageB.v`,
 //! `ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v`, `ExpSmall.v`,
-//! `formal/ln/LnReduction.v`, `LnAccurate.v`, `Ln1pStageH.v` and
-//! `Ln1pStageB.v`, extracted by
+//! `formal/ln/LnReduction.v`, `LnAccurate.v`, `Ln1pScreen.v`, `Ln1pStageH.v`
+//! and `Ln1pStageB.v`, extracted by
 //! `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
 //! identical results, which ties the proofs to this code.
 //!
@@ -456,12 +457,21 @@ fn internal_crosscheck_corpus() {
             found += 1;
         }
     }
-    // ln_1p's stages: (s, lo, eps) and the test's result, for arguments each
-    // stage's screen admits, across its branches.
+    // ln_1p's stages: both screens at every argument, and (s, lo, eps) and
+    // the test's result for arguments each stage's screen admits, across its
+    // branches.
     let mut rng = SplitMix64::new(0x7163_726f_7373_0002);
     let (mut h, mut b) = (0, 0);
     while h < 4000 || b < 4000 {
         let x = ln_1p_stage_argument(&mut rng);
+        writeln!(
+            out,
+            "ln1p_screens {:016x} : {} {}",
+            x.to_bits(),
+            u8::from(crate::ln::stages::stage_h_screen(x)),
+            u8::from(crate::ln::stages::stage_b_screen(x))
+        )
+        .unwrap();
         if h < 4000 && crate::ln::stages::stage_h_screen(x) {
             ln_1p_stage_line(&mut out, "ln1p_h", x, crate::ln::stages::stage_h_parts(x));
             h += 1;

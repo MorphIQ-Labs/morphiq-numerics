@@ -1,8 +1,8 @@
 (* Runs the extracted Q128 and Q256 transcriptions, rounding tests, exp's
    stages, exp's fallback reduction, fast value, accurate path and
    small-argument path, ln's reduction, ln's and ln_1p's accurate values and
-   ln_1p's stages H and B (InternalCrosscheck.v) on the internal cross-check
-   corpus and compares each result with the Rust library's.
+   ln_1p's screens and stages H and B (InternalCrosscheck.v) on the internal
+   cross-check corpus and compares each result with the Rust library's.
 
    Each line is "op args : result". A value is "n e k l1 .. lk": its sign
    (0 or 1), its exponent in decimal, its limb count and its 64-bit limbs in
@@ -10,7 +10,8 @@
    test's result is a binary64 or "none"; a reduction's is its six words, a
    fast value's its two, an exp stage line's is n, r1, j and k, then each
    stage's two words and its test's result, an ln_1p stage's s, lo, eps and
-   its test's result. Exits 1 on a mismatch or a malformed line. *)
+   its test's result, and the ln_1p screens' 0 or 1 each. Exits 1 on a
+   mismatch or a malformed line. *)
 
 open Internalcrosscheck
 
@@ -123,6 +124,12 @@ let compute op args =
            let f = if op = "ln_accurate" then x_ln_accurate else x_ln_1p_accurate in
            let ((n, e), l) = f (z_of_u64 (hex x)) in show (n, e, l)
        | _ -> failwith (op ^ " takes one word"))
+  | "ln1p_screens" ->
+      (match args with
+       | [x] ->
+           let (h, b) = x_ln1p_screens (z_of_u64 (hex x)) in
+           (if h then "1" else "0") ^ " " ^ (if b then "1" else "0")
+       | _ -> failwith "ln1p_screens takes one word")
   | "ln1p_h" | "ln1p_b" ->
       (match args with
        | [x] ->
