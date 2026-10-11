@@ -1,13 +1,117 @@
-//! The fast path against the accurate path, and its pass rate (docs/exp.md §4,
-//! §8).
+//! The stages and the fallback's fast path against the accurate path, their
+//! pass rates, and every unrounded value against its certified bound
+//! (docs/exp.md §7, §8, §10).
 
-use super::{EPS, Reduced, X_OVERFLOW, X_ZERO, small, small_parts};
+use super::{
+    E_A, E_B, EPS, Reduced, Stages, X_OVERFLOW, X_ZERO, exp, fallback, small, small_parts,
+};
 use crate::q128::Q128;
-use crate::random::SplitMix64;
+use crate::random::{SplitMix64, unit_closed_open};
 use crate::test_exact::{Exact, entries, field, word};
 
-/// The analytic miss rate of the rounding test (§4): about `2^−15`.
+/// The analytic miss rate of the fallback's rounding test (§8.2): about `2^−15`.
 const ANALYTIC_MISS_RATE: f64 = 1.0 / 32768.0;
+/// The analytic miss rates of the stages' tests (§7): `2·E/ulp(1)`, about
+/// `2^−7.4` for stage A and `2^−17` for stage B.
+const ANALYTIC_MISS_RATE_A: f64 = 3.0 / 512.0;
+const ANALYTIC_MISS_RATE_B: f64 = 1.0 / 131_072.0;
+
+/// An argument the stages take, `|x| < 704`: uniform, or one in four of
+/// magnitude `2^−e`, `0 ≤ e < 64`, either sign.
+fn stage_argument(rng: &mut SplitMix64) -> f64 {
+    let u = unit_closed_open(rng.next_u64());
+    if rng.next_u64().is_multiple_of(4) {
+        let e = rng.next_u64() % 64;
+        let x = (1.0 + u) * f64::from_bits((1023 - e) << 52) * 0.5;
+        if rng.next_u64() & 1 == 1 { -x } else { x }
+    } else {
+        // 704 itself is excluded: 1408·u − 704 < 704.
+        1408.0 * u - 704.0
+    }
+}
+
+/// Each stage, when its test passes, against the old algorithm, which is
+/// the fallback (§8): equal bits. Both stages run on every argument, so
+/// stage B is checked where stage A decides too.
+fn stages_agree_with_the_fallback(seed: u64, samples: u64) -> (u64, u64) {
+    let mut rng = SplitMix64::new(seed);
+    let (mut missed_a, mut missed_b) = (0, 0);
+    for _ in 0..samples {
+        let x = stage_argument(&mut rng);
+        let reference = fallback(x).to_bits();
+        let stages = Stages::of(x);
+        match stages.a() {
+            Some(y) => assert_eq!(y.to_bits(), reference, "stage A, exp({x:e})"),
+            None => missed_a += 1,
+        }
+        match stages.b() {
+            Some(y) => assert_eq!(y.to_bits(), reference, "stage B, exp({x:e})"),
+            None => missed_b += 1,
+        }
+        assert_eq!(exp(x).to_bits(), reference, "exp({x:e})");
+    }
+    (missed_a, missed_b)
+}
+
+#[test]
+fn stages_agree_with_the_fallback_and_mostly_decide() {
+    let samples = 1 << 20;
+    let (missed_a, missed_b) = stages_agree_with_the_fallback(0x6578_705f_7374_6167, samples);
+    #[allow(clippy::cast_precision_loss)] // counts below 2^53
+    let (rate_a, rate_b) = (
+        missed_a as f64 / samples as f64,
+        missed_b as f64 / samples as f64,
+    );
+    std::eprintln!("exp stage A: {missed_a} of {samples} undecided ({rate_a:.3e})");
+    std::eprintln!("exp stage B: {missed_b} of {samples} undecided ({rate_b:.3e})");
+    assert!(
+        rate_a <= 2.0 * ANALYTIC_MISS_RATE_A,
+        "stage A miss rate {rate_a:e}"
+    );
+    assert!(
+        rate_b <= 4.0 * ANALYTIC_MISS_RATE_B,
+        "stage B miss rate {rate_b:e}"
+    );
+}
+
+/// The same on a large corpus: `MORPHIQ_EXP_SAMPLES` arguments (default
+/// 2^28). Ignored by default; run with
+/// `cargo test --release -p morphiq-numerics --lib stages_agree_on_a_large_corpus -- --ignored`.
+#[test]
+#[ignore = "a long check, run on demand"]
+fn stages_agree_on_a_large_corpus() {
+    let samples = std::env::var("MORPHIQ_EXP_SAMPLES").map_or(1 << 28, |s| s.parse().unwrap());
+    let threads = 8;
+    let undecided = std::thread::scope(|scope| {
+        let handles: std::vec::Vec<_> = (0..threads)
+            .map(|t| {
+                scope.spawn(move || {
+                    stages_agree_with_the_fallback(0x6578_705f_6c61_7267 + t, samples / threads)
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().unwrap())
+            .fold((0, 0), |(a, b), (c, d)| (a + c, b + d))
+    });
+    std::eprintln!(
+        "exp stages on {} arguments: A undecided {}, B undecided {}",
+        samples / threads * threads,
+        undecided.0,
+        undecided.1
+    );
+}
+
+/// The stages' test constants are their definitions (§5, §6). As with `EPS`,
+/// results can't check them: a smaller bound would rarely change a result,
+/// but it would void the proof.
+#[test]
+fn stage_bounds_are_their_definitions() {
+    let two = |k: i32| f64::from_bits(u64::try_from(1023 + k).unwrap() << 52);
+    assert_eq!(E_A.to_bits(), (1.5 * two(-61)).to_bits());
+    assert_eq!(E_B.to_bits(), two(-70).to_bits());
+}
 
 #[test]
 fn fast_path_agrees_with_the_accurate_path_and_mostly_decides() {
@@ -73,19 +177,39 @@ fn every_unrounded_result_is_within_its_certified_bound() {
     assert_eq!(cases.len(), 1200);
     for (x, reference) in cases {
         let reduced = Reduced::of(x);
-        // §6, general case: below 2^-123.9 (1097/1024 * 2^-124 < 2^-123.9).
+        // §8.4, general case: below 2^-123.9 (1097/1024 * 2^-124 < 2^-123.9).
         let y = Exact::of(reduced.accurate_value());
         assert!(y.within(&reference, 1097, 134), "accurate path, exp({x:e})");
         if reduced.k >= -1021 {
-            // §4: eps_1 = 2^-69, relative to 2^(j/128) e^r = e^x / 2^k.
+            // §8.2: eps_1 = 2^-69, relative to 2^(j/128) e^r = e^x / 2^k.
             let y = reduced.fast_value();
             let y = Exact::of(Q128::from_f64(y.hi()))
                 .add(&Exact::of(Q128::from_f64(y.lo())))
                 .mul(&Exact::pow2(i64::from(reduced.k)));
             assert!(y.within(&reference, 1, 69), "fast path, exp({x:e})");
         }
+        if x.abs() < 704.0 {
+            // §5 and §6: y + l within the certified bound of 2^(j/512) e^r =
+            // e^x / 2^k, absolutely: 0x1.2ep-61 < 5/4 2^-61 for stage A,
+            // 0x1.a2p-71 < 7/4 2^-71 for stage B.
+            let stages = Stages::of(x);
+            let k = stages.jk().1;
+            for ((y, l), numerator, shift) in [(stages.a_value(), 5, 63), (stages.b_value(), 7, 73)]
+            {
+                let error = Exact::of_f64(y)
+                    .add(&Exact::of_f64(l))
+                    .mul(&Exact::pow2(k))
+                    .sub(&reference)
+                    .abs();
+                let bound = Exact::of_f64(f64::from(numerator)).mul(&Exact::pow2(k - shift));
+                assert!(
+                    error.cmp(&bound) != core::cmp::Ordering::Greater,
+                    "stage bound 2^-{shift}·{numerator}, exp({x:e})"
+                );
+            }
+        }
         if x.abs() < small_arguments {
-            // §6, small arguments: within 2^-178, absolutely; e^x < 2 here.
+            // §8.4, small arguments: within 2^-178, absolutely; e^x < 2 here.
             let (h, w) = small_parts(x);
             let error = Exact::of(Q128::from_f64(h))
                 .add(&Exact::of(w))
@@ -99,9 +223,9 @@ fn every_unrounded_result_is_within_its_certified_bound() {
     }
 }
 
-/// The rounding test's constant is `ε₁·(1 + 2^−50)` with `ε₁ = 2^−69` (§5).
+/// The rounding test's constant is `ε₁·(1 + 2^−50)` with `ε₁ = 2^−69` (§8.3).
 /// Results can't check it: the fast path's actual error is far below `ε₁`, so
-/// a smaller constant would rarely change a result, but it would void §5's
+/// a smaller constant would rarely change a result, but it would void §8.3's
 /// proof.
 #[test]
 fn rounding_test_constant_is_its_definition() {

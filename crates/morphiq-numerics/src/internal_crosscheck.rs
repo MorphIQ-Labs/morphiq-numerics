@@ -1,11 +1,13 @@
 //! Writes the internal cross-check corpus: `Q128` and `Q256` operations, the
-//! rounding tests (`ln::decide_with`, `exp::decide_scaled`), `exp`'s reduction,
+//! rounding tests (`ln::decide_with`, `exp::decide_scaled`), `exp`'s stages
+//! (`Stages::of`, `a_value`, `a`, `b_value`, `b`), the fallback's reduction,
 //! fast value (`exp::fast_at`), accurate path (`Reduced::accurate_value`) and
 //! small-argument path (`exp::small_parts`, `exp::small`), and `ln`'s
 //! reduction (`ln::Reduced::of`, `z`, `z_exact`) on reproducible inputs, with
 //! this crate's results. `scripts/check_formal.sh` runs the proved
 //! transcriptions (`formal/q`, `formal/binary64/RoundingTest.v`,
-//! `formal/exp/ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v`, `ExpSmall.v` and
+//! `formal/exp/ExpStageReduction.v`, `ExpStageA.v`, `ExpStageB.v`,
+//! `ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v`, `ExpSmall.v` and
 //! `formal/ln/LnReduction.v`, extracted by
 //! `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
 //! identical results, which ties the proofs to this code.
@@ -140,6 +142,48 @@ pub(crate) fn reduction_argument(rng: &mut SplitMix64) -> f64 {
     }
 }
 
+/// An argument of `exp`'s stages, `|x| < 704`: anywhere in that range, at a
+/// tie of `x/L` (`L = ln 2 / 512`, where `n` turns), or tiny (`n = 0`).
+fn stage_argument(rng: &mut SplitMix64) -> f64 {
+    const L: f64 = core::f64::consts::LN_2 / 512.0;
+    match rng.next_u64() % 3 {
+        0 => 1407.99 * unit(rng) - 703.995,
+        1 => {
+            #[allow(clippy::cast_precision_loss)] // |n| < 2^20
+            let n = (rng.next_u64() % 1_040_000) as f64 - 520_000.0;
+            (n + 0.5) * L + (unit(rng) - 0.5) * f64::from_bits(0x3d60_0000_0000_0000)
+        }
+        _ => {
+            let x = unit(rng) * f64::from_bits((1023 - rng.next_u64() % 61) << 52);
+            if rng.next_u64() & 1 == 1 { -x } else { x }
+        }
+    }
+}
+
+/// `exp`'s stages at `x`: `Stages::of`'s words, both stages' values and
+/// their tests' outcomes.
+fn stage_line(out: &mut String, x: f64) {
+    let stages = crate::exp::Stages::of(x);
+    let [n, r1] = stages.words();
+    let (j, k) = stages.jk();
+    let (ya, la) = stages.a_value();
+    let (yb, lb) = stages.b_value();
+    writeln!(
+        out,
+        "stage {:016x} : {:016x} {:016x} {j} {k} {:016x} {:016x} {} {:016x} {:016x} {}",
+        x.to_bits(),
+        n.to_bits(),
+        r1.to_bits(),
+        ya.to_bits(),
+        la.to_bits(),
+        opt(stages.a()),
+        yb.to_bits(),
+        lb.to_bits(),
+        opt(stages.b())
+    )
+    .unwrap();
+}
+
 /// An argument of `ln`'s reduction: any positive finite encoding, a
 /// subnormal, near 1 (`R[i] = 1`), or at a table interval's edge.
 fn ln_argument(rng: &mut SplitMix64) -> f64 {
@@ -214,6 +258,8 @@ fn internal_crosscheck_corpus() {
             opt(crate::exp::decide_scaled(y, k))
         )
         .unwrap();
+
+        stage_line(&mut out, stage_argument(&mut rng));
 
         let x = reduction_argument(&mut rng);
         let words = crate::exp::Reduced::of(x).words();
@@ -351,6 +397,16 @@ fn internal_crosscheck_corpus() {
             q256(Q256::from_limbs(neg, &limbs, e))
         )
         .unwrap();
+    }
+    // Arguments stage B's test leaves undecided, so both of its outcomes
+    // occur: searched for from a fixed seed (about one in 2^16.7).
+    let mut found = 0;
+    while found < 8 {
+        let x = 1407.99 * unit(&mut rng) - 703.995;
+        if crate::exp::Stages::of(x).b().is_none() {
+            stage_line(&mut out, x);
+            found += 1;
+        }
     }
     std::fs::write(path, out).unwrap();
 }
