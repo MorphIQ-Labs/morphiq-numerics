@@ -369,9 +369,8 @@ not a gate). The conditions:
 | `log_diff_exp` | `a` in `[−20, 20]`, `b = a − [0, 30]` | 57 ns | 58 ns |
 
 On AVX2 and AVX-512F, a batch of two pairs is shorter than one lane chunk.
-So `exp_slice` and `ln_1p_slice` evaluate it by the scalar function
-([lanes.md](lanes.md) §1), and `log_sum_exp_pairs::<2>` gains nothing there.
-No x86-64 host was timed.
+The backend cascade ([lanes.md](lanes.md) §1) runs it on SSE2's two lanes.
+No x86-64 host was timed, so the gain there is inferred, not measured.
 
 ## 9. Evidence
 

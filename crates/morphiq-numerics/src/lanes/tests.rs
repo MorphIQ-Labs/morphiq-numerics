@@ -13,7 +13,7 @@ use std::vec::Vec;
 
 use morphiq_numerics_arch::{Scalar, Simd, WithSimd};
 
-use super::{Kernel, run, two_prod};
+use super::{Kernel, chunks, run, two_prod};
 use crate::exp::lanes::Exp;
 use crate::internal_crosscheck::reduction_argument;
 use crate::ln::lanes::{Ln, Ln1p};
@@ -299,6 +299,96 @@ impl Backend {
             Backend::Avx512(s) => s.vectorize(op),
         }
     }
+}
+
+impl Backend {
+    /// `super::chunks` on this backend: `G`'s lanes on the whole chunks at
+    /// the start of `xs`; returns how many elements that covered.
+    fn chunks<G: Kernel>(&self, xs: &[f64], out: &mut [f64]) -> usize {
+        match self {
+            Backend::Scalar(s) => chunks::<G, _>(*s, xs, out),
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            Backend::Neon(s) => chunks::<G, _>(*s, xs, out),
+            #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
+            Backend::Sse2(s) => chunks::<G, _>(*s, xs, out),
+            #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
+            Backend::Avx2(s) => chunks::<G, _>(*s, xs, out),
+            #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
+            Backend::Avx512(s) => chunks::<G, _>(*s, xs, out),
+        }
+    }
+}
+
+/// Every cascade `map` could run, forced: each subset of this CPU's lane
+/// backends, widest first, then the scalar function for what remains. On
+/// slices of every length from 0 to 17 at eight offsets, and the whole
+/// corpus, every element has the scalar bits (§1).
+fn check_cascades<G: Kernel>(name: &str, xs: &[f64]) {
+    let lanes: Vec<Backend> = backends()
+        .into_iter()
+        .filter(|b| !matches!(b, Backend::Scalar(_)))
+        .collect();
+    let lengths: Vec<(usize, usize)> = (0..=17)
+        .flat_map(|len| (0..8).map(move |start| (start, len)))
+        .chain([(0, xs.len())])
+        .collect();
+    for subset in 0..1_u32 << lanes.len() {
+        let cascade: Vec<&Backend> = lanes
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| subset >> i & 1 == 1)
+            .map(|(_, b)| b)
+            .collect();
+        let names: Vec<&str> = cascade.iter().map(|b| b.name()).collect();
+        for &(start, len) in &lengths {
+            let xs = &xs[start..start + len];
+            let mut out = std::vec![f64::NAN; len];
+            let mut done = 0;
+            for backend in &cascade {
+                done += backend.chunks::<G>(&xs[done..], &mut out[done..]);
+            }
+            // What is left is shorter than the narrowest backend's chunk.
+            if let Some(narrowest) = cascade.last() {
+                assert!(len - done < lanes_of(narrowest), "{names:?}, length {len}");
+            }
+            for (o, &x) in out[done..].iter_mut().zip(&xs[done..]) {
+                *o = G::scalar(x);
+            }
+            for (&x, &y) in xs.iter().zip(&out) {
+                assert_eq!(
+                    y.to_bits(),
+                    G::scalar(x).to_bits(),
+                    "{name}({x:e}) through {names:?}, length {len}"
+                );
+            }
+        }
+    }
+    std::eprintln!(
+        "{name}: every cascade of {:?} bit-identical",
+        lanes.iter().map(Backend::name).collect::<Vec<_>>()
+    );
+}
+
+fn lanes_of(backend: &Backend) -> usize {
+    match backend {
+        Backend::Scalar(_) => 1,
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        Backend::Neon(_) => 2,
+        #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
+        Backend::Sse2(_) => 2,
+        #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
+        Backend::Avx2(_) => 4,
+        #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
+        Backend::Avx512(_) => 8,
+    }
+}
+
+#[test]
+fn every_lanes_cascade_returns_the_scalar_bits() {
+    let short = |v: Vec<f64>| -> Vec<f64> { v.into_iter().step_by(7).take(4_000).collect() };
+    check_cascades::<Exp>("exp", &short(exp_corpus()));
+    check_cascades::<Ln>("ln", &short(ln_corpus()));
+    check_cascades::<Ln1p>("ln_1p", &short(ln_1p_corpus()));
 }
 
 fn check_all<G: Kernel>(name: &str, xs: &[f64]) {

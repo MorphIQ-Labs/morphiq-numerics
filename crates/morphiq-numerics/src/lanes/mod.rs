@@ -11,7 +11,7 @@
 
 use core::marker::PhantomData;
 
-use morphiq_numerics_arch::{Simd, WithSimd, dispatch};
+use morphiq_numerics_arch::{Simd, WithSimd};
 
 /// Veltkamp's splitting constant `2^27 + 1`, as in `eft.rs` (Dekker 1971,
 /// (6.2)); the lane split is checked against `eft::two_prod` bit for bit.
@@ -34,49 +34,93 @@ pub(crate) trait Kernel {
     fn lanes<K: Simd>(k: K, x: K::Array) -> K::Array;
 }
 
-/// `out[i] = G::scalar(xs[i])` for every `i`, on the widest backend the CPU
-/// has. A one-lane backend loops the scalar function, which is no slower.
+/// `out[i] = G::scalar(xs[i])` for every `i`, in a cascade of the backends
+/// this CPU has, widest first (§1): each takes as many whole chunks of its
+/// own width as remain, so a slice, or a remainder, of at least two elements
+/// still runs in lanes. Only a last single element is left to the scalar
+/// function. On x86-64 the cascade is AVX-512F, AVX2, SSE2; on aarch64 NEON.
+/// Every backend returns the scalar bits, so the cascade does too.
 pub(crate) fn map<G: Kernel>(xs: &[f64], out: &mut [f64]) {
-    dispatch(Map::<G> {
+    let mut done = 0;
+    #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
+    {
+        use morphiq_numerics_arch::{Avx2, Avx512, Sse2};
+        if xs.len() - done >= Avx512::LANES
+            && let Some(k) = Avx512::try_new()
+        {
+            done += chunks::<G, _>(k, &xs[done..], &mut out[done..]);
+        }
+        if xs.len() - done >= Avx2::LANES
+            && let Some(k) = Avx2::try_new()
+        {
+            done += chunks::<G, _>(k, &xs[done..], &mut out[done..]);
+        }
+        if xs.len() - done >= Sse2::LANES {
+            done += chunks::<G, _>(Sse2::new(), &xs[done..], &mut out[done..]);
+        }
+    }
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        use morphiq_numerics_arch::Neon;
+        if xs.len() >= Neon::LANES {
+            done += chunks::<G, _>(Neon::new(), xs, out);
+        }
+    }
+    for (o, &x) in out[done..].iter_mut().zip(&xs[done..]) {
+        *o = G::scalar(x);
+    }
+}
+
+/// `G`'s lanes on every whole chunk of backend `k`'s width at the start of
+/// `xs`, inside `k`'s feature-enabled wrapper; returns how many elements
+/// that covered.
+pub(crate) fn chunks<G: Kernel, K: Simd>(k: K, xs: &[f64], out: &mut [f64]) -> usize {
+    k.vectorize(Chunks::<G> {
         xs,
         out,
         kernel: PhantomData,
-    });
+    })
 }
 
-struct Map<'a, G> {
+struct Chunks<'a, G> {
     xs: &'a [f64],
     out: &'a mut [f64],
     kernel: PhantomData<G>,
 }
 
-impl<G: Kernel> WithSimd for Map<'_, G> {
-    type Output = ();
+impl<G: Kernel> WithSimd for Chunks<'_, G> {
+    type Output = usize;
     #[inline(always)]
-    fn with<K: Simd>(self, k: K) {
-        if K::LANES == 1 {
-            for (o, &x) in self.out.iter_mut().zip(self.xs) {
-                *o = G::scalar(x);
-            }
-        } else {
-            run::<G, K>(k, self.xs, self.out);
-        }
+    fn with<K: Simd>(self, k: K) -> usize {
+        whole_chunks::<G, K>(k, self.xs, self.out)
     }
 }
 
-/// `out[i] = G::scalar(xs[i])` on backend `k`'s lanes, the last
-/// `xs.len() mod LANES` elements by the scalar function.
+/// `out[i] = G::scalar(xs[i])` on backend `k`'s lanes for every whole chunk;
+/// returns the number of elements covered, a multiple of `K::LANES`.
 #[inline(always)]
-pub(crate) fn run<G: Kernel, K: Simd>(k: K, xs: &[f64], out: &mut [f64]) {
+fn whole_chunks<G: Kernel, K: Simd>(k: K, xs: &[f64], out: &mut [f64]) -> usize {
     debug_assert_eq!(xs.len(), out.len());
-    let mut chunks = xs.chunks_exact(K::LANES);
-    let mut outs = out.chunks_exact_mut(K::LANES);
-    for (x, o) in (&mut chunks).zip(&mut outs) {
+    if K::LANES == 1 {
+        return 0;
+    }
+    let chunks = xs.chunks_exact(K::LANES);
+    let covered = xs.len() - chunks.remainder().len();
+    for (x, o) in chunks.zip(out.chunks_exact_mut(K::LANES)) {
         let mut a = K::Array::default();
         a.as_mut().copy_from_slice(x);
         o.copy_from_slice(G::lanes(k, a).as_ref());
     }
-    for (o, &x) in outs.into_remainder().iter_mut().zip(chunks.remainder()) {
+    covered
+}
+
+/// `out[i] = G::scalar(xs[i])` on backend `k`'s lanes alone, the last
+/// `xs.len() mod LANES` elements by the scalar function.
+#[cfg(test)]
+#[inline(always)]
+pub(crate) fn run<G: Kernel, K: Simd>(k: K, xs: &[f64], out: &mut [f64]) {
+    let done = whole_chunks::<G, K>(k, xs, out);
+    for (o, &x) in out[done..].iter_mut().zip(&xs[done..]) {
         *o = G::scalar(x);
     }
 }
