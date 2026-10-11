@@ -148,6 +148,7 @@ Definition rt_entry (bd : bounds) (i : Z) (r : Z) (t : Z * Z) : bool :=
   | Some R, Some zi, Some th, Some tl =>
       (0 <? fst R)%Z && (0 <? r)%Z && (r <? 2 ^ 63)%Z && (r mod 2 ^ 43 =? 0)%Z && (1022 <=? r / 2 ^ 52)%Z && (r / 2 ^ 52 <=? 1023)%Z
       && Bool.eqb (r =? one_bits)%Z (near_b i)
+      && (if (i <? 300)%Z then (one_bits <=? r)%Z else (r <=? one_bits)%Z)
       && dle zi z_max
       && grid43 th && dle (dabs tl) (b_tl_max bd) && dle (dabs th) (b_th_max bd)
       && (let '(lo, hi) := lnb R 110 24 in
@@ -178,6 +179,7 @@ Definition rt_entry_ok (bd : bounds) (i : Z) (r : Z) (t : Z * Z) : Prop :=
   finite (b64_of_bits r) /\ finite (b64_of_bits (fst t)) /\ finite (b64_of_bits (snd t)) /\
   (0 < r < 2 ^ 63)%Z /\ (r mod 2 ^ 43 = 0)%Z /\ (1022 <= r / 2 ^ 52 <= 1023)%Z /\
   ((r = one_bits)%Z <-> near_b i = true) /\
+  ((i < 300)%Z -> (one_bits <= r)%Z) /\ ((300 <= i)%Z -> (r <= one_bits)%Z) /\
   (exists zi, zi <= / 2 ^ 9 /\ Rabs (ya * R - 1) <= zi /\ Rabs (yb * R - 1) <= zi /\
      (near_b i = true -> fst t = 0%Z /\ snd t = 0%Z) /\
      (near_b i = false -> zi + dval (b_s_min bd) <= Rabs th)) /\
@@ -215,7 +217,7 @@ Proof.
   destruct (dec (snd t)) as [tl | ] eqn:DL; [ | discriminate].
   destruct (lnb R 110 24) as [lo hi] eqn:LN.
   intros H. repeat rewrite andb_true_iff in H.
-  destruct H as [[[[[[[[[[[[Rp H0] H1] H2] H3] H4] Hn] Hz] Hg] Htl] Hth] [Hhi Hlo]] Hs].
+  destruct H as [[[[[[[[[[[[[Rp H0] H1] H2] H3] H4] Hn] Hside] Hz] Hg] Htl] Hth] [Hhi Hlo]] Hs].
   apply Z.ltb_lt in Rp. apply Z.ltb_lt in H0. apply Z.ltb_lt in H1. apply Z.eqb_eq in H2. apply Z.leb_le in H3. apply Z.leb_le in H4.
   destruct (dec_ok _ _ DR) as [FR VR]. destruct (dec_ok _ _ DA) as [FA VA]. destruct (dec_ok _ _ DB) as [FB VB].
   destruct (dec_ok _ _ DH) as [FH VH]. destruct (dec_ok _ _ DL) as [FL VL].
@@ -226,6 +228,10 @@ Proof.
   { split; intros E.
     - apply Bool.eqb_prop in Hn. rewrite <- Hn. apply Z.eqb_eq. exact E.
     - apply Bool.eqb_prop in Hn. rewrite E in Hn. apply Z.eqb_eq. exact Hn. }
+  split.
+  { intros Hi. destruct (Z.ltb_spec i 300) as [_ | L]; [apply Z.leb_le, Hside | lia]. }
+  split.
+  { intros Hi. destruct (Z.ltb_spec i 300) as [L | _]; [lia | apply Z.leb_le, Hside]. }
   split.
   { set (zi := dmax (dabs (dsub (dmul ya R) (1%Z, 0%Z))) (dabs (dsub (dmul yb R) (1%Z, 0%Z)))) in *.
     exists (dval zi). destruct (dmax_ok (dabs (dsub (dmul ya R) (1%Z, 0%Z))) (dabs (dsub (dmul yb R) (1%Z, 0%Z))))
