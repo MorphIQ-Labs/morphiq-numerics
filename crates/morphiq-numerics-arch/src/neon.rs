@@ -92,6 +92,7 @@ impl Simd for Neon {
         fn and_u(a: uint64x2_t, b: uint64x2_t) -> uint64x2_t;
         fn or_u(a: uint64x2_t, b: uint64x2_t) -> uint64x2_t;
         fn sub_u(a: uint64x2_t, b: uint64x2_t) -> uint64x2_t;
+        fn shr_u(a: uint64x2_t, n: u32) -> uint64x2_t;
         fn eq_u(a: uint64x2_t, b: uint64x2_t) -> NeonMask;
     }
 }
@@ -101,10 +102,10 @@ impl Simd for Neon {
 mod helpers {
     use core::arch::aarch64::{
         float64x2_t, uint64x2_t, vabsq_f64, vaddq_f64, vandq_u64, vbslq_f64, vceqq_u64, vcleq_f64,
-        vcltq_f64, vdivq_f64, vdupq_n_f64, vdupq_n_u64, vfmaq_f64, vgetq_lane_u64, vld1q_f64,
-        vld1q_u64, vmulq_f64, vmvnq_u32, vnegq_f64, vorrq_u64, vreinterpretq_f64_u64,
-        vreinterpretq_u32_u64, vreinterpretq_u64_f64, vreinterpretq_u64_u32, vst1q_f64, vsubq_f64,
-        vsubq_u64,
+        vcltq_f64, vdivq_f64, vdupq_n_f64, vdupq_n_s64, vdupq_n_u64, vfmaq_f64, vgetq_lane_u64,
+        vld1q_f64, vld1q_u64, vmulq_f64, vmvnq_u32, vnegq_f64, vorrq_u64, vreinterpretq_f64_u64,
+        vreinterpretq_u32_u64, vreinterpretq_u64_f64, vreinterpretq_u64_u32, vshlq_u64, vst1q_f64,
+        vsubq_f64, vsubq_u64,
     };
 
     use super::NeonMask;
@@ -229,6 +230,12 @@ mod helpers {
     #[inline]
     pub(super) fn sub_u(a: uint64x2_t, b: uint64x2_t) -> uint64x2_t {
         vsubq_u64(a, b)
+    }
+    #[target_feature(enable = "neon")]
+    #[inline]
+    pub(super) fn shr_u(a: uint64x2_t, n: u32) -> uint64x2_t {
+        // USHL by a negative count shifts right; by −64 or less it gives 0.
+        vshlq_u64(a, vdupq_n_s64(-i64::from(n)))
     }
     #[target_feature(enable = "neon")]
     #[inline]

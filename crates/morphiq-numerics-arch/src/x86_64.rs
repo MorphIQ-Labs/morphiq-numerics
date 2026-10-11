@@ -97,6 +97,7 @@ impl Simd for Sse2 {
         fn and_u(a: __m128i, b: __m128i) -> __m128i;
         fn or_u(a: __m128i, b: __m128i) -> __m128i;
         fn sub_u(a: __m128i, b: __m128i) -> __m128i;
+        fn shr_u(a: __m128i, n: u32) -> __m128i;
         fn eq_u(a: __m128i, b: __m128i) -> Sse2Mask;
     }
 }
@@ -184,6 +185,7 @@ impl Simd for Avx2 {
         fn and_u(a: __m256i, b: __m256i) -> __m256i;
         fn or_u(a: __m256i, b: __m256i) -> __m256i;
         fn sub_u(a: __m256i, b: __m256i) -> __m256i;
+        fn shr_u(a: __m256i, n: u32) -> __m256i;
         fn eq_u(a: __m256i, b: __m256i) -> Avx2Mask;
     }
 }
@@ -266,6 +268,7 @@ impl Simd for Avx512 {
         fn and_u(a: __m512i, b: __m512i) -> __m512i;
         fn or_u(a: __m512i, b: __m512i) -> __m512i;
         fn sub_u(a: __m512i, b: __m512i) -> __m512i;
+        fn shr_u(a: __m512i, n: u32) -> __m512i;
         fn eq_u(a: __m512i, b: __m512i) -> Avx512Mask;
     }
 
@@ -296,9 +299,9 @@ mod helpers {
         use core::arch::x86_64::{
             __m128d, __m128i, _mm_add_pd, _mm_and_pd, _mm_and_si128, _mm_andnot_pd,
             _mm_castpd_si128, _mm_castsi128_pd, _mm_cmpeq_epi32, _mm_cmple_pd, _mm_cmplt_pd,
-            _mm_div_pd, _mm_loadu_pd, _mm_loadu_si128, _mm_movemask_pd, _mm_mul_pd, _mm_or_pd,
-            _mm_or_si128, _mm_set1_epi64x, _mm_set1_pd, _mm_shuffle_epi32, _mm_storeu_pd,
-            _mm_sub_epi64, _mm_sub_pd, _mm_xor_pd,
+            _mm_cvtsi64_si128, _mm_div_pd, _mm_loadu_pd, _mm_loadu_si128, _mm_movemask_pd,
+            _mm_mul_pd, _mm_or_pd, _mm_or_si128, _mm_set1_epi64x, _mm_set1_pd, _mm_shuffle_epi32,
+            _mm_srl_epi64, _mm_storeu_pd, _mm_sub_epi64, _mm_sub_pd, _mm_xor_pd,
         };
 
         use super::super::Sse2Mask;
@@ -427,6 +430,12 @@ mod helpers {
         }
         #[target_feature(enable = "sse2")]
         #[inline]
+        pub(in super::super) fn shr_u(a: __m128i, n: u32) -> __m128i {
+            // PSRLQ by the count in the low 64 bits; 64 or more gives 0.
+            _mm_srl_epi64(a, _mm_cvtsi64_si128(i64::from(n)))
+        }
+        #[target_feature(enable = "sse2")]
+        #[inline]
         pub(in super::super) fn eq_u(a: __m128i, b: __m128i) -> Sse2Mask {
             // SSE2 compares 32-bit halves only: a 64-bit lane is equal when both
             // halves are, so AND each half's result with its partner's.
@@ -438,12 +447,13 @@ mod helpers {
 
     pub(super) mod avx2 {
         use core::arch::x86_64::{
-            __m256d, __m256i, _CMP_LE_OQ, _CMP_LT_OQ, _mm256_add_pd, _mm256_and_pd,
-            _mm256_and_si256, _mm256_andnot_pd, _mm256_blendv_pd, _mm256_castpd_si256,
-            _mm256_castsi256_pd, _mm256_cmp_pd, _mm256_cmpeq_epi64, _mm256_div_pd, _mm256_fmadd_pd,
-            _mm256_loadu_pd, _mm256_loadu_si256, _mm256_movemask_pd, _mm256_mul_pd, _mm256_or_pd,
-            _mm256_or_si256, _mm256_set1_epi64x, _mm256_set1_pd, _mm256_storeu_pd,
-            _mm256_sub_epi64, _mm256_sub_pd, _mm256_xor_pd,
+            __m256d, __m256i, _CMP_LE_OQ, _CMP_LT_OQ, _mm_cvtsi64_si128, _mm256_add_pd,
+            _mm256_and_pd, _mm256_and_si256, _mm256_andnot_pd, _mm256_blendv_pd,
+            _mm256_castpd_si256, _mm256_castsi256_pd, _mm256_cmp_pd, _mm256_cmpeq_epi64,
+            _mm256_div_pd, _mm256_fmadd_pd, _mm256_loadu_pd, _mm256_loadu_si256,
+            _mm256_movemask_pd, _mm256_mul_pd, _mm256_or_pd, _mm256_or_si256, _mm256_set1_epi64x,
+            _mm256_set1_pd, _mm256_srl_epi64, _mm256_storeu_pd, _mm256_sub_epi64, _mm256_sub_pd,
+            _mm256_xor_pd,
         };
 
         use super::super::Avx2Mask;
@@ -582,6 +592,12 @@ mod helpers {
         }
         #[target_feature(enable = "avx2,fma")]
         #[inline]
+        pub(in super::super) fn shr_u(a: __m256i, n: u32) -> __m256i {
+            // VPSRLQ by the count in the low 64 bits; 64 or more gives 0.
+            _mm256_srl_epi64(a, _mm_cvtsi64_si128(i64::from(n)))
+        }
+        #[target_feature(enable = "avx2,fma")]
+        #[inline]
         pub(in super::super) fn eq_u(a: __m256i, b: __m256i) -> Avx2Mask {
             Avx2Mask(_mm256_castsi256_pd(_mm256_cmpeq_epi64(a, b)))
         }
@@ -589,12 +605,12 @@ mod helpers {
 
     pub(super) mod avx512 {
         use core::arch::x86_64::{
-            __m512d, __m512i, _CMP_LE_OQ, _CMP_LT_OQ, _mm512_abs_pd, _mm512_add_pd,
-            _mm512_and_si512, _mm512_castpd_si512, _mm512_castsi512_pd, _mm512_cmp_pd_mask,
-            _mm512_cmpeq_epi64_mask, _mm512_div_pd, _mm512_fmadd_pd, _mm512_loadu_pd,
-            _mm512_loadu_si512, _mm512_mask_blend_pd, _mm512_mul_pd, _mm512_or_si512,
-            _mm512_set1_epi64, _mm512_set1_pd, _mm512_storeu_pd, _mm512_sub_epi64, _mm512_sub_pd,
-            _mm512_xor_si512,
+            __m512d, __m512i, _CMP_LE_OQ, _CMP_LT_OQ, _mm_cvtsi64_si128, _mm512_abs_pd,
+            _mm512_add_pd, _mm512_and_si512, _mm512_castpd_si512, _mm512_castsi512_pd,
+            _mm512_cmp_pd_mask, _mm512_cmpeq_epi64_mask, _mm512_div_pd, _mm512_fmadd_pd,
+            _mm512_loadu_pd, _mm512_loadu_si512, _mm512_mask_blend_pd, _mm512_mul_pd,
+            _mm512_or_si512, _mm512_set1_epi64, _mm512_set1_pd, _mm512_srl_epi64, _mm512_storeu_pd,
+            _mm512_sub_epi64, _mm512_sub_pd, _mm512_xor_si512,
         };
 
         use super::super::Avx512Mask;
@@ -710,6 +726,12 @@ mod helpers {
         #[inline]
         pub(in super::super) fn sub_u(a: __m512i, b: __m512i) -> __m512i {
             _mm512_sub_epi64(a, b)
+        }
+        #[target_feature(enable = "avx512f")]
+        #[inline]
+        pub(in super::super) fn shr_u(a: __m512i, n: u32) -> __m512i {
+            // VPSRLQ by the count in the low 64 bits; 64 or more gives 0.
+            _mm512_srl_epi64(a, _mm_cvtsi64_si128(i64::from(n)))
         }
         #[target_feature(enable = "avx512f")]
         #[inline]

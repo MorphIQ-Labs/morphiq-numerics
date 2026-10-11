@@ -73,6 +73,9 @@ impl WithSimd for Check<'_> {
                 (words(s.and_u(ua, ub)), 7),
                 (words(s.or_u(ua, ub)), 8),
                 (words(s.sub_u(ua, ub)), 9),
+                (words(s.shr_u(ua, 45)), 12),
+                (words(s.shr_u(ua, 0)), 13),
+                (words(s.shr_u(ua, 64)), 14),
                 (lanes(s.splat(xs[0])), 10),
                 (words(s.splat_bits(xs[0].to_bits())), 11),
             ];
@@ -115,11 +118,14 @@ impl WithSimd for Check<'_> {
                     f64::from_bits(x.to_bits().wrapping_sub(y.to_bits())),
                     xs[0],
                     xs[0],
+                    f64::from_bits(x.to_bits() >> 45),
+                    x,
+                    0.0,
                 ];
                 for (got, op) in &results {
                     let want = expected[*op];
                     // Bit operations are compared as words, NaN payloads included.
-                    let exact = matches!(op, 4 | 5 | 7 | 8 | 9 | 10 | 11);
+                    let exact = matches!(op, 4 | 5 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14);
                     let ok = if exact {
                         got.as_ref()[i].to_bits() == want.to_bits()
                     } else {

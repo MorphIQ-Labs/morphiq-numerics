@@ -36,8 +36,8 @@ scalar operation it names: `add`, `sub`, `mul`, `div` (IEEE 754 binary64,
 round-to-nearest-even), `abs` and `neg` (the sign bit), the ordered
 comparisons `lt` and `le` (false on NaN), the lane masks' `and_m`, `or_m`,
 `not_m`, `mask_bits` and `select`, the reinterpretations `to_bits` and
-`to_float`, the 64-bit word operations `and_u`, `or_u`, `sub_u` (wrapping) and
-`eq_u`, `splat` and `splat_bits`, and `load`, `load_bits` and `store` on
+`to_float`, the 64-bit word operations `and_u`, `or_u`, `sub_u` (wrapping),
+`shr_u` (logical, zero for a count of 64 or more) and `eq_u`, `splat` and `splat_bits`, and `load`, `load_bits` and `store` on
 `[f64; LANES]` and `[u64; LANES]` arrays. `mul_add(a, b, c)` returns `a·b + c`
 rounded once on a backend with a hardware fused multiply-add (`Simd::FMA`),
 and `None` on one without; it is never emulated.

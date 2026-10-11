@@ -136,6 +136,10 @@ impl Simd for Scalar {
         a | b
     }
     #[inline(always)]
+    fn shr_u(self, a: u64, n: u32) -> u64 {
+        a.checked_shr(n).unwrap_or(0)
+    }
+    #[inline(always)]
     fn sub_u(self, a: u64, b: u64) -> u64 {
         a.wrapping_sub(b)
     }

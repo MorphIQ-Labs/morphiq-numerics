@@ -164,6 +164,8 @@ pub trait Simd: Copy + Send + Sync + core::fmt::Debug + sealed::Sealed + 'static
     fn or_u(self, a: Self::U, b: Self::U) -> Self::U;
     /// `a − b`, wrapping.
     fn sub_u(self, a: Self::U, b: Self::U) -> Self::U;
+    /// `a >> n`, logical; zero for `n ≥ 64`.
+    fn shr_u(self, a: Self::U, n: u32) -> Self::U;
     /// `a = b`.
     fn eq_u(self, a: Self::U, b: Self::U) -> Self::M;
 }

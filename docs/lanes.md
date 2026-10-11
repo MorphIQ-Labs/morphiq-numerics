@@ -132,8 +132,15 @@ Per lane, as `exp` and `Reduced::of` write them:
 
 **`ln`:**
 1. **The screen** per lane: NaN, `x ≤ 0`, `+∞` and `1` go to `ln`.
-2. **The reduction** per lane: `Reduced::of(x)` itself, then the lane loads of
-   `y`, `R[i]`, `E` and the pair `−ln R[i]`.
+2. **The reduction** in lanes, as `Reduced::of` computes it: a subnormal `x`
+   scaled by `2^54` (selected per lane); `m = 1.fraction` from the encoding;
+   `i ≥ 53` exactly when `m ≥ 1 + 53/128`, and then `y = m/2`, which is the
+   encoding with exponent 1022, else `y = m`; `E` as the biased exponent less
+   1022 or 1023 and less 54 if scaled, the biased exponent read as an integer
+   below `2^52` from `2^52`'s encoding, every step exact in binary64 (small
+   integers). Only the index `i` and the table loads of `R[i]` and `−ln R[i]`
+   are per lane. The fast values' word-for-word test (§6) checks the result
+   against `Reduced::of` itself.
 3. **`fast_value`** in lanes: `two_prod(y, R[i])`, `z = two_sum(p − 1, q)`,
    `ln_1p_double_word(z)`, the table term and `E·ln 2`, as `ln/mod.rs` writes
    them.
@@ -144,13 +151,15 @@ Per lane, as `exp` and `Reduced::of` write them:
    `ln_1p`. Lanes with `|x| < 2^−7` are case A, the others case B
    ([ln.md](ln.md) §7).
 2. **Case B's split** in lanes: `(h, l) = two_sum(1, x)` below `2^53`, else
-   `(x, 1)`, chosen per lane by a select. Then `Reduced::of(h)` per lane.
+   `(x, 1)`, chosen per lane by a select. Then `ln`'s in-lane reduction of `h`.
 3. **`z`** per lane: case A's `(x, 0)`, case B's `two_sum(p − 1, q)`, chosen by a
    select. `ln_1p_double_word(z)` then runs once for both cases: it is the same
    function on each lane's own `z`.
 4. **Case B continues** in lanes: the table term, `E·ln 2`, and `add_f64(l/h)`.
    A case-A lane computes these on a placeholder reduction and discards them:
-   a select returns `ln_1p_double_word(z)` itself there.
+   a select returns `ln_1p_double_word(z)` itself there. When every lane of a chunk is
+   case A (or screened), steps 2 to 4 reduce to `ln_1p_double_word((x, 0))`
+   alone.
 5. **`decide`** in lanes (§3).
 
 ## 6. Checked by
@@ -196,8 +205,8 @@ Software Development Emulator (pinned in `.cargo/sde-version` and
 
 The kernels are `O(n)` in the slice length and allocate nothing; each chunk of
 `LANES` elements uses fixed-size arrays on the stack. The per-lane scalar
-parts are the screens, the table loads (no gather instruction is used) and, for
-`ln` and `ln_1p`, `Reduced::of`. Lanes sent to the scalar function cost a scalar
+parts are the screens, the table indices and the table loads; no gather
+instruction is used. Lanes sent to the scalar function cost a scalar
 evaluation on top: about `2^−15.4` of `exp`'s arguments and `2^−9.4` of `ln`'s
 ([exp.md](exp.md) §8, [ln.md](ln.md) §9), plus the screened ones.
 

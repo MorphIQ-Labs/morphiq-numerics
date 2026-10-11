@@ -1,5 +1,5 @@
 //! `ln` and `ln_1p` on lanes ([`docs/lanes.md`] §5): their screens,
-//! `Reduced::of` per lane, `ln_1p_double_word`, `fast_value` and `decide`,
+//! `Reduced::of`, `ln_1p_double_word`, `fast_value` and `decide`,
 //! operation for operation, with the scalar function on every lane they don't
 //! decide.
 //!
@@ -7,8 +7,8 @@
 
 use morphiq_numerics_arch::Simd;
 
-use super::tables::{LN2_HI, LN2_LO, NEG_LN_R_BITS, POLY};
-use super::{EPS, Reduced, TWO_53, TWO_M7, TWO_M54, ln, ln_1p};
+use super::tables::{LN2_HI, LN2_LO, NEG_LN_R_BITS, POLY, R_BITS};
+use super::{EPS, FRACTION, TWO_53, TWO_54, TWO_M7, TWO_M54, ln, ln_1p};
 use crate::lanes::{Dw, Kernel, decide, dw_add, dw_add_f64, two_prod, two_sum};
 
 /// `ln` as a lane kernel.
@@ -17,38 +17,57 @@ pub(crate) struct Ln;
 /// `ln_1p` as a lane kernel.
 pub(crate) struct Ln1p;
 
-/// `Reduced::of` on each lane of `x` whose bit in `skip` is clear, gathered
-/// into lanes: `(y, R[i], E, −ln R[i] as a double-word)`. A skipped lane gets
-/// the reduction of 1, and is discarded.
+/// `1 + 53/128`: the reduced significand `m ∈ [1, 2)` has index `i ≥ 53`
+/// exactly from it up.
+const HIGH_INDEX: f64 = 1.0 + 53.0 / 128.0;
+/// `2^52`, whose encoding's low bits hold an integer below `2^52` exactly.
+const TWO_52: f64 = f64::from_bits(0x4330_0000_0000_0000);
+
+/// `Reduced::of` on every lane of `x`, with its values: `(y, R[i], E, −ln R[i]
+/// as a double-word)`. Lanes whose bit in `skip` is set reduce 1 instead, and
+/// are discarded. Everything but the table loads is in lanes, as `Reduced::of`
+/// computes it, with its integer steps done exactly in binary64 (docs/lanes.md
+/// §5).
 #[inline(always)]
-fn reduce<K: Simd>(k: K, x: &K::Array, skip: u64) -> (K::F, K::F, K::F, Dw<K>) {
-    let (mut y, mut r, mut e, mut n_hi, mut n_lo) = (
-        K::Array::default(),
-        K::Array::default(),
+fn reduce<K: Simd>(k: K, x: K::F, skip: u64) -> (K::F, K::F, K::F, Dw<K>) {
+    let x = k.select(lane_mask(k, skip), k.splat(1.0), x);
+    // Step 1: a subnormal x is scaled by 2^54, exactly.
+    let tiny = k.lt(x, k.splat(f64::MIN_POSITIVE));
+    let bits = k.to_bits(k.select(tiny, k.mul(x, k.splat(TWO_54)), x));
+    let fraction = k.and_u(bits, k.splat_bits(FRACTION));
+    // Step 2: m = 1.fraction; i is the fraction's top 7 bits, and i ≥ 53
+    // exactly when m ≥ 1 + 53/128. Then y = m/2 (exact: the encoding with
+    // exponent 1022), else y = m.
+    let m = k.to_float(k.or_u(fraction, k.splat_bits(1023 << 52)));
+    let high = k.le(k.splat(HIGH_INDEX), m);
+    let y = k.select(high, k.mul(m, k.splat(0.5)), m);
+    // E = biased − (1022 or 1023) − (54 if scaled): the biased exponent read
+    // as the integer below 2^52 in 2^52's encoding, every step exact.
+    let biased = k.sub(
+        k.to_float(k.or_u(k.shr_u(bits, 52), k.splat_bits(TWO_52.to_bits()))),
+        k.splat(TWO_52),
+    );
+    let offset = k.add(
+        k.select(high, k.splat(1022.0), k.splat(1023.0)),
+        k.select(tiny, k.splat(54.0), k.splat(0.0)),
+    );
+    let e = k.sub(biased, offset);
+    // Step 3, per lane: the tables at i.
+    let index = k.store(k.to_float(k.shr_u(fraction, 45)));
+    let (mut r, mut n_hi, mut n_lo) = (
         K::Array::default(),
         K::Array::default(),
         K::Array::default(),
     );
-    for i in 0..K::LANES {
-        let xi = if skip >> i & 1 == 0 {
-            x.as_ref()[i]
-        } else {
-            1.0
-        };
-        let reduced = Reduced::of(xi);
-        y.as_mut()[i] = reduced.y;
-        r.as_mut()[i] = reduced.r;
-        e.as_mut()[i] = f64::from(reduced.e);
-        let (hi, lo) = NEG_LN_R_BITS[reduced.i];
-        n_hi.as_mut()[i] = f64::from_bits(hi);
-        n_lo.as_mut()[i] = f64::from_bits(lo);
+    for (lane, word) in index.as_ref().iter().enumerate() {
+        #[allow(clippy::cast_possible_truncation)] // 7 bits
+        let i = word.to_bits() as usize;
+        r.as_mut()[lane] = f64::from_bits(R_BITS[i]);
+        let (hi, lo) = NEG_LN_R_BITS[i];
+        n_hi.as_mut()[lane] = f64::from_bits(hi);
+        n_lo.as_mut()[lane] = f64::from_bits(lo);
     }
-    (
-        k.load(y),
-        k.load(r),
-        k.load(e),
-        (k.load(n_hi), k.load(n_lo)),
-    )
+    (y, k.load(r), e, (k.load(n_hi), k.load(n_lo)))
 }
 
 /// `Reduced::fast_value` from the gathered reduction: `ln_y_fast`, then the
@@ -124,7 +143,10 @@ pub(super) fn fast_ln<K: Simd>(k: K, x: &K::Array) -> (Dw<K>, u64) {
             scalar_lanes |= 1 << i;
         }
     }
-    (fast_value(k, reduce(k, x, scalar_lanes)), scalar_lanes)
+    (
+        fast_value(k, reduce(k, k.load(*x), scalar_lanes)),
+        scalar_lanes,
+    )
 }
 
 impl Kernel for Ln1p {
@@ -156,16 +178,21 @@ pub(super) fn fast_ln_1p<K: Simd>(k: K, x: &K::Array) -> (Dw<K>, u64, u64) {
         }
     }
     let xv = k.load(*x);
+    if (case_a | scalar_lanes).count_ones() as usize == K::LANES {
+        // No lane needs case B: case A alone, ln_1p_double_word(x, 0).
+        let y = ln_1p_double_word(k, (xv, k.splat(0.0)));
+        return (y, scalar_lanes, case_a);
+    }
     // Case B: split, 1 + x = h + l exactly.
     let (sum_hi, sum_lo) = two_sum(k, k.splat(1.0), xv);
     let below = k.lt(xv, k.splat(TWO_53));
     let h = k.select(below, sum_hi, xv);
     let l = k.select(below, sum_lo, k.splat(1.0));
-    let (y, r, e, neg_ln_r) = reduce(k, &k.store(h), scalar_lanes | case_a);
+    let (y, r, e, neg_ln_r) = reduce(k, h, scalar_lanes | case_a);
     let (p, q) = two_prod(k, y, r);
     let z_b = two_sum(k, k.sub(p, k.splat(1.0)), q);
     // Case A takes z = x exactly: the same ln_1p_double_word, on (x, 0).
-    let a = case_a_mask(k, case_a);
+    let a = lane_mask(k, case_a);
     let z = (k.select(a, xv, z_b.0), k.select(a, k.splat(0.0), z_b.1));
     let ln_1p_z = ln_1p_double_word(k, z);
     // Case B continues as fast_value, then adds l/h.
@@ -178,7 +205,7 @@ pub(super) fn fast_ln_1p<K: Simd>(k: K, x: &K::Array) -> (Dw<K>, u64, u64) {
 
 /// The lanes whose bit in `bits` is set, as a lane mask.
 #[inline(always)]
-fn case_a_mask<K: Simd>(k: K, bits: u64) -> K::M {
+fn lane_mask<K: Simd>(k: K, bits: u64) -> K::M {
     let mut words = K::Words::default();
     for (i, w) in words.as_mut().iter_mut().enumerate() {
         *w = bits >> i & 1;
