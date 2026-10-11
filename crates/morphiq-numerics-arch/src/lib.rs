@@ -11,8 +11,8 @@
 //! Every operation is an IEEE 754 binary64 operation on each lane,
 //! round-to-nearest-even, exactly as the scalar `f64` operation computes it:
 //! the backends differ in width, never in a lane's result.
-//! [`Fma::mul_add`] is fused (one rounding) and exists only on backends with a
-//! hardware fused multiply-add.
+//! [`Simd::mul_add`] is fused (one rounding) and returns `None` on backends
+//! without a hardware fused multiply-add ([`Simd::FMA`]); it is never emulated.
 //!
 //! This is the workspace's only crate with `unsafe` code. The safety argument
 //! and the API are in
@@ -93,6 +93,8 @@ pub trait Simd: Copy + Send + Sync + core::fmt::Debug + sealed::Sealed + 'static
     const LANES: usize;
     /// The backend's name, for reports.
     const NAME: &'static str;
+    /// Whether the backend has a hardware fused multiply-add.
+    const FMA: bool;
     /// `LANES` binary64 numbers.
     type F: Copy;
     /// `LANES` 64-bit words.
@@ -128,6 +130,10 @@ pub trait Simd: Copy + Send + Sync + core::fmt::Debug + sealed::Sealed + 'static
     fn mul(self, a: Self::F, b: Self::F) -> Self::F;
     /// `a / b`.
     fn div(self, a: Self::F, b: Self::F) -> Self::F;
+    /// `a·b + c` rounded once, on a backend with a hardware fused
+    /// multiply-add ([`FMA`](Simd::FMA)); `None` on one without, which never
+    /// emulates it.
+    fn mul_add(self, a: Self::F, b: Self::F, c: Self::F) -> Option<Self::F>;
     /// `|a|`: the sign bit cleared.
     fn abs(self, a: Self::F) -> Self::F;
     /// `−a`: the sign bit flipped.
@@ -160,12 +166,6 @@ pub trait Simd: Copy + Send + Sync + core::fmt::Debug + sealed::Sealed + 'static
     fn sub_u(self, a: Self::U, b: Self::U) -> Self::U;
     /// `a = b`.
     fn eq_u(self, a: Self::U, b: Self::U) -> Self::M;
-}
-
-/// A backend with a hardware fused multiply-add.
-pub trait Fma: Simd {
-    /// `a · b + c` rounded once, to nearest, ties to even.
-    fn mul_add(self, a: Self::F, b: Self::F, c: Self::F) -> Self::F;
 }
 
 /// Runs `op` on the widest backend this CPU has: AVX-512F, then AVX2 with

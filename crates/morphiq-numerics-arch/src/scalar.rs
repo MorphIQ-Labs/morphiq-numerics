@@ -26,6 +26,7 @@ impl Sealed for Scalar {}
 impl Simd for Scalar {
     const LANES: usize = 1;
     const NAME: &'static str = "scalar";
+    const FMA: bool = false;
     type F = f64;
     type U = u64;
     type M = bool;
@@ -73,6 +74,12 @@ impl Simd for Scalar {
     #[inline(always)]
     fn div(self, a: f64, b: f64) -> f64 {
         a / b
+    }
+    #[inline(always)]
+    fn mul_add(self, _: f64, _: f64, _: f64) -> Option<f64> {
+        // Plain f64 arithmetic has no fused multiply-add without a libm call
+        // or a software emulation, and this backend uses neither.
+        None
     }
     #[inline(always)]
     fn abs(self, a: f64) -> f64 {

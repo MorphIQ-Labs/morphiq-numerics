@@ -9,7 +9,7 @@
 
 use core::arch::aarch64::{float64x2_t, uint64x2_t};
 
-use crate::{Fma, Simd, WithSimd, sealed::Sealed};
+use crate::{Simd, WithSimd, sealed::Sealed};
 
 /// Two NEON lanes. Every aarch64 target with a floating-point unit enables
 /// NEON, so the token is always available where the type exists.
@@ -46,6 +46,7 @@ impl Sealed for Neon {}
 impl Simd for Neon {
     const LANES: usize = 2;
     const NAME: &'static str = "neon";
+    const FMA: bool = true;
     type F = float64x2_t;
     type U = uint64x2_t;
     type M = NeonMask;
@@ -57,6 +58,14 @@ impl Simd for Neon {
         // NEON is enabled for the whole target, so every function already
         // compiles with it: no feature-enabled wrapper is needed.
         op.with(self)
+    }
+
+    #[inline(always)]
+    fn mul_add(self, a: float64x2_t, b: float64x2_t, c: float64x2_t) -> Option<float64x2_t> {
+        // SAFETY: the helper's only precondition is that the CPU has the
+        // features it is compiled with, and `self` is a token that exists
+        // only when it does.
+        Some(unsafe { helpers::mul_add(a, b, c) })
     }
 
     forward! { helpers;
@@ -84,12 +93,6 @@ impl Simd for Neon {
         fn or_u(a: uint64x2_t, b: uint64x2_t) -> uint64x2_t;
         fn sub_u(a: uint64x2_t, b: uint64x2_t) -> uint64x2_t;
         fn eq_u(a: uint64x2_t, b: uint64x2_t) -> NeonMask;
-    }
-}
-
-impl Fma for Neon {
-    forward! { helpers;
-        fn mul_add(a: float64x2_t, b: float64x2_t, c: float64x2_t) -> float64x2_t;
     }
 }
 

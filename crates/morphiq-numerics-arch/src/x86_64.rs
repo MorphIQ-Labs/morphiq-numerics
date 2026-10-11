@@ -12,7 +12,7 @@
 
 use core::arch::x86_64::{__m128d, __m128i, __m256d, __m256i, __m512d, __m512i, __mmask8};
 
-use crate::{Fma, Simd, WithSimd, sealed::Sealed};
+use crate::{Simd, WithSimd, sealed::Sealed};
 use helpers::{avx2, avx512, sse2};
 
 // ---------------------------------------------------------------------------
@@ -53,6 +53,7 @@ impl Sealed for Sse2 {}
 impl Simd for Sse2 {
     const LANES: usize = 2;
     const NAME: &'static str = "sse2";
+    const FMA: bool = false;
     type F = __m128d;
     type U = __m128i;
     type M = Sse2Mask;
@@ -64,6 +65,12 @@ impl Simd for Sse2 {
         // SSE2 is enabled for the whole target: no feature-enabled wrapper is
         // needed.
         op.with(self)
+    }
+
+    #[inline(always)]
+    fn mul_add(self, _: __m128d, _: __m128d, _: __m128d) -> Option<__m128d> {
+        // SSE2 has no fused multiply-add.
+        None
     }
 
     forward! { sse2;
@@ -132,6 +139,7 @@ fn avx2_run<W: WithSimd>(simd: Avx2, op: W) -> W::Output {
 impl Simd for Avx2 {
     const LANES: usize = 4;
     const NAME: &'static str = "avx2";
+    const FMA: bool = true;
     type F = __m256d;
     type U = __m256i;
     type M = Avx2Mask;
@@ -142,6 +150,14 @@ impl Simd for Avx2 {
     fn vectorize<W: WithSimd>(self, op: W) -> W::Output {
         // SAFETY: avx2_run only requires AVX2 and FMA, which `self` proves.
         unsafe { avx2_run(self, op) }
+    }
+
+    #[inline(always)]
+    fn mul_add(self, a: __m256d, b: __m256d, c: __m256d) -> Option<__m256d> {
+        // SAFETY: the helper's only precondition is that the CPU has the
+        // features it is compiled with, and `self` is a token that exists
+        // only when it does.
+        Some(unsafe { avx2::mul_add(a, b, c) })
     }
 
     forward! { avx2;
@@ -169,12 +185,6 @@ impl Simd for Avx2 {
         fn or_u(a: __m256i, b: __m256i) -> __m256i;
         fn sub_u(a: __m256i, b: __m256i) -> __m256i;
         fn eq_u(a: __m256i, b: __m256i) -> Avx2Mask;
-    }
-}
-
-impl Fma for Avx2 {
-    forward! { avx2;
-        fn mul_add(a: __m256d, b: __m256d, c: __m256d) -> __m256d;
     }
 }
 
@@ -215,6 +225,7 @@ fn avx512_run<W: WithSimd>(simd: Avx512, op: W) -> W::Output {
 impl Simd for Avx512 {
     const LANES: usize = 8;
     const NAME: &'static str = "avx512";
+    const FMA: bool = true;
     type F = __m512d;
     type U = __m512i;
     type M = Avx512Mask;
@@ -225,6 +236,14 @@ impl Simd for Avx512 {
     fn vectorize<W: WithSimd>(self, op: W) -> W::Output {
         // SAFETY: avx512_run only requires AVX-512F, which `self` proves.
         unsafe { avx512_run(self, op) }
+    }
+
+    #[inline(always)]
+    fn mul_add(self, a: __m512d, b: __m512d, c: __m512d) -> Option<__m512d> {
+        // SAFETY: the helper's only precondition is that the CPU has the
+        // features it is compiled with, and `self` is a token that exists
+        // only when it does.
+        Some(unsafe { avx512::mul_add(a, b, c) })
     }
 
     forward! { avx512;
@@ -266,12 +285,6 @@ impl Simd for Avx512 {
     #[inline(always)]
     fn mask_bits(self, m: Avx512Mask) -> u64 {
         u64::from(m.0)
-    }
-}
-
-impl Fma for Avx512 {
-    forward! { avx512;
-        fn mul_add(a: __m512d, b: __m512d, c: __m512d) -> __m512d;
     }
 }
 

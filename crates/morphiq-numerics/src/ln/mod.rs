@@ -4,6 +4,8 @@
 //! [`docs/ln.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/ln.md);
 //! section numbers below refer to it.
 
+#[cfg(feature = "simd")]
+pub(crate) mod lanes;
 mod tables;
 
 use crate::double_word::DoubleWord;

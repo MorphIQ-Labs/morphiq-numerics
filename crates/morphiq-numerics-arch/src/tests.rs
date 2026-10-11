@@ -185,7 +185,8 @@ fn x86_lanes_are_scalar_arithmetic() {
 /// `mul_add(a, b, −RN(a·b))` is the exact product's error wherever that error
 /// is representable: checked against the product in exact integer arithmetic
 /// on operands whose product is normal and far from overflow.
-fn check_fma<S: crate::Fma>(s: S) {
+fn check_fma<S: Simd>(s: S) {
+    assert!(S::FMA, "{} has no FMA", S::NAME);
     let mut state = 0x2545_f491_4f6c_dd1d_u64;
     let mut next = || {
         state ^= state << 13;
@@ -204,7 +205,7 @@ fn check_fma<S: crate::Fma>(s: S) {
         }
         let (va, vb) = (s.load(a), s.load(b));
         let p = s.mul(va, vb);
-        let e = s.store(s.mul_add(va, vb, s.neg(p)));
+        let e = s.store(s.mul_add(va, vb, s.neg(p)).expect("FMA"));
         let p = s.store(p);
         for i in 0..S::LANES {
             let (x, y) = (a.as_ref()[i], b.as_ref()[i]);
@@ -261,6 +262,21 @@ fn x86_mul_add_gives_the_exact_product_error() {
     }
     if let Some(s) = crate::Avx512::try_new() {
         check_fma(s);
+    }
+}
+
+#[test]
+fn backends_without_fma_return_none() {
+    const { assert!(!Scalar::FMA) };
+    assert!(Scalar::new().mul_add(1.0, 2.0, 3.0).is_none());
+    #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
+    {
+        let s = crate::Sse2::new();
+        const { assert!(!crate::Sse2::FMA) };
+        assert!(
+            s.mul_add(s.splat(1.0), s.splat(2.0), s.splat(3.0))
+                .is_none()
+        );
     }
 }
 
