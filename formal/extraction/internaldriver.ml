@@ -1,6 +1,7 @@
-(* Runs the extracted Q128 and Q256 transcriptions, rounding tests, and exp's
-   reduction, fast value, accurate path and small-argument path (InternalCrosscheck.v) on
-   the internal cross-check corpus and compares each result with the Rust library's.
+(* Runs the extracted Q128 and Q256 transcriptions, rounding tests, exp's
+   reduction, fast value, accurate path and small-argument path, and ln's reduction
+   (InternalCrosscheck.v) on the internal cross-check corpus and compares each result
+   with the Rust library's.
 
    Each line is "op args : result". A value is "n e k l1 .. lk": its sign
    (0 or 1), its exponent in decimal, its limb count and its 64-bit limbs in
@@ -97,6 +98,14 @@ let compute op args =
            let ((h, ((n, e), l)), v) = x_small (z_of_u64 (hex x)) in
            String.concat " " [show_bits h; show (n, e, l); show_bits v]
        | _ -> failwith "small takes one word")
+  | "ln_reduce" ->
+      (match args with
+       | [x] ->
+           let (((e, i), words), ((n, ex), l)) = x_ln_reduce (z_of_u64 (hex x)) in
+           String.concat " "
+             (string_of_int (int_of_z e) :: string_of_int (int_of_z i)
+              :: List.map show_bits words @ [show (n, ex, l)])
+       | _ -> failwith "ln_reduce takes one word")
   | "fast" ->
       (match args with
        | [rh; rl; j] ->

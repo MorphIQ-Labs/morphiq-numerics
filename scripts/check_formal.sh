@@ -14,10 +14,10 @@
 #      builds with each rewriting hint proved as a lemma by
 #      formal/gappa/Hints.v, so no hypothesis is left; and each final theorem's
 #      global axioms are among formal/axioms.expected.
-#   6. The kernels' transcriptions and proofs (formal/exp/*.v), which apply the
-#      certificates' theorems, build; and the global axioms the theorems in
-#      formal/audit/KernelAudit.v rest on are among formal/axioms.expected and
-#      formal/axioms.int63.expected. The second list is Coq's primitive 63-bit
+#   6. The kernels' transcriptions and proofs (formal/exp/*.v, formal/ln/*.v),
+#      which apply the certificates' theorems, build; and the global axioms the
+#      theorems in formal/audit/KernelAudit.v rest on are among
+#      formal/axioms.expected and formal/axioms.int63.expected. The second list is Coq's primitive 63-bit
 #      integers: CoqInterval, which proves the kernels' constants, computes with
 #      them through Bignums. Its calls stay above 53 bits of precision, so no
 #      primitive floats are used.
@@ -44,7 +44,7 @@ cd "$(dirname "$0")/.."
 sha256sum --check --quiet formal/binding.sha256
 
 if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v formal/binary64/*.v formal/extraction/*.v formal/q/*.v \
-    formal/exp/*.v formal/gappa/*.v "$proofs"/*/*.v; then
+    formal/exp/*.v formal/ln/*.v formal/gappa/*.v "$proofs"/*/*.v; then
   echo "a proof admits a goal" >&2
   exit 1
 fi
@@ -126,9 +126,9 @@ fi
 echo "certificates in Coq: $certificates proved"
 
 # The kernels' proofs, beside the certificates' modules they apply.
-cp formal/exp/*.v formal/audit/KernelAudit.v "$work/gappa/"
+cp formal/exp/*.v formal/ln/*.v formal/audit/KernelAudit.v "$work/gappa/"
 (cd "$work/gappa" \
-  && for proof in ExpTables ExpReduction ExpFast ExpAccurateLevels ExpAccurate ExpSmall; do
+  && for proof in ExpTables ExpReduction ExpFast ExpAccurateLevels ExpAccurate ExpSmall LnTables LnReduction; do
        coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" "$proof.v" || exit 1
      done \
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" KernelAudit.v) > "$work/kernel-audit.log"
