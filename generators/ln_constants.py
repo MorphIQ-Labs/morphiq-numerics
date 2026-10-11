@@ -246,10 +246,33 @@ def generate():
         *[f'    {f(c)},' for c in poly],
         '];',
     ]
-    return {OUTPUT: '\n'.join(lines) + '\n', COQ_OUTPUT: coq_tables(r)}
+    return {OUTPUT: '\n'.join(lines) + '\n', COQ_OUTPUT: coq_tables(r, d)}
 
 
-def coq_tables(r):
+def coq_q128(d):
+    """The accurate path's Q128 constants, as data: formal/ln/LnTableCheck.v
+    checks each table against its definition by one reflective computation."""
+    lines = [
+        '',
+        '(** The accurate path\'s Q128 constants (docs/ln.md, section 6), as',
+        '    crates/morphiq-numerics/src/ln/tables.rs gives them: [-ln R[i]] as',
+        '    [(negative, m, e)] with value [(-1)^negative·m·2^e] ([m = 0] where',
+        '    [R[i] = 1]); [ln 2] as [m·2^-128]; [1/k] as [(m, e)], [k = 1 ..]. Their',
+        '    errors are proved in formal/ln/LnTableCheck.v. *)',
+        'Definition ln_neg_ln_r_q : list (bool * Z * Z) := [',
+        *[f'  ({"true" if sg else "false"}, {m}%Z, ({e})%Z){";" if i < 127 else ""}'
+          for i, (sg, m, e) in enumerate(d['neg_ln_q'])],
+        '].',
+        f'Definition ln_ln2_q : Z := {d["ln2_m"]}%Z.',
+        'Definition ln_recips : list (Z * Z) := [',
+        *[f'  ({m}%Z, ({e})%Z){";" if k < DEGREE - 1 else ""}' for k, (m, e) in enumerate(d['reciprocals'])],
+        '].',
+    ]
+    assert d['ln2_e'] == -128
+    return lines
+
+
+def coq_tables(r, d):
     """formal/ln/LnTables.v: the reduction's reciprocals and what the proofs
     take about them, each entry proved from its encoding."""
     lines = [
@@ -328,6 +351,7 @@ def coq_tables(r):
             f'    replace (2 ^ {k}) with {2 ** k} by ring. lra.',
         ]
     lines += ['Qed.']
+    lines += coq_q128(d)
     return '\n'.join(lines) + '\n'
 
 
