@@ -96,8 +96,10 @@ above `2^1015` or below `2^−1015`) take the fallback.
 
 **Decision 2: a table of `N = 512` entries `T_j = 2^(j/512)`** (8 KiB, §4). It
 keeps `|r| ≤ 2^−10.5`, where a degree-5 polynomial is accurate to `2^−75.9`.
-`N = 1024` (16 KiB) cuts stage A's undecided rate from `2^−7.4` to `2^−8.4`
-and stage B's from `2^−16.7` to `2^−18`; the smaller table was chosen to leave
+`N = 1024` (16 KiB) would cut stage A's undecided rate from `2^−7.4` to
+`2^−8.4` and stage B's from `2^−16.9` to `2^−18` (the research's measurements,
+issue #114); measured inside a consumer's EM loop on an Apple M1 Pro, `N = 512`
+cost 2.6% more. The smaller table was chosen to leave
 room in a 32 KiB L1 data cache, as on many x86-64 cores, for a consumer's own
 working set and `ln_1p`'s table. That trade-off is inferred for x86-64, not
 measured there (§11).

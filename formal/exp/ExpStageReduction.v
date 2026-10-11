@@ -146,7 +146,7 @@ Proof.
   change (bpow radix2 (-1074)) with (/ 202402253307310618352495346718917307049556649764142118356901358027430339567995346891960383701437124495187077864316811911389808737385793476867013399940738509921517424276566361364466907742093216341239767678472745068562007483424692698618103355649159556340810056512358769552333414615230502532186327508646006263307707741093494784)%R in Ey.
   (* |x/L − ni| <= 1/2 + 2^-31 *)
   assert (Ic : Rabs (B st_inv - / L) <= / 2 ^ 42).
-  { replace (/ L) with (512 / ln 2) by (unfold L; field; interval).
+  { replace (/ L) with (512 / ln 2) by (unfold L; field; interval with (i_prec 64)).
     exact st_inv_close. }
   assert (XL : Rabs (B x / L - IZR ni) <= / 2 + / 2147483648).
   { replace (B x / L - IZR ni) with (B x * (/ L - B st_inv) + (B x * B st_inv - B y) + (B y - IZR ni))
@@ -167,7 +167,7 @@ Proof.
       apply Rle_trans with (704 * / 0.001353803).
       - apply Rmult_le_compat; [apply Rabs_pos | apply Rlt_le, Rinv_0_lt_compat; lra | lra | ].
         apply Rinv_le_contravar; lra.
-      - interval. }
+      - interval with (i_prec 64). }
     assert (T : Rabs (IZR ni - B x / L + B x / L) <= Rabs (IZR ni - B x / L) + Rabs (B x / L))
       by apply Rabs_triang.
     replace (IZR ni - B x / L + B x / L) with (IZR ni) in T by ring.
@@ -201,7 +201,7 @@ Proof.
   assert (P1f : fmtF (B n * B st_l1)).
   { rewrite P1. apply ExpReduction.fmt_int; [ | lia]. rewrite Z.abs_mul. change (2 ^ 53)%Z with 9007199254740992%Z. lia. }
   assert (P1b : Rabs (B n * B st_l1) <= 1024).
-  { assert (C : 0 <= B st_l1 <= 0.001354) by (rewrite st_l1_val; split; interval).
+  { assert (C : 0 <= B st_l1 <= 0.001354) by (rewrite st_l1_val; split; interval with (i_prec 64)).
     rewrite Bn', Rabs_mult, <- abs_IZR. rewrite (Rabs_pos_eq (B st_l1)) by (destruct C; assumption).
     assert (0 <= IZR (Z.abs ni) <= 520018) by (split; apply IZR_le; lia). nra. }
   destruct (fmul_ok 1 10 n st_l1 Fn F1 ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia)
@@ -311,7 +311,7 @@ Theorem stage_a_r_ok n r1 (ni : Z) (X : R) :
   Rabs (B r1 - B (fmul n st_l2d) - (X - IZR ni * L)) <= bpow radix2 (-77).
 Proof.
   intros Fn Bn Hn Fr1 Br1 HR Hr1.
-  assert (C : Rabs (B st_l2d) <= / 1000000000000) by (rewrite st_l2d_val; interval).
+  assert (C : Rabs (B st_l2d) <= / 1000000000000) by (rewrite st_l2d_val; interval with (i_prec 64)).
   assert (Ni : Rabs (IZR ni) <= 520018) by (rewrite <- abs_IZR; apply IZR_le; lia).
   assert (Pm : Rabs (B n * B st_l2d) <= 16).
   { rewrite Bn, Rabs_mult. apply Rle_trans with (520018 * / 1000000000000); [ | lra].
@@ -447,7 +447,7 @@ Proof.
   assert (Ni : Rabs (IZR ni) <= 520018) by (rewrite <- abs_IZR; apply IZR_le; lia).
   (* p2 = n·L2, exact *)
   assert (P2v : B n * B st_l2 = IZR (ni * -387466026) * bpow radix2 (-72)) by (rewrite Bn, l2_eq, mult_IZR; ring).
-  assert (L2b : Rabs (B st_l2) <= / 10000000000000) by (rewrite st_l2_val; interval).
+  assert (L2b : Rabs (B st_l2) <= / 10000000000000) by (rewrite st_l2_val; interval with (i_prec 64)).
   assert (P2b : Rabs (B n * B st_l2) <= / 1000000) .
   { rewrite Bn, Rabs_mult. apply Rle_trans with (520018 * / 10000000000000); [ | lra].
     apply Rmult_le_compat; try apply Rabs_pos; assumption. }
@@ -458,7 +458,7 @@ Proof.
   (* r0 *)
   assert (L23 : Rabs (L - B st_l1 - B st_l2) <= / 10000000000000000000000).
   { pose proof split_3 as S. change (bpow radix2 (-129)) with (/ 680564733841876926926749214863536422912) in S.
-    assert (Rabs (B st_l3) <= / 25000000000000000000000) by (rewrite st_l3_val; interval).
+    assert (Rabs (B st_l3) <= / 25000000000000000000000) by (rewrite st_l3_val; interval with (i_prec 64)).
     replace (L - B st_l1 - B st_l2) with ((L - B st_l1 - B st_l2 - B st_l3) + B st_l3) by ring.
     apply Rle_trans with (1 := Rabs_triang _ _). lra. }
   set (R := B x - IZR ni * L) in *.
@@ -549,7 +549,7 @@ Proof.
   assert (Bu : B (fsub (fsub r1 rh) p2) = B r1 - B rh - B p2)
     by (rewrite Bu', round_generic by (auto with typeclass_instances || exact Uf); rewrite Bu1; ring).
   (* p3 and r_t *)
-  assert (L3b : Rabs (B st_l3) <= / 25000000000000000000000) by (rewrite st_l3_val; interval).
+  assert (L3b : Rabs (B st_l3) <= / 25000000000000000000000) by (rewrite st_l3_val; interval with (i_prec 64)).
   destruct (fmul16 n st_l3 Fn st_l3_finite) as [Fp3 Bp3].
   { rewrite Bn, Rabs_mult. apply Rle_trans with (520018 * / 25000000000000000000000); [ | lra].
     apply Rmult_le_compat; try apply Rabs_pos; assumption. }

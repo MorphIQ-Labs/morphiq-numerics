@@ -197,9 +197,9 @@ Proof.
   pose proof (stage_b_poly_bound (B rhi) Hrhi') as PB.
   cbv zeta in PB. rewrite RN_rhi in PB.
   destruct PB as [Peq [Pq [Pt4 [Pt3 [Ph Pr2]]]]].
-  assert (C5 : Rabs d5_g <= 1) by (rewrite <- d5_g_eq, st_d5_val; interval).
-  assert (C4 : Rabs d4_g <= 1) by (rewrite <- d4_g_eq, st_d4_val; interval).
-  assert (C3 : Rabs d3_g <= 1) by (rewrite <- d3_g_eq, st_d3_val; interval).
+  assert (C5 : Rabs d5_g <= 1) by (rewrite <- d5_g_eq, st_d5_val; interval with (i_prec 64)).
+  assert (C4 : Rabs d4_g <= 1) by (rewrite <- d4_g_eq, st_d4_val; interval with (i_prec 64)).
+  assert (C3 : Rabs d3_g <= 1) by (rewrite <- d3_g_eq, st_d3_val; interval with (i_prec 64)).
   assert (Ch : Rabs half_g <= 1) by (rewrite half_g_eq, Rabs_pos_eq; lra).
   assert (Rh1 : Rabs (B rhi) <= 1) by lra.
   destruct (fmul16 rhi st_d5 Frhi st_d5_finite) as [F1 B1].

@@ -171,9 +171,9 @@ Proof.
   cbv zeta in G. rewrite <- Br' in G.
   destruct G as [GY [Gfl [Gr [Gt4 [Gt3 [Gh [Gw [Gu Gp]]]]]]]].
   (* the transcription computes the certificate's chain *)
-  assert (C5 : Rabs d5_g <= 1) by (rewrite <- d5_g_eq, st_d5_val; interval).
-  assert (C4 : Rabs d4_g <= 1) by (rewrite <- d4_g_eq, st_d4_val; interval).
-  assert (C3 : Rabs d3_g <= 1) by (rewrite <- d3_g_eq, st_d3_val; interval).
+  assert (C5 : Rabs d5_g <= 1) by (rewrite <- d5_g_eq, st_d5_val; interval with (i_prec 64)).
+  assert (C4 : Rabs d4_g <= 1) by (rewrite <- d4_g_eq, st_d4_val; interval with (i_prec 64)).
+  assert (C3 : Rabs d3_g <= 1) by (rewrite <- d3_g_eq, st_d3_val; interval with (i_prec 64)).
   assert (Ch : Rabs half_g <= 1) by (rewrite half_g_eq; rewrite Rabs_pos_eq; lra).
   assert (M11 : forall u v, Rabs u <= 1 -> Rabs v <= 1 -> Rabs (u * v) <= 1).
   { intros u v Hu Hv. rewrite Rabs_mult. apply Rle_trans with (1 * 1); [apply Rmult_le_compat; try apply Rabs_pos; lra | lra]. }
@@ -262,8 +262,8 @@ Proof.
   { split; [apply pos_INR | ]. assert (H : (j <= 511)%nat) by lia. apply le_INR in H.
     rewrite (INR_IZR_INZ 511) in H. exact H. }
   generalize (INR j) J; intros v Jv.
-  assert (T : 0.999 <= exp (v * ln 2 / 512) <= 2) by (split; interval).
-  assert (E : 0.999 <= exp R <= 1.001) by (split; interval).
+  assert (T : 0.999 <= exp (v * ln 2 / 512) <= 2) by (split; interval with (i_prec 64)).
+  assert (E : 0.999 <= exp R <= 1.001) by (split; interval with (i_prec 64)).
   split; nra.
 Qed.
 
