@@ -15,7 +15,9 @@ use morphiq_numerics::elementary::{
     cos, exp, exp_slice, exp2, expm1, ln, ln_1p, ln_1p_slice, ln_slice, log2, log10, sin, sincos,
     sqrt, tan,
 };
-use morphiq_numerics::log_space::{log_diff_exp, log_sum_exp};
+use morphiq_numerics::log_space::{
+    log_diff_exp, log_sum_exp, log_sum_exp_and_normalize, log_sum_exp_pairs,
+};
 use morphiq_numerics::normal::log_norm_pdf;
 use morphiq_numerics::random::{
     SplitMix64, Xoshiro256PlusPlus, normal_pair, unit_closed_open, unit_open,
@@ -621,6 +623,55 @@ pub fn corpus_digest() -> [u8; 32] {
         ];
         r.f64(log_sum_exp(&pair));
     }
+    // Longer slices, so the terms cross the chunks whose exponentials the
+    // `simd` feature evaluates together (docs/log_space.md decision 7), with
+    // zero mass and underflowing terms among them.
+    let mut x = [0.0; 100];
+    for len in 9..=100 {
+        for _ in 0..20 {
+            let top = normal_in(&mut words, -8, 10);
+            for v in x.iter_mut().take(len) {
+                *v = match words.next_word() % 16 {
+                    0 => f64::NEG_INFINITY,
+                    1 => top - 746.0 - normal_in(&mut words, -8, 8).abs(),
+                    _ => top - normal_in(&mut words, -40, 10).abs(),
+                };
+            }
+            r.f64(log_sum_exp(&x[..len]));
+        }
+    }
+
+    r.label("log_sum_exp_pairs");
+    // Every pairing of the special values, then pairs with gaps reaching
+    // cancellation and underflow, in batches of 1, 2, 3, 8 and 17.
+    let specials = [nan, inf, -inf, 0.0, -0.0, 1.0, -800.0, -745.1, max, -max];
+    for a in specials {
+        let pairs = specials.map(|b| [a, b]);
+        for y in log_sum_exp_pairs(&pairs) {
+            r.f64(y);
+        }
+    }
+    for _ in 0..1_000 {
+        pairs_section::<1>(&mut r, &mut words);
+        pairs_section::<2>(&mut r, &mut words);
+        pairs_section::<3>(&mut r, &mut words);
+        pairs_section::<8>(&mut r, &mut words);
+        pairs_section::<17>(&mut r, &mut words);
+    }
+
+    r.label("log_sum_exp_and_normalize");
+    // The same pairs as `log_sum_exp_pairs`: every pairing of the special
+    // values, then batches of 1, 2, 3, 8 and 17.
+    for a in specials {
+        normalize_record(&mut r, &specials.map(|b| [a, b]));
+    }
+    for _ in 0..1_000 {
+        normalize_section::<1>(&mut r, &mut words);
+        normalize_section::<2>(&mut r, &mut words);
+        normalize_section::<3>(&mut r, &mut words);
+        normalize_section::<8>(&mut r, &mut words);
+        normalize_section::<17>(&mut r, &mut words);
+    }
 
     r.label("log_diff_exp");
     // Special values (§1), then pairs whose gap reaches both regions, the
@@ -738,6 +789,61 @@ pub fn corpus_digest() -> [u8; 32] {
     batched_section(&mut r, &mut words, ln_1p_slice, &ln_1p_edges, (-1.0, 9.0));
 
     r.0.finalize().into()
+}
+
+/// `N` pairs for the `log_sum_exp_pairs` section: one element of each a
+/// random maximum, the other below it by a gap from `2^−40` to `2^11`, either
+/// first.
+fn pairs_section<const N: usize>(r: &mut Recorder, words: &mut Words) {
+    let mut pairs = [[0.0; 2]; N];
+    for pair in &mut pairs {
+        let top = normal_in(words, -8, 10);
+        let other = top - normal_in(words, -40, 10).abs();
+        *pair = if words.next_word() & 1 == 0 {
+            [top, other]
+        } else {
+            [other, top]
+        };
+    }
+    for y in log_sum_exp_pairs(&pairs) {
+        r.f64(y);
+    }
+}
+
+/// `N` random pairs as `pairs_section` draws them, through
+/// `log_sum_exp_and_normalize`.
+fn normalize_section<const N: usize>(r: &mut Recorder, words: &mut Words) {
+    let mut pairs = [[0.0; 2]; N];
+    for pair in &mut pairs {
+        let top = normal_in(words, -8, 10);
+        let other = top - normal_in(words, -40, 10).abs();
+        *pair = if words.next_word() & 1 == 0 {
+            [top, other]
+        } else {
+            [other, top]
+        };
+    }
+    normalize_record(r, &pairs);
+}
+
+/// Each pair's log-sum and normalized pair. A normalized pair that is absent
+/// records a code; a NaN entry, whose payload is unspecified, records one too.
+fn normalize_record<const N: usize>(r: &mut Recorder, pairs: &[[f64; 2]; N]) {
+    for (y, p) in log_sum_exp_and_normalize(pairs) {
+        r.f64(y);
+        match p {
+            None => r.u64(1),
+            Some(p) => {
+                for v in p {
+                    if v.is_nan() {
+                        r.u64(2);
+                    } else {
+                        r.f64(v);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// The batched sections' inputs: special values and branch edges, random

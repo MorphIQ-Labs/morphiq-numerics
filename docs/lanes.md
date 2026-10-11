@@ -16,13 +16,23 @@ for `exp` and `ln`; correct rounding where its rounding test decides, and
 `(1/2 + 2^−70)` ulp otherwise, for `ln_1p`).
 
 - **Without `simd`** each loops its scalar function.
-- **With `simd`** each runs on the widest backend the CPU has ([arch.md](arch.md)).
-  Every lane performs the scalar function's fast path operation for operation:
-  its special-argument screen, its argument reduction, its double-word
-  evaluation and its rounding test (§4, §5). A lane the screen sends elsewhere,
-  or the rounding test doesn't decide, calls the scalar function itself, and
-  so do the last `len mod LANES` elements. A one-lane backend loops the scalar
-  function.
+- **With `simd`** each runs in lanes ([arch.md](arch.md)). Every lane performs
+  the scalar function's fast path operation for operation: its
+  special-argument screen, its argument reduction, its double-word evaluation
+  and its rounding test (§4, §5). A lane the screen sends elsewhere, or the
+  rounding test doesn't decide, calls the scalar function itself.
+- **The backend cascade.** The slice runs through the backends the CPU has,
+  widest first: AVX-512F, AVX2 and SSE2 on x86-64, and NEON on aarch64. Each
+  backend takes as many whole chunks of its own width as remain. So a slice
+  or a remainder of at least two elements still runs in lanes: seven
+  elements on AVX-512F run as one AVX2 chunk, one SSE2 chunk and one scalar
+  call. Only a last single element, or a target with no lane backend, is
+  left to the scalar function. Every backend returns the scalar bits, so the
+  order in which they share a slice changes nothing.
+- **Within the crate,** `log_space::log_sum_exp` evaluates its terms'
+  exponentials with `exp_slice`, and `log_space::log_sum_exp_pairs` its pairs'
+  exponentials and logarithms with `exp_slice` and `ln_1p_slice`, so they
+  return the same bits too ([log_space.md](log_space.md), decision 7).
 - **The `std` feature** turns on runtime CPU detection. It changes which
   backend runs, so speed, never a result. The library stays `no_std`.
 
@@ -188,6 +198,16 @@ Per lane, as `exp` and `Reduced::of` write them:
   `y_lo`. This shows the kernels transcribe the scalar operations, which the
   final results alone could not: a different but accurate sequence would
   usually round alike.
+- **Every cascade** (`every_lanes_cascade_returns_the_scalar_bits`): each
+  subset of the CPU's lane backends, widest first, forced in turn, then the
+  scalar function. It runs on slices of every length from 0 to 17 at eight
+  offsets, and on 4,000 arguments of each function's corpus. On AVX-512F
+  hosts that is all eight cascades of AVX-512F, AVX2 and SSE2. The
+  `simd (avx512, sde)` job runs it.
+  The cascade's width tests and counters decide only which backend runs
+  which elements, and so speed, never bits. A mutant that skips a backend
+  or recomputes elements by the scalar function survives these tests by
+  design.
 - **The public functions** on the dispatched backend, for every length from 0
   to 17 and a long slice, and their length check.
 - **The error-free product** (§2).
@@ -209,6 +229,13 @@ parts are the screens, the table indices and the table loads; no gather
 instruction is used. Lanes sent to the scalar function cost a scalar
 evaluation on top: about `2^−15.4` of `exp`'s arguments and `2^−9.4` of `ln`'s
 ([exp.md](exp.md) §8, [ln.md](ln.md) §9), plus the screened ones.
+
+The cascade adds at most one detection check and one feature-enabled call per
+backend. On aarch64 it has one backend, NEON, so the NEON figures below are
+unaffected. On x86-64 it lets a slice shorter than the widest chunk, such as
+a two-element batch on AVX2 or AVX-512F, run on SSE2's two lanes instead of
+the scalar function. That gain is inferred from the kernels running the same
+operations; it has not been measured, since no x86-64 host was timed.
 
 `crates/reference/src/bin/bench-batched.rs` times a loop of the scalar
 function against the batched one, as the median over 31 rounds of the time per

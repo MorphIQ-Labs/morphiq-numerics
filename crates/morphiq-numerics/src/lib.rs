@@ -13,7 +13,10 @@
 //!   lanes with the `simd` feature;
 //! - [`log_space`]: `log_sum_exp` and `log_diff_exp`, logarithms of sums and
 //!   differences of exponentials, within proved error bounds, with `−∞` as
-//!   exact zero mass;
+//!   exact zero mass; `log_sum_exp_pairs`, which returns `log_sum_exp`'s
+//!   bits for several pairs at once, in SIMD lanes with the `simd` feature;
+//!   and `log_sum_exp_and_normalize`, a pair's log-sum with the pair divided
+//!   by its own sum, sharing one exponential;
 //! - [`normal`]: `log_norm_pdf`, the logarithm of the standard normal
 //!   density, correctly rounded wherever its rounding test decides;
 //! - [`random`]: seeded SplitMix64 and xoshiro256++ streams, with exact

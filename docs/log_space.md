@@ -1,6 +1,7 @@
 # `log_sum_exp` and `log_diff_exp`: sums and differences in log space
 
-`morphiq_numerics::log_space::{log_sum_exp, log_diff_exp}`
+`morphiq_numerics::log_space::{log_sum_exp, log_sum_exp_pairs,
+log_sum_exp_and_normalize, log_diff_exp}`
 (`crates/morphiq-numerics/src/log_space/`) follow this derivation step for
 step. They compute logarithms of sums and differences of exponentials without
 leaving log space. Zero mass is
@@ -75,6 +76,37 @@ treated as zero mass, however small `e^(xᵢ)` would be in binary64.
 The result never overflows. It is at most `max(x) + ln n`, and for
 `max(x) ≤ f64::MAX` that rounds to at most `f64::MAX`, because
 `ln n ≪ ulp(f64::MAX)/2`.
+
+### `log_sum_exp_pairs<const N: usize>(x: &[[f64; 2]; N]) -> [f64; N]`
+
+Element `i` of the result is `log_sum_exp(&x[i])`, bit for bit, on every
+target and with or without the `simd` feature. It adds no claim of its own:
+each element inherits `log_sum_exp`'s table above and its bound. It exists so
+that the independent pairs of a two-state recursion's step can share SIMD
+lanes (decision 7). Its working storage is a few `[f64; N]` arrays on the
+stack, so `N` is meant to be small.
+
+### `log_sum_exp_and_normalize<const N: usize>(x: &[[f64; 2]; N]) -> [(f64, Option<[f64; 2]>); N]`
+
+For each pair `x`, this returns `log_sum_exp(&x)`, bit for bit, together
+with `x` divided by its own sum, relative to its larger entry:
+
+```text
+hi = 1 if x[1] > x[0], else 0;   lo = 1 − hi
+d = RN(x[lo] − x[hi]);   p[hi] = −RN(ln_1p(RN(exp(d))));   p[lo] = RN(d + p[hi])
+```
+
+The pair is `None` when `x[hi] = −∞`, which means no entry has mass.
+- **Finite entries.** Then `d ≤ 0`, `ln_1p(e^d) ≥ 0` and `p[lo] ≤ p[hi] ≤ 0`,
+  so neither entry is positive.
+- **`x[lo] = −∞`** gives `p[hi] = −0` and `p[lo] = −∞`.
+- **A NaN entry** gives NaN entries, with an unspecified payload.
+
+This record makes no error claim for the pair beyond those operations, each
+of which is correctly rounded except `ln_1p` ([ln.md](ln.md)). A two-state
+recursion needs both values at every step: the conditional likelihood and the
+filtered probabilities. Computing them together shares one exponential, and
+lets their two logarithms share lanes (decision 8).
 
 ### `log_diff_exp(a: f64, b: f64) -> f64`
 
@@ -170,6 +202,47 @@ Proposition 4.5's bound applies unchanged. The summands are bounded by
 **Decision 5: summation order is index order, skipping `j`.** The result is
 deterministic for a given slice. A permutation of the slice changes it by at
 most the bound, not necessarily by zero.
+
+**Decision 7: lane evaluation returns the same bits.** With the `simd`
+feature, the exponentials of step 3, and `log_sum_exp_pairs`' `ln_1p`s of
+step 5, are evaluated by `exp_slice` and `ln_1p_slice`, which return `exp`'s
+and `ln_1p`'s bits on every backend ([lanes.md](lanes.md) §1). Nothing else
+changes:
+- **`log_sum_exp`** reduces the other finite terms in index order, as step 2
+  does, into chunks of 32 pairs `(dhᵢ, dlᵢ)`. It evaluates each chunk's
+  `exp(dhᵢ)` together, and then passes every term to Sum2 in index order,
+  skipping each `ehᵢ = 0` before its `dlᵢ` is used, as decision 3 does. Every
+  summand, and the order in which it is added, is step 4's, so `t̂` and the
+  result are the same bits. A slice of at most two elements has at most one
+  other term, which gains nothing from lanes, so it keeps the scalar loop.
+- **`log_sum_exp_pairs`** performs steps 1 and 2 per pair, then evaluates
+  every pair's `exp(dh)` together, forms each pair's `t̂` by step 4, and
+  evaluates every `ln_1p(t̂)` together. A pair without a second finite term
+  carries `dh = −∞`, whose exponential is `+0`, so its `t̂` is 0 and step 5
+  returns `m`, as `log_sum_exp` does. A pair decided by step 1 (a NaN, `+∞`
+  or no finite element) keeps step 1's result, and its lane values are
+  discarded.
+
+**Decision 8: one exponential for a log-sum and its normalized pair.** For
+a pair, `log_sum_exp`'s reduction is `(dh, dl) = two_sum(x[lo], −x[hi])`
+whenever step 1 finds a finite maximum. In that case its `j` is `hi`: both
+pick the second entry only when it is strictly larger. `two_sum`'s leading
+word is `RN(x[lo] + (−x[hi]))`, which IEEE 754 defines as `RN(x[lo] − x[hi])`.
+That is the normalization's `d`, bit for bit. So `exp(dh)` is `exp(d)` and
+is evaluated once.
+- **Zero mass.** When `x[lo] = −∞`, `d = −∞`, so `exp(d) = +0` and the term
+  is skipped (decision 3). That is the same `t̂ = 0` that step 2's skip of a
+  `−∞` element gives.
+- **The two logarithms,** `ln_1p(t̂)` and `ln_1p(e^d)`, are independent. The
+  function passes every pair's two arguments to one `ln_1p_slice` call, and
+  every pair's `d` to one `exp_slice` call.
+- **Without `simd`** those calls loop the scalar functions. The shared
+  exponential still saves one `exp` per pair.
+- **Where step 1 decides the log-sum** (a NaN, `+∞`, or no finite entry), the
+  log-sum is step 1's result. The pair still follows the formula above.
+
+Without the `simd` feature `log_sum_exp` loops `exp` term by term and
+`log_sum_exp_pairs` calls `log_sum_exp` on each pair.
 
 ## 4. `log_sum_exp`: error bound
 
@@ -311,20 +384,43 @@ These implement the requirements recorded on #44:
   step of Sum2. One `ln_1p` follows. That is `O(n)` time with no allocation.
   For `n = 2` it is one `exp`, one `ln_1p` and a handful of exact
   operations.
+- **`log_sum_exp_pairs`:** per pair, `log_sum_exp`'s work for `n = 2`. With
+  the `simd` feature the `N` exponentials and the `N` logarithms each run in
+  lanes. No allocation; its arrays are on the stack. `log_sum_exp`'s
+  chunks are too, three arrays of 32.
+- **`log_sum_exp_and_normalize`:** per pair, one `two_sum`, one `exp`, two
+  `ln_1p` and a few exact operations, against two `exp` and two `ln_1p` for
+  `log_sum_exp` and a separate normalization. No allocation.
 - **`log_diff_exp`:** one `two_sum`, then one `expm1` and one `ln`
   (region A), or one `exp` and one `ln_1p` (region B). Constant time.
 
 The accurate-path rates of the underlying `exp`, `expm1`, `ln` and `ln_1p`
 dominate the cost.
 
-**Local measurement** (Apple M1 Pro, release build, Rust 1.97.1;
-`cargo test --release -p morphiq-numerics measure_cost -- --ignored
---nocapture`; one run, not a gate):
+**Local measurement** (`cargo test --release -p morphiq-numerics measure_cost
+-- --ignored --nocapture`, with `--features simd,std` for the second column;
+not a gate). The conditions:
+- Apple M1 Pro, NEON, release build, Rust 1.97.1;
+- median of three runs, alternating between builds;
+- one-minute load average 2.8 to 2.9 when each run started, with no other
+  build or benchmark running.
 
-| Function | Inputs | Time per call |
-| --- | --- | --- |
-| `log_sum_exp` | `n = 2`, operands in `[−20, 20]` | 64 ns |
-| `log_diff_exp` | `a` in `[−20, 20]`, `b = a − [0, 30]` | 56 ns |
+| Function | Inputs | Without `simd` | With `simd` |
+| --- | --- | --- | --- |
+| `log_sum_exp` | `n = 2`, operands in `[−20, 20]` | 64 ns per call | 63 ns per call |
+| `log_sum_exp` | `n = 1000`, elements in `[−50, 20]` | 26 ns per element | 13 ns per element |
+| `log_sum_exp_pairs` | `N = 2`, the same pairs as `n = 2` | 63 ns per pair | 44 ns per pair |
+| `log_sum_exp_and_normalize` | `N = 1`, the same pairs | 92 ns per pair | 70 ns per pair |
+| `log_sum_exp` and a separate normalization | the same pairs | 115 ns per pair | 116 ns per pair |
+| `log_diff_exp` | `a` in `[−20, 20]`, `b = a − [0, 30]` | 57 ns | 58 ns |
+
+Without `simd`, the shared exponential alone makes `log_sum_exp_and_normalize`
+1.25× faster than the separate pair. With `simd`, pairing its two `ln_1p`s
+makes it 1.66× faster.
+
+On AVX2 and AVX-512F, a batch of two pairs is shorter than one lane chunk.
+The backend cascade ([lanes.md](lanes.md) §1) runs it on SSE2's two lanes.
+No x86-64 host was timed, so the gain there is inferred, not measured.
 
 ## 9. Evidence
 
@@ -377,17 +473,44 @@ dominate the cost.
 3. **Bound arithmetic.** `generators/log_space_bounds.py --check` verifies the
    composed bounds of §4 and §6 in exact rational arithmetic. It runs with
    the generators (`scripts/check_generators.sh`).
-4. **Determinism.** Both functions are in the determinism digest
-   ([determinism.md](determinism.md)).
-5. **Mutation.** cargo-mutants 27.1.0 over `log_space/mod.rs` catches 43 of
-   45 mutants. The other two are equivalent: each changes only a choice this
-   contract leaves free, so no test anchored outside the implementation can
-   tell them apart.
-   - `v > m` against `v ≥ m` picks the first or the last index of a tied
-     maximum (decision 5). The other tied element contributes `e^0 = 1`
-     either way.
+4. **Determinism.** All four functions are in the determinism digest
+   ([determinism.md](determinism.md)), which every CI target computes with
+   and without the `simd` feature. Its `log_sum_exp` section includes slices
+   of 9 to 100 elements, so terms fill and cross the chunks of decision 7.
+5. **Lane evaluation** (decision 7; `log_space/tests.rs`, run on AVX-512F
+   under Intel's emulator as well as on the test hosts, [lanes.md](lanes.md)
+   §6):
+   - `log_sum_exp` equals §3's steps with a scalar `exp` per term, bit for
+     bit, on every fixture input and on slices of every length from 0 to 100
+     at four gap scales, with zero mass, ties, underflowing terms, NaN and
+     `+∞` placed around the chunk boundaries, and a slice of 10,000;
+   - `log_sum_exp_pairs` equals `log_sum_exp` on each pair, bit for bit, in
+     batches of 1, 2, 3, 8 and 17: every pairing of twelve special values,
+     the fixture's pairs, and 40,000 random pairs.
+
+   - `log_sum_exp_and_normalize` equals `log_sum_exp` and the stated
+     normalization, written out with one scalar `exp` and `ln_1p` each, on
+     the same pairs and batch sizes. Entries are compared bit for bit,
+     except that a NaN entry need only be NaN.
+
+   Sum2's result rarely depends on the order of its summands: reversing each
+   chunk changed no result on 240,000 random slices. So these tests cannot
+   detect an order change; decision 7's same order is a property of the code,
+   which adds each chunk's terms in index order.
+6. **Mutation.** cargo-mutants 27.1.0 over `log_space/mod.rs`, run once with
+   the `simd` feature and once without, generates 112 mutants. Each run
+   compiles only its own `terms` and `log_sum_exp_pairs` path. 109 are
+   caught by the run that compiles them. The other three are equivalent:
+   each changes only a choice this contract leaves free, so no test anchored
+   outside the implementation can tell them apart.
    - `dh > T` against `dh ≥ T` is the region boundary (decision 6), where
      both regions meet the bound.
+   - Inverting the lane `terms`' test for slices of at most two elements
+     only exchanges which of two evaluations runs, and both return the same
+     bits (decision 7).
+   - `x[1] > x[0]` against `≥` in `log_sum_exp_and_normalize` changes `hi`
+     only for equal entries. There `d = 0` either way, and both entries are
+     `−ln_1p(1)`.
 
 ## 10. Out of scope here
 
