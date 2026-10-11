@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Writes every Gappa certificate of ln and ln_1p (docs/ln.md) into formal/ln.
+"""Writes every Gappa certificate of ln and ln_1p (docs/ln.md) into formal/ln,
+and formal/ln/LnAccurateLevels.v, the accurate certificates restated over reals.
 
 No number in a certificate is typed by hand. The polynomial and its
 approximation bound come from generators/ln_poly.out (generators/ln_poly.sollya);
@@ -286,7 +287,7 @@ G - X -> (1 / {k}) * kk - z * (En + Gn * m) + s;
 '''
 
 
-def accurate(d):
+def accurate(d, coq=None):
     files = {}
     # G_DEGREE = 1/DEGREE as a constant, relative error below 2^-127.
     e_prev = Fraction(1, DEGREE) * U
@@ -300,8 +301,10 @@ def accurate(d):
         g_max = x_hi + e_prev
         # |kk|/k + |z| (E_(k+1) + |G_(k+1)| 2^-127) + 2^-126 (operands below 1).
         bound = up(Fraction(1, k) * U + Z * (e_prev + g_max * U) + 2 * U)
-        files[f'accurate_level_{k:02}.g'] = level(
-            k, prev, f'{float(x_lo * Fraction(99, 100)):.9f}', f'{float(x_hi * Fraction(101, 100)):.9f}', bound)
+        x_range = (f'{float(x_lo * Fraction(99, 100)):.9f}', f'{float(x_hi * Fraction(101, 100)):.9f}')
+        files[f'accurate_level_{k:02}.g'] = level(k, prev, *x_range, bound)
+        if coq is not None:
+            coq['levels'].append((k, prev, x_range, bound))
         prev, e_prev = bound, value(bound)
     # G_1 approximates ln(1 + z)/z: the levels' error plus the truncation after
     # z^(DEGREE-1), at most the first omitted term, |z|^DEGREE / (DEGREE + 1)
@@ -310,7 +313,8 @@ def accurate(d):
     with mpmath.workprec(200):
         zm = mpmath.mpf(Z.numerator) / Z.denominator
         x1_lo, x1_hi = mpmath.log(1 + zm) / zm, mpmath.log(1 - zm) / -zm
-    x1 = f'[{float(x1_lo) * 0.999:.6f}, {float(x1_hi) * 1.001:.6f}]'
+    x1_range = (f'{float(x1_lo) * 0.999:.6f}', f'{float(x1_hi) * 1.001:.6f}')
+    x1 = f'[{x1_range[0]}, {x1_range[1]}]'
     head = f'''# The accurate path's result over ln x (docs/ln.md, section 6), {{title}}.
 # Written by generators/ln_certificates.py. In Q128: G = z G_1 with
 # |G_1 - ln(1 + z)/z| <= E1 (the levels and the truncation), X1 = ln(1 + z)/z;
@@ -319,6 +323,8 @@ def accurate(d):
 # rounding of z' (section 7), 0 for ln.
 '''
     common = f"{sym('E1', e1)} /\\ X1 in {x1} /\\ mz in [-1b-127, 0]"
+    if coq is not None:
+        coq.update(e1=e1, x1=x1_range)
     files['accurate_sum_a.g'] = head.format(title='case A: E = 0 and R[i] = 1, so ln x = z X1') + f'''
 Y = (X1 + E1) * (1 + mz) / X1;
 
@@ -330,6 +336,8 @@ Y - 1 -> E1 / X1 + (1 + E1 / X1) * mz {{ X1 <> 0 }};
     dzr = up(accurate_ln_1p_dz())
     kb = d['case_b']
     s2b = up(2 * U * max(kb['k2'], kb['k3']))
+    if coq is not None:
+        coq.update(dz=dzr, k3b=up(kb['k3']), s2b=s2b)
     files['accurate_sum_b.g'] = head.format(title='case B: E = 0 and R[i] != 1') + f'''#   ln x = N + z X1, with k2 = N / ln x and k3 = z X1 / ln x (generated).
 
 k2 = 1 - k3;
@@ -345,6 +353,8 @@ Y - 1 -> k2 * eN + k3 * (q + (1 + q) * mz) + dz + s2 {{ X1 <> 0 }};
     kc = d['case_c']
     s1c = up(2 * U * max(kc['k1'], kc['k2']))
     s2c = up(2 * U * (1 + kc['k3']))
+    if coq is not None:
+        coq.update(k2c=up(kc['k2']), k3c=up(kc['k3']), s1c=s1c, s2c=s2c)
     files['accurate_sum_c.g'] = head.format(title='case C: E != 0') + f'''#   ln x = E ln 2 + N + z X1, with k1, k2, k3 those terms over ln x (generated).
 
 k1 = 1 - k2 - k3;
@@ -361,23 +371,121 @@ Y - 1 -> k1 * ((1 + eL) * (1 + mL) - 1) + k2 * eN + k3 * (q + (1 + q) * mz) + dz
     return files
 
 
+def coq_real(literal):
+    """A Gappa literal m b-e as a Coq real."""
+    m, e = literal.split('b-')
+    return f'{m} * / 2 ^ {e}'
+
+
+def coq_levels(c):
+    """formal/ln/LnAccurateLevels.v: each accurate certificate restated over
+    reals, with the bounds written into its .g file."""
+    names = [f'ln_accurate_level_{k:02}' for k in range(1, DEGREE)] + [f'ln_accurate_sum_{x}' for x in 'abc']
+    lines = [
+        '(** The accurate path\'s certificates over reals (docs/ln.md, section 6),',
+        '    written by generators/ln_certificates.py with the same bounds it writes',
+        '    into formal/ln/accurate_level_*.g and accurate_sum_*.g; do not edit. Each',
+        '    theorem is its certificate\'s, applied through the Coq proof Gappa writes',
+        '    for it. *)',
+        '',
+        'From Coq Require Import ZArith Reals Lia Lra.',
+        'From Flocq Require Import Core.',
+        'From Gappa Require Gappa_definitions Gappa_pred_bnd.',
+        'Require ' + ' '.join(names) + '.',
+        '',
+        'Open Scope R_scope.',
+        '',
+        '(** Reduces a Gappa interval to numerals, leaving the real operators. *)',
+        'Ltac gappa_num := cbv beta iota zeta delta -[Rle Rlt Rabs IZR bpow Rdiv Rminus Rinv Ropp pow Rplus Rmult].',
+        'Ltac gappa_num_in H := cbv beta iota zeta delta -[Rle Rlt Rabs IZR bpow Rdiv Rminus Rinv Ropp pow Rplus Rmult] in H.',
+        '',
+        '(** A certificate [l1 : hypotheses /\\ ~ conclusion -> False], read as',
+        '    [hypotheses -> conclusion]. *)',
+        'Ltac bridge l1 bound :=',
+        '  apply Rnot_lt_le; intros Hlt; apply l1;',
+        '  repeat split; try (gappa_num; simpl; lra);',
+        '  intros Hb; gappa_num_in Hb; cbv [Gappa_pred_bnd.Float1] in Hb;',
+        '  apply (Rlt_irrefl bound); apply Rlt_le_trans with (1 := Hlt);',
+        '  apply Rabs_le; simpl in Hb |- *; lra.',
+    ]
+    for k, prev, (x_lo, x_hi), bound in c['levels']:
+        lines += [
+            '',
+            f'(** Level {k}: [G_{k} = (1/{k})(1 + kk) − (z·G_{k + 1})(1 + m) + s] against',
+            f'    [X_{k} = 1/{k} − z·X_{k + 1}]. *)',
+            f'Theorem level_{k:02} kk z Xn En m s :',
+            f'  Rabs z <= 0.0078126 -> {x_lo} <= Xn <= {x_hi} -> Rabs En <= {coq_real(prev)} ->',
+            '  Rabs kk <= / 2 ^ 127 -> - / 2 ^ 127 <= m <= 0 -> Rabs s <= / 2 ^ 126 ->',
+            f'  Rabs (1 / {k} * (1 + kk) - z * (Xn + En) * (1 + m) + s - (1 / {k} - z * Xn))',
+            f'    <= {coq_real(bound)}.',
+            'Proof.',
+            '  intros Hz HX HE Hk Hm Hs.',
+            '  apply Rabs_le_inv in Hz. apply Rabs_le_inv in HE. apply Rabs_le_inv in Hk. apply Rabs_le_inv in Hs.',
+            f'  bridge (ln_accurate_level_{k:02}.l1 kk z Xn En m s) ({coq_real(bound)}).',
+            'Qed.',
+        ]
+    x_lo, x_hi = c['x1']
+    lines += [
+        '',
+        '(** Case A: [ln x = z·X1]. *)',
+        'Theorem sum_a X1 E1 mz :',
+        f'  {x_lo} <= X1 <= {x_hi} -> Rabs E1 <= {coq_real(c["e1"])} -> - / 2 ^ 127 <= mz <= 0 ->',
+        '  Rabs ((X1 + E1) * (1 + mz) / X1 - 1) <= / 2 ^ 123.',
+        'Proof.',
+        '  intros HX HE Hm. apply Rabs_le_inv in HE.',
+        '  bridge (ln_accurate_sum_a.l1 X1 E1 mz) (/ 2 ^ 123).',
+        'Qed.',
+        '',
+        '(** Case B: [ln x = N + z·X1], [k3 = z·X1 / ln x]. *)',
+        'Theorem sum_b X1 k3 eN E1 mz dz s2 :',
+        f'  {x_lo} <= X1 <= {x_hi} -> Rabs k3 <= {coq_real(c["k3b"])} -> Rabs eN <= / 2 ^ 127 ->',
+        f'  Rabs E1 <= {coq_real(c["e1"])} -> - / 2 ^ 127 <= mz <= 0 -> Rabs dz <= {coq_real(c["dz"])} ->',
+        f'  Rabs s2 <= {coq_real(c["s2b"])} ->',
+        '  Rabs ((1 - k3) * (1 + eN) + k3 * (1 + E1 / X1) * (1 + mz) + dz + s2 - 1) <= / 2 ^ 123.',
+        'Proof.',
+        '  intros HX Hk HeN HE Hm Hdz Hs.',
+        '  apply Rabs_le_inv in Hk. apply Rabs_le_inv in HeN. apply Rabs_le_inv in HE.',
+        '  apply Rabs_le_inv in Hdz. apply Rabs_le_inv in Hs.',
+        '  bridge (ln_accurate_sum_b.l1 X1 k3 eN E1 mz dz s2) (/ 2 ^ 123).',
+        'Qed.',
+        '',
+        '(** Case C: [ln x = E·ln 2 + N + z·X1], [k2 = N / ln x], [k3 = z·X1 / ln x]. *)',
+        'Theorem sum_c X1 k2 k3 eL mL eN s1 E1 mz dz s2 :',
+        f'  {x_lo} <= X1 <= {x_hi} -> Rabs k2 <= {coq_real(c["k2c"])} -> Rabs k3 <= {coq_real(c["k3c"])} ->',
+        '  Rabs eL <= / 2 ^ 127 -> - / 2 ^ 127 <= mL <= 0 -> Rabs eN <= / 2 ^ 127 ->',
+        f'  Rabs s1 <= {coq_real(c["s1c"])} -> Rabs E1 <= {coq_real(c["e1"])} -> - / 2 ^ 127 <= mz <= 0 ->',
+        f'  Rabs dz <= {coq_real(c["dz"])} -> Rabs s2 <= {coq_real(c["s2c"])} ->',
+        '  Rabs ((1 - k2 - k3) * (1 + eL) * (1 + mL) + k2 * (1 + eN) + s1 + k3 * (1 + E1 / X1) * (1 + mz) + dz + s2 - 1)',
+        '    <= / 2 ^ 123.',
+        'Proof.',
+        '  intros HX Hk2 Hk3 HeL HmL HeN Hs1 HE Hm Hdz Hs2.',
+        '  apply Rabs_le_inv in Hk2. apply Rabs_le_inv in Hk3. apply Rabs_le_inv in HeL. apply Rabs_le_inv in HeN.',
+        '  apply Rabs_le_inv in Hs1. apply Rabs_le_inv in HE. apply Rabs_le_inv in Hdz. apply Rabs_le_inv in Hs2.',
+        '  bridge (ln_accurate_sum_c.l1 X1 k2 k3 eL mL eN s1 E1 mz dz s2) (/ 2 ^ 123).',
+        'Qed.',
+    ]
+    return '\n'.join(lines) + '\n'
+
+
 def generate():
     d = ln_constants.derive()
     files = {'tail.g': tail(d), 'p.g': poly(d)}
     for case in 'abc':
         files[f'fast_{case}.g'] = fast(d, case)
     files['fast_ln_1p.g'] = fast_ln_1p()
-    files.update(accurate(d))
-    return files
+    coq = {'levels': []}
+    files.update(accurate(d, coq))
+    return files, {'LnAccurateLevels.v': coq_levels(coq)}
 
 
 def main():
-    files = generate()
+    files, coq = generate()
     check = '--check' in sys.argv[1:]
     if check:
         present = {p.name for p in DIR.glob('*.g')}
         if present != set(files):
             sys.exit(f'formal/ln holds {sorted(present ^ set(files))} unexpectedly')
+    files.update(coq)
     for name, text in files.items():
         path = DIR / name
         if check:
