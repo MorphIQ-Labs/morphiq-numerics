@@ -139,7 +139,7 @@ Definition b_ideal (e1 e2 ln0 L z : R) : R :=
   e1 + e2 + ln0 + L * (1 - z + z * z - z * z * z) - (z * z - rn (z * z)) / 2 + z * z * z * b_W z.
 
 (** formal/ln/stage_b_lo.g. *)
-Theorem stage_b_lo e1 e2 ln0 L z : IZR 1 * bpow radix2 (-62) <= Rabs z <= IZR 1 * bpow radix2 (-9) -> IZR (-519) * bpow radix2 (-62) <= L <= IZR 519 * bpow radix2 (-62) ->
+Theorem stage_b_lo e1 e2 ln0 L z : IZR (-1) * bpow radix2 (-9) <= z <= IZR 1 * bpow radix2 (-9) -> IZR (-519) * bpow radix2 (-62) <= L <= IZR 519 * bpow radix2 (-62) ->
   IZR (-1) * bpow radix2 (-44) <= e1 <= IZR 1 * bpow radix2 (-44) -> IZR (-1) * bpow radix2 (-44) <= e2 <= IZR 1 * bpow radix2 (-44) -> IZR (-1) * bpow radix2 (-34) <= ln0 <= IZR 1 * bpow radix2 (-34) ->
   Gappa_definitions.FIX e1 (-1074) -> Gappa_definitions.FIX e2 (-1074) -> Gappa_definitions.FIX ln0 (-1074) ->
   (IZR (-415) * bpow radix2 (-88) <= b_lo e1 e2 ln0 L z - b_ideal e1 e2 ln0 L z <= IZR 415 * bpow radix2 (-88)) /\

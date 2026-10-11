@@ -1,7 +1,7 @@
 # ln_1p's stage B, |x| >= 2^-9 (docs/ln.md, section 7): the low word lo, every
 # operation rounded to binary64 as crates/morphiq-numerics/src/ln/stages.rs
 # does, against Ideal = e1 + e2 + ln0 + L (1 - z + z^2 - z^3) - pl/2 + z^3 Q(z).
-# z binary64, |z| <= 2^-9; p + pl = z^2 exactly (two_prod); L = l R 2^-E exact,
+# z binary64, |z| <= 2^-9 (zero included); p + pl = z^2 exactly (two_prod); L = l R 2^-E exact,
 # |L| <= 2^-53 (1 + 2^-9); e1, e2 the Fast2Sum errors, binary64, below 2^-44
 # (|s| < 1024); ln0 binary64, |ln0| <= 2^-34 (|E| <= 1020). -0.5 pl is exact.
 # Written by generators/ln1p_certificates.py.
@@ -37,7 +37,7 @@ r4 = rnd(e1 + e2);
 lo = rnd(r4 + r3);
 Ideal = e1 + e2 + ln0 + L * (1 - z + z * z - z * z * z) - pl / 2 + z * z * z * W;
 
-{ |z| in [1b-62, 1b-9] /\ L in [-519b-62, 519b-62]
+{ z in [-1b-9, 1b-9] /\ L in [-519b-62, 519b-62]
   /\ e1 in [-1b-44, 1b-44] /\ e2 in [-1b-44, 1b-44] /\ ln0 in [-1b-34, 1b-34]
   /\ @FIX(e1, -1074) /\ @FIX(e2, -1074) /\ @FIX(ln0, -1074)
   -> lo - Ideal in [-830b-89, 830b-89] /\ lo in [-1b-28, 1b-28] }

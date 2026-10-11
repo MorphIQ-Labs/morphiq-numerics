@@ -323,7 +323,7 @@ Proof. reflexivity. Qed.
 Theorem reduce_ok h : finite h -> bpow radix2 (-53) <= B h <= bpow radix2 1020 ->
   let hb := bits_of_b64 h in let E := rd_e hb in let i := rd_i hb in
   let y := B h * bpow radix2 (- E) in let R := B (st_r i) in
-  (-53 <= E <= 1020)%Z /\ (i < 512)%nat /\ / 2 <= R <= 2 /\
+  (-53 <= E <= 1020)%Z /\ (i < 512)%nat /\ / 2 <= R <= 2 /\ 7 / 10 <= y <= 3 / 2 /\
   B (b64_of_bits (st_off + Z.of_nat i * width)) <= y <= B (b64_of_bits (st_off + (Z.of_nat i + 1) * width - 1)) /\
   finite (rd_rs hb) /\ B (rd_rs hb) = R * bpow radix2 (- E) /\
   finite (rd_z h) /\ B (rd_z h) = y * R - 1 /\
@@ -550,7 +550,23 @@ Proof.
   rewrite Bm2, Bm3, Zv, exact_round in Bz' by exact Fz.
   assert (Ez : rd_z h = fadd (fsub (fmul hh rs) c_one) (fmul hl rs)) by reflexivity.
   rewrite Ez.
-  split; [lia | ]. split; [exact Hi | ]. split; [exact RR | ]. split; [split; assumption | ].
+  assert (Yr2 : 7 / 10 <= y <= 3 / 2).
+  { rewrite <- Vy. destruct (normal_bits hy Hyr) as [_ V]. rewrite V.
+    pose proof (Z.mod_pos_bound hy (2 ^ 52) ltac:(lia)) as Mb. pose proof (Z.div_mod hy (2 ^ 52) ltac:(lia)) as Dv.
+    destruct (Z.ltb_spec (Z.of_nat i) 300) as [L | L].
+    - assert (Q : (hy / 2 ^ 52 = 1022)%Z) by (rewrite Yb; destruct (Z.ltb_spec (Z.of_nat i) 300); [reflexivity | lia]).
+      rewrite Q in Dv |- *. change (bpow radix2 (1022 - 1075)) with (/ 9007199254740992).
+      assert (F1 : IZR 6305039478318695 <= IZR (hy mod 2 ^ 52 + 2 ^ 52) <= IZR 9007199254740992)
+        by (split; apply IZR_le; unfold st_off, width in Hy; lia).
+      split; [apply Rmult_le_reg_r with 9007199254740992; [lra | ]; rewrite Rmult_assoc, Rinv_l by lra; lra
+             | apply Rmult_le_reg_r with 9007199254740992; [lra | ]; rewrite Rmult_assoc, Rinv_l by lra; lra].
+    - assert (Q : (hy / 2 ^ 52 = 1023)%Z) by (rewrite Yb; destruct (Z.ltb_spec (Z.of_nat i) 300); [lia | reflexivity]).
+      rewrite Q in Dv |- *. change (bpow radix2 (1023 - 1075)) with (/ 4503599627370496).
+      assert (F1 : IZR 4503599627370496 <= IZR (hy mod 2 ^ 52 + 2 ^ 52) <= IZR 6755399441055744)
+        by (split; apply IZR_le; unfold st_off, width in Hy; lia).
+      split; [apply Rmult_le_reg_r with 4503599627370496; [lra | ]; rewrite Rmult_assoc, Rinv_l by lra; lra
+             | apply Rmult_le_reg_r with 4503599627370496; [lra | ]; rewrite Rmult_assoc, Rinv_l by lra; lra]. }
+  split; [lia | ]. split; [exact Hi | ]. split; [exact RR | ]. split; [exact Yr2 | ]. split; [split; assumption | ].
   split; [exact Frs' | ]. split; [exact Vrs' | ]. split; [exact Fz' | ]. split; [exact Bz' | ].
   split.
   { rewrite Bz'. destruct (Req_dec (y * R - 1) 0) as [Z0 | N0]; [left; exact Z0 | right; apply grid_nonzero; assumption]. }
