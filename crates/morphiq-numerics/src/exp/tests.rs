@@ -232,3 +232,68 @@ fn rounding_test_constant_is_its_definition() {
     let two = |k: i32| f64::from_bits(u64::try_from(1023 + k).unwrap() << 52);
     assert_eq!(EPS.to_bits(), (two(-69) * (1.0 + two(-50))).to_bits());
 }
+
+/// Time per call of `exp` and of `fallback` (the algorithm before the
+/// stages) on shuffled grids of 4,096 arguments: throughput (independent
+/// calls) and latency (each argument depends on the previous result), the
+/// median of 7 rounds. A local measurement (docs/exp.md §11), not a check:
+/// `cargo test --release -p morphiq-numerics --lib exp::tests::measure_cost
+/// -- --ignored --nocapture`.
+#[test]
+#[ignore = "a local measurement, not a check"]
+fn measure_cost() {
+    use core::hint::black_box;
+    use std::time::Instant;
+    let grid = |lo: f64, hi: f64| {
+        let mut rng = SplitMix64::new(0x6578_705f_636f_7374);
+        let mut v: std::vec::Vec<f64> = (0..4096)
+            .map(|i| lo + (hi - lo) * (f64::from(i) + 0.5) / 4096.0)
+            .collect();
+        for i in (1..v.len()).rev() {
+            let j = usize::try_from(rng.next_u64() % (i as u64 + 1)).unwrap();
+            v.swap(i, j);
+        }
+        v
+    };
+    #[allow(clippy::cast_precision_loss)] // timing arithmetic
+    let per_call = |start: Instant, calls: usize| start.elapsed().as_nanos() as f64 / calls as f64;
+    let throughput = |f: fn(f64) -> f64, xs: &[f64]| {
+        let mut out = std::vec![0.0; xs.len()];
+        let start = Instant::now();
+        for _ in 0..2000 {
+            for (x, y) in xs.iter().zip(out.iter_mut()) {
+                *y = f(black_box(*x));
+            }
+            black_box(&out);
+        }
+        per_call(start, 2000 * xs.len())
+    };
+    let latency = |f: fn(f64) -> f64, xs: &[f64]| {
+        let zero = black_box(0.0);
+        let mut y = 0.0;
+        let start = Instant::now();
+        for _ in 0..2000 {
+            for &x in xs {
+                y = f(x + y * zero);
+            }
+        }
+        black_box(y);
+        per_call(start, 2000 * xs.len())
+    };
+    let median = |mut v: std::vec::Vec<f64>| {
+        v.sort_by(f64::total_cmp);
+        v[v.len() / 2]
+    };
+    for (name, lo, hi) in [
+        ("[-30, 0]", -30.0, 0.0),
+        ("[-1, 1]", -1.0, 1.0),
+        ("[-700, 700]", -700.0, 700.0),
+    ] {
+        let xs = grid(lo, hi);
+        for (label, f) in [("exp", exp as fn(f64) -> f64), ("fallback", fallback)] {
+            let t = median((0..7).map(|_| throughput(f, &xs)).collect());
+            let l = median((0..7).map(|_| latency(f, &xs)).collect());
+            std::eprintln!("{label:8} {name:12} throughput {t:6.2} ns, latency {l:6.2} ns");
+        }
+    }
+}
