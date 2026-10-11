@@ -402,15 +402,21 @@ dominate the cost.
 not a gate). The conditions:
 - Apple M1 Pro, NEON, release build, Rust 1.97.1;
 - median of three runs, alternating between builds;
-- one-minute load average 2.4 to 2.9, with no other build or benchmark
-  running.
+- one-minute load average 2.8 to 2.9 when each run started, with no other
+  build or benchmark running.
 
 | Function | Inputs | Without `simd` | With `simd` |
 | --- | --- | --- | --- |
-| `log_sum_exp` | `n = 2`, operands in `[−20, 20]` | 65 ns per call | 64 ns per call |
-| `log_sum_exp` | `n = 1000`, elements in `[−50, 20]` | 26 ns per element | 14 ns per element |
-| `log_sum_exp_pairs` | `N = 2`, the same pairs as `n = 2` | 65 ns per pair | 45 ns per pair |
+| `log_sum_exp` | `n = 2`, operands in `[−20, 20]` | 64 ns per call | 63 ns per call |
+| `log_sum_exp` | `n = 1000`, elements in `[−50, 20]` | 26 ns per element | 13 ns per element |
+| `log_sum_exp_pairs` | `N = 2`, the same pairs as `n = 2` | 63 ns per pair | 44 ns per pair |
+| `log_sum_exp_and_normalize` | `N = 1`, the same pairs | 92 ns per pair | 70 ns per pair |
+| `log_sum_exp` and a separate normalization | the same pairs | 115 ns per pair | 116 ns per pair |
 | `log_diff_exp` | `a` in `[−20, 20]`, `b = a − [0, 30]` | 57 ns | 58 ns |
+
+Without `simd`, the shared exponential alone makes `log_sum_exp_and_normalize`
+1.25× faster than the separate pair. With `simd`, pairing its two `ln_1p`s
+makes it 1.66× faster.
 
 On AVX2 and AVX-512F, a batch of two pairs is shorter than one lane chunk.
 The backend cascade ([lanes.md](lanes.md) §1) runs it on SSE2's two lanes.
