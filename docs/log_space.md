@@ -353,14 +353,25 @@ These implement the requirements recorded on #44:
 The accurate-path rates of the underlying `exp`, `expm1`, `ln` and `ln_1p`
 dominate the cost.
 
-**Local measurement** (Apple M1 Pro, release build, Rust 1.97.1;
-`cargo test --release -p morphiq-numerics measure_cost -- --ignored
---nocapture`; one run, not a gate):
+**Local measurement** (`cargo test --release -p morphiq-numerics measure_cost
+-- --ignored --nocapture`, with `--features simd,std` for the second column;
+not a gate). The conditions:
+- Apple M1 Pro, NEON, release build, Rust 1.97.1;
+- median of three runs, alternating between builds;
+- one-minute load average 2.4 to 2.9, with no other build or benchmark
+  running.
 
-| Function | Inputs | Time per call |
-| --- | --- | --- |
-| `log_sum_exp` | `n = 2`, operands in `[−20, 20]` | 64 ns |
-| `log_diff_exp` | `a` in `[−20, 20]`, `b = a − [0, 30]` | 56 ns |
+| Function | Inputs | Without `simd` | With `simd` |
+| --- | --- | --- | --- |
+| `log_sum_exp` | `n = 2`, operands in `[−20, 20]` | 65 ns per call | 64 ns per call |
+| `log_sum_exp` | `n = 1000`, elements in `[−50, 20]` | 26 ns per element | 14 ns per element |
+| `log_sum_exp_pairs` | `N = 2`, the same pairs as `n = 2` | 65 ns per pair | 45 ns per pair |
+| `log_diff_exp` | `a` in `[−20, 20]`, `b = a − [0, 30]` | 57 ns | 58 ns |
+
+On AVX2 and AVX-512F, a batch of two pairs is shorter than one lane chunk.
+So `exp_slice` and `ln_1p_slice` evaluate it by the scalar function
+([lanes.md](lanes.md) §1), and `log_sum_exp_pairs::<2>` gains nothing there.
+No x86-64 host was timed.
 
 ## 9. Evidence
 
