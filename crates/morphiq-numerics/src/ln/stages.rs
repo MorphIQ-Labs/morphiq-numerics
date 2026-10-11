@@ -29,7 +29,7 @@ pub(super) const EPS_B_REL: f64 = pow2(-102);
 pub(super) const EPS_B: f64 = pow2(-78);
 
 /// `bits(2^−46) << 1`, `bits(2^−54) << 1`: the screens' magnitude floors.
-const TWO_M46_2X: u64 = pow2(-46).to_bits() << 1;
+const TWO_M46_2X: u64 = TWO_M46.to_bits() << 1;
 const TWO_M54_2X: u64 = pow2(-54).to_bits() << 1;
 /// `bits(2^53)`, `bits(2^1020)`: the screens' upper limits, as signed words.
 #[allow(clippy::cast_possible_wrap)] // below 2^63
@@ -40,8 +40,11 @@ const TWO_1020_BITS: i64 = pow2(1020).to_bits() as i64;
 const MINUS_ONE_BITS: u64 = 0xbff0_0000_0000_0000;
 /// `2^−9`, below which stage B takes `z = x`.
 const TWO_M9: f64 = pow2(-9);
-/// `2^53`, from which `1 + x` splits as `(x, 1)`.
-const TWO_53: f64 = pow2(53);
+/// `2^53`, from which `1 + x` splits as `(x, 1)`, and stage H's screen's
+/// limit.
+pub(super) const TWO_53: f64 = pow2(53);
+/// `2^−46`, stage H's screen's floor.
+pub(super) const TWO_M46: f64 = pow2(-46);
 
 /// Stage H's screen: `2^−46 ≤ |x|` and `−1 < x < 2^53`; false on NaN.
 #[inline(always)]

@@ -8,7 +8,7 @@
 use morphiq_numerics_arch::Simd;
 
 use super::stage_tables::{EL, H, OFF, R, T};
-use super::stages::{A_H, K_H, K2_H, stage_h_screen};
+use super::stages::{A_H, K_H, K2_H, TWO_53, TWO_M46};
 use super::tables::{LN2_HI, LN2_LO, NEG_LN_R_BITS, POLY, R_BITS};
 use super::{EPS, FRACTION, TWO_54, ln, ln_1p, ln_1p_after_h};
 use crate::lanes::{Dw, Kernel, decide, dw_add, dw_add_f64, two_prod, two_sum};
@@ -162,11 +162,18 @@ impl Kernel for Ln1p {
         let lb = k.add(s, k.sub(lo, eps));
         let ub = k.add(s, k.add(lo, eps));
         // lb == ub: neither is NaN or zero on a lane stage H tries.
+        let all = if K::LANES == 64 {
+            u64::MAX
+        } else {
+            (1 << K::LANES) - 1
+        };
         let decided = k.mask_bits(k.and_m(k.le(lb, ub), k.le(ub, lb))) & !scalar_lanes;
         let mut out = k.store(lb);
-        for (i, o) in out.as_mut().iter_mut().enumerate() {
-            if decided >> i & 1 == 0 {
-                *o = ln_1p_after_h(x.as_ref()[i]);
+        if decided != all {
+            for (i, o) in out.as_mut().iter_mut().enumerate() {
+                if decided >> i & 1 == 0 {
+                    *o = ln_1p_after_h(x.as_ref()[i]);
+                }
             }
         }
         out
@@ -178,25 +185,34 @@ pub(super) type StageH<K> = (<K as Simd>::F, <K as Simd>::F, <K as Simd>::F);
 
 /// `ln_1p`'s stage H on every lane, `stages::stage_h_parts` operation for
 /// operation: `(s, lo, eps)`, and the lanes (bit `i` set) its screen sends
-/// to `ln_1p_after_h`. The index, `R[i]·2^−E` and the table loads are per
-/// lane; every floating-point operation is in lanes.
+/// to `ln_1p_after_h`. The table index and loads are per lane; every
+/// floating-point operation is in lanes.
 #[inline(always)]
 pub(super) fn stage_h<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
-    let mut scalar_lanes = 0_u64;
-    let mut xs = *x;
-    for (i, xi) in xs.as_mut().iter_mut().enumerate() {
-        if !stage_h_screen(*xi) {
-            scalar_lanes |= 1 << i;
-            // A placeholder inside the screen; its lane is discarded.
-            *xi = 1.0;
-        }
-    }
-    let xv = k.load(xs);
     let one = k.splat(1.0);
+    let xv = k.load(*x);
+    // The screen, `2^−46 ≤ |x|` and `−1 < x < 2^53`: `stage_h_screen` on
+    // the encoding, the same predicate (both false on NaN).
+    let screen = k.and_m(
+        k.and_m(k.le(k.splat(TWO_M46), k.abs(xv)), k.lt(xv, k.splat(TWO_53))),
+        k.lt(k.splat(-1.0), xv),
+    );
+    let all = if K::LANES == 64 {
+        u64::MAX
+    } else {
+        (1 << K::LANES) - 1
+    };
+    let scalar_lanes = !k.mask_bits(screen) & all;
+    // Screened lanes compute on the placeholder 1, and are discarded.
+    let xv = k.select(screen, xv, one);
     let s0 = k.add(one, xv);
     let l = k.sub(xv, k.sub(s0, one));
-    let words = k.store(s0);
-    let (mut rs, mut th, mut tl, mut eh, mut el) = (
+    // u = bits(s0) − OFF; E·2^52 is u with its fraction cleared, so
+    // R[i]·2^−E is bits(R[i]) − (u & exponent field and sign).
+    let hb = k.to_bits(s0);
+    let u = k.sub_u(hb, k.splat_bits(OFF));
+    let words = k.store(k.to_float(u));
+    let (mut r, mut th, mut tl, mut eh, mut el) = (
         K::Array::default(),
         K::Array::default(),
         K::Array::default(),
@@ -204,21 +220,18 @@ pub(super) fn stage_h<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
         K::Array::default(),
     );
     for (lane, word) in words.as_ref().iter().enumerate() {
-        let u = word.to_bits().wrapping_sub(OFF);
-        #[allow(clippy::cast_possible_wrap)] // an arithmetic shift of the word
-        let e = (u as i64) >> 52;
+        let u = word.to_bits();
         #[allow(clippy::cast_possible_truncation)] // 9 bits
         let i = ((u >> 43) & 511) as usize;
-        #[allow(clippy::cast_sign_loss)] // the exponent's two's complement
-        let r = R[i].wrapping_sub((e as u64) << 52);
-        rs.as_mut()[lane] = f64::from_bits(r);
+        // ((E + 64) & 127), E the top 12 bits of u in two's complement.
+        #[allow(clippy::cast_possible_truncation)] // 7 bits
+        let e = (((u >> 52) + 64) & 127) as usize;
+        r.as_mut()[lane] = f64::from_bits(R[i]);
         (th.as_mut()[lane], tl.as_mut()[lane]) = T[i];
-        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)] // 7 bits
-        let (h, lo) = EL[((e + 64) & 127) as usize];
-        (eh.as_mut()[lane], el.as_mut()[lane]) = (h, lo);
+        (eh.as_mut()[lane], el.as_mut()[lane]) = EL[e];
     }
-    let rs = k.load(rs);
-    let hh = k.to_float(k.and_u(k.to_bits(s0), k.splat_bits(!0x3ff)));
+    let rs = k.to_float(k.sub_u(k.to_bits(k.load(r)), k.and_u(u, k.splat_bits(!FRACTION))));
+    let hh = k.to_float(k.and_u(hb, k.splat_bits(!0x3ff)));
     let hl = k.sub(s0, hh);
     let z = k.add(k.sub(k.mul(hh, rs), one), k.mul(hl, rs));
     let ln1 = k.add(k.load(eh), k.load(th));
