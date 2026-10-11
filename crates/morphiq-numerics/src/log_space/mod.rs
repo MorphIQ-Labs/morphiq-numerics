@@ -1,6 +1,7 @@
 //! `log_sum_exp` and `log_diff_exp`: logarithms of sums and differences of
-//! exponentials, without leaving log space; and `log_sum_exp_pairs`,
-//! `log_sum_exp` of several pairs at once.
+//! exponentials, without leaving log space; `log_sum_exp_pairs`,
+//! `log_sum_exp` of several pairs at once; and `log_sum_exp_and_normalize`,
+//! a pair's log-sum with its normalized pair.
 //!
 //! The contract, the derivation and every bound are in
 //! [`docs/log_space.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/log_space.md);
@@ -12,9 +13,7 @@
 mod tests;
 
 use crate::eft::two_sum;
-use crate::elementary::{exp, expm1, ln, ln_1p};
-#[cfg(feature = "simd")]
-use crate::elementary::{exp_slice, ln_1p_slice};
+use crate::elementary::{exp, exp_slice, expm1, ln, ln_1p, ln_1p_slice};
 
 /// `T = RN(−ln 2)`, the boundary between `log_diff_exp`'s regions (decision 6).
 const T: f64 = f64::from_bits(0xbfe6_2e42_fefa_39ef);
@@ -68,6 +67,65 @@ pub fn log_sum_exp_pairs<const N: usize>(x: &[[f64; 2]; N]) -> [f64; N] {
     {
         x.map(|pair| log_sum_exp(&pair))
     }
+}
+
+/// For each of `N` pairs `x`: `log_sum_exp(&x)`, bit for bit, and `x`
+/// divided by its own sum relative to its larger entry (§1), which is
+/// `None` when the larger entry is `−∞`.
+///
+/// With `hi` the index of the larger entry (1 only if `x[1] > x[0]`),
+/// `lo = 1 − hi` and `d = x[lo] − x[hi]`, the pair is
+/// `p[hi] = −ln_1p(exp(d))` and `p[lo] = d + p[hi]`, both at most 0 for
+/// finite entries. `d` is the leading word of `log_sum_exp`'s reduction
+/// `two_sum(x[lo], −x[hi])`, so the two results share one `exp(d)`; their
+/// two `ln_1p`s, and the `N` pairs' exponentials, are evaluated together, in
+/// SIMD lanes with the `simd` feature (decision 8).
+#[must_use]
+pub fn log_sum_exp_and_normalize<const N: usize>(
+    x: &[[f64; 2]; N],
+) -> [(f64, Option<[f64; 2]>); N] {
+    let mut hi = [0; N];
+    let mut d = [0.0; N];
+    let mut dl = [0.0; N];
+    for (i, pair) in x.iter().enumerate() {
+        hi[i] = usize::from(pair[1] > pair[0]);
+        (d[i], dl[i]) = two_sum(pair[1 - hi[i]], -pair[hi[i]]);
+    }
+    let mut e = [0.0; N];
+    exp_slice(&d, &mut e);
+    // Each pair's t̂ (§3 steps 2–4, the term e^(d + dl)), then its e, so one
+    // ln_1p_slice call evaluates both logarithms of every pair.
+    let mut args = [[0.0; 2]; N];
+    let mut results = [(0.0, None); N];
+    let mut tops = [0.0; N];
+    for i in 0..N {
+        let mut sum = Sum2Stream::default();
+        sum.add(e[i], dl[i]);
+        args[i] = [sum.total(), e[i]];
+    }
+    let mut logs = [[0.0; 2]; N];
+    ln_1p_slice(args.as_flattened(), logs.as_flattened_mut());
+    for i in 0..N {
+        tops[i] = -logs[i][1];
+        results[i].0 = match shift(&x[i]) {
+            Err(y) => y,
+            // Here j = hi: the first index of the larger finite entry.
+            Ok((m, _)) => {
+                if args[i][0] == 0.0 {
+                    m
+                } else {
+                    m + logs[i][0]
+                }
+            }
+        };
+        if x[i][hi[i]] != f64::NEG_INFINITY {
+            let mut pair = [0.0; 2];
+            pair[hi[i]] = tops[i];
+            pair[1 - hi[i]] = d[i] + tops[i];
+            results[i].1 = Some(pair);
+        }
+    }
+    results
 }
 
 /// §3 step 1: classify, and find `m = max` and the first index `j` attaining

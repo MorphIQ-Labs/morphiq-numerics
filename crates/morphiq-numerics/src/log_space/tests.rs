@@ -5,7 +5,9 @@
 //! A bounded case passes when `lo ≤ ŷ ≤ hi`: the documented bound around the
 //! exact result, rounded inward, so the comparison is exact.
 
-use super::{log_diff_exp, log_sum_exp, log_sum_exp_pairs, scalar_terms, shift};
+use super::{
+    log_diff_exp, log_sum_exp, log_sum_exp_and_normalize, log_sum_exp_pairs, scalar_terms, shift,
+};
 use crate::test_exact::{entries, field, word};
 use std::vec::Vec;
 
@@ -209,8 +211,45 @@ fn check_pairs<const N: usize>(pairs: &[[f64; 2]]) {
     }
 }
 
-#[test]
-fn log_sum_exp_pairs_lanes_return_log_sum_exps_bits() {
+/// §1's normalized pair by its stated operations, one scalar `exp` and
+/// `ln_1p` each: `hi` the index of the larger entry, `d = x[lo] − x[hi]`,
+/// `p[hi] = −ln_1p(exp(d))`, `p[lo] = d + p[hi]`; `None` when `x[hi] = −∞`.
+fn normalized_reference(x: [f64; 2]) -> Option<[f64; 2]> {
+    let hi = usize::from(x[1] > x[0]);
+    if x[hi] == f64::NEG_INFINITY {
+        return None;
+    }
+    let d = x[1 - hi] - x[hi];
+    let top = -crate::elementary::ln_1p(crate::elementary::exp(d));
+    let mut p = [0.0; 2];
+    p[hi] = top;
+    p[1 - hi] = d + top;
+    Some(p)
+}
+
+/// `log_sum_exp_and_normalize::<N>` against `log_sum_exp` and
+/// `normalized_reference` on each pair, bit for bit.
+fn check_normalize<const N: usize>(pairs: &[[f64; 2]]) {
+    for start in (0..pairs.len()).step_by(N) {
+        let batch: [[f64; 2]; N] = core::array::from_fn(|i| pairs[(start + i) % pairs.len()]);
+        for ((y, p), pair) in log_sum_exp_and_normalize(&batch).iter().zip(&batch) {
+            assert_eq!(y.to_bits(), log_sum_exp(pair).to_bits(), "{pair:?}");
+            // A NaN entry is NaN either way; its payload is not specified.
+            let bits = |p: &Option<[f64; 2]>| {
+                p.map(|p| p.map(|v| if v.is_nan() { u64::MAX } else { v.to_bits() }))
+            };
+            assert_eq!(
+                bits(p),
+                bits(&normalized_reference(*pair)),
+                "{pair:?} in a batch of {N}"
+            );
+        }
+    }
+}
+
+/// The pairs both batched tests run on: every pairing of twelve special
+/// values, the fixture's pairs, and 40,000 random pairs.
+fn pair_corpus() -> Vec<[f64; 2]> {
     let specials = [
         f64::NAN,
         -f64::NAN,
@@ -243,6 +282,22 @@ fn log_sum_exp_pairs_lanes_return_log_sum_exps_bits() {
         pairs.push([a, a - gap]);
         pairs.push([-gap, f64::from_bits(stream.next_u64())]);
     }
+    pairs
+}
+
+#[test]
+fn log_sum_exp_and_normalize_lanes_return_the_scalar_bits() {
+    let pairs = pair_corpus();
+    check_normalize::<1>(&pairs);
+    check_normalize::<2>(&pairs);
+    check_normalize::<3>(&pairs);
+    check_normalize::<8>(&pairs);
+    check_normalize::<17>(&pairs);
+}
+
+#[test]
+fn log_sum_exp_pairs_lanes_return_log_sum_exps_bits() {
+    let pairs = pair_corpus();
     check_pairs::<1>(&pairs);
     check_pairs::<2>(&pairs);
     check_pairs::<3>(&pairs);
@@ -294,6 +349,30 @@ fn measure_cost() {
     #[allow(clippy::cast_precision_loss)] // timing arithmetic
     let ns = start.elapsed().as_nanos() as f64 / (16.0 * pairs.len() as f64);
     std::eprintln!("log_sum_exp_pairs, N = 2: {ns:.1} ns per pair ({sink:e})");
+    // A log-sum and its normalized pair, one pair per call as a filter step
+    // forms it, against log_sum_exp and the normalization done separately.
+    let mut sink = 0.0;
+    let start = Instant::now();
+    for _ in 0..16 {
+        for &(a, b) in &pairs {
+            let [(y, p)] = log_sum_exp_and_normalize(core::hint::black_box(&[[a, b]]));
+            sink += y + p.map_or(0.0, |p| p[0]);
+        }
+    }
+    #[allow(clippy::cast_precision_loss)] // timing arithmetic
+    let ns = start.elapsed().as_nanos() as f64 / (16.0 * pairs.len() as f64);
+    std::eprintln!("log_sum_exp_and_normalize, N = 1: {ns:.1} ns per pair ({sink:e})");
+    let mut sink = 0.0;
+    let start = Instant::now();
+    for _ in 0..16 {
+        for &(a, b) in &pairs {
+            let x = core::hint::black_box([a, b]);
+            sink += log_sum_exp(&x) + normalized_reference(x).map_or(0.0, |p| p[0]);
+        }
+    }
+    #[allow(clippy::cast_precision_loss)] // timing arithmetic
+    let ns = start.elapsed().as_nanos() as f64 / (16.0 * pairs.len() as f64);
+    std::eprintln!("log_sum_exp + separate normalization: {ns:.1} ns per pair ({sink:e})");
     // One long slice, as a sum over a series.
     let long: Vec<f64> = pairs.iter().take(1_000).map(|&(_, b)| b).collect();
     let mut sink = 0.0;

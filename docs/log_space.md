@@ -1,6 +1,7 @@
 # `log_sum_exp` and `log_diff_exp`: sums and differences in log space
 
-`morphiq_numerics::log_space::{log_sum_exp, log_sum_exp_pairs, log_diff_exp}`
+`morphiq_numerics::log_space::{log_sum_exp, log_sum_exp_pairs,
+log_sum_exp_and_normalize, log_diff_exp}`
 (`crates/morphiq-numerics/src/log_space/`) follow this derivation step for
 step. They compute logarithms of sums and differences of exponentials without
 leaving log space. Zero mass is
@@ -84,6 +85,28 @@ each element inherits `log_sum_exp`'s table above and its bound. It exists so
 that the independent pairs of a two-state recursion's step can share SIMD
 lanes (decision 7). Its working storage is a few `[f64; N]` arrays on the
 stack, so `N` is meant to be small.
+
+### `log_sum_exp_and_normalize<const N: usize>(x: &[[f64; 2]; N]) -> [(f64, Option<[f64; 2]>); N]`
+
+For each pair `x`, this returns `log_sum_exp(&x)`, bit for bit, together
+with `x` divided by its own sum, relative to its larger entry:
+
+```text
+hi = 1 if x[1] > x[0], else 0;   lo = 1 − hi
+d = RN(x[lo] − x[hi]);   p[hi] = −RN(ln_1p(RN(exp(d))));   p[lo] = RN(d + p[hi])
+```
+
+The pair is `None` when `x[hi] = −∞`, which means no entry has mass.
+- **Finite entries.** Then `d ≤ 0`, `ln_1p(e^d) ≥ 0` and `p[lo] ≤ p[hi] ≤ 0`,
+  so neither entry is positive.
+- **`x[lo] = −∞`** gives `p[hi] = −0` and `p[lo] = −∞`.
+- **A NaN entry** gives NaN entries, with an unspecified payload.
+
+This record makes no error claim for the pair beyond those operations, each
+of which is correctly rounded except `ln_1p` ([ln.md](ln.md)). A two-state
+recursion needs both values at every step: the conditional likelihood and the
+filtered probabilities. Computing them together shares one exponential, and
+lets their two logarithms share lanes (decision 8).
 
 ### `log_diff_exp(a: f64, b: f64) -> f64`
 
@@ -199,6 +222,24 @@ changes:
   returns `m`, as `log_sum_exp` does. A pair decided by step 1 (a NaN, `+∞`
   or no finite element) keeps step 1's result, and its lane values are
   discarded.
+
+**Decision 8: one exponential for a log-sum and its normalized pair.** For
+a pair, `log_sum_exp`'s reduction is `(dh, dl) = two_sum(x[lo], −x[hi])`
+whenever step 1 finds a finite maximum. In that case its `j` is `hi`: both
+pick the second entry only when it is strictly larger. `two_sum`'s leading
+word is `RN(x[lo] + (−x[hi]))`, which IEEE 754 defines as `RN(x[lo] − x[hi])`.
+That is the normalization's `d`, bit for bit. So `exp(dh)` is `exp(d)` and
+is evaluated once.
+- **Zero mass.** When `x[lo] = −∞`, `d = −∞`, so `exp(d) = +0` and the term
+  is skipped (decision 3). That is the same `t̂ = 0` that step 2's skip of a
+  `−∞` element gives.
+- **The two logarithms,** `ln_1p(t̂)` and `ln_1p(e^d)`, are independent. The
+  function passes every pair's two arguments to one `ln_1p_slice` call, and
+  every pair's `d` to one `exp_slice` call.
+- **Without `simd`** those calls loop the scalar functions. The shared
+  exponential still saves one `exp` per pair.
+- **Where step 1 decides the log-sum** (a NaN, `+∞`, or no finite entry), the
+  log-sum is step 1's result. The pair still follows the formula above.
 
 Without the `simd` feature `log_sum_exp` loops `exp` term by term and
 `log_sum_exp_pairs` calls `log_sum_exp` on each pair.
@@ -347,6 +388,9 @@ These implement the requirements recorded on #44:
   the `simd` feature the `N` exponentials and the `N` logarithms each run in
   lanes. No allocation; its arrays are on the stack. `log_sum_exp`'s
   chunks are too, three arrays of 32.
+- **`log_sum_exp_and_normalize`:** per pair, one `two_sum`, one `exp`, two
+  `ln_1p` and a few exact operations, against two `exp` and two `ln_1p` for
+  `log_sum_exp` and a separate normalization. No allocation.
 - **`log_diff_exp`:** one `two_sum`, then one `expm1` and one `ln`
   (region A), or one `exp` and one `ln_1p` (region B). Constant time.
 
@@ -423,7 +467,7 @@ No x86-64 host was timed, so the gain there is inferred, not measured.
 3. **Bound arithmetic.** `generators/log_space_bounds.py --check` verifies the
    composed bounds of §4 and §6 in exact rational arithmetic. It runs with
    the generators (`scripts/check_generators.sh`).
-4. **Determinism.** All three functions are in the determinism digest
+4. **Determinism.** All four functions are in the determinism digest
    ([determinism.md](determinism.md)), which every CI target computes with
    and without the `simd` feature. Its `log_sum_exp` section includes slices
    of 9 to 100 elements, so terms fill and cross the chunks of decision 7.
@@ -437,6 +481,11 @@ No x86-64 host was timed, so the gain there is inferred, not measured.
    - `log_sum_exp_pairs` equals `log_sum_exp` on each pair, bit for bit, in
      batches of 1, 2, 3, 8 and 17: every pairing of twelve special values,
      the fixture's pairs, and 40,000 random pairs.
+
+   - `log_sum_exp_and_normalize` equals `log_sum_exp` and the stated
+     normalization, written out with one scalar `exp` and `ln_1p` each, on
+     the same pairs and batch sizes. Entries are compared bit for bit,
+     except that a NaN entry need only be NaN.
 
    Sum2's result rarely depends on the order of its summands: reversing each
    chunk changed no result on 240,000 random slices. So these tests cannot
