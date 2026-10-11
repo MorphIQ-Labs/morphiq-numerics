@@ -21,7 +21,7 @@ for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig
   sha256sum --check --quiet "$dir/binding.sha256"
   # A function with its own polynomial replays its Sollya script.
   if [ -f "generators/${f}_poly.sollya" ]; then
-    sollya "generators/${f}_poly.sollya" | grep -E '^([sc][0-9]+|[a-z_]*error_bound|[a-z_]*remainder_bound) ' \
+    sollya "generators/${f}_poly.sollya" | grep -E '^([a-z]+[0-9]+|[a-z_]*error_bound|[a-z_]*remainder_bound) ' \
       | diff -u "generators/${f}_poly.out" -
     echo "replayed: generators/${f}_poly.sollya"
   fi
