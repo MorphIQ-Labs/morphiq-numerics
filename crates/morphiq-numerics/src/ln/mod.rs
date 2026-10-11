@@ -86,8 +86,7 @@ pub fn ln_1p(x: f64) -> f64 {
         if let Some(y) = decide(ln_1p_double_word(DoubleWord::from_f64(x))) {
             return y;
         }
-        let z = Q128::from_f64(x);
-        return z.mul(series(z)).to_f64();
+        return small_accurate(x).to_f64();
     }
     let (h, l) = split(x);
     let reduced = Reduced::of(h);
@@ -97,8 +96,15 @@ pub fn ln_1p(x: f64) -> f64 {
     reduced.accurate_value(reduced.z_prime(l)).to_f64()
 }
 
+/// `ln_1p`'s accurate value for `|x| < 2^−7`: `z = x` exactly, then `z·G_1`
+/// (§6, §7).
+pub(crate) fn small_accurate(x: f64) -> Q128 {
+    let z = Q128::from_f64(x);
+    z.mul(series(z))
+}
+
 /// `1 + x = h + l` exactly, `|l| ≤ 2^−53·(1 + 2u)·|h|`, for `x ≥ −1` (§7).
-fn split(x: f64) -> (f64, f64) {
+pub(crate) fn split(x: f64) -> (f64, f64) {
     if x < TWO_53 {
         two_sum(1.0, x)
     } else {
@@ -208,7 +214,7 @@ impl Reduced {
 
     /// `ln_1p`'s `z' = (y·R[i] − 1) + R[i]·l·2^−E` (§7): the second term an
     /// exact `Q128` product, the sum one `Q128` addition.
-    fn z_prime(&self, l: f64) -> Q128 {
+    pub(crate) fn z_prime(&self, l: f64) -> Q128 {
         let low = Q128::from_f64(self.r)
             .mul(Q128::from_f64(l))
             .mul_pow2(-self.e);

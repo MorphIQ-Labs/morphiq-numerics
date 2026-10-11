@@ -1,6 +1,6 @@
 (* Runs the extracted Q128 and Q256 transcriptions, rounding tests, exp's
    stages, exp's fallback reduction, fast value, accurate path and
-   small-argument path, and ln's reduction
+   small-argument path, ln's reduction and ln's and ln_1p's accurate values
    (InternalCrosscheck.v) on the internal cross-check corpus and compares each result
    with the Rust library's.
 
@@ -117,6 +117,12 @@ let compute op args =
              (string_of_int (int_of_z e) :: string_of_int (int_of_z i)
               :: List.map show_bits words @ [show (n, ex, l)])
        | _ -> failwith "ln_reduce takes one word")
+  | "ln_accurate" | "ln_1p_accurate" ->
+      (match args with
+       | [x] ->
+           let f = if op = "ln_accurate" then x_ln_accurate else x_ln_1p_accurate in
+           let ((n, e), l) = f (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith (op ^ " takes one word"))
   | "fast" ->
       (match args with
        | [rh; rl; j] ->
