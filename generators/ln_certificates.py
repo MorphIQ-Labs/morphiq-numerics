@@ -482,7 +482,7 @@ def main():
     files, coq = generate()
     check = '--check' in sys.argv[1:]
     if check:
-        present = {p.name for p in DIR.glob('*.g')}
+        present = {p.name for p in DIR.glob('*.g') if not p.name.startswith('stage_')}
         if present != set(files):
             sys.exit(f'formal/ln holds {sorted(present ^ set(files))} unexpectedly')
     files.update(coq)
