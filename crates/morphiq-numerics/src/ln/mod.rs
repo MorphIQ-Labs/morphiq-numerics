@@ -6,6 +6,8 @@
 
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;
+mod stage_tables;
+pub(crate) mod stages;
 mod tables;
 
 use crate::double_word::DoubleWord;
@@ -58,13 +60,38 @@ pub fn ln(x: f64) -> f64 {
     reduced.accurate_value(reduced.z_exact()).to_f64()
 }
 
-/// `ln(1 + x)`, without rounding `1 + x`: correctly rounded whenever the
+/// `ln(1 + x)`, without rounding `1 + x`: correctly rounded whenever a
 /// rounding test decides it, and otherwise within `(1/2 + 2^−70)` ulp (§7).
 ///
 /// `ln_1p(−1) = −∞`, `ln_1p(+∞) = +∞` and `ln_1p(±0) = ±0`; a NaN, `x < −1`
 /// and `−∞` give NaN.
 #[must_use]
 pub fn ln_1p(x: f64) -> f64 {
+    if stages::stage_h_screen(x)
+        && let Some(y) = stages::stage_h(x)
+    {
+        return y;
+    }
+    ln_1p_after_h(x)
+}
+
+/// `ln_1p` past stage H: stage B, then [`ln_1p_reference`] (§7).
+#[inline(never)]
+pub(crate) fn ln_1p_after_h(x: f64) -> f64 {
+    if stages::stage_b_screen(x)
+        && let Some(y) = stages::stage_b(x)
+    {
+        return y;
+    }
+    ln_1p_reference(x)
+}
+
+/// `ln_1p`'s fallback (§7): the double-word fast path and its rounding test,
+/// then the `Q128` accurate path, for every argument stages H and B don't
+/// decide, specials included.
+#[cold]
+#[inline(never)]
+pub(crate) fn ln_1p_reference(x: f64) -> f64 {
     if x.is_nan() {
         return x;
     }
