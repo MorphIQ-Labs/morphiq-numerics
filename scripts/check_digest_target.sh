@@ -4,7 +4,8 @@
 #   wasm32-wasip1                                         under wasmtime (install_wasmtime.sh);
 #   thumbv7em-none-eabihf                                 bare metal, on QEMU's mps2-an386
 #                                                         (Cortex-M4F), digest only.
-# The digest must equal crates/reference/determinism.sha256 there too.
+# The digest must equal crates/reference/determinism.sha256 there too, and on
+# musl with the `simd` feature as well as without it.
 set -eu
 cd "$(dirname "$0")/.."
 target=${1:?usage: check_digest_target.sh TARGET}
@@ -27,4 +28,9 @@ case "$target" in
 esac
 rustup target add "$target" >/dev/null
 cargo test --locked -p morphiq-numerics-reference --target "$target"
+# Again with the batched functions in SIMD lanes (docs/lanes.md): the digest
+# must not change. On wasm only the scalar backend exists, so once suffices.
+case "$target" in
+  *-linux-musl) cargo test --locked -p morphiq-numerics-reference --features simd,std --target "$target" ;;
+esac
 echo "digest on $target: OK"

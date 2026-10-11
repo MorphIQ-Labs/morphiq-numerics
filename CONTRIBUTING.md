@@ -37,6 +37,7 @@ cargo test --workspace --all-features --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps --locked
 rustup target add thumbv7em-none-eabihf
 cargo build -p morphiq-numerics --locked --target thumbv7em-none-eabihf
+cargo build -p morphiq-numerics --locked --target thumbv7em-none-eabihf --features simd
 cargo install --locked cargo-audit --version "$(cat .cargo/audit-version)"
 ./scripts/check_advisories.sh
 cargo install --locked cargo-deny --version "$(cat .cargo/deny-version)"
