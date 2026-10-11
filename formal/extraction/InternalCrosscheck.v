@@ -1,7 +1,9 @@
 (** The proved Q128 and Q256 transcriptions (formal/q), rounding tests
-    (formal/binary64/RoundingTest.v), exp's reduction, fast value, accurate path
-    and small-argument path (formal/exp/ExpReduction.v, ExpFast.v, ExpAccurate.v,
-    ExpSmall.v), and ln's reduction (formal/ln/LnReduction.v), extracted to OCaml
+    (formal/binary64/RoundingTest.v), exp's stages (formal/exp/ExpStageReduction.v,
+    ExpStageA.v, ExpStageB.v, with formal/binary64/RoundingConstant.v), exp's
+    fallback reduction, fast value, accurate path and small-argument path
+    (formal/exp/ExpReduction.v, ExpFast.v, ExpAccurate.v, ExpSmall.v), and ln's
+    reduction (formal/ln/LnReduction.v), extracted to OCaml
     so formal/extraction/internaldriver.ml can run them on the internal
     cross-check corpus and compare with the Rust code bit for bit. A value
     travels as its sign, its exponent and its significand's 64-bit limbs, least
@@ -11,7 +13,7 @@ From Coq Require Import ZArith List Extraction ExtrOcamlBasic.
 From Flocq Require Import IEEE754.Binary IEEE754.Bits.
 From Q Require Import Limbs Digits64 Q128 Q256.
 From Binary64 Require Import IEEE64 RoundingTest.
-Require ExpReduction ExpFast ExpAccurate ExpSmall LnReduction.
+Require ExpReduction ExpFast ExpAccurate ExpSmall LnReduction ExpStageReduction ExpStageA ExpStageB.
 Import ListNotations.
 
 Definition limbs (k : nat) (x : Z) : list Z := map (fun i => dig x (Z.of_nat i)) (seq 0 k).
@@ -35,6 +37,16 @@ Definition x_q256_from_limbs n e l := q256_out (Q256.from_limbs n l e).
 Definition opt_bits (o : option f64) : option Z := match o with Some v => Some (bits_of_b64 v) | None => None end.
 Definition x_decide_with hi lo eps := opt_bits (decide_with (b64_of_bits hi) (b64_of_bits lo) (b64_of_bits eps)).
 Definition x_decide_scaled hi lo eps k := opt_bits (decide_scaled (b64_of_bits hi) (b64_of_bits lo) (b64_of_bits eps) k).
+
+(** exp's stages: [Stages::of]'s [n], [r1], [j] and [k]; stage A's and stage
+    B's values and their tests' outcomes. *)
+Definition x_stage x :=
+  let xb := b64_of_bits x in
+  let '(n, j, k, r1) := ExpStageReduction.stage_of xb in
+  let '(ya, la) := ExpStageA.stage_a_value n r1 (Z.to_nat j) in
+  let '(yb, lb) := ExpStageB.stage_b_value n r1 (Z.to_nat j) in
+  (map bits_of_b64 [n; r1], j, k, map bits_of_b64 [ya; la], opt_bits (ExpStageA.stage_a xb),
+   map bits_of_b64 [yb; lb], opt_bits (ExpStageB.stage_b xb)).
 
 (** exp's reduction (ExpReduction.v): [n], [r1], [p2], [e2], [r_hi], [r_lo]. *)
 Definition x_reduce x :=
@@ -64,5 +76,5 @@ Definition x_ln_reduce x :=
   let '(zh, zl) := LnReduction.reduce_z y r in
   (e, Z.of_nat i, map bits_of_b64 [y; r; zh; zl], q128_out (LnReduction.z_exact y r)).
 
-Extraction "internalcrosscheck.ml" x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
+Extraction "internalcrosscheck.ml" x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
   x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs.
