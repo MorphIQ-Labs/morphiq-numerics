@@ -12,6 +12,12 @@ publish = false
 [lints]
 workspace = true
 
+[features]
+# Run the suite, the determinism digest included, with the library's batched
+# functions in SIMD lanes (and runtime detection): the digest must not change.
+simd = ["morphiq-numerics/simd"]
+std = ["morphiq-numerics/std"]
+
 [dependencies]
 morphiq-numerics = { path = "../morphiq-numerics" }
 morphiq-numerics-digest = { path = "../digest" }

@@ -62,21 +62,41 @@ jobs:
             printf 'Generated or ignored files are tracked:\n%s\n' "$tracked_ignored" >&2
             exit 1
           fi
-      - name: The library crate ships the root license texts, unchanged
+      - name: The published crates ship the root license texts, unchanged
         # crates.io packages each crate alone, so the license texts are copied
         # into the crate directory; this keeps the copies identical.
         run: |
-          for license in LICENSE-MIT LICENSE-APACHE; do
-            cmp "$license" "crates/morphiq-numerics/$license"
+          for crate in morphiq-numerics morphiq-numerics-arch; do
+            for license in LICENSE-MIT LICENSE-APACHE; do
+              cmp "$license" "crates/$crate/$license"
+            done
           done
-      - name: The library takes no dependencies
+      - name: The library depends only on the first-party arch crate, optionally
         # Target independence and clean provenance rest on the library being
-        # self-contained; a dependency needs a decision recorded in AGENTS.md.
+        # self-contained; its one dependency is the optional first-party lane
+        # crate, which itself takes none. Any other needs a decision recorded
+        # in AGENTS.md.
         run: |
-          if awk '/^\[(build-|dev-)?dependencies/{f=1;next} /^\[/{f=0} f && NF && !/^#/' crates/morphiq-numerics/Cargo.toml | grep -q .; then
-            echo 'crates/morphiq-numerics declares a dependency' >&2
+          deps() { awk '/^\[(build-|dev-)?dependencies/{f=1;next} /^\[/{f=0} f && NF && !/^#/' "$1"; }
+          allowed='morphiq-numerics-arch = { path = "../morphiq-numerics-arch", version = "0.0.0", optional = true }'
+          if [ "$(deps crates/morphiq-numerics/Cargo.toml)" != "$allowed" ]; then
+            echo 'crates/morphiq-numerics declares a dependency other than the optional arch crate:' >&2
+            deps crates/morphiq-numerics/Cargo.toml >&2
             exit 1
           fi
+          if deps crates/morphiq-numerics-arch/Cargo.toml | grep -q .; then
+            echo 'crates/morphiq-numerics-arch declares a dependency' >&2
+            exit 1
+          fi
+      - name: Only the arch crate may contain unsafe code
+        # Every other crate inherits the workspace's unsafe_code = "forbid";
+        # the arch crate's own lint table is the one exception (docs/arch.md).
+        run: |
+          for manifest in crates/*/Cargo.toml; do
+            case "$manifest" in crates/morphiq-numerics-arch/*) continue ;; esac
+            grep -q '^workspace = true' "$manifest" || { echo "$manifest does not inherit the workspace lints" >&2; exit 1; }
+          done
+          grep -q '^unsafe_code = "forbid"' Cargo.toml
 
   secret-scan:
     name: check / secret-scan
@@ -173,6 +193,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: cargo build --locked -p morphiq-numerics --target thumbv7em-none-eabihf
       - run: cargo build --locked -p morphiq-numerics --target wasm32-unknown-unknown
+      # With simd, these targets have only the scalar backend: it must build.
+      - run: cargo build --locked -p morphiq-numerics --features simd --target thumbv7em-none-eabihf
+      - run: cargo build --locked -p morphiq-numerics --features simd --target wasm32-unknown-unknown
 
   test:
     name: test (${{ matrix.os }})
@@ -182,8 +205,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
+        include:
+          # The lane backends each host must have (docs/lanes.md §6): the lane
+          # tests fail if one is absent, so the job states what it exercised.
+          - { os: ubuntu-24.04, backends: "avx2,sse2,scalar" }
+          - { os: ubuntu-24.04-arm, backends: "neon,scalar" }
+          - { os: macos-15, backends: "neon,scalar" }
+          - { os: windows-2025, backends: "avx2,sse2,scalar" }
     runs-on: ${{ matrix.os }}
+    env:
+      MORPHIQ_REQUIRE_BACKENDS: ${{ matrix.backends }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -217,6 +248,25 @@ jobs:
         if: matrix.target == 'thumbv7em-none-eabihf'
         run: sudo apt-get install --yes --no-install-recommends qemu-system-arm
       - run: ./scripts/check_digest_target.sh ${{ matrix.target }}
+
+  # The AVX-512F lane backend, which the hosted runners may lack, under
+  # Intel's Software Development Emulator, pinned by version and SHA-256
+  # (.cargo/sde-version, .cargo/sde-sha256); gate logic in scripts/.
+  simd-avx512:
+    name: simd (avx512, sde)
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: simd-avx512
+      - name: Pinned Intel SDE
+        run: |
+          ./scripts/install_sde.sh "$RUNNER_TEMP/sde"
+          echo "$RUNNER_TEMP/sde" >> "$GITHUB_PATH"
+      - run: ./scripts/check_lanes_sde.sh
 
   # Machine-checked proofs, bound to the source they describe: the double-word
   # error bounds and two_prod's exactness (docs/double-word.md). The Coq image

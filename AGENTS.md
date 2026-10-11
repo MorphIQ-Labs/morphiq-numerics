@@ -10,12 +10,14 @@ This file is the repository's engineering contract for human and agent contribut
 
 The library's public API is what `crates/morphiq-numerics/src/lib.rs` lists, and each function's contract and derivation is a document in `docs/`; documentation must not describe functions that are not in the source tree.
 
-- `crates/morphiq-numerics` is the published library. It is `#![no_std]`, has no dependencies, forbids `unsafe`, and never calls a platform math library. A `std` feature, if one is ever added, may only add conveniences, never a different numerical result.
+- `crates/morphiq-numerics` is the published library. It is `#![no_std]`, forbids `unsafe`, and never calls a platform math library. Its one dependency is `morphiq-numerics-arch`, first-party, optional and behind the `simd` feature. Its `std` feature turns on runtime CPU detection for `simd`; like any feature, it may change speed or add conveniences, never a numerical result.
+- `crates/morphiq-numerics-arch` holds the SIMD lane intrinsics behind a safe, token-gated API ([arch.md](docs/arch.md)). It is `no_std`, takes no dependencies, and is the only crate allowed `unsafe` code: every `unsafe` block carries its `SAFETY:` proof, which Clippy enforces.
 - Test oracles (MPFR, mpmath), generators, proofs and fuzzing live outside the published crate and are never its dependencies.
 - Consumers take pinned releases. A defect found by a consumer is fixed here and consumed back at a released version.
 
 ```text
-crates/morphiq-numerics/   the published library: no_std, no dependencies
+crates/morphiq-numerics/   the published library: no_std, forbids unsafe; optionally depends on the arch crate
+crates/morphiq-numerics-arch/  safe SIMD lanes (NEON, SSE2, AVX2+FMA, AVX-512F): the only unsafe code, no dependencies
 crates/reference/          reference tests against the fixtures, and the cross-check corpus writer (unpublished)
 crates/digest/             the determinism digest, and digest-embedded for the no_std target
 generators/                Sollya and mpmath generators for constants, certificates and fixtures
@@ -27,7 +29,7 @@ scripts/                   gate logic that CI and contributors run identically
 ## Design Constraints
 
 - **Correct rounding is the contract.** For every finite argument in its domain, a function returns the binary64 value nearest the exact result, ties to even, with IEEE 754-2019 §9.2 special-value semantics. A function is claimed correctly rounded only over a domain where its accurate path is proved sufficient against the published worst cases; anywhere else its proved bound is stated instead. Never claim more than the artifacts establish.
-- **Target independence is enforced, not assumed.** No platform libm (the crate is `no_std`; Clippy's `disallowed-methods` denies the `std` transcendentals in every target, tests included). No implicit contraction. Error-free transforms are exact with or without FMA. A vectorized path performs the scalar operation sequence per lane and returns the scalar result bit for bit. The determinism digest proves this on every supported target.
+- **Target independence is enforced, not assumed.** No platform libm (the crate is `no_std`; Clippy's `disallowed-methods` denies the `std` transcendentals in every target, tests included). No implicit contraction. Error-free transforms are exact with or without FMA; a lane kernel uses a fused multiply-add only for `two_prod`'s error term, only on a backend with hardware FMA, and only on `two_prod`'s proved domain, where it gives Dekker's bits ([lanes.md](docs/lanes.md) §2). A vectorized path performs the scalar operation sequence per lane and returns the scalar result bit for bit. The determinism digest proves this on every supported target.
 - **Provenance is clean.** Everything here can ship under MIT OR Apache-2.0 and lives in this repository. Algorithms come from published mathematics or from vendored code under a compatible license, recorded with its notices; every generated coefficient and constant comes from a versioned generator. No copyleft or unclear-license code, and an agent is never given such source ([PROVENANCE.md](docs/PROVENANCE.md), [AI-assisted contributions](docs/PROVENANCE.md#ai-assisted-contributions)).
 - **Expected values come from outside the implementation.** Test oracles are MPFR, mpmath and published worst-case data, never a rearrangement of the function under test and never a tolerance wide enough to accept a wrong rounding. For a correctly rounded function the assertion is bit equality.
 - **Performance is designed.** Each function's fast path is chosen for its operation count and branch behaviour; the accurate path's rate is measured and reported. Performance claims are local same-host measurements, never CI timing.
@@ -62,6 +64,8 @@ cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-features --locked
 cargo doc --workspace --all-features --no-deps --locked      # RUSTDOCFLAGS="-D warnings"
 cargo build -p morphiq-numerics --locked --target thumbv7em-none-eabihf   # no_std
+cargo build -p morphiq-numerics --locked --target thumbv7em-none-eabihf --features simd
+./scripts/check_lanes_sde.sh       # AVX-512F lanes under Intel SDE (scripts/install_sde.sh), x86-64 Linux
 ./scripts/check_advisories.sh
 ./scripts/check_generators.sh
 cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
@@ -76,7 +80,7 @@ Gate logic lives in `scripts/` and tool pins in `.cargo/*-version`, never only i
 
 ## Security, Safety, and Dependencies
 
-`unsafe` is forbidden in the library. The library takes no dependencies; a proposal to add one needs a written justification against this file. Test and tooling dependencies are declared in `[workspace.dependencies]`, checked by `cargo-deny` for licenses and RustSec advisories, and kept out of the published crate. Third-party GitHub Actions are pinned to full commit SHAs. Never commit secrets.
+`unsafe` is forbidden in every crate but `morphiq-numerics-arch`, whose lint table is the workspace's one exception: the `core::arch` intrinsics are `unsafe` without a proof that the CPU has them, and that crate makes the proof, a detection token per backend, behind a safe API ([arch.md](docs/arch.md)). Exit condition: none while the intrinsics are `unsafe`. The library takes no third-party dependencies; its one dependency is that first-party crate, optional behind `simd`, which itself takes none. A proposal to add any other needs a written justification against this file. Test and tooling dependencies are declared in `[workspace.dependencies]`, checked by `cargo-deny` for licenses and RustSec advisories, and kept out of the published crate. Third-party GitHub Actions are pinned to full commit SHAs. Never commit secrets.
 
 ## Coding Style and Testing
 

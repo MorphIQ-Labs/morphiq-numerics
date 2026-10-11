@@ -16,4 +16,18 @@ publish = false
 [lints]
 workspace = true
 
+[features]
+# Evaluates the batched entry points (`elementary::exp_slice` and its
+# siblings) in SIMD lanes. Every lane returns the scalar function's bits, so
+# the feature changes speed, never a result (docs/lanes.md).
+simd = ["dep:morphiq-numerics-arch"]
+# Runtime CPU feature detection for `simd`; without it a backend is used only
+# when the target enables its features at compile time. Changes speed, never
+# a result. The library itself stays `no_std`.
+std = ["morphiq-numerics-arch?/std"]
+
+# The one dependency: the first-party lane crate, optional and behind `simd`
+# (AGENTS.md, "Security, Safety, and Dependencies"). It holds the workspace's
+# only `unsafe` code, so this crate keeps `forbid(unsafe_code)`.
 [dependencies]
+morphiq-numerics-arch = { path = "../morphiq-numerics-arch", version = "0.0.0", optional = true }

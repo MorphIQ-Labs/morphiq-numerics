@@ -1,0 +1,36 @@
+[package]
+name = "morphiq-numerics-arch"
+description = "Safe binary64 SIMD lanes for morphiq-numerics: NEON, SSE2, AVX2+FMA and AVX-512F behind detection tokens. The workspace's only unsafe code."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["simd", "no-std"]
+categories = ["hardware-support", "no-std", "no-std::no-alloc"]
+# Published with morphiq-numerics, which depends on it behind its `simd` feature.
+publish = false
+
+[features]
+# Runtime CPU feature detection (`std::arch::is_*_feature_detected!`). Without
+# it a backend is available only when the target enables its features at
+# compile time. It selects among backends; every backend returns the same
+# results, so it changes speed, never a result.
+std = []
+
+# The workspace forbids `unsafe_code`; this crate is the one exception, because
+# `core::arch` intrinsics are `unsafe` to call without a proof that the CPU has
+# the feature. Every `unsafe` block states that proof in a `SAFETY:` comment
+# (enforced by `clippy::undocumented_unsafe_blocks`), and every public item is
+# safe (docs/arch.md). Exit condition: none while the intrinsics are unsafe.
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+disallowed_methods = "deny"
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+
+[dependencies]

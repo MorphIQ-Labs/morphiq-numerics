@@ -12,7 +12,8 @@
 use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::elementary::{
-    cos, exp, exp2, expm1, ln, ln_1p, log2, log10, sin, sincos, sqrt, tan,
+    cos, exp, exp_slice, exp2, expm1, ln, ln_1p, ln_1p_slice, ln_slice, log2, log10, sin, sincos,
+    sqrt, tan,
 };
 use morphiq_numerics::log_space::{log_diff_exp, log_sum_exp};
 use morphiq_numerics::normal::log_norm_pdf;
@@ -686,7 +687,96 @@ pub fn corpus_digest() -> [u8; 32] {
         r.f64(log_norm_pdf(16.0 * unit - 8.0));
     }
 
+    // The batched entry points, on slices of every length up to 17 so every
+    // lane count and remainder occurs; with the `simd` feature they run in
+    // lanes and must give the same bits.
+    r.label("exp_slice");
+    let exp_edges = [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        0x4086_2e42_fefa_39ef,
+        0x4086_2e42_fefa_39f0,
+        0xc087_4910_d52d_3052,
+        0xc087_4910_d52d_3051,
+        0x3ca0_0000_0000_0000,
+        0x3c9f_ffff_ffff_ffff,
+        0xbc90_0000_0000_0000,
+        0xbc90_0000_0000_0001,
+    ];
+    batched_section(&mut r, &mut words, exp_slice, &exp_edges, (-746.0, 710.0));
+    r.label("ln_slice");
+    let ln_edges = [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0,
+        1 << 63,
+        0xbff0_0000_0000_0000,
+        1,
+        0x3ff0_0000_0000_0000,
+        0x3ff0_0000_0000_0001,
+        0x3fef_ffff_ffff_ffff,
+    ];
+    batched_section(&mut r, &mut words, ln_slice, &ln_edges, (0.0, 4.0));
+    r.label("ln_1p_slice");
+    let ln_1p_edges = [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0,
+        1 << 63,
+        0xbff0_0000_0000_0000,
+        0xbfef_ffff_ffff_ffff,
+        0x3c90_0000_0000_0000,
+        0x3c8f_ffff_ffff_ffff,
+        0x3f80_0000_0000_0000,
+        0xbf80_0000_0000_0000,
+        0x4340_0000_0000_0000,
+        0x433f_ffff_ffff_ffff,
+    ];
+    batched_section(&mut r, &mut words, ln_1p_slice, &ln_1p_edges, (-1.0, 9.0));
+
     r.0.finalize().into()
+}
+
+/// The batched sections' inputs: special values and branch edges, random
+/// encodings, and arguments across `low..high`, in turn.
+fn batched_input(words: &mut Words, edges: &[u64], i: usize, low: f64, high: f64) -> f64 {
+    match i % 4 {
+        0 => f64::from_bits(edges[(i / 4) % edges.len()]),
+        1 => f64::from_bits(words.next_word()),
+        _ => {
+            #[allow(clippy::cast_precision_loss)] // a 53-bit integer
+            let unit = (words.next_word() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+            low + (high - low) * unit
+        }
+    }
+}
+
+/// One batched function on 1,000 slices of each length from 1 to 17: every
+/// output of `batched`, in order.
+fn batched_section(
+    r: &mut Recorder,
+    words: &mut Words,
+    batched: fn(&[f64], &mut [f64]),
+    edges: &[u64],
+    (low, high): (f64, f64),
+) {
+    let (mut x, mut out) = ([0.0; 17], [0.0; 17]);
+    let mut i = 0;
+    for _ in 0..1_000 {
+        for len in 1..=17 {
+            for v in &mut x[..len] {
+                *v = batched_input(words, edges, i, low, high);
+                i += 1;
+            }
+            batched(&x[..len], &mut out[..len]);
+            for &y in &out[..len] {
+                r.f64(y);
+            }
+        }
+    }
 }
 
 /// The digest as lowercase hex, written into `out`.

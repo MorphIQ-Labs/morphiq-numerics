@@ -33,14 +33,18 @@ functions unnoticed.
 | `log_sum_exp` | the special values and zero-mass cases of [log_space.md](log_space.md) §1, overflow and `±max` pairs; 1,000 slices of each length from 1 to 8, gaps below their maximum from `2^−40` to `2^11`; 4,000 pairs with exponents in `[−1022, 1023]` | `log_sum_exp` |
 | `log_diff_exp` | the special values of [log_space.md](log_space.md) §1, the region boundary `T`, underflow and overflow; 10,000 pairs with gaps from `2^−60` to `2^12`; 4,000 ordered pairs with exponents in `[−1022, 1023]` | `log_diff_exp` |
 | `log_norm_pdf` | NaN, ±∞, ±0, the least subnormal, each regime boundary of [log_norm_pdf.md](log_norm_pdf.md) §1 (`2^−27`, `2^500`, `2^512`, `2^513`), the overflow threshold and its successor, all with both signs, and a regime-L tie; 20,000 arguments with exponents in `[−40, 512]`; 10,000 in `[−8, 8)` | `log_norm_pdf` |
+| `exp_slice`, `ln_slice`, `ln_1p_slice` | 1,000 slices of each length from 1 to 17, each element in turn a special value or branch edge of the function, a random encoding, or an argument in `[−746, 710)`, `[0, 4)` or `[−1, 9)` respectively | every element of each output slice |
 
 ## Where it is checked
 
 The test `every_output_matches_the_committed_digest` runs:
 - in the `test` job on x86-64 Linux, aarch64 Linux, aarch64 macOS and x86-64
-  Windows;
+  Windows, with every feature, so the batched functions run in SIMD lanes
+  (AVX2 or wider, NEON; [lanes.md](lanes.md));
+- in the `simd (avx512, sde)` job, in AVX-512F lanes under Intel's emulator;
 - in the `digest` job:
-  - on x86-64 Linux with musl (`x86_64-unknown-linux-musl`);
+  - on x86-64 Linux with musl (`x86_64-unknown-linux-musl`), without and with
+    the `simd` feature;
   - on WebAssembly (`wasm32-wasip1`, under the wasmtime pinned in
     `.cargo/wasmtime-version` and checked against `.cargo/wasmtime-sha256`);
   - on bare metal (`thumbv7em-none-eabihf`), from reset on QEMU's `mps2-an386`

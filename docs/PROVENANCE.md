@@ -88,7 +88,9 @@ No third-party code is vendored yet, so `THIRD_PARTY_NOTICES.md` doesn't exist.
 The first vendored source adds it, and the repository-hygiene gate's license
 check extends to it then.
 
-Published dependencies of the library crate: none. The test and tooling crates'
+Published dependencies of the library crate: `morphiq-numerics-arch`, this
+repository's own crate under the same license, optional behind `simd`; it has
+none of its own. The test and tooling crates'
 licenses are checked by `cargo-deny` against the allowlist in `deny.toml`. MPFR
 (LGPL) is a test-only oracle in an unpublished crate and is never distributed
 with the library.

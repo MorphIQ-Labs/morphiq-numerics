@@ -8,7 +8,9 @@
 //!   relative error bounds;
 //! - [`elementary`]: correctly rounded `exp`, `expm1`, `exp2`, `ln`, `ln_1p`,
 //!   `log2`, `log10`, `sin`, `cos`, `sincos`, `tan` and `sqrt`, each with its
-//!   stated domain of correct rounding;
+//!   stated domain of correct rounding, and `exp_slice`, `ln_slice` and
+//!   `ln_1p_slice`, which return the same bits for a whole slice, in SIMD
+//!   lanes with the `simd` feature;
 //! - [`log_space`]: `log_sum_exp` and `log_diff_exp`, logarithms of sums and
 //!   differences of exponentials, within proved error bounds, with `−∞` as
 //!   exact zero mass;
@@ -20,10 +22,13 @@
 //!   with compensated variants as accurate as twice the working precision;
 //! - [`ulp`]: units in the last place, and distances measured in them.
 //!
-//! The crate is `no_std`, has no dependencies and never calls a platform
-//! math library, so its results are the same on every target.
+//! The crate is `no_std`, forbids `unsafe` and never calls a platform math
+//! library, so its results are the same on every target. Its one dependency,
+//! optional behind the `simd` feature, is the first-party
+//! `morphiq-numerics-arch`, which holds the lane intrinsics.
 
 #![no_std]
+#![forbid(unsafe_code)]
 
 #[cfg(test)]
 extern crate std;
@@ -36,6 +41,8 @@ mod exp2;
 mod expm1;
 #[cfg(test)]
 mod internal_crosscheck;
+#[cfg(feature = "simd")]
+mod lanes;
 mod ln;
 mod log2;
 mod log_norm_pdf;

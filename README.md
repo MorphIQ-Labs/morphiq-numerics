@@ -27,7 +27,10 @@ reference, returns the same bits.
   over the whole domain. Where that isn't yet proved, the proved bound is
   stated instead.
 - **Target-independent:**
-  - `no_std`, with no dependencies and no platform libm;
+  - `no_std`, with no third-party dependencies and no platform libm;
+  - batched functions that return the scalar functions' bits, in SIMD lanes
+    with the opt-in `simd` feature ([docs/lanes.md](docs/lanes.md)), whose only
+    `unsafe` code is the first-party `morphiq-numerics-arch` crate;
   - error-free transforms that are exact with or without FMA;
   - a determinism digest checked on every supported target
     ([docs/determinism.md](docs/determinism.md)).

@@ -123,7 +123,7 @@ fn unit(rng: &mut SplitMix64) -> f64 {
 
 /// An argument of `exp`'s reduction: anywhere in its domain, at a tie of
 /// `x/L` (where `n` turns), or tiny (`n = 0`, and `r1 = x`).
-fn reduction_argument(rng: &mut SplitMix64) -> f64 {
+pub(crate) fn reduction_argument(rng: &mut SplitMix64) -> f64 {
     /// `ln 2 / 128`, near enough to place a tie within `2^−40`.
     const L: f64 = core::f64::consts::LN_2 / 128.0;
     match rng.next_u64() % 3 {
