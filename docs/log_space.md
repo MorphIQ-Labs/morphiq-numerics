@@ -492,19 +492,19 @@ No x86-64 host was timed, so the gain there is inferred, not measured.
    detect an order change; decision 7's same order is a property of the code,
    which adds each chunk's terms in index order.
 6. **Mutation.** cargo-mutants 27.1.0 over `log_space/mod.rs`, run once with
-   the `simd` feature and once without (each run compiles only its own
-   `terms` and `log_sum_exp_pairs` path), generates 85 mutants. 82 are caught
-   by the run that compiles them. The other three are equivalent: each
-   changes only a choice this contract leaves free, so no test anchored
+   the `simd` feature and once without, generates 112 mutants. Each run
+   compiles only its own `terms` and `log_sum_exp_pairs` path. 109 are
+   caught by the run that compiles them. The other three are equivalent:
+   each changes only a choice this contract leaves free, so no test anchored
    outside the implementation can tell them apart.
-   - `v > m` against `v ≥ m` picks the first or the last index of a tied
-     maximum (decision 5). The other tied element contributes `e^0 = 1`
-     either way.
    - `dh > T` against `dh ≥ T` is the region boundary (decision 6), where
      both regions meet the bound.
    - Inverting the lane `terms`' test for slices of at most two elements
      only exchanges which of two evaluations runs, and both return the same
      bits (decision 7).
+   - `x[1] > x[0]` against `≥` in `log_sum_exp_and_normalize` changes `hi`
+     only for equal entries. There `d = 0` either way, and both entries are
+     `−ln_1p(1)`.
 
 ## 10. Out of scope here
 

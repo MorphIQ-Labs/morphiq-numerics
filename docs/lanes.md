@@ -204,6 +204,10 @@ Per lane, as `exp` and `Reduced::of` write them:
   offsets, and on 4,000 arguments of each function's corpus. On AVX-512F
   hosts that is all eight cascades of AVX-512F, AVX2 and SSE2. The
   `simd (avx512, sde)` job runs it.
+  The cascade's width tests and counters decide only which backend runs
+  which elements, and so speed, never bits. A mutant that skips a backend
+  or recomputes elements by the scalar function survives these tests by
+  design.
 - **The public functions** on the dispatched backend, for every length from 0
   to 17 and a long slice, and their length check.
 - **The error-free product** (§2).
