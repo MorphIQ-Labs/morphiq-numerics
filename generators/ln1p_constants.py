@@ -54,8 +54,8 @@ EL_BIAS = 64  # EL[k] holds E = k - 64
 # Bounds the derivation relies on; each is checked below and in Coq.
 T_ERR = Fraction(1, 2**97)  # |-ln R[i] - TH - TL|
 TL_MAX = Fraction(1, 2**44)  # |TL|
-TH_MAX = Fraction(347, 1000)  # |TH|
-S_MIN = Fraction(1, 2**11)  # |TH| - max |z| over the interval, where E = 0 and R[i] != 1
+TH_MAX = Fraction(711, 2048)  # |TH|
+S_MIN = Fraction(181, 2**18)  # |TH| - max |z| over the interval, where E = 0 and R[i] != 1
 L_ERR = Fraction(1, 2**101)  # |ln 2 - L1 - L0|
 L0_MAX = Fraction(1, 2**44)  # |L0|
 
@@ -226,9 +226,12 @@ def rust(d):
     return '\n'.join(lines) + '\n'
 
 
-def coq_frac(v):
+def coq_dy(v):
+    """A dyadic Fraction as Ln1pCheck's (m, e), value m 2^e."""
     v = Fraction(v)
-    return f'({v.numerator}%Z, {v.denominator}%Z)'
+    k = v.denominator.bit_length() - 1
+    assert v.denominator == 1 << k
+    return f'({v.numerator}%Z, (-{k})%Z)'
 
 
 def coq(d):
@@ -256,17 +259,16 @@ def coq(d):
         f'Definition st_h_bits : list Z := [{"; ".join(str(to_bits(c)) for c in d["h"])}].',
         f'Definition st_b_bits : list Z := [{"; ".join(str(to_bits(c)) for c in d["b"])}].',
         '',
-        '(** The bounds the generator checked, as [(numerator, denominator)]. *)',
-        f'Definition st_bounds : bounds := {{| b_t_err := {coq_frac(T_ERR)}; b_tl_max := {coq_frac(TL_MAX)};',
-        f'  b_th_max := {coq_frac(TH_MAX)}; b_s_min := {coq_frac(S_MIN)}; b_l_err := {coq_frac(L_ERR)};',
-        f'  b_l0_max := {coq_frac(L0_MAX)} |}}.',
+        '(** The bounds the generator checked, as [(m, e)] for [m·2^e]. *)',
+        f'Definition st_bounds : bounds := {{| b_t_err := {coq_dy(T_ERR)}; b_tl_max := {coq_dy(TL_MAX)};',
+        f'  b_th_max := {coq_dy(TH_MAX)}; b_s_min := {coq_dy(S_MIN)}; b_l_err := {coq_dy(L_ERR)};',
+        f'  b_l0_max := {coq_dy(L0_MAX)} |}}.',
         '',
-        'Theorem st_r_check : r_table_check st_r_bits = true.',
+        '(** The reciprocals and [-ln R[i]]: one check over the 512 intervals. *)',
+        'Theorem st_rt_check : rt_check st_bounds st_r_bits st_t_bits = true.',
         'Proof. vm_compute. reflexivity. Qed.',
         '',
-        'Theorem st_t_check : t_table_check st_bounds st_r_bits st_t_bits = true.',
-        'Proof. vm_compute. reflexivity. Qed.',
-        '',
+        '(** [ln 2 = L1 + L0] and stage H\'s [E·ln 2] table. *)',
         'Theorem st_l_check : l_check st_bounds st_l1_bits st_l0_bits st_el_bits = true.',
         'Proof. vm_compute. reflexivity. Qed.',
     ]
