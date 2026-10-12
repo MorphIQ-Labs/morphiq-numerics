@@ -15,7 +15,7 @@
 //! `ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v`, `ExpSmall.v`,
 //! `formal/ln/LnReduction.v`, `LnAccurate.v`, `Ln1pScreen.v`, `Ln1pStageH.v`
 //! and `Ln1pStageB.v`, `formal/exp/Exp2FallbackReduction.v` and
-//! `Exp2FallbackAccurate.v`, extracted by
+//! `Exp2FallbackAccurate.v`, `Exp2FallbackFast.v` and `Exp2.v`, extracted by
 //! `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
 //! identical results, which ties the proofs to this code.
 //!
@@ -519,6 +519,10 @@ fn internal_crosscheck_corpus() {
     // entry-screen boundaries, plus finite inputs outside the proved domain.
     let mut fallback_case = |x: f64| {
         let (j, k, d, q) = crate::exp2::crosscheck_fallback(x);
+        exp2_entry_line(&mut out, x);
+        if x > -1075.0 && x < 1024.0 {
+            exp2_fast_line(&mut out, x);
+        }
         writeln!(
             out,
             "exp2_fallback {:016x} : {j} {k} {:016x} {}",
@@ -558,6 +562,48 @@ fn internal_crosscheck_corpus() {
     for _ in 0..4000 {
         fallback_case(-1075.0 + 2099.0 * unit(&mut rng));
     }
+    // Whole entry: independent fixture inputs (including worst cases),
+    // arbitrary encodings (NaN payloads included), and small values spanning
+    // both ends of the interval that rounds to one.
+    // Read the generated flat x fields from both precise values and cases.
+    // Case descriptions can contain brackets, unlike the precise-only arrays
+    // accepted by test_exact::entries.
+    for case in include_str!("../../reference/fixtures/exp2.json")
+        .lines()
+        .filter(|line| line.trim_start().starts_with("\"x\":"))
+    {
+        exp2_entry_line(&mut out, crate::test_exact::word(case, "x"));
+    }
+    for _ in 0..4000 {
+        exp2_entry_line(&mut out, f64::from_bits(rng.next_u64()));
+        let x = (unit(&mut rng) - 0.5) * f64::from_bits((1023 - 50) << 52);
+        exp2_entry_line(&mut out, x);
+    }
+    for bits in [
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0x7ff0_0000_0000_0001,
+        0xfff0_0000_0000_0001,
+        0x7ff8_0000_0000_0042,
+        0xfff8_0000_0000_0042,
+    ] {
+        exp2_entry_line(&mut out, f64::from_bits(bits));
+    }
+    // Exercise rejection of the fallback's interval test with normal scaling,
+    // independently of whether the newer stages would accept the input.
+    let mut rejected = 0;
+    for _ in 0..(1 << 22) {
+        let x = -1016.0 + 2032.0 * unit(&mut rng);
+        if crate::exp2::crosscheck_fast(x).1.is_none() {
+            exp2_fast_line(&mut out, x);
+            exp2_entry_line(&mut out, x);
+            rejected += 1;
+            if rejected == 8 {
+                break;
+            }
+        }
+    }
+    assert_eq!(rejected, 8, "fallback rejection coverage");
     std::fs::write(path, out).unwrap();
 }
 
@@ -604,6 +650,29 @@ fn ln_1p_stage_line(
         lo.to_bits(),
         eps.to_bits(),
         opt(y)
+    )
+    .unwrap();
+}
+
+fn exp2_entry_line(out: &mut String, x: f64) {
+    writeln!(
+        out,
+        "exp2_entry {:016x} : {:016x}",
+        x.to_bits(),
+        crate::exp2::exp2(x).to_bits()
+    )
+    .unwrap();
+}
+
+fn exp2_fast_line(out: &mut String, x: f64) {
+    let (y, decided) = crate::exp2::crosscheck_fast(x);
+    writeln!(
+        out,
+        "exp2_fast {:016x} : {:016x} {:016x} {}",
+        x.to_bits(),
+        y.hi().to_bits(),
+        y.lo().to_bits(),
+        opt(decided)
     )
     .unwrap();
 }

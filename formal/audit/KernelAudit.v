@@ -78,3 +78,20 @@ Require Exp2FallbackReduction Exp2FallbackAccurate.
 Print Assumptions Exp2FallbackReduction.exp2_fallback_reduce_ok.
 Print Assumptions Exp2FallbackAccurate.exp2_qproduct_ok.
 Print Assumptions Exp2FallbackAccurate.exp2_fallback_accurate_bound.
+
+Require Exp2Range Exp2FallbackProduct Exp2FallbackFast Exp2Fallback Exp2Thresholds Exp2.
+Print Assumptions ExpFast.fast_reduced_ok.
+Print Assumptions ExpFast.fast_decide_scaled_ok.
+Print Assumptions Exp2Range.exp2_below_overflow.
+Print Assumptions Exp2FallbackProduct.exp2_dwproduct_ok.
+Print Assumptions Exp2FallbackFast.exp2_fallback_fast_ok.
+Print Assumptions Exp2Fallback.exp2_accurate_round_ok.
+Print Assumptions Exp2Fallback.exp2_fallback_ok.
+Print Assumptions Exp2Thresholds.exp2_round_one.
+Print Assumptions Exp2Thresholds.exp2_underflow.
+Print Assumptions Exp2.exp2_entry_finite.
+Print Assumptions Exp2.exp2_entry_nan.
+Print Assumptions Exp2.exp2_entry_infinities.
+Print Assumptions Exp2.exp2_entry_zero.
+Print Assumptions Exp2.exp2_entry_positive.
+Print Assumptions Exp2.exp2_entry_signed_zeros.

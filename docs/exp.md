@@ -407,7 +407,8 @@ the accurate path; measured, it sends one in 2^15.4 (§10).
 and proves `ε₁` for it (`fast_ok`): for `(r_hi, r_lo)` within `2^−113` of `R`,
 `|R| ≤ 0.0027076063`, both on `2^−151`'s grid, and every `j`, `Y` is a
 double-word number within `2^−69` relatively of `2^(j/128)·e^R`, with `y_hi` in
-`[3/4, 4]`.
+`[3/4, 4]`. The more general `fast_reduced_ok` needs only the high word on
+`2^−151`'s grid and the low word on `2^−967`'s grid; `exp2` uses this form.
 - **The certificates' theorems,** applied through Gappa's Coq proofs:
   `fast.g`, and `mvt.g` for `Q(r) − Q(r_hi)`.
 - **Their hypotheses about the transcription.** The polynomial is `fast.g`'s
@@ -420,7 +421,7 @@ double-word number within `2^−69` relatively of `2^(j/128)·e^R`, with `y_hi` 
   `2^−107`, and the `L` split, from the definitions of `exp` and `ln`.
 
 `exp_fast_ok` composes the reduction, `fast_ok` and the rounding test
-(`decide_scaled_ok`): for every finite `x` with `−745.1333 ≤ x < X_OVERFLOW`,
+(`fast_decide_scaled_ok`, which applies `decide_scaled_ok`): for every finite `x` with `−745.1333 ≤ x < X_OVERFLOW`,
 `|x| ≥ 2^−99` and `k ≥ −1021`, a value the fast path returns is `RN(e^x)`. The
 formal job also compares `fast_at` with the Rust code bit for bit, at the
 corpus's reduced arguments, cycling through every table index.
