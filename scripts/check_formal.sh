@@ -30,11 +30,40 @@
 #        MORPHIQ_INTERNAL_CORPUS=$PWD/target/internal-crosscheck.txt cargo test --locked -p morphiq-numerics --lib internal_crosscheck -- --ignored
 #        ./scripts/write_gappa_proofs.sh target/gappa-proofs   (in the certificates image)
 #
-# Runs inside the pinned Coq image (see the formal job in .github/workflows/ci.yml),
-# which provides coqc, coq_makefile and opam; Flocq and math-comp are pinned here.
+# The builds of 3, 5 and 6 are one parallel make over a generated _CoqProject.
+# The audits of 4, 5 and 6 and the extraction of 7 are compiled afresh on every
+# run, against the build's .vo files, all at once.
+#
+# Options:
+#   --deps TAR   restore the Coq libraries from TAR (scripts/formal_deps.sh)
+#                and check their pinned versions, instead of installing them.
+#   --build DIR  build in DIR and keep it, so a later run reuses it (CI caches
+#                it). A .vo file is reused only if its source file's bytes, the
+#                generated _CoqProject and the Coq toolchain's fingerprint (the
+#                compiler, its library and plugin files, and every installed
+#                package's version) are unchanged; make rebuilds everything
+#                downstream of a rebuilt file, and Coq refuses a .vo compiled
+#                against a different version of a library it requires.
+#                It marks the tree with DIR/.built once make succeeds.
+#                Without it, the build is in a fresh temporary directory.
+#
+# Runs inside the pinned Coq image (.cargo/coq-image; see the formal jobs in
+# .github/workflows/ci.yml), which provides coqc, coq_makefile and opam; the
+# Coq libraries are pinned by version in .cargo/coq-packages.
 set -eu
+deps=
+build=
+while [ $# -gt 0 ]; do
+  case $1 in
+    --deps) deps=$(realpath "$2"); shift 2 ;;
+    --build) mkdir -p "$2"; build=$(realpath "$2"); shift 2 ;;
+    --) shift; break ;;
+    -*) echo "unknown option $1" >&2; exit 2 ;;
+    *) break ;;
+  esac
+done
 if [ $# -ne 3 ]; then
-  echo "usage: $0 <cross-check corpus> <internal cross-check corpus> <Gappa proofs directory>" >&2
+  echo "usage: $0 [--deps <tar>] [--build <dir>] <cross-check corpus> <internal cross-check corpus> <Gappa proofs directory>" >&2
   exit 2
 fi
 corpus=$(realpath "$1")
@@ -50,24 +79,140 @@ if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v for
   exit 1
 fi
 
-opam install --yes coq-flocq.3.4.3 coq-mathcomp-ssreflect.1.14.0 coq-gappa.1.5.2 \
-  coq-bignums.9.0.0+coq8.15 coq-coquelicot.3.4.5 coq-interval.4.11.5 >/dev/null
+packages=$(grep -v -E '^(#|$)' .cargo/coq-packages)
+if [ -n "$deps" ]; then
+  tar -C "$(opam var prefix)" -xzf "$deps"
+  installed=$(opam list --installed --short --columns=package)
+  for package in $packages; do
+    if ! printf '%s\n' "$installed" | grep -qxF "$package"; then
+      echo "$deps does not provide $package (.cargo/coq-packages)" >&2
+      exit 1
+    fi
+  done
+else
+  # shellcheck disable=SC2086 # one package per word
+  opam install --yes $packages >/dev/null
+fi
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-cp -r formal/double-word formal/two-prod formal/binary64 formal/q formal/audit formal/extraction "$work/"
-(cd "$work/q" && for proof in QSpec QRound Q128Mul Q128 Limbs Digits64 Shifts LimbScan Q256; do
-  coqc -R . Q "$proof.v" || exit 1
-done)
-(cd "$work/double-word" && coq_makefile -f _CoqProject -o Makefile && make -j"$(nproc)")
-(cd "$work/two-prod" && coqc TwoProdBinary64.v)
-(cd "$work/binary64" && for proof in Binary64Add Instances Binary64Mul Grid Binary64Div \
-    IEEE64 IEEE64Add IEEE64Mul IEEE64Div IEEE64Eft IEEE64Sqrt \
-    Isqrt SqrtRound SqrtAlgorithm RoundingGaps RoundingCore RoundingTest Encodings RoundingConstant; do
-  coqc -R ../double-word Double -R . Binary64 -R ../two-prod "" "$proof.v" || exit 1
-done)
 
-(cd "$work/audit" && coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" -R ../binary64 Binary64 -R ../q Q Audit.v) > "$work/audit.log"
+# The source tree: the developments, each Gappa certificate's proof with its
+# hints proved, and the kernels beside the certificates they apply.
+src="$work/src"
+mkdir "$src"
+cp -r formal/double-word formal/two-prod formal/binary64 formal/q formal/audit formal/extraction "$src/"
+rm "$src/double-word/_CoqProject"
+mkdir "$src/gappa"
+cp formal/gappa/Hints.v "$src/gappa/"
+# The Gappa certificates: each hint hypothesis becomes a lemma proved by [hint].
+printf '' > "$src/gappa/CertificateAudit.v"
+for proof in "$proofs"/*/*.v; do
+  f=$(basename "$(dirname "$proof")")
+  module="${f}_$(basename "$proof" .v)"
+  if ! grep -q '^Lemma l1 : s1 -> False\.$' "$proof"; then
+    echo "$proof: no final theorem l1" >&2
+    exit 1
+  fi
+  { echo 'From Coq Require Import Reals. Require Import Hints.'
+    sed -E 's/^Hypothesis (a[0-9]+) : (.*)\.$/Lemma \1 : \2.\nProof. hint. Qed./' "$proof"
+  } > "$src/gappa/$module.v"
+  if grep -q '^Hypothesis' "$src/gappa/$module.v"; then
+    echo "$proof: a hypothesis is left" >&2
+    exit 1
+  fi
+  printf 'Require %s.\nPrint Assumptions %s.l1.\n' "$module" "$module" >> "$src/gappa/CertificateAudit.v"
+done
+cp formal/exp/*.v formal/ln/*.v formal/audit/KernelAudit.v "$src/gappa/"
+# Everything but the audits and the extraction, which are compiled below. The
+# mappings are those each directory's proofs are written against.
+(cd "$src" && {
+  echo '-R double-word Double'
+  echo '-R two-prod ""'
+  echo '-R binary64 Binary64'
+  echo '-R q Q'
+  echo '-R gappa ""'
+  find double-word two-prod binary64 q gappa -name '*.v' \
+    ! -name CertificateAudit.v ! -name KernelAudit.v | LC_ALL=C sort
+} > _CoqProject)
+
+# The build tree. A kept one is reused only where nothing it was built from
+# has changed.
+if [ -z "$build" ]; then
+  build="$work/build"
+  mkdir "$build"
+fi
+toolchain=$({
+  coqc --version
+  ocamlfind ocamlopt -version
+  opam list --installed --short --columns=package
+  cd "$(opam var prefix)"
+  find bin/coqc lib/coq lib/coq-core/plugins -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
+} | sha256sum | cut -d' ' -f1)
+# .built marks a tree whose last make succeeded, so every .vo in it is complete;
+# CI saves the tree only then.
+rm -f "$build/.built"
+if [ "$(cat "$build/.toolchain" 2>/dev/null)" != "$toolchain" ] || ! cmp -s "$build/_CoqProject" "$src/_CoqProject"; then
+  find "$build" -mindepth 1 -delete
+fi
+# A source file that's new or changed is copied, with a new modification time,
+# and its compiled files are removed; one that's gone is removed with them.
+compiled() {
+  echo "${1%.v}.vo ${1%.v}.vos ${1%.v}.vok ${1%.v}.glob $(dirname "$1")/.$(basename "$1" .v).aux"
+}
+(cd "$src" && find . -type f) | while read -r f; do
+  if ! cmp -s "$src/$f" "$build/$f"; then
+    mkdir -p "$(dirname "$build/$f")"
+    cp "$src/$f" "$build/$f"
+    # shellcheck disable=SC2046 # the names have no spaces
+    case $f in *.v) (cd "$build" && rm -f $(compiled "$f")) ;; esac
+  fi
+done
+(cd "$build" && find . -name '*.v') | while read -r f; do
+  if [ ! -e "$src/$f" ]; then
+    # shellcheck disable=SC2046
+    (cd "$build" && rm -f "$f" $(compiled "$f"))
+  fi
+done
+echo "$toolchain" > "$build/.toolchain"
+
+(cd "$build" && coq_makefile -f _CoqProject -o Makefile && make -j"$(nproc)" TIMED=1)
+touch "$build/.built"
+
+# The audits and the cross-checks are independent, so they run at once; each is
+# then judged in turn, and the first to fail fails the lane.
+(cd "$build/audit" && coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" -R ../binary64 Binary64 -R ../q Q Audit.v) \
+  > "$work/audit.log" 2> "$work/audit.err" &
+audit=$!
+(cd "$build/gappa" && coqc -R . "" CertificateAudit.v) \
+  > "$work/certificate_audit.log" 2> "$work/certificate_audit.err" &
+certificate_audit=$!
+(cd "$build/gappa" && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" KernelAudit.v) \
+  > "$work/kernel_audit.log" 2> "$work/kernel_audit.err" &
+kernel_audit=$!
+(cd "$build/extraction" \
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
+  && ocamlfind ocamlopt -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
+  && ./crosscheck "$corpus") > "$work/crosscheck.log" 2> "$work/crosscheck.err" &
+crosscheck=$!
+(cd "$build/extraction" \
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R ../gappa "" InternalCrosscheck.v \
+  && ocamlfind ocamlopt -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
+  && ./internalcrosscheck "$icorpus") > "$work/internal_crosscheck.log" 2> "$work/internal_crosscheck.err" &
+internal_crosscheck=$!
+# finish NAME PID: waits for the step, shows its errors, and fails if it did.
+finish() {
+  status=0
+  wait "$2" || status=$?
+  cat "$work/$1.err" >&2
+  if [ "$status" -ne 0 ]; then
+    tail -n 20 "$work/$1.log" >&2
+    echo "$1 failed" >&2
+    exit "$status"
+  fi
+}
+
+finish audit "$audit"
 # Each axiom entry starts unindented; its type follows on the same line or on
 # indented lines after it, depending on its length.
 grep -E '^[^[:space:]]' "$work/audit.log" \
@@ -88,55 +233,25 @@ if [ "$reports" -ne "$(grep -c '^Print Assumptions' formal/audit/Audit.v)" ]; th
   echo "the audit reported on $reports theorems, not every one in formal/audit/Audit.v" >&2
   exit 1
 fi
-# The Gappa certificates: each hint hypothesis becomes a lemma proved by [hint].
-mkdir "$work/gappa"
-cp formal/gappa/Hints.v "$work/gappa/"
-(cd "$work/gappa" && coqc -R . "" Hints.v)
-printf '' > "$work/gappa/CertificateAudit.v"
-for proof in "$proofs"/*/*.v; do
-  f=$(basename "$(dirname "$proof")")
-  module="${f}_$(basename "$proof" .v)"
-  if ! grep -q '^Lemma l1 : s1 -> False\.$' "$proof"; then
-    echo "$proof: no final theorem l1" >&2
-    exit 1
-  fi
-  { echo 'From Coq Require Import Reals. Require Import Hints.'
-    sed -E 's/^Hypothesis (a[0-9]+) : (.*)\.$/Lemma \1 : \2.\nProof. hint. Qed./' "$proof"
-  } > "$work/gappa/$module.v"
-  if grep -q '^Hypothesis' "$work/gappa/$module.v"; then
-    echo "$proof: a hypothesis is left" >&2
-    exit 1
-  fi
-  printf 'Require %s.\nPrint Assumptions %s.l1.\n' "$module" "$module" >> "$work/gappa/CertificateAudit.v"
-done
-(cd "$work/gappa" && for v in [a-z]*_*.v; do coqc -R . "" "$v" || exit 1; done)
-(cd "$work/gappa" && coqc -R . "" CertificateAudit.v) > "$work/certificate-audit.log"
-grep -E '^[^[:space:]]' "$work/certificate-audit.log" \
+
+finish certificate_audit "$certificate_audit"
+grep -E '^[^[:space:]]' "$work/certificate_audit.log" \
   | grep -v -E '^(Axioms:|Closed under the global context)' \
   | sed 's/ :.*//' | sort -u > "$work/certificate-axioms"
 if ! comm -23 "$work/certificate-axioms" "$work/expected" | diff /dev/null - >&2; then
   echo "a certificate's theorem rests on an axiom outside formal/axioms.expected" >&2
   exit 1
 fi
-certificates=$(grep -c '^Print Assumptions' "$work/gappa/CertificateAudit.v")
-reports=$(( $(grep -c '^Axioms:' "$work/certificate-audit.log" || true) + $(grep -c 'Closed under the global context' "$work/certificate-audit.log" || true) ))
+certificates=$(grep -c '^Print Assumptions' "$build/gappa/CertificateAudit.v")
+reports=$(( $(grep -c '^Axioms:' "$work/certificate_audit.log" || true) + $(grep -c 'Closed under the global context' "$work/certificate_audit.log" || true) ))
 if [ "$reports" -ne "$certificates" ]; then
   echo "the certificate audit reported on $reports theorems, not $certificates" >&2
   exit 1
 fi
 echo "certificates in Coq: $certificates proved"
 
-# The kernels' proofs, beside the certificates' modules they apply.
-cp formal/exp/*.v formal/ln/*.v formal/audit/KernelAudit.v "$work/gappa/"
-(cd "$work/gappa" \
-  && for proof in ExpTables ExpReduction ExpFast ExpAccurateLevels ExpAccurate ExpSmall \
-       TableCheck ExpStageTables StageGappa ExpStageReduction ExpStageA ExpStageB \
-       LnCheck LnTables LnTableCheck LnReduction LnAccurateLevels LnAccurate \
-       Ln1pCheck Ln1pTables Ln1pCertificates Ln1pApprox Ln1pReduction Ln1pTest Ln1pLemmas Ln1pStageH Ln1pStageB Ln1pScreen Ln1p; do
-       coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" "$proof.v" || exit 1
-     done \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" KernelAudit.v) > "$work/kernel-audit.log"
-grep -E '^[^[:space:]]' "$work/kernel-audit.log" \
+finish kernel_audit "$kernel_audit"
+grep -E '^[^[:space:]]' "$work/kernel_audit.log" \
   | grep -v -E '^(Axioms:|Closed under the global context)' \
   | sed 's/ :.*//' | sort -u > "$work/kernel-axioms"
 sort -u formal/axioms.expected formal/axioms.int63.expected > "$work/kernel-expected"
@@ -145,19 +260,15 @@ if ! comm -23 "$work/kernel-axioms" "$work/kernel-expected" | diff /dev/null - >
   exit 1
 fi
 kernels=$(grep -c '^Print Assumptions' formal/audit/KernelAudit.v)
-reports=$(( $(grep -c '^Axioms:' "$work/kernel-audit.log" || true) + $(grep -c 'Closed under the global context' "$work/kernel-audit.log" || true) ))
+reports=$(( $(grep -c '^Axioms:' "$work/kernel_audit.log" || true) + $(grep -c 'Closed under the global context' "$work/kernel_audit.log" || true) ))
 if [ "$reports" -ne "$kernels" ]; then
   echo "the kernel audit reported on $reports theorems, not $kernels" >&2
   exit 1
 fi
 echo "kernel proofs: $kernels proved"
 
-(cd "$work/extraction" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
-  && ocamlfind ocamlopt -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
-  && ./crosscheck "$corpus")
-(cd "$work/extraction" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R ../gappa "" InternalCrosscheck.v \
-  && ocamlfind ocamlopt -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
-  && ./internalcrosscheck "$icorpus")
+finish crosscheck "$crosscheck"
+cat "$work/crosscheck.log"
+finish internal_crosscheck "$internal_crosscheck"
+cat "$work/internal_crosscheck.log"
 echo "formal: OK"

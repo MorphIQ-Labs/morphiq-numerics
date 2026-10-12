@@ -220,7 +220,8 @@ The checks allocate nothing and are `no_std`.
 ## Machine-checked proofs
 
 `scripts/check_formal.sh` (the `formal (coq)` CI job) checks these, on Coq 8.15.2
-with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest.
+with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest
+(`.cargo/coq-image`, with the libraries' versions in `.cargo/coq-packages`).
 
 **What is machine-checked:**
 - **The double-word bounds.** `formal/double-word` is Muller and Rideau's Coq

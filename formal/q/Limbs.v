@@ -162,6 +162,9 @@ Definition row (i : nat) (x : Z) (b p : list Z) : list Z :=
   let '(w', c) := mac x b w 0 in
   firstn i p ++ w' ++ c :: skipn (i + 5) p.
 
+(* lia considers every arithmetic hypothesis in the context; the large powers
+   of B here make it take minutes per call, so each call keeps only the
+   hypotheses it needs. *)
 Lemma row_ok i x b p : (i <= 3)%nat -> length p = 8%nat -> length b = 4%nat ->
   limbs_ok p -> limbs_ok b -> 0 <= x < B -> v p < B ^ Z.of_nat (i + 4) ->
   let p' := row i x b p in
@@ -191,8 +194,8 @@ Proof.
   assert (Top : v (skipn (i + 4) p) = 0).
   { rewrite E4 in Hv. pose proof B_pos. assert (0 < B ^ 4) by (apply Z.pow_pos_nonneg; lia). nia. }
   (* skipn (i + 4) p = hd :: skipn (i + 5) p, both zero *)
-  assert (Ls : length (skipn (i + 4) p) = (4 - i)%nat) by (rewrite skipn_length; lia).
-  destruct (skipn (i + 4) p) as [ | hd rest] eqn:Esk; [cbn [length] in Ls; lia | ].
+  assert (Ls : length (skipn (i + 4) p) = (4 - i)%nat) by (rewrite skipn_length; clear - Hp Hi; lia).
+  destruct (skipn (i + 4) p) as [ | hd rest] eqn:Esk; [cbn [length] in Ls; clear - Ls Hi; lia | ].
   assert (Er : skipn (i + 5) p = rest).
   { replace (i + 5)%nat with (1 + (i + 4))%nat by lia. rewrite <- skipn_skipn', Esk. reflexivity. }
   cbn [v] in Top. pose proof (v_nonneg _ (limbs_ok_skipn (i + 4) p Op)) as N4. rewrite Esk in N4.
@@ -207,13 +210,13 @@ Proof.
   cbn [v] in Vs. rewrite Top, Z.mul_0_r, Z.add_0_r in Vs.
   split; [ | split; [ | split]].
   - rewrite Vn, Vs.
-    assert (Wb : v w' + B ^ 4 * c = v w + x * v b) by (change (Z.of_nat 4) with 4 in Mv; lia).
+    assert (Wb : v w' + B ^ 4 * c = v w + x * v b) by (change (Z.of_nat 4) with 4 in Mv; clear - Mv; lia).
     rewrite Wb. ring.
   - apply limbs_ok_app; [apply limbs_ok_firstn, Op | ]. apply limbs_ok_app; [exact Mo | ].
     constructor; [lia | exact Orest].
-  - rewrite !app_length, Lf, Ml. cbn [length] in *. lia.
+  - rewrite !app_length, Lf, Ml. cbn [length] in *. clear - Ls Hi. lia.
   - rewrite Vn. rewrite Nat2Z.inj_add, Z.pow_add_r by lia.
-    assert (Wb : v w' + B ^ 4 * c = v w + x * v b) by (change (Z.of_nat 4) with 4 in Mv; lia).
+    assert (Wb : v w' + B ^ 4 * c = v w + x * v b) by (change (Z.of_nat 4) with 4 in Mv; clear - Mv; lia).
     rewrite Wb. pose proof (v_bounds w Ow) as Wv. rewrite Lw in Wv. change (Z.of_nat 4) with 4 in *.
     change (Z.of_nat 5) with 5. pose proof B_pos.
     assert (X : x * v b <= (B - 1) * (B ^ 4 - 1)) by (apply Z.mul_le_mono_nonneg; lia).

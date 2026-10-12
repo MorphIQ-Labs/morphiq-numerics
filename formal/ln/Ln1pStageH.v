@@ -660,6 +660,12 @@ Proof.
     split; [apply Rle_trans with 56; [exact Shi | change 56 with (IZR 56); apply Rle_trans with (bpow radix2 6); [bpow_num; lra | apply bpow_le; lia]] | ].
     split; [exact Lo1 | exact Main].
 Qed.
+(* The kernel, checking [stage_h_ok]'s proof, otherwise unfolds
+   [stage_h_parts] first and takes most of an hour; unfolding it last, it takes
+   well under a second. A strategy orders conversion's unfolding and never
+   changes what conversion accepts. [stage_h_eval]'s proof unfolds the
+   definition, so the strategy starts after it. *)
+Local Strategy opaque [stage_h_parts].
 (** Stage H, end to end: when its test passes, its result is [RN(ln(1 + x))],
     and every real within [2^-123] of [ln(1 + x)] relatively rounds to it. *)
 Theorem stage_h_ok x v : finite x -> bpow radix2 (-46) <= Rabs (B x) -> -1 < B x < bpow radix2 53 ->
