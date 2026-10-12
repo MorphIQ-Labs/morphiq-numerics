@@ -10,6 +10,20 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.2](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.1...v0.0.2) - 2026-10-12
+
+### Added
+
+- *(simd)* batch exp2 and expm1 with scalar-equivalent lanes ([#137](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/137))
+- *(formal)* prove expm1 general fallback bounds ([#136](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/136))
+- *(formal)* prove exp2 entry and fallback rounding ([#135](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/135))
+- *(formal)* prove exp2 fallback accurate value ([#133](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/133))
+
+### Performance
+
+- *(elementary)* prove exp2 and expm1 exponential stages ([#131](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/131))
+- *(ln)* prove and vectorize the reciprocal first stage ([#130](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/130))
+
 ## [0.0.1](https://github.com/MorphIQ-Labs/morphiq-numerics/releases/tag/v0.0.1) - 2026-10-12
 
 ### Added
