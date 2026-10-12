@@ -532,10 +532,11 @@ result once therefore rounds `e^x` correctly.
   with the certificates), with its hypotheses proved about the transcription:
   the contracts of `mul` and `add`, zero operands included, and the reciprocal's
   error.
-- **`accurate_ok`:** `accurate_at` is within `2^−120` relatively of
+- **`accurate_bound`:** `accurate_at` is within `1097·2^−134` relatively of
   `2^(j/128)·e^R·2^k`, composing `accurate_y.g`, the truncation (`2^−143`, by
-  CoqInterval) and the error of `r`. `2^−120` is what rounding once needs; the
-  sharper `2^−123.9` above isn't required.
+  CoqInterval) and the error of `r`. This establishes the sharper `2^−123.9`
+  bound above. `accurate_ok` preserves the weaker `2^−120` corollary used by
+  the rounding theorem.
 - **`exp_accurate_ok`:** for every finite `x` with `−745.1333 ≤ x < X_OVERFLOW`,
   if `e^x` keeps [LM]'s mantissa distance `2^−113` from every rounding
   breakpoint, the value the accurate path returns is `RN(e^x)`. That distance

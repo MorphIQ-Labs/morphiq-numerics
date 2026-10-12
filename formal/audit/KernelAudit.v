@@ -16,6 +16,7 @@ Print Assumptions ExpTables.exp_recip_table_ok.
 Print Assumptions ExpReduction.reduce_ok.
 Print Assumptions ExpFast.fast_ok.
 Print Assumptions ExpFast.exp_fast_ok.
+Print Assumptions ExpAccurate.accurate_bound.
 Print Assumptions ExpAccurate.accurate_ok.
 Print Assumptions ExpAccurate.exp_accurate_ok.
 Print Assumptions ExpSmall.small_parts_ok.
@@ -72,3 +73,8 @@ Print Assumptions LnStage.ln_stage_accurate_value.
 Require Exp2Stages Expm1Stages.
 Print Assumptions Exp2Stages.exp2_stages_ok.
 Print Assumptions Expm1Stages.expm1_stages_ok.
+
+Require Exp2FallbackReduction Exp2FallbackAccurate.
+Print Assumptions Exp2FallbackReduction.exp2_fallback_reduce_ok.
+Print Assumptions Exp2FallbackAccurate.exp2_qproduct_ok.
+Print Assumptions Exp2FallbackAccurate.exp2_fallback_accurate_bound.

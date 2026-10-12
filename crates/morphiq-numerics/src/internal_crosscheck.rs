@@ -7,13 +7,15 @@
 //! and `ln_1p` (`Reduced::accurate_value`, `z_prime`, `ln::split`,
 //! `ln::small_accurate`) and `ln_1p`'s screens and stages H and B
 //! (`ln::stages::stage_h_screen`, `stage_b_screen`, `stage_h_parts`,
-//! `stage_b_parts`) on reproducible inputs, with
+//! `stage_b_parts`), and `exp2`'s fallback reduction and accurate value
+//! on reproducible inputs, with
 //! this crate's results. `scripts/check_formal.sh` runs the proved
 //! transcriptions (`formal/q`, `formal/binary64/RoundingTest.v`,
 //! `formal/exp/ExpStageReduction.v`, `ExpStageA.v`, `ExpStageB.v`,
 //! `ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v`, `ExpSmall.v`,
 //! `formal/ln/LnReduction.v`, `LnAccurate.v`, `Ln1pScreen.v`, `Ln1pStageH.v`
-//! and `Ln1pStageB.v`, extracted by
+//! and `Ln1pStageB.v`, `formal/exp/Exp2FallbackReduction.v` and
+//! `Exp2FallbackAccurate.v`, extracted by
 //! `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
 //! identical results, which ties the proofs to this code.
 //!
@@ -511,6 +513,50 @@ fn internal_crosscheck_corpus() {
         for x in [edge.next_down(), edge, edge.next_up()] {
             stage_case(x);
         }
+    }
+    // The exp2 fallback independently computes j/k, the residual and Q128
+    // value. Cover all table indices, both tie parities, signs, binade and
+    // entry-screen boundaries, plus finite inputs outside the proved domain.
+    let mut fallback_case = |x: f64| {
+        let (j, k, d, q) = crate::exp2::crosscheck_fallback(x);
+        writeln!(
+            out,
+            "exp2_fallback {:016x} : {j} {k} {:016x} {}",
+            x.to_bits(),
+            d.to_bits(),
+            q128(q)
+        )
+        .unwrap();
+    };
+    for n in -256..=256 {
+        for x in [f64::from(n) / 128.0, (f64::from(n) + 0.5) / 128.0] {
+            for x in [x.next_down(), x, x.next_up()] {
+                fallback_case(x);
+            }
+        }
+    }
+    for edge in [
+        -2000.0_f64,
+        -1075.0,
+        -1021.0,
+        -1.0,
+        -0.0,
+        0.0,
+        1.0,
+        1024.0,
+        1075.0,
+        2000.0,
+        f64::from_bits((1023 - 55) << 52),
+        -f64::from_bits((1023 - 55) << 52),
+        f64::from_bits(0xbc97_1547_652b_82fe),
+        f64::from_bits(0x3ca7_1547_652b_82fe),
+    ] {
+        for x in [edge.next_down(), edge, edge.next_up()] {
+            fallback_case(x);
+        }
+    }
+    for _ in 0..4000 {
+        fallback_case(-1075.0 + 2099.0 * unit(&mut rng));
     }
     std::fs::write(path, out).unwrap();
 }

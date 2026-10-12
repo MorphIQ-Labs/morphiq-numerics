@@ -1,7 +1,7 @@
 (** exp/mod.rs's accurate path, general case ([Reduced::accurate_value] and
     [accurate_at], docs/exp.md, section 8.4), transcribed on the proved Q128
     transcription (formal/q) and proved: the 128-bit result is within
-    [2^-123.9] relatively of [e^x] ([accurate_ok]), so when [e^x] keeps the
+    [1097*2^-134] relatively of [e^x] ([accurate_bound]), so when [e^x] keeps the
     mantissa distance [LM] guarantees from every rounding breakpoint, rounding
     it once returns [RN(e^x)] ([exp_accurate_ok]). The series and the product
     with [T_j] are the certificates' theorems (ExpAccurateLevels.v); this file
@@ -655,14 +655,14 @@ Proof.
   destruct C as [C _]. exact C.
 Qed.
 
-(** [accurate_at] at a reduced argument within [2^-131] of [R] is within
-    [2^-120] relatively of [2^(j/128)·e^R·2^k] (docs/exp.md, section 8.4, proves
-    [2^-123.9]; [2^-120] is what rounding once needs). *)
-Theorem accurate_ok r j k (R : R) :
+(** [accurate_at] at a reduced argument within [2^-131] of [R] meets the
+    documented [1097*2^-134] relative bound. [accurate_ok] retains the weaker
+    [2^-120] interface used by the existing correct-rounding theorem. *)
+Theorem accurate_bound r j k (R : R) :
   NZ r -> Rabs (Q128.qval r - R) <= / 2 ^ 131 -> Rabs R <= 0.0027076063 -> (j < 128)%nat ->
   let Z := exp (INR j * ln 2 / 128) * exp R * bpow radix2 k in
   QSpec.normalized 128 (Q128.m (accurate_at r j k)) /\
-  Rabs (Q128.qval (accurate_at r j k) - Z) <= / 2 ^ 120 * Z.
+  Rabs (Q128.qval (accurate_at r j k) - Z) <= 1097 / 2 ^ 134 * Z.
 Proof.
   intros Nr Er HR Hj Z.
   assert (U131 : 0 < / 2 ^ 131 < / 1000000000) by (split; interval with (i_prec 64)).
@@ -683,7 +683,7 @@ Proof.
     assert (D : - / 2 ^ 131 <= d <= / 2 ^ 131) by exact Er. interval with (i_prec 200). }
   assert (X1p : 0.99 <= X1 <= 1.01).
   { pose proof (xq_range (Q128.qval r) 12 Hr ltac:(lia)) as XR. fold X1 in XR. apply Rabs_le_inv in XR. lra. }
-  (* |Y − T·e^R| <= 2^-121·T·e^R *)
+  (* Compose the series, truncation and reduction errors. *)
   assert (TX : 0 < T * X1) by nra.
   assert (A1 : Rabs (Q128.qval Y - T * X1) <= / 2 ^ 124 * (T * X1)).
   { replace (Q128.qval Y - T * X1) with ((Q128.qval Y - T * X1) / (T * X1) * (T * X1)) by (field; lra).
@@ -699,8 +699,8 @@ Proof.
   { replace (T * exp (Q128.qval r) - T * exp R) with (T * (exp (Q128.qval r) - exp R)) by ring.
     rewrite Rabs_mult, (Rabs_pos_eq T) by lra.
     assert (0 < / 2 ^ 130) by interval with (i_prec 64). nra. }
-  assert (C : / 2 ^ 124 * 1.02 + / 2 ^ 142 + / 2 ^ 130 <= / 2 ^ 120) by interval with (i_prec 64).
-  assert (AY : Rabs (Q128.qval Y - T * exp R) <= / 2 ^ 120 * (T * exp R)).
+  assert (C : / 2 ^ 124 * 1.02 + / 2 ^ 142 + / 2 ^ 130 <= 1097 / 2 ^ 134) by interval with (i_prec 64).
+  assert (AY : Rabs (Q128.qval Y - T * exp R) <= 1097 / 2 ^ 134 * (T * exp R)).
   { replace (Q128.qval Y - T * exp R)
       with ((Q128.qval Y - T * X1) + (T * X1 - T * exp (Q128.qval r)) + (T * exp (Q128.qval r) - T * exp R))
       by ring.
@@ -712,7 +712,7 @@ Proof.
   assert (NYn : QSpec.normalized 128 (Q128.m Y)).
   { destruct NY as [Z0 | Nn]; [ | exact Nn]. exfalso.
     rewrite (qval_zero Y Z0) in AY. assert (0 < T * exp R) by nra.
-    assert (/ 2 ^ 120 < 1) by interval with (i_prec 64).
+    assert (1097 / 2 ^ 134 < 1) by interval with (i_prec 64).
     rewrite Rminus_0_l, Rabs_Ropp, Rabs_pos_eq in AY by lra. nra. }
   assert (Mm : Q128.m (accurate_at r j k) = Q128.m Y).
   { unfold accurate_at, Q128.mul_pow2. fold Y. destruct (Q128.m Y =? 0)%Z; reflexivity. }
@@ -721,8 +721,22 @@ Proof.
   replace (Q128.qval Y * bpow radix2 k - T * exp R * bpow radix2 k)
     with ((Q128.qval Y - T * exp R) * bpow radix2 k) by ring.
   pose proof (bpow_gt_0 radix2 k). rewrite Rabs_mult, (Rabs_pos_eq (bpow radix2 k)) by lra.
-  replace (/ 2 ^ 120 * (T * exp R * bpow radix2 k)) with (/ 2 ^ 120 * (T * exp R) * bpow radix2 k) by ring.
+  replace (1097 / 2 ^ 134 * (T * exp R * bpow radix2 k)) with (1097 / 2 ^ 134 * (T * exp R) * bpow radix2 k) by ring.
   apply Rmult_le_compat_r; lra.
+Qed.
+
+Theorem accurate_ok r j k (R : R) :
+  NZ r -> Rabs (Q128.qval r - R) <= / 2 ^ 131 -> Rabs R <= 0.0027076063 -> (j < 128)%nat ->
+  let Z := exp (INR j * ln 2 / 128) * exp R * bpow radix2 k in
+  QSpec.normalized 128 (Q128.m (accurate_at r j k)) /\
+  Rabs (Q128.qval (accurate_at r j k) - Z) <= / 2 ^ 120 * Z.
+Proof.
+ intros Nr Er HR Hj Z.
+ destruct (accurate_bound r j k R Nr Er HR Hj) as [N E].
+ split; [exact N | ].
+ apply Rle_trans with (1 := E). apply Rmult_le_compat_r.
+ - unfold Z. apply Rlt_le. repeat apply Rmult_lt_0_compat; try apply exp_pos; apply bpow_gt_0.
+ - interval with (i_prec 160).
 Qed.
 
 (** The accurate path end to end: for every finite [x] that exp(x) reduces,
