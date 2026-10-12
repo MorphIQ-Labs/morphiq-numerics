@@ -37,6 +37,7 @@ rebind() {
   sed -i "s|^[0-9a-f]*  $1\$|$(sha256sum "$1")|" formal/binding.sha256
   sha256sum --check --quiet formal/binding.sha256
 }
+expected_status=1
 case "$mutation" in
   binding)
     printf '(* edited *)\n' >> formal/exp/ExpReduction.v
@@ -61,6 +62,7 @@ case "$mutation" in
     test -n "$line"
     sed -i "$((line - 1))d" "$file"
     expected='Attempt to save an incomplete proof'
+    expected_status=2
     ;;
   crosscheck|internal-crosscheck)
     file="$work/$mutation.txt"
@@ -87,12 +89,16 @@ status=0
   "$work/crosscheck.txt" "$work/internal-crosscheck.txt" "$work/proofs" \
   > "$work/result.log" 2>&1 || status=$?
 cat "$work/result.log"
-if [ "$status" -eq 0 ]; then
-  echo "negative ($mutation): FAIL: corrupted input was accepted" >&2
+if [ "$status" -ne "$expected_status" ]; then
+  echo "negative ($mutation): FAIL: expected exit $expected_status, got $status" >&2
   exit 1
 fi
 if ! grep -qF "$expected" "$work/result.log"; then
   echo "negative ($mutation): FAIL: exited $status without the intended rejection: $expected" >&2
   exit 1
 fi
+case "$mutation" in
+  crosscheck) grep -qxF 'crosscheck failed' "$work/result.log" ;;
+  internal-crosscheck) grep -qxF 'internal_crosscheck failed' "$work/result.log" ;;
+esac
 echo "negative ($mutation): PASS: intended rejection (exit $status, $(($(date +%s) - started)) seconds)"
