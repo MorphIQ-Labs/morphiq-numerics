@@ -62,3 +62,75 @@ fn fast_path_agrees_with_the_accurate_path_and_mostly_decides() {
     std::eprintln!("exp2 fast path: {missed} of {tried} sent to the accurate path ({rate:.3e})");
     assert!(rate <= 4.0 * ANALYTIC_MISS_RATE, "miss rate {rate:e}");
 }
+
+#[test]
+fn exponential_stages_meet_their_unscaled_bounds() {
+    for c in entries(
+        include_str!("../../../reference/fixtures/exp2.json"),
+        &["precise"],
+    ) {
+        let x = word(c, "x");
+        if !(x.abs() >= f64::from_bits((1023 - 55) << 52) && x.abs() < 1016.0) {
+            continue;
+        }
+        let r = super::stages::Stages::of(x);
+        let reference =
+            Exact::of_hex(field(c, "m"), field(c, "e").parse().unwrap()).mul(&Exact::pow2(-r.k));
+        for ((h, l), bound) in [
+            (
+                r.a_value(),
+                Exact::of_f64(302.0)
+                    .mul(&Exact::pow2(-69))
+                    .add(&Exact::pow2(-63)),
+            ),
+            (r.b_value(), Exact::of_f64(209.0).mul(&Exact::pow2(-78))),
+        ] {
+            let value = Exact::of_f64(h).add(&Exact::of_f64(l));
+            assert!(
+                value.sub(&reference).abs().cmp(&bound).is_le(),
+                "exp2({x:e})"
+            );
+        }
+    }
+}
+
+#[test]
+fn exponential_stages_agree_with_accurate_results_and_mostly_decide() {
+    let mut rng = SplitMix64::new(0x6578_7032_7374_6167);
+    let mut missed = 0;
+    for _ in 0..(1 << 20) {
+        #[allow(clippy::cast_precision_loss)] // 53-bit integer
+        let u = (rng.next_u64() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+        let x = -1016.0 + 2032.0 * u;
+        if let Some(v) = super::stages::stages(x) {
+            assert_eq!(
+                v.to_bits(),
+                Reduced::of(x).accurate_value().to_f64().to_bits(),
+                "exp2({x:e})"
+            );
+        } else {
+            missed += 1;
+        }
+    }
+    std::eprintln!("exp2 stages: {missed} of 1048576 fall through both stages");
+    assert!(missed < 128);
+}
+
+#[test]
+fn dyadic_reduction_boundaries_and_neighbors_round_correctly() {
+    // Every table boundary and midpoint at representative exponents, including
+    // both screen edges. The accurate path is supplemented by independent
+    // fixtures and the unrounded bound test above.
+    for k in [-1016.0, -1000.0, -2.0, -1.0, 0.0, 1.0, 2.0, 1000.0, 1015.0] {
+        for j in 0..=1024 {
+            let x = k + f64::from(j) / 1024.0;
+            for x in [x.next_down(), x, x.next_up()] {
+                assert_eq!(
+                    super::exp2(x).to_bits(),
+                    Reduced::of(x).accurate_value().to_f64().to_bits(),
+                    "exp2({x:e})"
+                );
+            }
+        }
+    }
+}

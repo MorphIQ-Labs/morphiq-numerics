@@ -481,6 +481,37 @@ fn internal_crosscheck_corpus() {
             b += 1;
         }
     }
+    // Full exp2/expm1 stage transcriptions: admitted inputs, cancellation,
+    // arbitrary encodings and screen boundaries (including NaNs/infinities).
+    let mut rng = SplitMix64::new(0x7163_726f_7373_0003);
+    let mut stage_case = |x: f64| {
+        for (op, v) in [
+            ("exp2_stages", crate::exp2::stages::stages(x)),
+            ("expm1_stages", crate::expm1::stages::stages(x)),
+        ] {
+            writeln!(out, "{op} {:016x} : {}", x.to_bits(), opt(v)).unwrap();
+        }
+    };
+    for _ in 0..2000 {
+        stage_case(-1016.0 + 2032.0 * unit(&mut rng));
+        stage_case(-37.0 + 741.0 * unit(&mut rng));
+        stage_case(-1.0 + 2.0 * unit(&mut rng));
+        stage_case(f64::from_bits(rng.next_u64()));
+    }
+    for edge in [
+        -1016.0_f64,
+        -37.0,
+        -0.03125,
+        0.03125,
+        704.0,
+        1016.0,
+        f64::from_bits((1023 - 55) << 52),
+        -f64::from_bits((1023 - 55) << 52),
+    ] {
+        for x in [edge.next_down(), edge, edge.next_up()] {
+            stage_case(x);
+        }
+    }
     std::fs::write(path, out).unwrap();
 }
 

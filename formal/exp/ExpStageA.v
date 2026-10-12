@@ -99,12 +99,14 @@ Proof. exact (bits_finite 4602678819172646912 _ _ _ eq_refl). Qed.
 
 (** [Stages::a_value]: [(th, tl + th·u)],
     [u = r + r²·(1/2 + r·(d3 + r·(d4 + r·d5)))], [r = r1 − n·L2D]. *)
-Definition stage_a_value (n r1 : f64) (j : nat) : f64 * f64 :=
-  let r := fsub r1 (fmul n st_l2d) in
+Definition stage_a_at (r : f64) (j : nat) : f64 * f64 :=
   let u := fadd r (fmul (fmul r r)
                         (fadd c_half (fmul r (fadd st_d3 (fmul r (fadd st_d4 (fmul r st_d5))))))) in
   let th := st_t_hi j in
   (th, fadd (st_t_lo j) (fmul th u)).
+
+Definition stage_a_value (n r1 : f64) (j : nat) : f64 * f64 :=
+  stage_a_at (fsub r1 (fmul n st_l2d)) j.
 
 Lemma rnd_le1 v : Rabs v <= 1 -> Rabs (rndF v) <= 1.
 Proof.
@@ -126,23 +128,16 @@ Proof.
   change (-53)%Z with (- Z.of_nat 53)%Z. rewrite bpow_m. exact Tl.
 Qed.
 
-Theorem stage_a_value_ok x n r1 (ni : Z) (j : nat) :
-  finite x -> finite n -> B n = IZR ni -> (Z.abs ni <= 520018)%Z -> finite r1 ->
-  B r1 = B x - IZR ni * B st_l1 -> Rabs (B x - IZR ni * L) <= 0.000677 ->
-  Rabs (B r1) < bpow radix2 (-10) -> (j < 512)%nat ->
-  let '(y, l) := stage_a_value n r1 j in
+Theorem stage_a_at_ok r j R dr : finite r -> B r = rn (R + dr) ->
+  Rabs R <= 0.000677 -> Rabs dr <= bpow radix2 (-77) -> (j < 512)%nat ->
+  let '(y,l) := stage_a_at r j in
   finite y /\ finite l /\ Rabs (B y) <= 4 /\ Rabs (B l) <= IZR 181 * bpow radix2 (-17) /\
-  Rabs (exp (INR j * ln 2 / 512) * exp (B x - IZR ni * L) - (B y + B l)) <= IZR 302 * bpow radix2 (-69).
+  Rabs (exp (INR j * ln 2 / 512) * exp R - (B y + B l)) <= IZR 302 * bpow radix2 (-69).
 Proof.
-  intros Fx Fn Bn Hn Fr1 Br1 HR Hr1 Hj.
-  destruct (stage_a_r_ok n r1 ni (B x) Fn Bn Hn Fr1 Br1 HR Hr1) as [Fr [Br Hdr]].
+  intros Fr Br' HR Hdr Hj.
   destruct (table_facts j Hj) as [Fth [Ftl [Hth [Htl Htab]]]].
-  set (R := B x - IZR ni * L) in *.
-  set (dr := B r1 - B (fmul n st_l2d) - R) in *.
   set (th := st_t_hi j) in *. set (tl := st_t_lo j) in *.
   set (T := exp (INR j * ln 2 / 512)) in *.
-  set (r := fsub r1 (fmul n st_l2d)) in *.
-  assert (Br' : B r = rn (R + dr)) by (rewrite Br; f_equal; unfold dr; ring).
   (* |r| <= 0.00068, and R − r for the mean value term *)
   assert (Er : Rabs (B r - (R + dr)) <= bpow radix2 (-64)).
   { rewrite Br'. apply (rnd_err_below _ (-10)); [lia | ].
@@ -177,7 +172,7 @@ Proof.
   assert (Ch : Rabs half_g <= 1) by (rewrite half_g_eq; rewrite Rabs_pos_eq; lra).
   assert (M11 : forall u v, Rabs u <= 1 -> Rabs v <= 1 -> Rabs (u * v) <= 1).
   { intros u v Hu Hv. rewrite Rabs_mult. apply Rle_trans with (1 * 1); [apply Rmult_le_compat; try apply Rabs_pos; lra | lra]. }
-  unfold stage_a_value. fold r th tl.
+  unfold stage_a_at. fold th tl.
   destruct (fmul16 r st_d5 Fr st_d5_finite) as [F0 B0].
   { rewrite d5_g_eq. apply Rle_trans with 1; [apply M11; lra | lra]. }
   rewrite d5_g_eq, rndF_rn in B0.
@@ -224,6 +219,21 @@ Proof.
     unfold Qs in ER. rewrite ER in GY.
     replace (B th + B tl - Dt) with T in GY by (unfold Dt; ring).
     rewrite Rabs_minus_sym. exact GY.
+Qed.
+
+Theorem stage_a_value_ok x n r1 (ni : Z) (j : nat) :
+  finite x -> finite n -> B n = IZR ni -> (Z.abs ni <= 520018)%Z -> finite r1 ->
+  B r1 = B x - IZR ni * B st_l1 -> Rabs (B x - IZR ni * L) <= 0.000677 ->
+  Rabs (B r1) < bpow radix2 (-10) -> (j < 512)%nat ->
+  let '(y, l) := stage_a_value n r1 j in
+  finite y /\ finite l /\ Rabs (B y) <= 4 /\ Rabs (B l) <= IZR 181 * bpow radix2 (-17) /\
+  Rabs (exp (INR j * ln 2 / 512) * exp (B x - IZR ni * L) - (B y + B l)) <= IZR 302 * bpow radix2 (-69).
+Proof.
+  intros Fx Fn Bn Hn Fr1 Br1 HR Hr1 Hj.
+  destruct (stage_a_r_ok n r1 ni (B x) Fn Bn Hn Fr1 Br1 HR Hr1) as [Fr [Br Hdr]].
+  unfold stage_a_value.
+  apply (stage_a_at_ok _ j (B x - IZR ni * L) (B r1 - B (fmul n st_l2d) - (B x - IZR ni * L))); try assumption.
+  rewrite Br. f_equal. ring.
 Qed.
 
 (** [e^x = 2^k·2^(j/512)·e^R] for [x = (512k + j)·ln 2/512 + R]. *)
