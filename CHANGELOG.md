@@ -9,3 +9,50 @@ is reserved for the first crates.io release
 ([#90](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/90)).
 
 ## [Unreleased]
+
+## [0.0.1](https://github.com/MorphIQ-Labs/morphiq-numerics/releases/tag/v0.0.1) - 2026-10-12
+
+### Added
+
+- *(formal)* prove ln's accurate path end to end ([#117](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/117))
+- *(logspace)* log_sum_exp_pairs, log_sum_exp_and_normalize, and a lane backend cascade ([#116](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/116))
+- *(simd)* lane evaluation that returns the scalar bits ([#115](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/115))
+- *(formal)* prove ln's reduction ([#113](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/113))
+- *(formal)* prove exp's small-argument path end to end ([#112](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/112))
+- *(formal)* prove exp's accurate path end to end ([#111](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/111))
+- *(normal)* log_norm_pdf ([#109](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/109))
+- *(logspace)* log_sum_exp and log_diff_exp ([#106](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/106))
+- *(formal)* prove exp's fast path end to end ([#105](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/105))
+- *(formal)* prove exp's argument reduction ([#103](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/103))
+- *(formal)* prove the rounding test every kernel shares ([#102](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/102))
+- *(formal)* prove the Q128 and Q256 contracts ([#86](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/86))
+- *(random)* Box–Muller normal pairs, with a correctly rounded sqrt ([#83](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/83))
+- *(elementary)* sin, cos, sincos and tan, correctly rounded where the worst cases reach ([#82](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/82))
+- *(elementary)* expm1 within a proved bound, accurate as x → 0 ([#81](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/81))
+- *(elementary)* correctly rounded exp2 and log2, and log10 within its proved bound ([#80](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/80))
+- *(elementary)* correctly rounded ln and ln_1p ([#73](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/73))
+- *(exp)* correctly rounded exp ([#71](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/71))
+- *(double-word)* checked operations bound to each theorem's hypotheses ([#77](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/77))
+- *(reduce)* sums, dot products and sums of squares in a specified order, with Sum2 and Dot2 ([#69](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/69))
+- *(formal)* prove no double-word operation overflows, in IEEE 754 arithmetic ([#65](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/65))
+- *(formal)* prove the double-word divisions' bounds in binary64 ([#68](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/68))
+- *(formal)* prove the double-word products' bounds in binary64 ([#63](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/63))
+- *(formal)* prove the additive double-word bounds in binary64 ([#60](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/60))
+- *(formal)* machine-checked double-word bounds and two_prod exactness ([#58](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/58))
+- *(random)* SplitMix64 and xoshiro256++ streams with exact unit uniforms ([#53](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/53))
+- *(eft)* error-free transforms and double-word arithmetic ([#52](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/52))
+- *(ulp)* units in the last place and ordered-bits distance ([#51](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/51))
+
+### Other
+
+- release tagging with release-plz ([#122](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/122))
+- remove PLAN.md; GitHub issues, epics and milestones are the record ([#101](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/101))
+- *(eft)* two_prod's domain is the proof's sufficient hypothesis ([#59](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/59))
+- determinism digest over every public function ([#55](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/55))
+- initial commit
+
+### Performance
+
+- *(elementary)* ln_1p fast path with an exact reduction and no division ([#119](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/119))
+- *(elementary)* exp fast path in binary64 with a constant-bound rounding test ([#118](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/118))
+- mark the primitives inline for cross-crate callers ([#54](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/54))
