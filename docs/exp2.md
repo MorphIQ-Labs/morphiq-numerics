@@ -126,9 +126,11 @@ rounding once rounds `2^x` correctly. `2^n` for an integer `n` gives `r = 0`,
 | `generators/radix_constants.py` | `LN2_HI`, `LN2_LO`, `ln 2` in `Q128`, with their errors (`src/exp2/tables.rs`) |
 | `formal/exp/Exp2Constants.v`, `Exp2Reduction.v`, `Exp2Product.v`, `Exp2Stages.v` | binary64 stages, generated constants and end-to-end rounding theorem |
 | `formal/exp/Exp2FallbackReduction.v`, `Exp2FallbackAccurate.v` | exact fallback reduction and `1097·2^−134` relative error of its Q128 result |
+| `formal/exp/Exp2FallbackProduct.v`, `Exp2FallbackFast.v`, `Exp2Fallback.v` | double-word reduction, fast-path rounding test, and final Q128 rounding |
+| `formal/exp/Exp2Range.v`, `Exp2ThresholdConstants.v`, `Exp2Thresholds.v`, `Exp2.v` | generated entry thresholds, overflow and underflow, rounding to one, and the composed public-entry theorem |
 | `generators/radix_certificates.py` | writes `formal/exp2/reduction.g` from those errors |
 | `formal/exp2/reduction.g` (Gappa 1.4.1) | the reduction, within `2^−113` |
-| `generators/exp2_reference.py` | the fixture: [LM] Table 6, thresholds, integers, special values, random arguments, and 1,200 values to 192 bits |
+| `generators/exp2_reference.py` | the fixture: [LM] Table 6, thresholds, integers, special values, random arguments, and 1,200 values to 192 bits; generated Coq threshold encodings |
 
 Every certificate's Coq proof is also built, with each rewriting hint proved, by the formal job ([exp.md](exp.md), gates).
 
@@ -157,6 +159,25 @@ computed from the input. Its transcription is extracted and compared bit for
 bit with Rust's actual fallback, including both signs, every table index,
 nearest-integer ties, entry thresholds and finite inputs outside that proof
 domain. The formal gate audits its axioms and binds the source and proof files.
-This theorem covers the unrounded accurate value; the fallback's double-word
-fast path, public-entry screens and final rounding do not yet have a composed
-end-to-end theorem.
+`exp2_fallback_fast_ok` composes the exact reduction, the double-word product
+bound, the shared `ExpFast.fast_reduced_ok` evaluation and
+`fast_decide_scaled_ok` rounding/scaling theorem. The accurate path rounds once
+through `Q128.to_f64_ok`; `exp2_fallback_ok` combines both paths.
+
+`exp2_entry_finite` composes the public comparisons, binary64 stages and fallback.
+Its explicit hypothesis is [LM]'s worst-case midpoint separation, expressed as
+`midpoint_far (exp (x·ln 2)) (2^−113)` for `−1075 < x < 1024`; the published
+worst-case search is not re-proved in Coq or introduced as an axiom. Subject to
+that hypothesis, every finite input below 1024 returns a finite result equal
+to `RN(2^x)`. Inputs at or above 1024 return positive infinity, with exact
+`2^x ≥ 2^1024`. The threshold proof handles the underflow tie at −1075 and the
+exclusive upper boundary of the interval rounding to one, using its binary64
+predecessor. Separate entry theorems fix the positive zero below underflow,
+positive results above it, signed-zero inputs, infinities and NaN preservation.
+
+The internal cross-check extracts the entire entry, the fallback double-word
+value and its optional fast result, as well as the unrounded Q128 fallback.
+It compares them bit for bit against Rust on all fixture inputs, arbitrary
+encodings, both one-screen boundaries, subnormal results, every reduction
+index and selected fast-test rejections. The formal gate audits the composed
+theorems and binds all source and proof files.

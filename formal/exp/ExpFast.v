@@ -350,7 +350,7 @@ Proof. intros H. unfold bnd. change (IZR 1 * bpow radix2 0) with (1 * 1). lra. Q
 Lemma p_step rh rl :
   finite rh -> finite rl -> B rh = rndF (B rh + B rl) ->
   Rabs (B rh) <= 0.00270769 -> Rabs (B rl) <= bpow radix2 (-62) ->
-  on_grid (-151) (B rh) -> on_grid (-151) (B rl) ->
+  on_grid (-151) (B rh) -> on_grid (-967) (B rl) ->
   let '(ph, pl) := add_f64_64 rh rl (poly_q rh) in
   finite ph /\ finite pl /\ B ph = rndF (B ph + B pl) /\
   on_grid (-967) (B ph) /\ on_grid (-967) (B pl) /\
@@ -370,7 +370,7 @@ Proof.
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) ltac:(lia)) as [_ [_ EQ]].
   pose proof (add_f64_dw (B rh) (B rl) (B q) (B_fmt rh) (B_fmt rl) (B_fmt q) Dh) as DW.
   pose proof (grid_add_f64 (-967) (B rh) (B rl) (B q) (grid_le (-151) (-967) _ ltac:(lia) Gh)
-                (grid_le (-151) (-967) _ ltac:(lia) Gl) Gq) as GP.
+                Gl Gq) as GP.
   destruct (add_f64_64 rh rl q) as [ph pl]. cbn [fst snd] in EQ.
   rewrite <- EQ in DW, GP. cbn [fst snd] in DW, GP. destruct GP as [Gph Gpl].
   destruct AI as [Fph [Fpl Rel]].
@@ -590,10 +590,10 @@ Qed.
     double-word [Y] within [2^-69] relatively of [Z = 2^(j/128)·e^R], with its
     leading word in [[3/4, 4]]: the premises of [decide_scaled_ok] at
     [ε₁ = 2^-69]. *)
-Theorem fast_ok rh rl j (R : R) :
+Theorem fast_reduced_ok rh rl j (R : R) :
   finite rh -> finite rl -> B rh = rndF (B rh + B rl) ->
   Rabs (B rh + B rl - R) <= bpow radix2 (-113) -> Rabs R <= 0.0027076063 ->
-  on_grid (-151) (B rh) -> on_grid (-151) (B rl) -> (j < 128)%nat ->
+  on_grid (-151) (B rh) -> on_grid (-967) (B rl) -> (j < 128)%nat ->
   let Z := exp (INR j * ln 2 / 128) * exp R in
   let '(yh, yl) := fast_at rh rl j in
   finite yh /\ finite yl /\ B yh = rndF (B yh + B yl) /\ 3 / 4 <= B yh <= 4 /\
@@ -690,6 +690,20 @@ Proof.
   split; [exact Fyh | split; [exact Fyl | split; [exact Dy | split; [lra | exact EZ]]]].
 Qed.
 
+Theorem fast_ok rh rl j (R : R) :
+  finite rh -> finite rl -> B rh = rndF (B rh + B rl) ->
+  Rabs (B rh + B rl - R) <= bpow radix2 (-113) -> Rabs R <= 0.0027076063 ->
+  on_grid (-151) (B rh) -> on_grid (-151) (B rl) -> (j < 128)%nat ->
+  let Z := exp (INR j * ln 2 / 128) * exp R in
+  let '(yh, yl) := fast_at rh rl j in
+  finite yh /\ finite yl /\ B yh = rndF (B yh + B yl) /\ 3 / 4 <= B yh <= 4 /\
+  Rabs (Z - (B yh + B yl)) <= / 2 ^ 69 * Rabs Z.
+Proof.
+ intros Fh Fl Dh Er HR Gh Gl Hj.
+ apply fast_reduced_ok; try assumption.
+ apply (grid_le (-151)); [lia | exact Gl].
+Qed.
+
 (** exp/mod.rs's [EPS], [ε₁·(1 + 2^-50)] for [ε₁ = 2^-69], and [X_OVERFLOW]. *)
 Definition c_eps : f64 := b64_of_bits 4296434044511453188.          (* 0x3ba0000000000004 *)
 Definition c_x_overflow : f64 := b64_of_bits 4649454530587146736.   (* 0x40862e42fefa39f0 *)
@@ -751,6 +765,58 @@ Proof.
       unfold a. rewrite c_x_overflow_val. interval with (i_prec 120). }
 Qed.
 
+(** Shared fast-path decision and finite scaling, with explicit room below
+    overflow. The exponent and lower result bound are proved by each caller. *)
+Lemma fast_decide_scaled_ok yh yl k Z v :
+ finite yh -> finite yl -> 3 / 4 <= B yh <= 4 ->
+ B yh = rndF (B yh + B yl) -> 0.99 <= Z ->
+ Rabs (Z - (B yh + B yl)) <= / 2 ^ 69 * Rabs Z ->
+ (-1021 <= k <= 1024)%Z ->
+ Z * bpow radix2 k <= bpow radix2 1024 * (1 - / 2 ^ 46) ->
+ RoundingTest.decide_scaled yh yl c_eps k = Some v ->
+ finite v /\ B v = rndF (Z * bpow radix2 k).
+Proof.
+ intros Fyh Fyl Hy Dy Zl EZ K Eb Hd.
+ assert (B1024 : bpow radix2 1024 = 2 ^ 1024)
+   by (change 1024%Z with (Z.of_nat 1024); rewrite bpow_powerRZ, <- pow_powerRZ; reflexivity).
+ rewrite B1024 in Eb.
+  assert (EZa : Rabs (Z - (B yh + B yl)) <= / 2 ^ 69 * Z) by (rewrite <- (Rabs_pos_eq Z) at 2 by lra; exact EZ).
+  pose proof EZa as EZ2. apply Rabs_le_inv in EZ2.
+  assert (u69 : 0 < / 2 ^ 69 < / 1000) by (split; interval with (i_prec 64)).
+  assert (Yl : 0.98 <= B yh + B yl) by nra.
+  assert (Yb : bpow radix2 (-1022) <= Rabs (B yh + B yl)).
+  { rewrite Rabs_pos_eq by lra. apply Rle_trans with (/ 1024); [ | lra].
+    change (/ 1024) with (bpow radix2 (-10)). apply bpow_le. lia. }
+  pose proof (rel_FLT _ Yb) as RY. rewrite <- Dy in RY.
+  rewrite (Rabs_pos_eq (B yh + B yl)) in RY by lra. apply Rabs_le_inv in RY.
+  assert (Ov : B yh * bpow radix2 k < bpow radix2 1024).
+  { assert (Yh : B yh <= (1 + / 2 ^ 52) * Z).
+    { assert (C : / 2 ^ 69 * (1 + / 9007199254740992) + / 9007199254740992 <= / 2 ^ 52) by interval with (i_prec 64).
+      assert (Yu : B yh + B yl <= (1 + / 2 ^ 69) * Z) by lra.
+      assert (B yh <= (1 + / 9007199254740992) * (B yh + B yl)) by lra.
+      assert (B yh <= (1 + / 9007199254740992) * ((1 + / 2 ^ 69) * Z)).
+      { apply Rle_trans with (1 := H). apply Rmult_le_compat_l; [lra | exact Yu]. }
+      assert ((1 + / 9007199254740992) * (1 + / 2 ^ 69) <= 1 + / 2 ^ 52) by lra. nra. }
+    assert (Bk : 0 < bpow radix2 k) by apply bpow_gt_0.
+    apply Rle_lt_trans with ((1 + / 2 ^ 52) * Z * bpow radix2 k); [apply Rmult_le_compat_r; lra | ].
+    rewrite Rmult_assoc.
+    rewrite B1024.
+    assert (0 < 2 ^ 1024) by (apply pow_lt; lra).
+    assert ((1 + / 2 ^ 52) * (1 - / 2 ^ 46) < 1) by interval with (i_prec 64).
+    assert (0 < 1 + / 2 ^ 52) by lra. nra. }
+  assert (He1 : bpow radix2 (-80) <= / 2 ^ 69 <= bpow radix2 (-60)).
+  { change (bpow radix2 (-80)) with (bpow radix2 (- Z.of_nat 80)).
+    change (bpow radix2 (-60)) with (bpow radix2 (- Z.of_nat 60)). rewrite !bpow_m. split; interval with (i_prec 64). }
+  assert (Heps : / 2 ^ 69 * (1 + bpow radix2 (-50)) <= B c_eps <= 1).
+  { rewrite c_eps_val. change (bpow radix2 (-50)) with (bpow radix2 (- Z.of_nat 50)). rewrite bpow_m.
+    split; [right; field | interval with (i_prec 64)]. }
+  assert (Feps : finite c_eps) by exact (bits_finite 4296434044511453188 _ _ _ eq_refl).
+  assert (EZ' : Rabs (Z - (B yh + B yl)) <= / 2 ^ 69 * Rabs Z) by exact EZ.
+  destruct (RoundingTest.decide_scaled_ok yh yl c_eps k Z (/ 2 ^ 69) v Fyh Fyl Feps Hy Dy He1 Heps EZ'
+              ltac:(lia) Ov Hd) as [Fv Ev].
+  split; [exact Fv | exact Ev].
+Qed.
+
 (** The fast path end to end: for every finite [x] that exp(x) reduces and
     whose fast result is normal ([k >= -1021]), when the rounding test passes,
     the returned value is [RN(e^x)]. *)
@@ -797,40 +863,10 @@ Proof.
     assert (0 <= INR j * ln 2 / 128) by nra. pose proof (exp_ineq1_le (INR j * ln 2 / 128)). lra. }
   assert (eR : 0.99 <= exp R) by (pose proof HR as H'; apply Rabs_le_inv in H'; interval with (i_prec 64)).
   assert (Zl : 0.99 <= Z) by (unfold Z; nra).
-  assert (EZa : Rabs (Z - (B yh + B yl)) <= / 2 ^ 69 * Z) by (rewrite <- (Rabs_pos_eq Z) at 2 by lra; exact EZ).
-  pose proof EZa as EZ2. apply Rabs_le_inv in EZ2.
-  assert (u69 : 0 < / 2 ^ 69 < / 1000) by (split; interval with (i_prec 64)).
-  assert (Yl : 0.98 <= B yh + B yl) by nra.
-  assert (Yb : bpow radix2 (-1022) <= Rabs (B yh + B yl)).
-  { rewrite Rabs_pos_eq by lra. apply Rle_trans with (/ 1024); [ | lra].
-    change (/ 1024) with (bpow radix2 (-10)). apply bpow_le. lia. }
-  pose proof (rel_FLT _ Yb) as RY. rewrite <- Dy in RY.
-  rewrite (Rabs_pos_eq (B yh + B yl)) in RY by lra. apply Rabs_le_inv in RY.
-  assert (Ov : B yh * bpow radix2 k < bpow radix2 1024).
-  { assert (Yh : B yh <= (1 + / 2 ^ 52) * Z).
-    { assert (C : / 2 ^ 69 * (1 + / 9007199254740992) + / 9007199254740992 <= / 2 ^ 52) by interval with (i_prec 64).
-      assert (Yu : B yh + B yl <= (1 + / 2 ^ 69) * Z) by lra.
-      assert (B yh <= (1 + / 9007199254740992) * (B yh + B yl)) by lra.
-      assert (B yh <= (1 + / 9007199254740992) * ((1 + / 2 ^ 69) * Z)).
-      { apply Rle_trans with (1 := H). apply Rmult_le_compat_l; [lra | exact Yu]. }
-      assert ((1 + / 9007199254740992) * (1 + / 2 ^ 69) <= 1 + / 2 ^ 52) by lra. nra. }
-    assert (Bk : 0 < bpow radix2 k) by apply bpow_gt_0.
-    apply Rle_lt_trans with ((1 + / 2 ^ 52) * Z * bpow radix2 k); [apply Rmult_le_compat_r; lra | ].
-    rewrite Rmult_assoc, <- Ex.
-    replace (bpow radix2 1024) with (2 ^ 1024)
+  destruct (fast_decide_scaled_ok yh yl k Z v Fyh Fyl Hy Dy Zl EZ ltac:(lia)) as [Fv Ev].
+  - rewrite <- Ex. replace (bpow radix2 1024) with (2 ^ 1024)
       by (change 1024%Z with (Z.of_nat 1024); rewrite bpow_powerRZ, <- pow_powerRZ; reflexivity).
-    assert (0 < 2 ^ 1024) by (apply pow_lt; lra).
-    assert ((1 + / 2 ^ 52) * (1 - / 2 ^ 46) < 1) by interval with (i_prec 64).
-    assert (0 < 1 + / 2 ^ 52) by lra. nra. }
-  assert (He1 : bpow radix2 (-80) <= / 2 ^ 69 <= bpow radix2 (-60)).
-  { change (bpow radix2 (-80)) with (bpow radix2 (- Z.of_nat 80)).
-    change (bpow radix2 (-60)) with (bpow radix2 (- Z.of_nat 60)). rewrite !bpow_m. split; interval with (i_prec 64). }
-  assert (Heps : / 2 ^ 69 * (1 + bpow radix2 (-50)) <= B c_eps <= 1).
-  { rewrite c_eps_val. change (bpow radix2 (-50)) with (bpow radix2 (- Z.of_nat 50)). rewrite bpow_m.
-    split; [right; field | interval with (i_prec 64)]. }
-  assert (Feps : finite c_eps) by exact (bits_finite 4296434044511453188 _ _ _ eq_refl).
-  assert (EZ' : Rabs (Z - (B yh + B yl)) <= / 2 ^ 69 * Rabs Z) by exact EZ.
-  destruct (RoundingTest.decide_scaled_ok yh yl c_eps k Z (/ 2 ^ 69) v Fyh Fyl Feps Hy Dy He1 Heps EZ'
-              ltac:(lia) Ov Hd) as [Fv Ev].
-  split; [exact Fv | rewrite Ex; exact Ev].
+    exact Eb.
+  - exact Hd.
+  - split; [exact Fv | rewrite Ex; exact Ev].
 Qed.

@@ -106,5 +106,18 @@ pub(crate) fn crosscheck_fallback(x: f64) -> (usize, i32, f64, Q128) {
     (reduced.j, reduced.k, reduced.r, reduced.accurate_value())
 }
 
+/// The existing fast kernel and its exponent-gated rounding decision.
+#[cfg(test)]
+pub(crate) fn crosscheck_fast(x: f64) -> (DoubleWord, Option<f64>) {
+    let reduced = Reduced::of(x);
+    let y = reduced.fast_value();
+    let decided = if reduced.k >= -1021 {
+        decide_scaled(y, reduced.k)
+    } else {
+        None
+    };
+    (y, decided)
+}
+
 #[cfg(test)]
 mod tests;

@@ -110,6 +110,16 @@ let compute op args =
              (List.map show_bits nr @ [string_of_int (int_of_z j); string_of_int (int_of_z k)]
               @ List.map show_bits a @ [show_opt ra] @ List.map show_bits b @ [show_opt rb])
        | _ -> failwith "stage takes one word")
+  | "exp2_entry" ->
+      (match args with
+       | [x] -> show_bits (x_exp2_entry (z_of_u64 (hex x)))
+       | _ -> failwith "exp2_entry takes one word")
+  | "exp2_fast" ->
+      (match args with
+       | [x] ->
+           let (words, result) = x_exp2_fast (z_of_u64 (hex x)) in
+           String.concat " " (List.map show_bits words @ [show_opt result])
+       | _ -> failwith "exp2_fast takes one word")
   | "exp2_fallback" ->
       (match args with
        | [x] ->
