@@ -582,8 +582,9 @@ alone doesn't claim.
   with plain multiplications on every target. An FMA kernel (`z = fma(h, rs,
   −1)`, about 40% more proof) is a follow-up.
 - **`J = 9` against `J = 10`.** `J = 10` (26 KiB) sends fewer arguments past H
-  (`2^−9.7` against `2^−8.6` on `e^d`) and measured no faster. 14 KiB and
-  `exp`'s 16 KiB table fit a 32 KiB L1 data cache together.
+  (`2^−9.7` against `2^−8.6` on `e^d`) and measured no faster. The 14 KiB
+  table and `exp`'s 8 KiB table total 22 KiB, leaving room for other data
+  in a 32 KiB L1 data cache.
 - **H's floor `2^−46`.** Below it, `A_H` is a large share of an `ulp` of
   `ln(1 + x)` and H would rarely decide. Stage B's small branch has a relative
   bound and takes those arguments.
