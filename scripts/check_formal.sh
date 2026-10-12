@@ -32,7 +32,7 @@
 #
 # The builds of 3, 5 and 6 are one parallel make over a generated _CoqProject.
 # The audits of 4, 5 and 6 and the extraction of 7 are compiled afresh on every
-# run, against the build's .vo files.
+# run, against the build's .vo files, all at once.
 #
 # Options:
 #   --deps TAR   restore the Coq libraries from TAR (scripts/formal_deps.sh)
@@ -179,7 +179,40 @@ echo "$toolchain" > "$build/.toolchain"
 (cd "$build" && coq_makefile -f _CoqProject -o Makefile && make -j"$(nproc)" TIMED=1)
 touch "$build/.built"
 
-(cd "$build/audit" && coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" -R ../binary64 Binary64 -R ../q Q Audit.v) > "$work/audit.log"
+# The audits and the cross-checks are independent, so they run at once; each is
+# then judged in turn, and the first to fail fails the lane.
+(cd "$build/audit" && coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" -R ../binary64 Binary64 -R ../q Q Audit.v) \
+  > "$work/audit.log" 2> "$work/audit.err" &
+audit=$!
+(cd "$build/gappa" && coqc -R . "" CertificateAudit.v) \
+  > "$work/certificate_audit.log" 2> "$work/certificate_audit.err" &
+certificate_audit=$!
+(cd "$build/gappa" && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" KernelAudit.v) \
+  > "$work/kernel_audit.log" 2> "$work/kernel_audit.err" &
+kernel_audit=$!
+(cd "$build/extraction" \
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
+  && ocamlfind ocamlopt -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
+  && ./crosscheck "$corpus") > "$work/crosscheck.log" 2> "$work/crosscheck.err" &
+crosscheck=$!
+(cd "$build/extraction" \
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R ../gappa "" InternalCrosscheck.v \
+  && ocamlfind ocamlopt -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
+  && ./internalcrosscheck "$icorpus") > "$work/internal_crosscheck.log" 2> "$work/internal_crosscheck.err" &
+internal_crosscheck=$!
+# finish NAME PID: waits for the step, shows its errors, and fails if it did.
+finish() {
+  status=0
+  wait "$2" || status=$?
+  cat "$work/$1.err" >&2
+  if [ "$status" -ne 0 ]; then
+    tail -n 20 "$work/$1.log" >&2
+    echo "$1 failed" >&2
+    exit "$status"
+  fi
+}
+
+finish audit "$audit"
 # Each axiom entry starts unindented; its type follows on the same line or on
 # indented lines after it, depending on its length.
 grep -E '^[^[:space:]]' "$work/audit.log" \
@@ -201,8 +234,8 @@ if [ "$reports" -ne "$(grep -c '^Print Assumptions' formal/audit/Audit.v)" ]; th
   exit 1
 fi
 
-(cd "$build/gappa" && coqc -R . "" CertificateAudit.v) > "$work/certificate-audit.log"
-grep -E '^[^[:space:]]' "$work/certificate-audit.log" \
+finish certificate_audit "$certificate_audit"
+grep -E '^[^[:space:]]' "$work/certificate_audit.log" \
   | grep -v -E '^(Axioms:|Closed under the global context)' \
   | sed 's/ :.*//' | sort -u > "$work/certificate-axioms"
 if ! comm -23 "$work/certificate-axioms" "$work/expected" | diff /dev/null - >&2; then
@@ -210,16 +243,15 @@ if ! comm -23 "$work/certificate-axioms" "$work/expected" | diff /dev/null - >&2
   exit 1
 fi
 certificates=$(grep -c '^Print Assumptions' "$build/gappa/CertificateAudit.v")
-reports=$(( $(grep -c '^Axioms:' "$work/certificate-audit.log" || true) + $(grep -c 'Closed under the global context' "$work/certificate-audit.log" || true) ))
+reports=$(( $(grep -c '^Axioms:' "$work/certificate_audit.log" || true) + $(grep -c 'Closed under the global context' "$work/certificate_audit.log" || true) ))
 if [ "$reports" -ne "$certificates" ]; then
   echo "the certificate audit reported on $reports theorems, not $certificates" >&2
   exit 1
 fi
 echo "certificates in Coq: $certificates proved"
 
-(cd "$build/gappa" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" KernelAudit.v) > "$work/kernel-audit.log"
-grep -E '^[^[:space:]]' "$work/kernel-audit.log" \
+finish kernel_audit "$kernel_audit"
+grep -E '^[^[:space:]]' "$work/kernel_audit.log" \
   | grep -v -E '^(Axioms:|Closed under the global context)' \
   | sed 's/ :.*//' | sort -u > "$work/kernel-axioms"
 sort -u formal/axioms.expected formal/axioms.int63.expected > "$work/kernel-expected"
@@ -228,19 +260,15 @@ if ! comm -23 "$work/kernel-axioms" "$work/kernel-expected" | diff /dev/null - >
   exit 1
 fi
 kernels=$(grep -c '^Print Assumptions' formal/audit/KernelAudit.v)
-reports=$(( $(grep -c '^Axioms:' "$work/kernel-audit.log" || true) + $(grep -c 'Closed under the global context' "$work/kernel-audit.log" || true) ))
+reports=$(( $(grep -c '^Axioms:' "$work/kernel_audit.log" || true) + $(grep -c 'Closed under the global context' "$work/kernel_audit.log" || true) ))
 if [ "$reports" -ne "$kernels" ]; then
   echo "the kernel audit reported on $reports theorems, not $kernels" >&2
   exit 1
 fi
 echo "kernel proofs: $kernels proved"
 
-(cd "$build/extraction" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
-  && ocamlfind ocamlopt -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
-  && ./crosscheck "$corpus")
-(cd "$build/extraction" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R ../gappa "" InternalCrosscheck.v \
-  && ocamlfind ocamlopt -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
-  && ./internalcrosscheck "$icorpus")
+finish crosscheck "$crosscheck"
+cat "$work/crosscheck.log"
+finish internal_crosscheck "$internal_crosscheck"
+cat "$work/internal_crosscheck.log"
 echo "formal: OK"
