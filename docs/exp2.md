@@ -97,8 +97,10 @@ That's within [exp] §8.1's range for its reduced argument, `|r| ≤ 0.0027077`.
   `formal/exp2/reduction.g`, proves `2^−114.57`). That's [exp]'s reduction
   budget.
 - `|r_lo| ≤ 2^−62`.
-- `two_prod`'s domain holds: `r` is `0` or at least `2^−59` in magnitude (it is
-  a multiple of `ulp(x)` once `|x| ≥ 2^−7`, and `x` itself when smaller).
+- `two_prod`'s domain holds: `r` is `0` or at least `2^−60` in magnitude.
+  For `n ≠ 0`, `|x| ≥ 2^−8`, so `x` and `n/128` lie on the `2^−60` grid;
+  for `n = 0`, `r = x`, and the entry screen excludes `|x| < 2^−55`.
+  The predecessor of `1/128` attains `r = −2^−60`.
 
 Then [exp] §8.2's fast path at `(r_hi, r_lo)` and `j` gives `Y`, within
 `ε₁ = 2^−69` of `2^(j/128 + r)` (`formal/exp/fast.g`). [exp] §8.3's rounding test
@@ -123,6 +125,7 @@ rounding once rounds `2^x` correctly. `2^n` for an integer `n` gives `r = 0`,
 |---|---|
 | `generators/radix_constants.py` | `LN2_HI`, `LN2_LO`, `ln 2` in `Q128`, with their errors (`src/exp2/tables.rs`) |
 | `formal/exp/Exp2Constants.v`, `Exp2Reduction.v`, `Exp2Product.v`, `Exp2Stages.v` | binary64 stages, generated constants and end-to-end rounding theorem |
+| `formal/exp/Exp2FallbackReduction.v`, `Exp2FallbackAccurate.v` | exact fallback reduction and `1097·2^−134` relative error of its Q128 result |
 | `generators/radix_certificates.py` | writes `formal/exp2/reduction.g` from those errors |
 | `formal/exp2/reduction.g` (Gappa 1.4.1) | the reduction, within `2^−113` |
 | `generators/exp2_reference.py` | the fixture: [LM] Table 6, thresholds, integers, special values, random arguments, and 1,200 values to 192 bits |
@@ -145,3 +148,15 @@ the certificate and the source.
 - The extracted binary64 stage transcription against the Rust stage result,
   including the screen edges and arbitrary encodings, in the internal cross-check.
 - The determinism digest's `exp2` section on every target.
+
+`exp2_fallback_accurate_bound` proves the unrounded Q128 bound for every
+finite binary64 `x` with `2^−55 ≤ |x| ≤ 1075`. It composes the exact reduction,
+the generated Q128 `ln 2` bound, Q128 multiplication and `ExpAccurate.accurate_bound`.
+The theorem does not assume the reduction's table index or scale: both are
+computed from the input. Its transcription is extracted and compared bit for
+bit with Rust's actual fallback, including both signs, every table index,
+nearest-integer ties, entry thresholds and finite inputs outside that proof
+domain. The formal gate audits its axioms and binds the source and proof files.
+This theorem covers the unrounded accurate value; the fallback's double-word
+fast path, public-entry screens and final rounding do not yet have a composed
+end-to-end theorem.

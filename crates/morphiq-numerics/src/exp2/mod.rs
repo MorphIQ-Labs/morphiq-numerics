@@ -99,5 +99,12 @@ impl Reduced {
     }
 }
 
+/// Exposes the actual fallback to the extracted Coq cross-check.
+#[cfg(test)]
+pub(crate) fn crosscheck_fallback(x: f64) -> (usize, i32, f64, Q128) {
+    let reduced = Reduced::of(x);
+    (reduced.j, reduced.k, reduced.r, reduced.accurate_value())
+}
+
 #[cfg(test)]
 mod tests;

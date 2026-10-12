@@ -134,3 +134,19 @@ fn dyadic_reduction_boundaries_and_neighbors_round_correctly() {
         }
     }
 }
+
+/// The predecessor of 1/128 is the tight residual case missed by the old
+/// 2^-59 derivation. Check both signs against exact dyadic values.
+#[test]
+fn fallback_residual_reaches_the_proved_lower_bound() {
+    for sign in [-1.0, 1.0] {
+        let x = sign * 0.007_812_5_f64.next_down();
+        let reduced = Reduced::of(x);
+        let expected = Exact::of_f64(-sign).mul(&Exact::pow2(-60));
+        assert!(Exact::of_f64(reduced.r).cmp(&expected).is_eq());
+        let reconstructed = Exact::of_f64(f64::from(reduced.k))
+            .add(&Exact::of_f64(f64::from(u32::try_from(reduced.j).unwrap())).mul(&Exact::pow2(-7)))
+            .add(&Exact::of_f64(reduced.r));
+        assert!(reconstructed.cmp(&Exact::of_f64(x)).is_eq());
+    }
+}
