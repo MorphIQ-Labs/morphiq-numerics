@@ -71,7 +71,8 @@ cargo build -p morphiq-numerics --locked --target thumbv7em-none-eabihf --featur
 cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
 MORPHIQ_INTERNAL_CORPUS=$PWD/target/internal-crosscheck.txt cargo test --locked -p morphiq-numerics --lib internal_crosscheck -- --ignored
 # in the pinned Debian image (see the formal job): ./scripts/write_gappa_proofs.sh target/gappa-proofs
-# then, in the pinned Coq image (see the formal job): ./scripts/check_formal.sh target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
+# then, in the pinned Coq image (.cargo/coq-image): ./scripts/check_formal.sh target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
+#   (--build DIR keeps the proof build in DIR and reuses it next time; see the script's header)
 # and, in the pinned Debian image (see the certificates job): ./scripts/check_certificates.sh
 cargo deny --locked check licenses
 ```

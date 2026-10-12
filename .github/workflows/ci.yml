@@ -271,8 +271,8 @@ jobs:
       - run: ./scripts/check_lanes_sde.sh
 
   # Machine-checked proofs, bound to the source they describe: the double-word
-  # error bounds and two_prod's exactness (docs/double-word.md). The Coq image
-  # is pinned by digest; Flocq and math-comp versions are pinned in the script.
+  # error bounds and two_prod's exactness (docs/double-word.md), the Gappa
+  # certificates here and their Coq proofs in the formal job below.
   certificates:
     name: certificates (sollya, gappa)
     needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
@@ -288,11 +288,25 @@ jobs:
             debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 \
             bash -c 'apt-get update -qq >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq sollya=8.0+ds-2+b1 gappa=1.4.1-1 >/dev/null && ./scripts/check_certificates.sh'
 
+  # The Coq proofs (scripts/check_formal.sh). The Coq image is pinned by digest
+  # (.cargo/coq-image) and its libraries by version (.cargo/coq-packages).
+  # Two caches keep the job short; neither is trusted for a result:
+  # - coq-deps: the libraries' install (scripts/formal_deps.sh), keyed on the
+  #   image, the versions and the script that builds it. The proof step checks
+  #   the restored versions.
+  # - formal-build: the proof build's tree. check_formal.sh reuses a .vo only
+  #   if its source's bytes, the generated _CoqProject and the toolchain's
+  #   fingerprint are unchanged, so the key decides only how much is reused.
+  #   The admits check, the audits and the cross-checks run on every run.
+  # A pull request's caches are visible only to that pull request; main's are
+  # visible to every pull request, and main reads only its own.
   formal:
     name: formal (coq)
     needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-24.04
+    # Cold (no cache) about TODO minutes; warm about TODO.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -311,8 +325,56 @@ jobs:
           docker run --rm -v "$PWD:/w" -w /w \
             debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 \
             bash -c 'apt-get update -qq >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gappa=1.4.1-1 >/dev/null && ./scripts/write_gappa_proofs.sh target/gappa-proofs'
-      - name: Proofs build, are bound to the source, assume only the expected axioms, and match the Rust bit for bit
+      - name: Pull the Coq image
+        run: docker pull --quiet "$(cat .cargo/coq-image)"
+      - name: Cache keys
+        id: keys
+        run: echo "deps=coq-deps-$(sha256sum .cargo/coq-image .cargo/coq-packages scripts/formal_deps.sh | sha256sum | cut -c1-64)" >> "$GITHUB_OUTPUT"
+      - name: Restore the Coq libraries
+        id: deps
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/coq-deps
+          key: ${{ steps.keys.outputs.deps }}
+      - name: Build the Coq libraries
+        if: steps.deps.outputs.cache-hit != 'true'
+        # The container's user isn't the runner's, so the mounted directory is
+        # open to it.
         run: |
-          docker run --rm -v "$PWD:/w:ro" -w /w \
-            coqorg/coq@sha256:6113894351967e84f6eca8bd584abbea2c8b97621bb1a0aa9cf7b1d24e7f49ef \
-            bash -c 'opam update --quiet >/dev/null 2>&1 || true; ./scripts/check_formal.sh target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs'
+          mkdir -p -m 0777 "$RUNNER_TEMP/coq-deps"
+          docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP/coq-deps:/deps" -w /w "$(cat .cargo/coq-image)" \
+            ./scripts/formal_deps.sh /deps/coq-deps.tar.gz
+      - name: Save the Coq libraries
+        if: steps.deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/coq-deps
+          key: ${{ steps.keys.outputs.deps }}
+      - name: Restore the proof build
+        id: build
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/formal-build
+          key: formal-build-${{ steps.keys.outputs.deps }}-${{ hashFiles('formal/**', 'scripts/check_formal.sh', 'target/gappa-proofs/**') }}
+          restore-keys: formal-build-${{ steps.keys.outputs.deps }}-
+      - name: Proofs build, are bound to the source, assume only the expected axioms, and match the Rust bit for bit
+        id: proofs
+        run: |
+          mkdir -p "$RUNNER_TEMP/formal-build"
+          rm -f "$RUNNER_TEMP/formal-build/.built"
+          chmod -R a+rwX "$RUNNER_TEMP/formal-build"
+          docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
+            ./scripts/check_formal.sh --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
+            target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
+      # Saved whenever the build itself succeeded (check_formal.sh marks the
+      # tree), even if a later check failed, so the next run reuses it.
+      - name: Was the proof build completed
+        id: built
+        if: ${{ !cancelled() && steps.build.outputs.cache-hit != 'true' }}
+        run: if [ -e "$RUNNER_TEMP/formal-build/.built" ]; then echo "built=true" >> "$GITHUB_OUTPUT"; fi
+      - name: Save the proof build
+        if: ${{ !cancelled() && steps.built.outputs.built == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/formal-build
+          key: ${{ steps.build.outputs.cache-primary-key }}
