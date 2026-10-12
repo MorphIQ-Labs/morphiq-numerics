@@ -6,6 +6,7 @@
 
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;
+mod stage;
 mod stage_tables;
 pub(crate) mod stages;
 mod tables;
@@ -54,6 +55,9 @@ pub fn ln(x: f64) -> f64 {
         return 0.0;
     }
     let reduced = Reduced::of(x);
+    if let Some(y) = stage::parts(reduced.e, reduced.y).3 {
+        return y;
+    }
     if let Some(y) = decide(reduced.fast_value()) {
         return y;
     }

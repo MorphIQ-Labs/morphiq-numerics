@@ -170,7 +170,43 @@ in case B, and `|−ln R[i]/ln x|`, `|ln(1 + z)/ln x|` and `|E·ln 2/ln x|` belo
 at a rational (the series of `2·artanh`, its remainder bounded by the mean
 value theorem, evaluated in integers rounded outward).
 
-## 4. Fast path (after [DLM] §3.3)
+### 3.1 Reciprocal first stage for `ln`
+
+After the special values in §1, `ln` normalizes the argument with
+`Reduced::of`: `x = 2^e h`, including the exact `2^54` scaling for subnormals.
+It applies §7.2's 512-entry reciprocal reduction to `h`, obtaining
+`h = 2^re y` and the exact binary64 `z = y R[i] − 1`. The total exponent
+is `E = e + re`. The normalizer gives `h ∈ [181/256, 181/128)`;
+`LnStage.v` bounds `re` by `[-1, 1]`, hence `E ∈ [-1075, 1025]`.
+
+`ln/stage.rs` evaluates §7.3's degree-six polynomial with the same operation
+order, replacing the limited-range `EL` lookup by `E·L1` and `RN(E·L0)`.
+There is no `1 + x` split residual. Its reconstruction is
+
+```text
+ln1 = E·L1 + th              // exact on the 2^-43 grid
+ln0 = RN(RN(E·L0) + tl)
+s   = RN(ln1 + z)
+e1  = RN(z − RN(s − ln1))    // Fast2Sum residual
+lo  = RN(RN(e1 + ln0) + q)
+eps = RN(RN(z2·2^-49) + RN(RN(|s|·2^-83) + 2^-102))
+```
+
+The proof allows `|E| ≤ 1100`: `|E·L1 + th| < 1024`, so the high sum
+remains exact on its grid. The relative errors of the table reconstruction
+remain bounded by `183·2^-94 |s|` and `183·2^-41 |s|`, as in §7.3;
+the composition allows `|s| ≤ 900`. Thus the original H constants suffice,
+without widening the bound for the full exponent range.
+
+`formal/ln/LnStage.v` transcribes these binary64 operations. `ln_stage_ok`
+connects `LnReduction.reduce_ok`, the exact reciprocal reduction, the
+polynomial certificates, reconstruction and §7.5's rounding test. For every
+finite `x > 0`, `x ≠ 1`, a decided value is `RN(ln x)`; every real within
+`2^-123 |ln x|` also rounds to that value. Undecided inputs continue through
+§4 and §6. The accurate path and special-value results are unchanged.
+`ln_slice` performs the same stage in lanes ([lanes.md](lanes.md) §5).
+
+## 4. Double-word fallback (after [DLM] §3.3)
 
 **Decision 2: [DLM]'s portable evaluation, on the crate's proved double-word
 operations.**
@@ -583,14 +619,14 @@ alone doesn't claim.
   −1)`, about 40% more proof) is a follow-up.
 - **`J = 9` against `J = 10`.** `J = 10` (26 KiB) sends fewer arguments past H
   (`2^−9.7` against `2^−8.6` on `e^d`) and measured no faster. 14 KiB and
-  `exp`'s 16 KiB table fit a 32 KiB L1 data cache together.
+  `exp`'s 8 KiB table total 22 KiB, fitting a 32 KiB L1 data cache together.
 - **H's floor `2^−46`.** Below it, `A_H` is a large share of an `ulp` of
   `ln(1 + x)` and H would rarely decide. Stage B's small branch has a relative
   bound and takes those arguments.
 - **Stage B's constant `eps`.** `|ln(1 + x)| ≥ 2^−9.01` on the table branch,
   so `2^−78` is far below an `ulp`.
-- **`ln` is unchanged.** Its fast path keeps §4; giving it this reduction is a
-  follow-up.
+- **`ln` shares the reciprocal reduction.** Its first stage is §3.1, with
+  `E·ln 2` evaluated across its full exponent range.
 - **Lanes.** Stage H has no branch or select, so `ln_1p_slice` runs it in
   lanes ([lanes.md](lanes.md)).
 
@@ -614,6 +650,7 @@ alone doesn't claim.
 | `generators/ln_poly.sollya` (stages) | Sollya 8.0 | `H0`–`H3` (`h3`–`h6`) and `B0`–`B5` (`b3`–`b8`), `fpminimax`, relative on `\|z\| ≤ 2^−9`, with their approximation bounds, in `generators/ln_poly.out` |
 | `generators/ln1p_constants.py` | Python, mpmath | writes `crates/morphiq-numerics/src/ln/stage_tables.rs` and `formal/ln/Ln1pTables.v`: `OFF`, `R`, `T`, `L1`/`L0`, `EL` and the stages' polynomials, each bound of §7.2 checked |
 | `generators/ln1p_certificates.py` | Python, mpmath | writes the stage certificates below and `formal/ln/Ln1pCertificates.v`, their theorems over reals; hypotheses derived, goals widened by at least 1% |
+| `formal/ln/LnStage.v` | Coq | `ln` reciprocal stage, normalization through rounding test (§3.1) |
 | `formal/ln/stage_h_q.g`, `_lr.g`, `_gz.g`, `_gs.g`, `_ga.g` | Gappa 1.4.1 | stage H's `q`, `l` term and the three error terms (§7.3) |
 | `formal/ln/stage_b_small_tail.g`, `_small.g` | Gappa | stage B's small branch (§7.4) |
 | `formal/ln/stage_b_lo.g`, `_total.g` | Gappa | stage B's table branch (§7.4) |
