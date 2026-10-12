@@ -23,12 +23,15 @@ cd "$(dirname "$0")/.."
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir "$work/repo"
-cp -r .cargo formal scripts "$work/repo/"
+cp -r .cargo crates formal scripts "$work/repo/"
 cp -a "$build" "$work/build"
 cp "$corpus" "$work/crosscheck.txt"
 cp "$icorpus" "$work/internal-crosscheck.txt"
 cp -r "$proofs" "$work/proofs"
 cd "$work/repo"
+# Validate the clean fixture first: unrelated missing or stale bound sources
+# must not masquerade as a successful rejection in the binding case.
+sha256sum --check --quiet formal/binding.sha256
 
 rebind() {
   sed -i "s|^[0-9a-f]*  $1\$|$(sha256sum "$1")|" formal/binding.sha256
