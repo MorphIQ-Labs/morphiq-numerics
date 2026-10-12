@@ -16,7 +16,7 @@ Proof.
  - rewrite H. replace (/2*B p) with (B p*bpow radix2 (-1)) by (change (bpow radix2 (-1)) with (/2); ring).
    apply (scaled_fmt_grid _ (-212)); [apply B_fmt | exact G | lia].
  - rewrite H, Rabs_mult, (Rabs_pos_eq (/2)) by lra.
-   apply Rle_lt_trans with (/2); [lra | interval].
+   apply Rle_lt_trans with (/2); [lra | interval with (i_prec 64)].
  - rewrite H in V. split; [exact Fp | split; [rewrite V; field | ]].
    rewrite V, Rabs_mult, (Rabs_pos_eq (/2)); lra.
 Qed.
@@ -28,7 +28,7 @@ Proof.
  intros F X. assert (A : Rabs (B x*B x) <= /1024).
  { rewrite Rabs_mult. nra. }
  assert (Dom : in_two_prod_domain (B x) (B x)).
- { right. rewrite Rabs_mult. apply Rle_trans with ((/2^54)*(/2^54)); [interval | nra]. }
+ { right. rewrite Rabs_mult. apply Rle_trans with ((/2^54)*(/2^54)); [interval with (i_prec 64) | nra]. }
  pose proof (two_prod_ieee 0 0 x x F F ltac:(change (bpow radix2 0) with 1; lra)
   ltac:(change (bpow radix2 0) with 1; lra) ltac:(lia) ltac:(lia) ltac:(lia) Dom) as P.
  unfold em_half_square. destruct (two_prod64 x x) as [p l]. destruct P as [Fp [Fl [Vp Vl]]].
@@ -45,8 +45,8 @@ Proof.
  destruct (em_half_word p Fp Gp ltac:(lra)) as [Fhp [Vhp Ahp]].
  destruct (em_half_word l Fl Gl ltac:(lra)) as [Fhl [Vhl Ahl]].
  pose proof (two_sum_ieee (fmul c_half p) (fmul c_half l) Fhp Fhl
-   ltac:(apply Rle_trans with (/2); [exact Ahp | interval])
-   ltac:(apply Rle_trans with (/2); [exact Ahl | interval])) as S.
+   ltac:(apply Rle_trans with (/2); [exact Ahp | interval with (i_prec 64)])
+   ltac:(apply Rle_trans with (/2); [exact Ahl | interval with (i_prec 64)])) as S.
  destruct (two_sum64 (fmul c_half p) (fmul c_half l)) as [h t]. destruct S as [Fh [Ft [Vh Vt]]].
  rewrite Vhp, Vhl in Vh, Vt.
  assert (V : B h+B t = B x*B x/2) by lra.

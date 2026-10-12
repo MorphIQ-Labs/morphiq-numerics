@@ -126,7 +126,7 @@ Theorem em_small_accurate_bound x : finite x ->
  Rabs (Q128.qval (em_small_accurate x)-(exp (B x)-1)) <= /2^123 * Rabs (exp (B x)-1).
 Proof.
  intros Fx X. assert (X0 : B x <> 0).
- { intros Z. rewrite Z, Rabs_R0 in X. assert (0 < /2^54) by interval. lra. }
+ { intros Z. rewrite Z, Rabs_R0 in X. assert (0 < /2^54) by interval with (i_prec 64). lra. }
  assert (XA : Rabs (B x) <= 0.0312501) by lra.
  pose proof (from_f64_nz (bits_of_b64 x)) as Nx.
  pose proof (from_f64_b64 x Fx) as Vx. fold (qf x) in Nx, Vx.
@@ -159,7 +159,7 @@ Proof.
    rewrite Rabs_mult. apply Rmult_le_compat_r; [apply Rabs_pos | exact C]. }
  split; [ | exact E]. destruct Nq as [Z | N]; [ | exact N].
  rewrite (qval_zero _ Z), Rminus_0_l, Rabs_Ropp in E.
- pose proof (Rabs_pos_lt _ W0). assert (/2^123 < 1) by interval. nra.
+ pose proof (Rabs_pos_lt _ W0). assert (/2^123 < 1) by interval with (i_prec 64). nra.
 Qed.
 
 Require Import Exp2Fallback Ln1pLemmas.
@@ -173,7 +173,7 @@ Proof.
  { generalize XA. generalize (B x). intros v V. interval with (i_prec 80). }
  assert (Qb : Rabs (Q128.qval (em_small_accurate x)) <= 1).
  { pose proof (Rabs_triang_inv (Q128.qval (em_small_accurate x)) (exp (B x)-1)).
-   assert (/2^123 <= 1) by interval. pose proof (Rabs_pos (exp (B x)-1)). nra. }
+   assert (/2^123 <= 1) by interval with (i_prec 64). pose proof (Rabs_pos (exp (B x)-1)). nra. }
  assert (Bd : bnd 1 0 (Q128.qval (em_small_accurate x))) by (unfold bnd; change (IZR 1 * bpow radix2 0) with (1*1); lra).
  assert (Ov : Rabs (rndF (Q128.qval (em_small_accurate x))) < bpow radix2 1024).
  { apply Rle_lt_trans with (1:=bnd_round 1 0 _ ltac:(lia) ltac:(lia) Bd).

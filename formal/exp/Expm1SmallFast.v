@@ -83,7 +83,7 @@ Proof.
  assert (Hlo : bpow radix2 (-900) <= Rabs (B h)).
  { rewrite Dh. apply Rle_trans with (bpow radix2 (-55)); [apply bpow_le; lia | apply em_rnd_lower; [lia | tauto]]. }
  assert (Hhi : Rabs (B h) < bpow radix2 1024).
- { rewrite Dh. apply Rle_lt_trans with 1; [apply rnd_bound; [apply (fmt_pow 0); lia | tauto] | interval]. }
+ { rewrite Dh. apply Rle_lt_trans with 1; [apply rnd_bound; [apply (fmt_pow 0); lia | tauto] | interval with (i_prec 64)]. }
  repeat split; assumption.
 Qed.
 Definition em_small_fast x := let '(h,l) := em_small_fast_value x in decide_with h l em_eps.

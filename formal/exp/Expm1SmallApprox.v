@@ -54,7 +54,7 @@ Proof.
  assert (V : Rabs (x*x*x)*Rabs (em_poly_difference x) <= Rabs (x*x*x)*((1035/2^64)*em_w x))
    by (apply Rmult_le_compat_l; assumption).
  assert (C : /2^70 <= (1/2^64)*em_w x).
- { apply Rle_trans with ((1/2^64)*0.16); [interval | apply Rmult_le_compat_l; [interval | lra]]. }
+ { apply Rle_trans with ((1/2^64)*0.16); [interval with (i_prec 64) | apply Rmult_le_compat_l; [interval with (i_prec 64) | lra]]. }
  assert (Cw : Rabs (x*x*x)/2^70 <= Rabs (x*x*x)*((1/2^64)*em_w x)) by (apply Rmult_le_compat_l; assumption).
  nra.
 Qed.

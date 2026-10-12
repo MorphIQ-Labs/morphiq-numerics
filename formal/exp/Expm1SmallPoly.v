@@ -22,12 +22,12 @@ Proof.
        apply Rle_trans with (1:=Rabs_triang _ _). lra.
      + split; [exact Fs | split; [rewrite Vs,Vm; reflexivity | exact As]]. }
  unfold em_horner.
- destruct (Step em_c9 em_c8 em_c9_finite em_c8_finite ltac:(rewrite em_c9_val; interval) ltac:(rewrite em_c8_val; interval)) as [F1 [V1 A1]].
- destruct (Step _ em_c7 F1 em_c7_finite A1 ltac:(rewrite em_c7_val; interval)) as [F2 [V2 A2]].
- destruct (Step _ em_c6 F2 em_c6_finite A2 ltac:(rewrite em_c6_val; interval)) as [F3 [V3 A3]].
- destruct (Step _ em_c5 F3 em_c5_finite A3 ltac:(rewrite em_c5_val; interval)) as [F4 [V4 A4]].
- destruct (Step _ em_c4 F4 em_c4_finite A4 ltac:(rewrite em_c4_val; interval)) as [F5 [V5 A5]].
- destruct (Step _ em_c3 F5 em_c3_finite A5 ltac:(rewrite em_c3_val; interval)) as [F6 [V6 A6]].
+ destruct (Step em_c9 em_c8 em_c9_finite em_c8_finite ltac:(rewrite em_c9_val; interval with (i_prec 64)) ltac:(rewrite em_c8_val; interval with (i_prec 64))) as [F1 [V1 A1]].
+ destruct (Step _ em_c7 F1 em_c7_finite A1 ltac:(rewrite em_c7_val; interval with (i_prec 64))) as [F2 [V2 A2]].
+ destruct (Step _ em_c6 F2 em_c6_finite A2 ltac:(rewrite em_c6_val; interval with (i_prec 64))) as [F3 [V3 A3]].
+ destruct (Step _ em_c5 F3 em_c5_finite A3 ltac:(rewrite em_c5_val; interval with (i_prec 64))) as [F4 [V4 A4]].
+ destruct (Step _ em_c4 F4 em_c4_finite A4 ltac:(rewrite em_c4_val; interval with (i_prec 64))) as [F5 [V5 A5]].
+ destruct (Step _ em_c3 F5 em_c3_finite A5 ltac:(rewrite em_c3_val; interval with (i_prec 64))) as [F6 [V6 A6]].
  split; [exact F6 | split; [ | exact A6]].
  rewrite V6,V5,V4,V3,V2,V1. em_real_coefficients. unfold em_wr.
  change (round radix2 (FLT_exp (-1074) 53) Gappa_round_def.rndNE) with (round radix2 (FLT_exp emin prec) (Znearest ne)).
