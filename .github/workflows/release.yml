@@ -79,6 +79,11 @@ jobs:
           release-plz release --config release-plz.toml --forge github --git-token "$GITHUB_TOKEN"
           git fetch --force --tags origin
 
+      # Every tag, the one just cut included, names its commit's workspace
+      # version. release-version.yml checks the same on the tag push.
+      - name: Release tags equal the workspace version
+        run: ./scripts/check_release_version.sh
+
       - name: Open or update the release pull request
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}

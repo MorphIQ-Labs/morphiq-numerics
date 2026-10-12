@@ -1,0 +1,38 @@
+# Release tags equal the Cargo version (scripts/check_release_version.sh): on
+# every pull request, the release pull request's proposed tag; on every push to
+# main and every pushed v* tag, every tag in the repository.
+#
+# A separate workflow from ci.yml, so its job can be made a required check in
+# the "Main branch protection" ruleset on its own.
+
+name: release-version
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-version-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  version:
+    name: release / version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Every tag, to check each against its commit's version.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Release tags equal the workspace version
+        # The title arrives through the environment, never interpolated into
+        # the script.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: ./scripts/check_release_version.sh

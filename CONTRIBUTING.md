@@ -64,7 +64,9 @@ Releases are automated by release-plz. After each merge it keeps a
 `CHANGELOG.md` section written from the squash subjects; a maintainer merges
 it like any other pull request once its checks pass, and that merge tags
 `v{version}` and creates the GitHub release. Never push a tag, bump the
-version or edit a released changelog section by hand.
+version or edit a released changelog section by hand. A tag always equals
+the workspace version at its commit; `scripts/check_release_version.sh`
+enforces it.
 
 Until 0.1 a release is a git tag only (`v0.0.N`); 0.1.0 is reserved for the
 first crates.io release ([#90](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/90)).
