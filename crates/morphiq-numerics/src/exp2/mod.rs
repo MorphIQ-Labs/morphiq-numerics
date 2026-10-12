@@ -5,6 +5,7 @@
 //! section numbers below refer to it. The reduction is `exp`'s with `ln 2`
 //! factored out, and both paths after it are `exp`'s.
 
+pub(crate) mod stages;
 mod tables;
 
 use crate::double_word::DoubleWord;
@@ -46,6 +47,9 @@ pub fn exp2(x: f64) -> f64 {
     }
     if (ONE_LOW..ONE_HIGH).contains(&x) {
         return 1.0;
+    }
+    if let Some(y) = stages::stages(x) {
+        return y;
     }
     let reduced = Reduced::of(x);
     if reduced.k >= -1021

@@ -68,3 +68,7 @@ Print Assumptions Ln1p.ln_1p_stages_ok.
 Require LnStage.
 Print Assumptions LnStage.ln_stage_ok.
 Print Assumptions LnStage.ln_stage_accurate_value.
+
+Require Exp2Stages Expm1Stages.
+Print Assumptions Exp2Stages.exp2_stages_ok.
+Print Assumptions Expm1Stages.expm1_stages_ok.

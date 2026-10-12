@@ -16,6 +16,7 @@ From Flocq Require Import IEEE754.Binary IEEE754.Bits.
 From Q Require Import Limbs Digits64 Q128 Q256.
 From Binary64 Require Import IEEE64 RoundingTest.
 Require ExpReduction ExpFast ExpAccurate ExpSmall LnReduction LnAccurate Ln1pScreen ExpStageReduction ExpStageA ExpStageB Ln1pStageH Ln1pStageB.
+Require Exp2Stages Expm1Stages.
 Import ListNotations.
 
 Definition limbs (k : nat) (x : Z) : list Z := map (fun i => dig x (Z.of_nat i)) (seq 0 k).
@@ -95,5 +96,9 @@ Definition x_ln1p_b x :=
 (** ln_1p's screens (Ln1pScreen.v): stage H's, then stage B's. *)
 Definition x_ln1p_screens x := (Ln1pScreen.h_screen (b64_of_bits x), Ln1pScreen.b_screen (b64_of_bits x)).
 
-Extraction "internalcrosscheck.ml" x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
+(** The full screens, stages, rounding decisions and scaling of exp2/expm1. *)
+Definition x_exp2_stages x := opt_bits (Exp2Stages.exp2_stages (b64_of_bits x)).
+Definition x_expm1_stages x := opt_bits (Expm1Stages.expm1_stages (b64_of_bits x)).
+
+Extraction "internalcrosscheck.ml" x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
   x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs.

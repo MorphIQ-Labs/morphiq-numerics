@@ -127,6 +127,12 @@ impl Stages {
         }
     }
 
+    /// The final power-of-two exponent, also used by `expm1`.
+    #[inline]
+    pub(crate) fn exponent(&self) -> i64 {
+        self.k
+    }
+
     /// `(j, k)`, for the internal cross-check.
     #[cfg(test)]
     pub(crate) fn jk(&self) -> (usize, i64) {
@@ -152,10 +158,7 @@ impl Stages {
     #[inline]
     pub(crate) fn a_value(&self) -> (f64, f64) {
         let r = self.r1 - self.n * S_L2D;
-        let [d3, d4, d5] = POLY_S;
-        let u = r + (r * r) * (0.5 + r * (d3 + r * (d4 + r * d5)));
-        let (th, tl) = table(self.j);
-        (th, tl + th * u)
+        stage_a_at(self.j, r)
     }
 
     /// §6 and §7: stage B's `y + l`, scaled by `2^k` when the test proves
@@ -176,16 +179,32 @@ impl Stages {
         let r0 = self.r1 - p2;
         let r_h = (r0 + SPLIT) - SPLIT;
         let r_t = ((self.r1 - r_h) - p2) - self.n * S_L3;
-        let r_hi = r_h + r_t;
-        let [d3, d4, d5] = POLY_S;
-        let q = (r_hi * r_hi) * (0.5 + r_hi * (d3 + r_hi * (d4 + r_hi * d5)));
-        let (th, tl) = table(self.j);
-        // a: th's leading 21 bits, so a·r_h and th − a are exact.
-        let a = f64::from_bits(th.to_bits() & HIGH_21);
-        let rest = tl + (tl * r_hi + ((th - a) * r_h + th * (r_t + q)));
-        let (y, e) = fast_two_sum(th, a * r_h);
-        (y, e + rest)
+        stage_b_at(self.j, r_h, r_t)
     }
+}
+
+/// Shared exponential stage A after the caller's proved reduction.
+#[inline]
+pub(crate) fn stage_a_at(j: usize, r: f64) -> (f64, f64) {
+    let [d3, d4, d5] = POLY_S;
+    let u = r + (r * r) * (0.5 + r * (d3 + r * (d4 + r * d5)));
+    let (th, tl) = table(j);
+    (th, tl + th * u)
+}
+
+/// Shared exponential stage B: `r_h` is on the `2^-40` grid and the
+/// caller supplies the proved residual `r_t`.
+#[inline]
+pub(crate) fn stage_b_at(j: usize, r_h: f64, r_t: f64) -> (f64, f64) {
+    let r_hi = r_h + r_t;
+    let [d3, d4, d5] = POLY_S;
+    let q = (r_hi * r_hi) * (0.5 + r_hi * (d3 + r_hi * (d4 + r_hi * d5)));
+    let (th, tl) = table(j);
+    // a: th's leading 21 bits, so a·r_h and th − a are exact.
+    let a = f64::from_bits(th.to_bits() & HIGH_21);
+    let rest = tl + (tl * r_hi + ((th - a) * r_h + th * (r_t + q)));
+    let (y, e) = fast_two_sum(th, a * r_h);
+    (y, e + rest)
 }
 
 /// `2^(j/512)` as a double-word `(hi, lo)`.
@@ -200,7 +219,7 @@ fn table(j: usize) -> (f64, f64) {
 /// `y + l` near `[1, 2]` and `|k| ≤ 1016`, so the scaling, on the exponent
 /// field, is exact.
 #[inline]
-fn decide(y: f64, l: f64, e: f64, k: i64) -> Option<f64> {
+pub(crate) fn decide(y: f64, l: f64, e: f64, k: i64) -> Option<f64> {
     let low = y + (l - e);
     let high = y + (l + e);
     #[allow(clippy::cast_sign_loss)] // two's complement: adds k to the exponent

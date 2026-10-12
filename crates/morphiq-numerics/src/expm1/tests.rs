@@ -103,3 +103,75 @@ fn rounding_test_constant_is_its_definition() {
     let two = |k: i32| f64::from_bits(u64::try_from(1023 + k).unwrap() << 52);
     assert_eq!(EPS.to_bits(), (two(-62) * (1.0 + two(-50))).to_bits());
 }
+
+#[test]
+fn stage_subtraction_budget_contains_independent_reference_values() {
+    use super::stages::{E_A, E_B, parts};
+    for c in entries(
+        include_str!("../../../reference/fixtures/expm1.json"),
+        &["precise"],
+    ) {
+        let x = word(c, "x");
+        if !(x > -37.0 && x < 704.0 && x.abs() >= SMALL) {
+            continue;
+        }
+        let mut reference = Exact::of_hex(field(c, "m"), field(c, "e").parse().unwrap());
+        if field(c, "negative") == "true" {
+            reference = reference.neg();
+        }
+        let r = crate::exp::Stages::of(x);
+        let k = i32::try_from(r.exponent()).unwrap();
+        let reference = reference.mul(&Exact::pow2(-i64::from(k)));
+        for ((h, l), base) in [(r.a_value(), E_A), (r.b_value(), E_B)] {
+            let (s, lo, eps) = parts(h, l, k, base);
+            let center = Exact::of_f64(s).add(&Exact::of_f64(lo));
+            let margin = Exact::of_f64(lo)
+                .abs()
+                .add(&Exact::of_f64(eps))
+                .mul(&Exact::pow2(-53));
+            assert!(
+                center
+                    .sub(&reference)
+                    .abs()
+                    .add(&margin)
+                    .cmp(&Exact::of_f64(eps))
+                    .is_le(),
+                "expm1({x:e})"
+            );
+        }
+    }
+}
+
+#[test]
+fn exponential_stages_agree_with_accurate_results_and_mostly_decide() {
+    let mut rng = SplitMix64::new(0x6578_6d31_7374_6167);
+    for (lo, hi) in [
+        (-37.0, -SMALL),
+        (SMALL, 704.0),
+        (-1.0, -SMALL),
+        (SMALL, 1.0),
+    ] {
+        let (mut a_missed, mut b_missed) = (0, 0);
+        for _ in 0..(1 << 18) {
+            #[allow(clippy::cast_precision_loss)] // 53-bit integer
+            let u = (rng.next_u64() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+            let x = lo + (hi - lo) * u;
+            let r = crate::exp::Stages::of(x);
+            let k = i32::try_from(r.exponent()).unwrap();
+            let expected = general_accurate(&Reduced::of(x)).to_f64();
+            for ((h, l), base, missed) in [
+                (r.a_value(), super::stages::E_A, &mut a_missed),
+                (r.b_value(), super::stages::E_B, &mut b_missed),
+            ] {
+                match super::stages::subtract(h, l, k, base) {
+                    Some(v) => assert_eq!(v.to_bits(), expected.to_bits(), "expm1({x:e})"),
+                    None => *missed += 1,
+                }
+            }
+        }
+        std::eprintln!(
+            "expm1 stages ({lo},{hi}): A misses {a_missed}, B misses {b_missed} of 262144"
+        );
+        assert!(b_missed < 256);
+    }
+}

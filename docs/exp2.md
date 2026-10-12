@@ -1,10 +1,10 @@
 # `exp2`: correctly rounded radix-2 exponential
 
 `morphiq_numerics::elementary::exp2` (`crates/morphiq-numerics/src/exp2/`)
-follows this derivation. It reduces `x` to `exp`'s reduced argument, then runs
-the fast value, rounding test and accurate path of `exp`'s fallback
-([exp.md](exp.md) §8) unchanged. Only the reduction is new, and its error is
-certified here (§3).
+follows this derivation. Its first two stages share `exp`'s 512-entry table
+and polynomial kernels. An exact dyadic reduction replaces `exp`'s reduction.
+Undecided arguments and the range edges use the 128-entry double-word and
+`Q128` fallback described in §2–§4.
 
 `exp2(x)` returns `2^x` rounded to nearest, ties to even, for every binary64
 `x`, subnormal results included. `2^n` is exact for every integer `n` where it
@@ -36,7 +36,42 @@ reference.
 distance `2^−113` of `2^x` rounds correctly, over the whole range. Relative
 error below `2^−114` suffices ([LM] footnote 10).
 
-## 2. Reduction
+## 2. Reduction and stages
+
+### 2.1. The 512-entry stages
+
+For `2^−55 ≤ |x| < 1016`, let `n = RN_int(512x)`, `j = n mod 512`,
+`k = n >> 9`, and `d = x − n/512`. Multiplication by 512 and subtraction
+are exact; `|d| ≤ 2^−10`, and `d` is zero or at least `2^−62` in magnitude.
+Thus `2^x = 2^k · 2^(j/512) · exp(d ln 2)`.
+
+Stage A evaluates [exp.md](exp.md) §5 at `RN(d·LN2_HI)`. Its absolute
+unscaled error is at most `302·2^−69 + 2^−63`; the second term covers replacing
+`ln 2` by its leading word. The interval-test budget is `2^−59`.
+
+Stage B uses the compensated product and a split on the `2^−40` grid:
+
+```
+(p, e) = two_prod(d, LN2_HI)
+rl = RN(e + RN(d·LN2_LO))
+rh = RN(RN(p + 6144) − 6144)
+rt = RN((p − rh) + rl)
+```
+
+The product's error-free-transform domain and the exact subtraction `p − rh`
+are proved. `|rh| ≤ 0.000678`, `|rt| ≤ 2^−40`, and
+`|rh + rt − d ln 2| ≤ 2^−93`, meeting the shared stage B's reduction contract.
+Its error is at most `209·2^−78`, with interval-test budget `2^−70`.
+Both stages use [exp.md](exp.md) §7's test and exact normal scaling.
+
+`formal/exp/Exp2Stages.v::exp2_stages_ok` proves the screened binary64
+computation end to end: every accepted value is `RN(2^x)`. The reduction,
+product, constants and shared exponential evaluations are dependencies of
+that theorem, rather than assumptions about the inputs to a certificate.
+The old reduction below is reached only if both stages decline or the
+argument lies outside the screen.
+
+### 2.2. Fallback reduction
 
 `n = RN_int(128·x)`, computed as `(128·x + S) − S` with `S = 1.5·2^52`.
 `128·x` is exact, and `|n| ≤ 137,600`. Then:
@@ -87,6 +122,7 @@ rounding once rounds `2^x` correctly. `2^n` for an integer `n` gives `r = 0`,
 | Artifact | Establishes |
 |---|---|
 | `generators/radix_constants.py` | `LN2_HI`, `LN2_LO`, `ln 2` in `Q128`, with their errors (`src/exp2/tables.rs`) |
+| `formal/exp/Exp2Constants.v`, `Exp2Reduction.v`, `Exp2Product.v`, `Exp2Stages.v` | binary64 stages, generated constants and end-to-end rounding theorem |
 | `generators/radix_certificates.py` | writes `formal/exp2/reduction.g` from those errors |
 | `formal/exp2/reduction.g` (Gappa 1.4.1) | the reduction, within `2^−113` |
 | `generators/exp2_reference.py` | the fixture: [LM] Table 6, thresholds, integers, special values, random arguments, and 1,200 values to 192 bits |
@@ -100,6 +136,12 @@ the certificate and the source.
 - `crates/reference/tests/exp2.rs`: all 4,049 fixture cases, bit for bit.
 - `src/exp2/tests.rs`:
   - every unrounded result within its bound, against the 192-bit values;
-  - the fast path against the accurate path on 2^20 arguments. Measured, it
+  - both stage error bounds against the independent 192-bit values, and
+    table-boundary/midpoint neighbors across the exponent range;
+  - the stages against the accurate path on 2^20 arguments: 8 fall through
+    both stages on the fixed-seed uniform sample over `(−1016, 1016)`;
+  - the fallback fast path alone against the accurate path on 2^20 arguments. It
     sends `2^−15` of them to the accurate path, as `exp` does.
+- The extracted binary64 stage transcription against the Rust stage result,
+  including the screen edges and arbitrary encodings, in the internal cross-check.
 - The determinism digest's `exp2` section on every target.

@@ -110,6 +110,10 @@ let compute op args =
              (List.map show_bits nr @ [string_of_int (int_of_z j); string_of_int (int_of_z k)]
               @ List.map show_bits a @ [show_opt ra] @ List.map show_bits b @ [show_opt rb])
        | _ -> failwith "stage takes one word")
+  | "exp2_stages" | "expm1_stages" ->
+      (match args with
+       | [x] -> show_opt ((if op = "exp2_stages" then x_exp2_stages else x_expm1_stages) (z_of_u64 (hex x)))
+       | _ -> failwith (op ^ " takes one word"))
   | "ln_reduce" ->
       (match args with
        | [x] ->

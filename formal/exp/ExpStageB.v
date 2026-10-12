@@ -138,10 +138,7 @@ Qed.
 (** * The transcription *)
 
 (** [Stages::b_value]. *)
-Definition stage_b_value (n r1 : f64) (j : nat) : f64 * f64 :=
-  let p2 := fmul n st_l2 in
-  let rh := fsub (fadd (fsub r1 p2) c_split) c_split in
-  let rt := fsub (fsub (fsub r1 rh) p2) (fmul n st_l3) in
+Definition stage_b_at (rh rt : f64) (j : nat) : f64 * f64 :=
   let rhi := fadd rh rt in
   let q := fmul (fmul rhi rhi)
                 (fadd c_half (fmul rhi (fadd st_d3 (fmul rhi (fadd st_d4 (fmul rhi st_d5)))))) in
@@ -152,29 +149,27 @@ Definition stage_b_value (n r1 : f64) (j : nat) : f64 * f64 :=
   let '(y, e) := fast_two_sum64 th (fmul a rh) in
   (y, fadd e rest).
 
+Definition stage_b_value (n r1 : f64) (j : nat) : f64 * f64 :=
+  let p2 := fmul n st_l2 in
+  let rh := fsub (fadd (fsub r1 p2) c_split) c_split in
+  let rt := fsub (fsub (fsub r1 rh) p2) (fmul n st_l3) in
+  stage_b_at rh rt j.
+
 Lemma mul1 u v U V : Rabs u <= U -> Rabs v <= V -> Rabs (u * v) <= U * V.
 Proof. intros Hu Hv. rewrite Rabs_mult. apply Rmult_le_compat; try apply Rabs_pos; assumption. Qed.
 
 Lemma add1 u v U V : Rabs u <= U -> Rabs v <= V -> Rabs (u + v) <= U + V.
 Proof. intros Hu Hv. apply Rle_trans with (1 := Rabs_triang u v). lra. Qed.
 
-Theorem stage_b_value_ok x n r1 (ni : Z) (j : nat) :
-  finite x -> finite n -> B n = IZR ni -> (Z.abs ni <= 520018)%Z -> finite r1 ->
-  B r1 = B x - IZR ni * B st_l1 -> Rabs (B x - IZR ni * L) <= 0.000677 ->
-  Rabs (B r1) < bpow radix2 (-10) ->
-  (ni <> 0%Z -> on_grid (-63) (B r1)) -> (ni = 0%Z -> B r1 = B x) -> (j < 512)%nat ->
-  let '(y, l) := stage_b_value n r1 j in
+Theorem stage_b_at_ok rh rt j R : finite rh -> finite rt -> on_grid (-40) (B rh) ->
+  Rabs (B rh) <= 0.000678 -> Rabs (B rt) <= bpow radix2 (-40) ->
+  Rabs (B rh + B rt - R) <= bpow radix2 (-93) -> Rabs R <= 0.000677 -> (j < 512)%nat ->
+  let '(y,l) := stage_b_at rh rt j in
   finite y /\ finite l /\ Rabs (B y) <= 4 /\ Rabs (B l) <= bpow radix2 (-20) /\
-  Rabs (exp (INR j * ln 2 / 512) * exp (B x - IZR ni * L) - (B y + B l)) <= IZR 209 * bpow radix2 (-78).
+  Rabs (exp (INR j * ln 2 / 512) * exp R - (B y + B l)) <= IZR 209 * bpow radix2 (-78).
 Proof.
-  intros Fx Fn Bn Hn Fr1 Br1 HR Hr1 G1 Z1 Hj.
-  pose proof (stage_b_r_ok x n r1 ni Fx Fn Bn Hn Fr1 Br1 HR Hr1 G1 Z1) as RB. cbv zeta in RB.
-  unfold stage_b_value. cbv zeta.
-  set (p2 := fmul n st_l2) in *.
-  set (rh := fsub (fadd (fsub r1 p2) c_split) c_split) in *.
-  set (rt := fsub (fsub (fsub r1 rh) p2) (fmul n st_l3)) in *.
-  destruct RB as [Frh [Frt [Grh [Hrh [Hrt Hdr]]]]].
-  set (R := B x - IZR ni * L) in *.
+  intros Frh Frt Grh Hrh Hrt Hdr HR Hj.
+  unfold stage_b_at. cbv zeta.
   set (dr := B rh + B rt - R) in *.
   pose proof (bpow_le1 (-40) ltac:(lia)) as P41.
   (* r_hi *)
@@ -361,6 +356,22 @@ Proof.
       by (rewrite one_g_eq; unfold dr, eqv, m, av; ring).
     rewrite ER in GY. replace (B th + B tl - Dt) with T in GY by (unfold Dt; ring).
     rewrite Rabs_minus_sym. exact GY.
+Qed.
+
+Theorem stage_b_value_ok x n r1 (ni : Z) (j : nat) :
+  finite x -> finite n -> B n = IZR ni -> (Z.abs ni <= 520018)%Z -> finite r1 ->
+  B r1 = B x - IZR ni * B st_l1 -> Rabs (B x - IZR ni * L) <= 0.000677 ->
+  Rabs (B r1) < bpow radix2 (-10) ->
+  (ni <> 0%Z -> on_grid (-63) (B r1)) -> (ni = 0%Z -> B r1 = B x) -> (j < 512)%nat ->
+  let '(y, l) := stage_b_value n r1 j in
+  finite y /\ finite l /\ Rabs (B y) <= 4 /\ Rabs (B l) <= bpow radix2 (-20) /\
+  Rabs (exp (INR j * ln 2 / 512) * exp (B x - IZR ni * L) - (B y + B l)) <= IZR 209 * bpow radix2 (-78).
+Proof.
+  intros Fx Fn Bn Hn Fr1 Br1 HR Hr1 G1 Z1 Hj.
+  pose proof (stage_b_r_ok x n r1 ni Fx Fn Bn Hn Fr1 Br1 HR Hr1 G1 Z1) as RB. cbv zeta in RB.
+  unfold stage_b_value. cbv zeta.
+  destruct RB as [Frh [Frt [Grh [Hrh [Hrt Hdr]]]]].
+  apply stage_b_at_ok; assumption.
 Qed.
 
 (** exp/mod.rs's [E_B], [2^-70]. *)

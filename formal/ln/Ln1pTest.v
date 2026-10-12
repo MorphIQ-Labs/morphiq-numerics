@@ -57,9 +57,9 @@ Definition decide (s lo eps : f64) : option f64 :=
   | _ => None
   end.
 
-Theorem decide_ok s lo eps v :
+Theorem decide_bounded_ok s lo eps v :
   finite s -> finite lo -> finite eps -> 0 <= B eps ->
-  Rabs (B s) <= bpow radix2 999 -> Rabs (B lo) + B eps <= 1 ->
+  Rabs (B s) <= bpow radix2 999 -> Rabs (B lo) + B eps <= bpow radix2 999 ->
   decide s lo eps = Some v ->
   finite v /\ forall w, Rabs (w - (B s + B lo)) + bpow radix2 (-53) * (Rabs (B lo) + B eps) <= B eps -> rndF w = B v.
 Proof.
@@ -76,9 +76,9 @@ Proof.
   pose proof (rnd_sum_err (B lo) (B eps) (B_fmt lo) (B_fmt eps)) as R2.
   replace (B lo + - B eps) with (B lo - B eps) in R1 by ring. rewrite <- B1 in R1. rewrite <- B2 in R2.
   pose proof (bpow_ge_0 radix2 (-53)) as P53.
-  assert (One : fmtF 1) by (change 1 with (bpow radix2 0); apply generic_format_bpow; unfold FLT_exp, emin, prec; lia).
-  assert (M1 : Rabs (B (fsub lo eps)) <= 1) by (rewrite B1; apply abs_round_le_generic; [exact _ | exact _ | exact One | lra]).
-  assert (M2 : Rabs (B (fadd lo eps)) <= 1) by (rewrite B2; apply abs_round_le_generic; [exact _ | exact _ | exact One | lra]).
+  assert (One : fmtF (bpow radix2 999)) by ( apply generic_format_bpow; unfold FLT_exp, emin, prec; lia).
+  assert (M1 : Rabs (B (fsub lo eps)) <= bpow radix2 999) by (rewrite B1; apply abs_round_le_generic; [exact _ | exact _ | exact One | lra]).
+  assert (M2 : Rabs (B (fadd lo eps)) <= bpow radix2 999) by (rewrite B2; apply abs_round_le_generic; [exact _ | exact _ | exact One | lra]).
   destruct (fadd_s s (fsub lo eps) Fs F1) as [F3 B3].
   { apply Rle_trans with (1 := Rabs_triang _ _). lra. }
   destruct (fadd_s s (fadd lo eps) Fs F2) as [F4 B4].
@@ -102,4 +102,15 @@ Proof.
   - rewrite C, B4. apply round_le; [exact _ | exact _ | exact Hi].
   - rewrite B3. apply round_le; [exact _ | exact _ | exact Lo].
 
+Qed.
+
+Theorem decide_ok s lo eps v :
+  finite s -> finite lo -> finite eps -> 0 <= B eps ->
+  Rabs (B s) <= bpow radix2 999 -> Rabs (B lo) + B eps <= 1 ->
+  decide s lo eps = Some v ->
+  finite v /\ forall w, Rabs (w - (B s + B lo)) + bpow radix2 (-53) * (Rabs (B lo) + B eps) <= B eps -> rndF w = B v.
+Proof.
+ intros Fs Fl Fe E0 Hs Hl Hd.
+ apply decide_bounded_ok; try assumption.
+ apply Rle_trans with 1; [exact Hl | change 1 with (bpow radix2 0); apply bpow_le; lia].
 Qed.

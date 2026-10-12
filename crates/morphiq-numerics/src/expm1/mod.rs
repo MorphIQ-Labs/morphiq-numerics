@@ -5,6 +5,7 @@
 //! [`docs/expm1.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/expm1.md);
 //! section numbers below refer to it.
 
+pub(crate) mod stages;
 mod tables;
 
 use crate::double_word::DoubleWord;
@@ -54,6 +55,9 @@ pub fn expm1(x: f64) -> f64 {
             return y;
         }
         return small_accurate(x).to_f64();
+    }
+    if let Some(y) = stages::stages(x) {
+        return y;
     }
     let reduced = Reduced::of(x);
     if let Some(y) = decide_with(general_fast(&reduced), EPS) {

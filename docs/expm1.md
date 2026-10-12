@@ -2,8 +2,9 @@
 
 `morphiq_numerics::elementary::expm1` (`crates/morphiq-numerics/src/expm1/`)
 follows this derivation. Near zero it evaluates its own polynomial and series,
-because `e^x − 1` cancels there. Elsewhere it uses the reduction and paths of
-`exp`'s fallback ([exp.md](exp.md) §8), and subtracts before scaling. Every bound is certified (§7).
+because `e^x − 1` cancels there. Elsewhere it first uses `exp`'s 512-entry stages, with compensated subtraction
+before scaling. The 128-entry double-word and accurate paths remain the
+fallback. Every bound is certified (§7).
 
 `expm1(x)` is `e^x − 1`:
 - correctly rounded whenever its rounding test decides;
@@ -86,6 +87,38 @@ of `e^x − 1` (*certified*: `formal/expm1/accurate_small.g`, proves `2^−125.6
 
 ## 5. Other arguments
 
+### 5.1. Exponential stages
+
+For `−37 < x < 704` and `|x| ≥ 2^−5`, use [exp.md](exp.md) §3's reduction
+and §5–§6's stage values `(h,l)` for `z = exp(x)/2^k`. The reduction proves
+`−54 ≤ k ≤ 1016`. Each stage subtracts before scaling:
+
+```
+(s, e) = two_sum(h, −2^−k)
+lo = RN(e + l)
+eps = RN(base + RN(RN(|e| + |l|) · 2^−51))
+```
+
+`base` is `2^−59` for A and `2^−68` for B. The exponential evaluation error
+is at most `base/2`. The binary64 proof accounts for every rounding in `lo`
+and `eps`, and proves
+
+`|z − 2^−k − (s + lo)| + 2^−53(|lo| + eps) ≤ eps`.
+
+The interval test accepts only when `RN(s + RN(lo − eps))` and
+`RN(s + RN(lo + eps))` agree. Its proof also covers the larger low words
+that can arise for negative arguments. The accepted word is multiplied by
+`2^k` exactly: the screened domain proves `|z − 2^−k| ≥ 2^−8`, so neither
+rounding nor scaling encounters subnormal results, and overflow is excluded.
+
+`formal/exp/Expm1Stages.v::expm1_stages_ok` proves the complete screened
+computation returns `RN(exp(x) − 1)` whenever it accepts. Its dependencies
+`Expm1Subtract.v` and `Expm1Scale.v` establish subtraction, error-budget
+arithmetic and scaling. A declined test proceeds to stage B, then to §5.2.
+This adds no whole-domain correct-rounding claim to the accurate fallback.
+
+### 5.2. Fallback
+
 **Fast:** [exp]'s reduction and fast path give `Y ≈ 2^(j/128)·e^R`, within
 `2^−69` (`formal/exp/fast.g`), and `e^x − 1 = 2^k·(2^(j/128)·e^R − 2^−k)`.
 
@@ -112,11 +145,11 @@ addition errs by at most `2^−126·max(e^x, 1)`, and
 ## 6. Rounding test and bound
 
 **Decision 3: `ε₁ = 2^−62`.** That's [ln] §5's test, with
-`EPS = 2^−62·(1 + 2^−50)`. Both fast paths are certified within it. The test's
+`EPS = 2^−62·(1 + 2^−50)`. The small and general fallback fast paths are certified within it. The test's
 proof needs `e^x − 1` not to be a breakpoint, and it is transcendental for every
 nonzero rational `x` (Lindemann).
 
-At that `ε₁` the test sends about one argument in 2^8.5 to the accurate path
+For these fallback paths, at that `ε₁` the test sends about one argument in 2^8.5 to the accurate path
 (measured: `2^−8.5` small, `2^−8.4` otherwise; the analytic rate is at most
 `2^−8`).
 
@@ -131,6 +164,7 @@ At that `ε₁` the test sends about one argument in 2^8.5 to the accurate path
 
 | Artifact | Establishes |
 |---|---|
+| `formal/exp/Expm1Subtract.v`, `Expm1Scale.v`, `Expm1Stages.v` | screened exponential stages, including cancellation and exact scaling |
 | `generators/expm1_poly.sollya` (Sollya 8.0) | `c3`–`c9` and their bound, with the remainder, in `generators/expm1_poly.out` |
 | `generators/expm1_constants.py` | `src/expm1/tables.rs`: `c3`–`c9`, `1/m` in `Q128`, the series degree |
 | `generators/expm1_certificates.py` | writes every certificate below; the ratio `kq` is enclosed with `mpmath.iv` |
@@ -151,7 +185,15 @@ script and output, the constants, every certificate and the source.
   - every unrounded result within its bound, on both sides of `2^−5`;
   - each fast path against its accurate path on 2^19 arguments, with the pass
     rates above;
+  - the stage subtraction budget, including the interval-test margin, against
+    the independent 192-bit values;
+  - both exponential stages against the accurate path on four fixed-seed
+    samples of 2^18 arguments: negative, positive, and the cancellation range
+    on either side of zero. Stage B declines 0, 9, 30 and 39 arguments,
+    respectively (the ranges are stated in `src/expm1/tests.rs`);
   - the rounding test's constant.
+- The extracted binary64 stage transcription against the Rust stage result,
+  including the screen edges and arbitrary encodings, in the internal cross-check.
 - The determinism digest's `expm1` section on every target.
 
 **A defect this work found in the oracle,** fixed in
