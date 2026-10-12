@@ -226,7 +226,7 @@ additions certified here.
 
 ## 5. Rounding test
 
-[exp] §5, unchanged, with **`ε₁ = 2^−63`**: `EPS = 2^−63·(1 + 2^−50)`, shared by
+[exp] §8.3, unchanged, with **`ε₁ = 2^−63`**: `EPS = 2^−63·(1 + 2^−50)`, shared by
 `ln` and `ln_1p`. `ln`'s fast path proves `2^−64`, and `ln_1p`'s `2^−63` (§7).
 - The proof needs `ln x` not to be a breakpoint. For rational `x ≠ 1`, `ln x` is
   transcendental (Lindemann: `e^a` is transcendental for algebraic `a ≠ 0`). And
