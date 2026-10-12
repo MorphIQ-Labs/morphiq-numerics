@@ -159,8 +159,8 @@ by `k mod 4`, with `sin`'s sign from `x`.
 ## 6. Rounding test and claims
 
 **Decision 3: `ε₁ = 2^−62`** in [ln] §5's test, with `EPS = 2^−62·(1 + 2^−50)`.
-- The proof needs the value not to be a breakpoint. `sin x` and `cos x` are
-  transcendental for rational `x ≠ 0` (Lindemann).
+- An accepted strict comparison places the error interval inside one rounding
+  cell; the fast decision needs no midpoint-distance hypothesis.
 - At that `ε₁` the test sends about one argument in 2^8.4 to the accurate path
   (measured: `3.0·10^−3` for each function; the analytic rate is at most `2^−8`).
 

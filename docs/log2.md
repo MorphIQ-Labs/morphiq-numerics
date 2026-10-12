@@ -54,9 +54,9 @@ the scaling is new, and its error is certified here.
 arithmetic over [ln]'s reduced range at `|E| = 1`. The ratio only shrinks as
 `|E|` grows.
 
-[ln] §5's rounding test then decides, with `ε₁ = 2^−63`. The proof needs
-`log2 x` not to be a breakpoint. It is irrational unless `x = 2^n`, and then it
-is the integer `n`, which is representable.
+[ln] §5's rounding test then decides, with `ε₁ = 2^−63`. An accepted strict
+comparison places the error interval inside one rounding cell; no
+midpoint-distance hypothesis is needed for this fast decision.
 
 **Powers of two:** `x = 2^n` gives `y = 1`, `R[0] = 1` and `z = 0`, so `S = 0`,
 and `Y = n` exactly on both paths.
