@@ -31,279 +31,12 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  commit-convention:
-    name: check / commit-convention
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Pull request title is a conventional commit
-        # The title arrives through the environment, never interpolated into
-        # the script, so a crafted title cannot inject shell.
-        env:
-          TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          types='build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test'
-          if printf '%s' "$TITLE" | grep -qE "^($types)(\([a-z0-9._/-]+\))?!?: .+"; then
-            printf 'conventional title: %s\n' "$TITLE"
-          else
-            printf 'Pull request title is not a conventional commit: %s\n' "$TITLE" >&2
-            exit 1
-          fi
-
-  repository-hygiene:
-    name: check / repository-hygiene
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: No generated or ignored files are tracked
-        run: |
-          tracked_ignored="$(git ls-files -ci --exclude-standard)"
-          if [ -n "$tracked_ignored" ]; then
-            printf 'Generated or ignored files are tracked:\n%s\n' "$tracked_ignored" >&2
-            exit 1
-          fi
-      - name: The published crates ship the root license texts, unchanged
-        # crates.io packages each crate alone, so the license texts are copied
-        # into the crate directory; this keeps the copies identical.
-        run: |
-          for crate in morphiq-numerics morphiq-numerics-arch; do
-            for license in LICENSE-MIT LICENSE-APACHE; do
-              cmp "$license" "crates/$crate/$license"
-            done
-          done
-      - name: The library depends only on the first-party arch crate, optionally
-        # Target independence and clean provenance rest on the library being
-        # self-contained; its one dependency is the optional first-party lane
-        # crate, which itself takes none. Any other needs a decision recorded
-        # in AGENTS.md. Its version requirement is the workspace version, which
-        # the release pull request bumps in both places.
-        run: |
-          deps() { awk '/^\[(build-|dev-)?dependencies/{f=1;next} /^\[/{f=0} f && NF && !/^#/' "$1"; }
-          version="$(awk -F'"' '/^\[/{f=($0=="[workspace.package]");next} f && /^version = /{print $2}' Cargo.toml)"
-          allowed="morphiq-numerics-arch = { path = \"../morphiq-numerics-arch\", version = \"$version\", optional = true }"
-          if [ "$(deps crates/morphiq-numerics/Cargo.toml)" != "$allowed" ]; then
-            echo 'crates/morphiq-numerics declares a dependency other than the optional arch crate:' >&2
-            deps crates/morphiq-numerics/Cargo.toml >&2
-            exit 1
-          fi
-          if deps crates/morphiq-numerics-arch/Cargo.toml | grep -q .; then
-            echo 'crates/morphiq-numerics-arch declares a dependency' >&2
-            exit 1
-          fi
-      - name: Only the arch crate may contain unsafe code
-        # Every other crate inherits the workspace's unsafe_code = "forbid";
-        # the arch crate's own lint table is the one exception (docs/arch.md).
-        run: |
-          for manifest in crates/*/Cargo.toml; do
-            case "$manifest" in crates/morphiq-numerics-arch/*) continue ;; esac
-            grep -q '^workspace = true' "$manifest" || { echo "$manifest does not inherit the workspace lints" >&2; exit 1; }
-          done
-          grep -q '^unsafe_code = "forbid"' Cargo.toml
-
-  secret-scan:
-    name: check / secret-scan
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - name: gitleaks over the pull request's commits
-        # The container is pinned by digest (gitleaks v8.30.1).
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo:ro" \
-            zricethezav/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
-            git /repo --config /repo/.gitleaks.toml --redact --no-banner \
-            --log-opts="$BASE..HEAD"
-
-  fmt:
-    name: check / fmt
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: cargo fmt --all -- --check
-
-  clippy:
-    name: check / clippy
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: workspace
-      - run: rustc --version
-      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
-      - run: cargo doc --locked --workspace --all-features --no-deps
-        env:
-          RUSTDOCFLAGS: -D warnings
-
-  # Runs on pull requests and on main, so a newly published advisory blocks
-  # the next change and withdraws a just-merged revision from release.
-  audit:
-    name: check / audit
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: tools
-      - run: cargo install --locked --no-default-features cargo-audit --version "$(cat .cargo/audit-version)"
-      - run: ./scripts/check_advisories.sh
-
-  # The graph may ship under MIT OR Apache-2.0 only while every dependency is
-  # permissively licensed; deny.toml is that allowlist.
-  licenses:
-    name: check / licenses
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: tools
-      - run: cargo install --locked cargo-deny --version "$(cat .cargo/deny-version)"
-      - run: cargo deny --locked check licenses
-
-  # rust-toolchain.toml pins the development toolchain. Select the declared
-  # minimum explicitly so this job cannot silently build with the newer pin.
-  generators:
-    name: check / generators
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Every committed fixture matches a fresh run of its generator
-        run: ./scripts/check_generators.sh
-
-  msrv:
-    name: check / msrv
-    runs-on: ubuntu-24.04
-    env:
-      RUSTUP_TOOLCHAIN: "1.89.0"
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: rustup toolchain install 1.89.0 --profile minimal
-      - run: rustc --version && cargo --version
-      - run: cargo check --locked --workspace --all-features --all-targets
-
-  # The library builds without std or an allocator, and for wasm: the targets
-  # on which a platform libm is least available and most likely to differ.
-  no-std:
-    name: check / no-std
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: cargo build --locked -p morphiq-numerics --target thumbv7em-none-eabihf
-      - run: cargo build --locked -p morphiq-numerics --target wasm32-unknown-unknown
-      # With simd, these targets have only the scalar backend: it must build.
-      - run: cargo build --locked -p morphiq-numerics --features simd --target thumbv7em-none-eabihf
-      - run: cargo build --locked -p morphiq-numerics --features simd --target wasm32-unknown-unknown
-
-  test:
-    name: test (${{ matrix.os }})
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
-    # Skipped checks (commit-convention, secret-scan on push) still let this run.
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # The lane backends each host must have (docs/lanes.md §6): the lane
-          # tests fail if one is absent, so the job states what it exercised.
-          - { os: ubuntu-24.04, backends: "avx2,sse2,scalar" }
-          - { os: ubuntu-24.04-arm, backends: "neon,scalar" }
-          - { os: macos-15, backends: "neon,scalar" }
-          - { os: windows-2025, backends: "avx2,sse2,scalar" }
-    runs-on: ${{ matrix.os }}
-    env:
-      MORPHIQ_REQUIRE_BACKENDS: ${{ matrix.backends }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: test-${{ matrix.os }}
-      - run: cargo test --locked --workspace --all-features
-
-  # The determinism digest on targets beyond the test hosts: musl's libc,
-  # WebAssembly and bare metal, where a platform libm differs most or is absent. Each runs the reference
-  # suite, digest included (docs/determinism.md); gate logic lives in scripts/.
-  digest:
-    name: digest (${{ matrix.target }})
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [x86_64-unknown-linux-musl, wasm32-wasip1, thumbv7em-none-eabihf]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: digest-${{ matrix.target }}
-      - name: Pinned wasmtime
-        if: matrix.target == 'wasm32-wasip1'
-        run: |
-          ./scripts/install_wasmtime.sh "$RUNNER_TEMP/wasmtime"
-          echo "$RUNNER_TEMP/wasmtime/bin" >> "$GITHUB_PATH"
-      - name: QEMU for bare-metal Cortex-M4F
-        if: matrix.target == 'thumbv7em-none-eabihf'
-        run: sudo apt-get install --yes --no-install-recommends qemu-system-arm
-      - run: ./scripts/check_digest_target.sh ${{ matrix.target }}
-
-  # The AVX-512F lane backend, which the hosted runners may lack, under
-  # Intel's Software Development Emulator, pinned by version and SHA-256
-  # (.cargo/sde-version, .cargo/sde-sha256); gate logic in scripts/.
-  simd-avx512:
-    name: simd (avx512, sde)
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: simd-avx512
-      - name: Pinned Intel SDE
-        run: |
-          ./scripts/install_sde.sh "$RUNNER_TEMP/sde"
-          echo "$RUNNER_TEMP/sde" >> "$GITHUB_PATH"
-      - run: ./scripts/check_lanes_sde.sh
-
-  # Machine-checked proofs, bound to the source they describe: the double-word
-  # error bounds and two_prod's exactness (docs/double-word.md), the Gappa
-  # certificates here and their Coq proofs in the formal job below.
-  certificates:
-    name: certificates (sollya, gappa)
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Sollya and Gappa certificates reproduce, prove their goals, and are bound to their sources
-        # Debian bookworm, pinned by digest, with Sollya 8.0 and Gappa 1.4.1
-        # pinned by package version.
-        run: |
-          docker run --rm -v "$PWD:/w:ro" -w /w \
-            debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 \
-            bash -c 'apt-get update -qq >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq sollya=8.0+ds-2+b1 gappa=1.4.1-1 >/dev/null && ./scripts/check_certificates.sh'
-
-  # The Coq proofs (scripts/check_formal.sh). The Coq image is pinned by digest
-  # (.cargo/coq-image) and its libraries by version (.cargo/coq-packages).
-  # Two caches keep the job short; neither is trusted for a result:
-  # - coq-deps: the libraries' install (scripts/formal_deps.sh), keyed on the
-  #   image, the versions and the script that builds it. The proof step checks
-  #   the restored versions.
-  # - formal-build: the proof build's tree. check_formal.sh reuses a .vo only
-  #   if its source's bytes, the generated _CoqProject and the toolchain's
-  #   fingerprint are unchanged, so the key decides only how much is reused.
-  #   The admits check, the audits and the cross-checks run on every run.
-  # A pull request's caches are visible only to that pull request; main's are
-  # visible to every pull request, and main reads only its own.
   formal:
-    name: formal (coq)
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    name: negative (${{ matrix.case }})
+    strategy:
+      fail-fast: false
+      matrix:
+        case: [binding, admitted, axiom, certificate, crosscheck]
     runs-on: ubuntu-24.04
     # About three times a run with neither cache (21 minutes when added); with
     # both, a run takes about 10.
@@ -326,6 +59,33 @@ jobs:
           docker run --rm -v "$PWD:/w" -w /w \
             debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 \
             bash -c 'apt-get update -qq >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gappa=1.4.1-1 >/dev/null && ./scripts/write_gappa_proofs.sh target/gappa-proofs'
+      - name: Sabotage (${{ matrix.case }})
+        run: |
+          set -x
+          case "${{ matrix.case }}" in
+            binding)   # a bound proof file changes, the manifest doesn't
+              printf '(* edited *)\n' >> formal/exp/ExpReduction.v ;;
+            admitted)  # a proof's last Qed becomes Admitted; the manifest is updated so only the admits check can catch it
+              f=formal/ln/Ln1pScreen.v
+              n=$(grep -n '^Qed\.$' "$f" | tail -1 | cut -d: -f1)
+              sed -i "${n}s/^Qed\.\$/Admitted./" "$f"
+              sed -n "${n}p" "$f"
+              sed -i "s|^[0-9a-f]*  $f\$|$(sha256sum "$f")|" formal/binding.sha256 ;;
+            axiom)     # a relied-on theorem gains an axiom; the manifest is updated so only the audit can catch it
+              printf 'Axiom sabotage_axiom : 0 = 0.\nDefinition uses_sabotage := sabotage_axiom.\nPrint Assumptions uses_sabotage.\n' >> formal/audit/Audit.v
+              sed -i "s|^[0-9a-f]*  formal/audit/Audit.v\$|$(sha256sum formal/audit/Audit.v)|" formal/binding.sha256
+              grep -F formal/audit/Audit.v formal/binding.sha256 ;;
+            certificate)  # one certificate's Coq proof loses its final step
+              f=target/gappa-proofs/exp/reduction.v
+              n=$(grep -n '^Qed\.$' "$f" | tail -1 | cut -d: -f1)
+              sed -n "$((n-1))p" "$f"
+              sed -i "$((n-1))d" "$f" ;;
+            crosscheck)   # the Rust result differs from the extracted one in one case
+              sed -n 3p target/crosscheck.txt
+              sed -i '3s/: 8000000000000000 /: 8000000000000001 /' target/crosscheck.txt
+              sed -n 3p target/crosscheck.txt ;;
+          esac
+          git diff --stat
       - name: Pull the Coq image
         run: docker pull --quiet "$(cat .cargo/coq-image)"
       - name: Cache keys
@@ -367,15 +127,3 @@ jobs:
           docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
             ./scripts/check_formal.sh --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
             target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
-      # Saved whenever the build itself succeeded (check_formal.sh marks the
-      # tree), even if a later check failed, so the next run reuses it.
-      - name: Was the proof build completed
-        id: built
-        if: ${{ !cancelled() && steps.build.outputs.cache-hit != 'true' }}
-        run: if [ -e "$RUNNER_TEMP/formal-build/.built" ]; then echo "built=true" >> "$GITHUB_OUTPUT"; fi
-      - name: Save the proof build
-        if: ${{ !cancelled() && steps.built.outputs.built == 'true' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/formal-build
-          key: ${{ steps.build.outputs.cache-primary-key }}
