@@ -491,6 +491,25 @@ Qed.
 Lemma bnd12 x : Rabs x <= 4 -> bnd 1 2 x.
 Proof. intros H. unfold bnd. change (IZR 1 * bpow radix2 2) with (1 * 4). lra. Qed.
 
+(** Multiplication preserves the common grid of its three products. *)
+Lemma grid_mul_products q xh xl yh yl : fmtF xh -> fmtF yh ->
+ in_two_prod_domain xh yh ->
+ on_grid q (xh*yh) -> on_grid q (xh*yl) -> on_grid q (xl*yh) ->
+ on_grid q (fst (Binary64Mul.mul xh xl yh yl)) /\
+ on_grid q (snd (Binary64Mul.mul xh xl yh yl)).
+Proof.
+ intros Fx Fy Dom Ghh Ghl Glh.
+ pose proof (TwoProdBinary64.two_prod_exact xh yh Fx Fy Dom) as P.
+ assert (Ge : on_grid q (TwoProdBinary64.two_prod_e xh yh)).
+ { replace (TwoProdBinary64.two_prod_e xh yh) with
+     (xh*yh - TwoProdBinary64.two_prod_p xh yh) by lra.
+   apply grid_minus; [exact Ghh | unfold TwoProdBinary64.two_prod_p; apply grid_round; auto with typeclass_instances]. }
+ unfold Binary64Mul.mul, two_prod. cbv zeta.
+ apply grid_fast_two_sum.
+ - unfold TwoProdBinary64.two_prod_p. apply grid_round; auto with typeclass_instances.
+ - repeat first [assumption | apply grid_round | apply grid_plus | exact _].
+Qed.
+
 (** [T_j = sum(hi, lo)] and [Y = T_j.mul(E)]: [Y] is a double-word number equal
     to [T·(1 + d4)·E·(1 + d3)], with [T = 2^(j/128)], [|d4| <= 2^-107] and
     [|d3| <= 21·2^-108] ([d4] and [d3] in fast.g). *)
@@ -501,6 +520,7 @@ Lemma y_step eh el j :
   let '(th, tl) := two_sum64 (exp_t_hi j) (exp_t_lo j) in
   let '(yh, yl) := mul64 th tl eh el in
   finite yh /\ finite yl /\ B yh = rndF (B yh + B yl) /\ 1 <= T <= 2 /\
+  on_grid (-1020) (B yh) /\ on_grid (-1020) (B yl) /\
   exists d3 d4, Rabs d3 <= 21 / 2 ^ 108 /\ Rabs d4 <= / 2 ^ 107 /\
     B yh + B yl = T * (1 + d4) * (B eh + B el) * (1 + d3).
 Proof.
@@ -572,10 +592,22 @@ Proof.
   destruct (mul64_ok 2 th tl eh el Fth Ftl Feh Fel (bnd12 _ Ath) (bnd12 _ Atl) (bnd12 _ Aeh) (bnd12 _ Ael)
               ltac:(lia)) as [_ [_ EQ]].
   pose proof (mul_dw _ _ _ _ (B_fmt th) (B_fmt tl) Dth (B_fmt eh) (B_fmt el) Deh Dom N1 N2) as DW.
+  assert (Gt : on_grid (-53) (B th)).
+  { apply (grid_fmt_bound (FLT_exp emin prec) (-1));
+      [intros e; unfold FLT_exp, emin, prec; lia | apply B_fmt | right; rewrite Rabs_pos_eq by lra; change (bpow radix2 (-1)) with (/2); lra]. }
+  assert (Ge : on_grid (-53) (B eh)).
+  { apply (grid_fmt_bound (FLT_exp emin prec) (-1));
+      [intros e; unfold FLT_exp, emin, prec; lia | apply B_fmt | right; rewrite Rabs_pos_eq by lra; exact (proj1 Heh)]. }
+  assert (Ghh : on_grid (-1020) (B th * B eh)).
+  { apply (grid_le (-106)); [lia | exact (grid_mult (-53) (-53) _ _ Gt Ge)]. }
+  assert (Ghl : on_grid (-1020) (B th * B el)) by exact (grid_mult (-53) (-967) _ _ Gt Gel).
+  assert (Glh : on_grid (-1020) (B tl * B eh)).
+  { apply (grid_le (-173)); [lia | exact (grid_mult (-120) (-53) _ _ Gtl Ge)]. }
+  pose proof (grid_mul_products (-1020) _ _ _ _ (B_fmt th) (B_fmt eh) Dom Ghh Ghl Glh) as GY.
   destruct (mul64 th tl eh el) as [yh yl]. cbn [fst snd] in EQ.
-  rewrite <- EQ in DW. cbn [fst snd] in DW.
+  rewrite <- EQ in DW, GY. cbn [fst snd] in DW, GY. destruct GY as [Gyh Gyl].
   destruct MI as [Fyh [Fyl Rel3]].
-  split; [exact Fyh | split; [exact Fyl | split; [exact DW | split; [exact HT | ]]]].
+  split; [exact Fyh | split; [exact Fyl | split; [exact DW | split; [exact HT | split; [exact Gyh | split; [exact Gyl | ]]]]]].
   assert (Wne : (B th + B tl) * (B eh + B el) <> 0) by (rewrite Ets; apply Rmult_integral_contrapositive; lra).
   exists ((B yh + B yl - (B th + B tl) * (B eh + B el)) / ((B th + B tl) * (B eh + B el))).
   exists ((B hi + B lo - T) / T).
@@ -590,14 +622,15 @@ Qed.
     double-word [Y] within [2^-69] relatively of [Z = 2^(j/128)·e^R], with its
     leading word in [[3/4, 4]]: the premises of [decide_scaled_ok] at
     [ε₁ = 2^-69]. *)
-Theorem fast_reduced_ok rh rl j (R : R) :
+Theorem fast_reduced_grid_ok rh rl j (R : R) :
   finite rh -> finite rl -> B rh = rndF (B rh + B rl) ->
   Rabs (B rh + B rl - R) <= bpow radix2 (-113) -> Rabs R <= 0.0027076063 ->
   on_grid (-151) (B rh) -> on_grid (-967) (B rl) -> (j < 128)%nat ->
   let Z := exp (INR j * ln 2 / 128) * exp R in
   let '(yh, yl) := fast_at rh rl j in
   finite yh /\ finite yl /\ B yh = rndF (B yh + B yl) /\ 3 / 4 <= B yh <= 4 /\
-  Rabs (Z - (B yh + B yl)) <= / 2 ^ 69 * Rabs Z.
+  Rabs (Z - (B yh + B yl)) <= / 2 ^ 69 * Rabs Z /\
+  on_grid (-1020) (B yh) /\ on_grid (-1020) (B yl).
 Proof.
   intros Fh Fl Dh HrR HR Gh Gl Hj Z.
   change (bpow radix2 (-113)) with (bpow radix2 (- Z.of_nat 113)) in HrR. rewrite bpow_m in HrR.
@@ -641,7 +674,7 @@ Proof.
   pose proof (y_step eh el j Feh Fel Deh Gel Heh Hev Hj) as YS. cbv zeta in YS.
   destruct (two_sum64 (exp_t_hi j) (exp_t_lo j)) as [th tl].
   destruct (mul64 th tl eh el) as [yh yl].
-  destruct YS as [Fyh [Fyl [Dy [HT [d3 [d4 [Hd3 [Hd4 EY]]]]]]]].
+  destruct YS as [Fyh [Fyl [Dy [HT [Gyh [Gyl [d3 [d4 [Hd3 [Hd4 EY]]]]]]]]]].
   (* fast.g's theorem *)
   set (T := exp (INR j * ln 2 / 128)) in *.
   set (dr := B rh + B rl - R).
@@ -687,7 +720,22 @@ Proof.
         [change (/ 1024) with (bpow radix2 (-10)); apply bpow_le; lia | lra]).
   pose proof (rel_FLT _ Yb) as RY. rewrite <- Dy in RY.
   rewrite (Rabs_pos_eq (B yh + B yl)) in RY by lra. apply Rabs_le_inv in RY.
-  split; [exact Fyh | split; [exact Fyl | split; [exact Dy | split; [lra | exact EZ]]]].
+  split; [exact Fyh | split; [exact Fyl | split; [exact Dy | split; [lra | split; [exact EZ | split; assumption]]]]].
+Qed.
+
+Theorem fast_reduced_ok rh rl j (R : R) :
+  finite rh -> finite rl -> B rh = rndF (B rh + B rl) ->
+  Rabs (B rh + B rl - R) <= bpow radix2 (-113) -> Rabs R <= 0.0027076063 ->
+  on_grid (-151) (B rh) -> on_grid (-967) (B rl) -> (j < 128)%nat ->
+  let Z := exp (INR j * ln 2 / 128) * exp R in
+  let '(yh, yl) := fast_at rh rl j in
+  finite yh /\ finite yl /\ B yh = rndF (B yh + B yl) /\ 3 / 4 <= B yh <= 4 /\
+  Rabs (Z - (B yh + B yl)) <= / 2 ^ 69 * Rabs Z.
+Proof.
+ intros Fh Fl Dh Er HR Gh Gl Hj.
+ pose proof (fast_reduced_grid_ok rh rl j R Fh Fl Dh Er HR Gh Gl Hj) as H.
+ cbv zeta in H |- *. destruct (fast_at rh rl j) as [yh yl].
+ destruct H as [Fyh [Fyl [Dw [Range [Err _]]]]]. repeat split; assumption || lra.
 Qed.
 
 Theorem fast_ok rh rl j (R : R) :

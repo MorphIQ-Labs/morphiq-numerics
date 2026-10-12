@@ -123,12 +123,14 @@ This adds no whole-domain correct-rounding claim to the accurate fallback.
 `2^−69` (`formal/exp/fast.g`), and `e^x − 1 = 2^k·(2^(j/128)·e^R − 2^−k)`.
 
 **Decision 2: subtract `2^−k` before scaling.**
-- `M = Y.add_f64(−2^−k)` keeps every word of size about 1, inside the
-  double-word bounds' domain, even where `e^x` nears overflow.
+- `M = Y.add_f64(−2^−k)` keeps the subtraction operands at most `2^54`,
+  inside the double-word bounds' domain, even where `e^x` nears overflow.
 - `2^−k` is exact: `−54 ≤ k ≤ 1024`, so `2^−k` is at worst a subnormal power of
   two.
-- Scaling `M`'s words by `2^k` is exact for `k ≥ −54`, since neither word
-  underflows.
+- Both words of `Y` lie on the `2^−1020` grid. After subtracting `2^−k`,
+  both words lie on the `2^min(−1020,−k)` grid. Scaling by `2^k` is exact:
+  the resulting grid is no finer than `2^−1074`, including subnormal low
+  words. A finite margin below overflow also covers the final `2Sum`.
 
 The relative error against `e^x − 1` is `kq·eY·(1 + ea) + ea`, with
 `kq = e^x/(e^x − 1)`:
@@ -138,16 +140,33 @@ The relative error against `e^x − 1` is `kq·eY·(1 + ea) + ea`, with
   proves `2^−63.96`).
 
 **Accurate:** [exp]'s accurate `e^x`, within `2^−123.9`, less 1 in `Q128`. The
-addition errs by at most `2^−126·max(e^x, 1)`, and
-`max(e^x, 1)/|e^x − 1| ≤ |kq| + 1`. The result is within `2^−118` of `e^x − 1`
+addition errs by at most `2^−126·max(|V|, 1)`, where `V` is the Q128
+approximation to `e^x`. Including `V`'s error gives
+`max(|V|, 1)/|e^x − 1| ≤ 542/16`. The result is within `2^−118` of `e^x − 1`
 (*certified*: `formal/expm1/accurate_general.g`, proves `2^−118.55`).
+
+**Machine-checked:** `formal/exp/Expm1GeneralReduction.v` computes the
+128-entry fallback index and scale from the input, and proves the reduction's
+hypotheses for finite `−37.43 ≤ x < X_OVERFLOW`, `|x| ≥ 1/32` (a superset of
+arguments admitted by the public screens). `Expm1GeneralSubtract.v`,
+`Expm1GeneralScale.v`, `Expm1GeneralSum.v` and `Expm1GeneralFast.v` compose
+that reduction with the fast value, cancellation bound, exact scaling,
+renormalization and rounding decision. `em_general_fast_ok` proves an
+accepted result is `RN(e^x − 1)`, including the largest finite inputs.
+
+`Expm1GeneralAccurate.v` composes the same reduction with the executable Q128
+arithmetic and proves the `2^−118` relative bound before conversion.
+`em_general_accurate_round` proves the final conversion is finite and rounds
+that approximation once. Neither theorem assumes a published worst-case
+separation for `expm1`; the accurate branch retains the bounded contract in §6.
+The small-argument paths in §3–4 have the certificate coverage listed below.
 
 ## 6. Rounding test and bound
 
 **Decision 3: `ε₁ = 2^−62`.** That's [ln] §5's test, with
-`EPS = 2^−62·(1 + 2^−50)`. The small and general fallback fast paths are certified within it. The test's
-proof needs `e^x − 1` not to be a breakpoint, and it is transcendental for every
-nonzero rational `x` (Lindemann).
+`EPS = 2^−62·(1 + 2^−50)`. The small and general fallback fast paths are certified within it. An accepted
+test places the error interval strictly inside the rounding cell; no
+midpoint-distance hypothesis is needed for this branch.
 
 For these fallback paths, at that `ε₁` the test sends about one argument in 2^8.5 to the accurate path
 (measured: `2^−8.5` small, `2^−8.4` otherwise; the analytic rate is at most
@@ -165,6 +184,7 @@ For these fallback paths, at that `ε₁` the test sends about one argument in 2
 | Artifact | Establishes |
 |---|---|
 | `formal/exp/Expm1Subtract.v`, `Expm1Scale.v`, `Expm1Stages.v` | screened exponential stages, including cancellation and exact scaling |
+| `formal/exp/Expm1General*.v` | general fallback reduction, fast decision and accurate Q128 bound with single rounding |
 | `generators/expm1_poly.sollya` (Sollya 8.0) | `c3`–`c9` and their bound, with the remainder, in `generators/expm1_poly.out` |
 | `generators/expm1_constants.py` | `src/expm1/tables.rs`: `c3`–`c9`, `1/m` in `Q128`, the series degree |
 | `generators/expm1_certificates.py` | writes every certificate below; the ratio `kq` is enclosed with `mpmath.iv` |
@@ -176,7 +196,9 @@ For these fallback paths, at that `ε₁` the test sends about one argument in 2
 Every certificate's Coq proof is also built, with each rewriting hint proved, by the formal job ([exp.md](exp.md), gates).
 
 The binding `formal/expm1/binding.sha256` covers this document, the Sollya
-script and output, the constants, every certificate and the source.
+script and output, the constants, every certificate and the source. The global
+`formal/binding.sha256` additionally binds the executable Coq transcriptions,
+kernel audit and Rust sources.
 
 **Checked by:**
 - `crates/reference/tests/expm1.rs`: all 4,025 fixture cases, bit for bit. A
@@ -194,6 +216,10 @@ script and output, the constants, every certificate and the source.
   - the rounding test's constant.
 - The extracted binary64 stage transcription against the Rust stage result,
   including the screen edges and arbitrary encodings, in the internal cross-check.
+- The extracted general fallback against Rust: input-derived indices and scales,
+  both fast words, decision, Q128 value and rounded accurate result. The corpus
+  covers every table index, both decisions, fixture inputs, cancellation edges
+  and `k = −54` and `1024`, plus finite inputs outside the proved domain.
 - The determinism digest's `expm1` section on every target.
 
 **A defect this work found in the oracle,** fixed in

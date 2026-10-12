@@ -264,9 +264,8 @@ additions certified here.
 
 [exp] §8.3, unchanged, with **`ε₁ = 2^−63`**: `EPS = 2^−63·(1 + 2^−50)`, shared by
 `ln` and `ln_1p`. `ln`'s fast path proves `2^−64`, and `ln_1p`'s `2^−63` (§7).
-- The proof needs `ln x` not to be a breakpoint. For rational `x ≠ 1`, `ln x` is
-  transcendental (Lindemann: `e^a` is transcendental for algebraic `a ≠ 0`). And
-  `x = 1` never reaches the test (§1).
+- An accepted strict comparison places the error interval inside one rounding
+  cell, so the fast decision needs no midpoint-distance hypothesis.
 - Every result is normal (§2), so no scaling follows, and the test's `ulp` is
   the result's.
 

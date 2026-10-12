@@ -122,5 +122,20 @@ fn pow2(e: i32) -> f64 {
     }
 }
 
+/// The actual general fallback and its independently checked reduction metadata.
+#[cfg(test)]
+pub(crate) fn crosscheck_general(x: f64) -> (usize, i32, DoubleWord, Option<f64>, Q128) {
+    let reduced = Reduced::of(x);
+    let (j, k) = reduced.jk();
+    let fast = general_fast(&reduced);
+    (
+        j,
+        k,
+        fast,
+        decide_with(fast, EPS),
+        general_accurate(&reduced),
+    )
+}
+
 #[cfg(test)]
 mod tests;

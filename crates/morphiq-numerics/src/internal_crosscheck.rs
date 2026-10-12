@@ -604,6 +604,76 @@ fn internal_crosscheck_corpus() {
         }
     }
     assert_eq!(rejected, 8, "fallback rejection coverage");
+    // expm1's general fallback: compute the reduction metadata, both scaled
+    // words, decision, Q128 subtraction and final conversion from x alone.
+    let mut rng = SplitMix64::new(0x7163_726f_7373_0005);
+    let mut seen = [false; 128];
+    let (mut accepted, mut rejected) = (0, 0);
+    let (mut least_k, mut greatest_k) = (i32::MAX, i32::MIN);
+    let mut general_case = |x: f64| {
+        if x < -38.0 || x >= f64::from_bits(0x4086_2e42_fefa_39f0) || !x.is_finite() {
+            return;
+        }
+        let (j, k, y, decision, q) = crate::expm1::crosscheck_general(x);
+        seen[j] = true;
+        if x >= -37.43 && x.abs() >= 0.03125 {
+            least_k = least_k.min(k);
+            greatest_k = greatest_k.max(k);
+        }
+        if decision.is_some() {
+            accepted += 1;
+        } else {
+            rejected += 1;
+        }
+        writeln!(
+            out,
+            "expm1_general {:016x} : {j} {k} {:016x} {:016x} {} {} {:016x}",
+            x.to_bits(),
+            y.hi().to_bits(),
+            y.lo().to_bits(),
+            opt(decision),
+            q128(q),
+            q.to_f64().to_bits(),
+        )
+        .unwrap();
+    };
+    for _ in 0..8000 {
+        general_case(-37.42 + 747.2 * unit(&mut rng));
+        general_case(-1.0 + 2.0 * unit(&mut rng));
+    }
+    for edge in [
+        f64::from_bits(0xc042_b708_8723_20e2),
+        -37.0,
+        -0.03125,
+        0.03125,
+        704.0,
+        f64::from_bits(0x4086_2e42_fefa_39f0),
+    ] {
+        for offset in 0..=32 {
+            general_case(f64::from_bits(edge.to_bits() - offset));
+            general_case(f64::from_bits(edge.to_bits() + offset));
+        }
+    }
+    // Finite inputs outside the general fallback's proved domain, including
+    // cancellation to zero: the transcription must still match its operations.
+    for x in [-38.0, -37.43, -0.02, -0.0, 0.0, 0.02] {
+        general_case(x);
+    }
+    for case in include_str!("../../reference/fixtures/expm1.json")
+        .lines()
+        .filter(|line| line.trim_start().starts_with("\"x\":"))
+    {
+        general_case(crate::test_exact::word(case, "x"));
+    }
+    assert!(
+        seen.into_iter().all(core::convert::identity),
+        "all expm1 fallback table indices"
+    );
+    assert!(
+        accepted > 0 && rejected >= 8,
+        "both expm1 fallback decisions"
+    );
+    assert_eq!((least_k, greatest_k), (-54, 1024), "expm1 scaling extremes");
     std::fs::write(path, out).unwrap();
 }
 

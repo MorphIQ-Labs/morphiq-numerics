@@ -95,3 +95,16 @@ Print Assumptions Exp2.exp2_entry_infinities.
 Print Assumptions Exp2.exp2_entry_zero.
 Print Assumptions Exp2.exp2_entry_positive.
 Print Assumptions Exp2.exp2_entry_signed_zeros.
+
+Require Expm1GeneralReduction Expm1GeneralBounds Expm1GeneralScale Expm1GeneralSum Expm1GeneralSubtract Expm1GeneralFast Expm1GeneralAccurate.
+Print Assumptions ExpFast.fast_reduced_grid_ok.
+Print Assumptions Binary64.RoundingTest.decide_with_bounded_ok.
+Print Assumptions Expm1GeneralReduction.em_reduce_ok.
+Print Assumptions Expm1GeneralBounds.em_ratio_bounds.
+Print Assumptions Expm1GeneralScale.em_scale_exact.
+Print Assumptions Expm1GeneralSum.em_two_sum_large.
+Print Assumptions Expm1GeneralSubtract.em_subtract_fast_ok.
+Print Assumptions Expm1GeneralFast.em_general_fast_bound.
+Print Assumptions Expm1GeneralFast.em_general_fast_ok.
+Print Assumptions Expm1GeneralAccurate.em_general_accurate_bound.
+Print Assumptions Expm1GeneralAccurate.em_general_accurate_round.
