@@ -699,6 +699,26 @@ manifest is updated.
 ## 11. Cost
 
 **Stage A** is about 20 floating-point operations after the reduction's 5,
-with one table load; **stage B**, which runs for about one argument in 2^7.4,
+with one table load; **stage B**, which runs for about one argument in 2^7.3,
 about 30 more. The fallback costs about 20 ns on its fast value and 210–240 ns
 on its accurate path, for about one argument in 2^17 inside the screen.
+
+**Local measurement** (one Apple M1 Pro, release build, Rust 1.97.1,
+`cargo test --release -p morphiq-numerics --lib exp::tests::measure_cost --
+--ignored --nocapture`; not a gate). The 1-minute load average was 3.2–3.3,
+with one core busy with another job and no other benchmark running. Each
+figure is the median of seven rounds; two runs agreed within 2%. Throughput
+is independent calls over a shuffled grid of 4,096 arguments; latency chains
+each argument to the previous result. `fallback` is `exp` before the stages,
+the same code in the same build:
+
+| Arguments | `exp` throughput | `fallback` throughput | `exp` latency | `fallback` latency |
+|---|---|---|---|---|
+| `[−30, 0]` | 4.04 ns | 20.00 ns | 25.6 ns | 56.5 ns |
+| `[−1, 1]` | 4.06 ns | 20.01 ns | 25.6 ns | 56.5 ns |
+| `[−700, 700]` | 4.04 ns | 20.02 ns | 25.7 ns | 56.5 ns |
+
+That is about 5× the throughput and 2.2× shorter latency. Batched, two NEON
+lanes take 2.34 ns per argument on `[−30, 0]` ([lanes.md](lanes.md) §7). Only
+this host is measured. On x86-64 the table's smaller footprint (§3) is
+expected to matter more than here, but that is inferred, not measured.

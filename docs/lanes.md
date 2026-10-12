@@ -258,22 +258,22 @@ cargo run --release --locked -p morphiq-numerics-reference --features simd,std -
 ```
 
 Measured on one Apple M1 Pro (NEON, 2 lanes), `--release`, Rust 1.97.1, with
-the 1-minute load average at 2.8 and no other benchmark running; two
-consecutive runs agreed within 0.1 ns:
+the 1-minute load average at 3.2–3.3, one core busy with another job and no
+other benchmark running; two consecutive runs agreed within 0.3 ns:
 
 | Function | Arguments | Scalar loop (ns) | Batched, NEON (ns) | Speed-up |
 |---|---|---|---|---|
-| `exp` | `[−30, 0]` | 19.46 | 8.39 | 2.32× |
-| `exp` | `[−745, 709]` | 24.15 | 13.93 | 1.73× |
-| `ln` | `[0.5, 2)` | 29.50 | 14.73 | 2.00× |
-| `ln` | positive encodings | 29.54 | 14.78 | 2.00× |
-| `ln_1p` | `e^d`, `d ∈ [−30, 0]` | 16.70 | 9.78 | 1.71× |
-| `ln_1p` | `z²/4`, `z ∈ [−6, 6]` | 33.67 | 18.15 | 1.85× |
-| `ln_1p` | `[−1, 2^60]`, log-uniform | 34.77 | 18.23 | 1.91× |
+| `exp` | `[−30, 0]` | 4.06 | 2.34 | 1.73× |
+| `exp` | `[−745, 709]` | 9.58 | 7.52 | 1.27× |
+| `ln` | `[0.5, 2)` | 30.51 | 15.17 | 2.01× |
+| `ln` | positive encodings | 30.57 | 15.21 | 2.01× |
+| `ln_1p` | `e^d`, `d ∈ [−30, 0]` | 17.23 | 10.09 | 1.71× |
+| `ln_1p` | `z²/4`, `z ∈ [−6, 6]` | 34.82 | 18.71 | 1.86× |
+| `ln_1p` | `[−1, 2^60]`, log-uniform | 35.99 | 18.83 | 1.91× |
 
-`exp` on its whole domain gains less because arguments with subnormal results
-(`k < −1021`, `x < −707.7`: 2.6% of these arguments) go to `exp`
-itself, and those take its accurate path.
+`exp` on its whole domain gains less: the arguments beyond `exp`'s screen
+(`|x| ≥ 704`, 3.2% of these), among them every subnormal result, go to `exp`
+itself, whose fallback takes its accurate path for the subnormal ones.
 
 Only the NEON figures are measured. SSE2, AVX2 and AVX-512F are checked for
 bit equality, not timed: timing on a CI runner is not evidence, and no x86-64
