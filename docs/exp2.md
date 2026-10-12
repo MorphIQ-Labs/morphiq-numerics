@@ -181,3 +181,12 @@ It compares them bit for bit against Rust on all fixture inputs, arbitrary
 encodings, both one-screen boundaries, subnormal results, every reduction
 index and selected fast-test rejections. The formal gate audits the composed
 theorems and binds all source and proof files.
+
+## Batched evaluation
+
+`elementary::exp2_slice` returns the scalar function's bits for every
+element. With `simd`, both 512-entry stages run in lanes, including the
+compensated stage B reduction. Screened and undecided arguments use the
+scalar fallback. The operation sequence, FMA domain, backend equivalence
+tests and same-host measurements are documented in [lanes.md](lanes.md).
+The scalar proof coverage and numerical contract above are unchanged.

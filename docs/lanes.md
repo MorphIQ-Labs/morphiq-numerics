@@ -1,8 +1,8 @@
 # Batched functions and lane evaluation
 
-`morphiq_numerics::elementary::{exp_slice, ln_slice, ln_1p_slice}` apply
-[`exp`](exp.md), [`ln` and `ln_1p`](ln.md) to every element of a slice. The
-lane kernels are `crates/morphiq-numerics/src/lanes/`, `exp/lanes.rs` and
+`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice}` apply
+[`exp`](exp.md), [`exp2`](exp2.md), [`expm1`](expm1.md), [`ln` and `ln_1p`](ln.md) to every element of a slice. The
+lane kernels are `crates/morphiq-numerics/src/lanes/`, `exp/lanes.rs`, `exp2/lanes.rs`, `expm1/lanes.rs` and
 `ln/lanes.rs`; the SIMD backends are the `morphiq-numerics-arch` crate
 ([arch.md](arch.md)).
 
@@ -12,15 +12,16 @@ lane kernels are `crates/morphiq-numerics/src/lanes/`, `exp/lanes.rs` and
 every target, with or without the `simd` feature. It panics if `x` and `out`
 have different lengths, as `reduce::dot` does. So the batched functions add
 no claim of their own: each inherits its scalar function's (correct rounding
-for `exp` and `ln`; correct rounding where its rounding test decides, and
-`(1/2 + 2^−70)` ulp otherwise, for `ln_1p`).
+for `exp`, `exp2` and `ln`; correct rounding where its rounding test decides, and
+`(1/2 + 2^−70)` ulp otherwise for `ln_1p`, or `(1/2 + 2^−65)` ulp otherwise for `expm1`).
 
 - **Without `simd`** each loops its scalar function.
 - **With `simd`** each runs in lanes ([arch.md](arch.md)). Every lane performs
   the scalar function's first stage operation for operation: its
   special-argument screen, its argument reduction, its evaluation and its
   rounding test (§4, §5); for `ln` that is the reciprocal stage, for
-  `exp` its stages, for `ln_1p` stage H. A lane the screen sends elsewhere,
+  `exp` and `exp2` their stages, for `expm1` its small polynomial or stages,
+  for `ln_1p` stage H. A lane the screen sends elsewhere,
   or the rounding test doesn't decide, calls the scalar function from that
   point on (for `ln_1p`, from stage B).
 - **The backend cascade.** The slice runs through the backends the CPU has,
@@ -90,10 +91,20 @@ none, it performs Dekker's operations as `eft.rs` writes them. **On `D`,
      is `+0`. The case `b = ±0` is symmetric, through the second term. So `e`
      is never `−0` on `D`.
 
-The current `exp`, `ln` and `ln_1p` lane kernels need no `two_prod`:
-their products that must be exact are exact by construction with plain
-multiplications. The lane product helper remains in tests to check the
-backends' fused operation against Dekker's result on `D`.
+`exp2` stage B uses `two_prod(d, LN2_HI)`. The screen gives
+`2^−55 ≤ |x| < 1016`; reduction leaves `d = x − n/512` exactly.
+If `n = 0`, a nonzero `d` is at least `2^−55`. Otherwise the smallest
+nonzero distance occurs beside `1/512`, whose lower neighbour is `2^−62`
+away. Hence `d = 0` or `2^−62 ≤ |d| ≤ 2^−10`, and `1/2 < LN2_HI < 1`:
+the product is zero or at least `2^−63`, safely in `D`.
+`expm1`'s small polynomial uses `two_prod(x, x)` for
+`2^−54 ≤ |x| < 2^−5`, so the product is at least `2^−108`, also in `D`.
+Both kernels substitute in-domain placeholders for inactive lanes before
+these operations. NaNs, infinities and tiny inputs therefore never enter
+the fused product outside its proved domain.
+
+`exp`, `ln` and `ln_1p` need no `two_prod`: their products that must be
+exact are exact by construction with plain multiplications.
 
 The test `lane_two_prod_is_efts_two_prod` compares the lane product with
 `eft::two_prod` bit for bit: on random encodings without FMA, and on `D`, with
@@ -134,6 +145,42 @@ both are positive normal numbers (`y + l` lies near `[1, 2]`), and two such
 numbers are equal exactly when their encodings are. `exp` scales by adding `k`
 to the exponent field; the lanes multiply by `2^k`. The product is exact and
 normal (`|k| ≤ 1016`), so it is the same number, with the same encoding.
+
+### `exp2`
+
+The screen and reduction reproduce `exp2::stages`: `2^−55 ≤ |x| < 1016`,
+`t = x·512 + S`, `n = t − S`, `d = x − n/512`. The shared table loader
+uses the low nine integer bits for `j` and the rest for `k`. Stage A uses
+`d·LN2_HI`; stage B compensates that product (§2), then splits it into
+`rh` and `rt`. Both call the same lane polynomial evaluators as `exp`.
+Their tests use `exp2`'s own bounds, `2^−59` and `2^−70`. Scaling is exact
+on the screened normal-result domain, as for `exp`. Screened or undecided
+lanes call scalar `exp2`, including every subnormal-result input.
+
+### `expm1`
+
+Inputs with `|x| < 2^−54` return `x` directly, preserving signed zero.
+For `2^−54 ≤ |x| < 1/32`, the kernel evaluates `small_fast`'s polynomial,
+exact square and double-word additions in the scalar order. Its rounding
+test is `ln::decide_with`: the ulp comes from the leading word's exponent,
+and the gap is halved at powers of two before the final half-gap comparison.
+All evaluated leading words and ulps are normal on this domain.
+
+For `|x| ≥ 1/32`, `|x| < 704`, `x > −37`, the kernel shares `exp`'s
+reduction and both stages, then reproduces `expm1::stages::parts`:
+`two_sum(h, −2^−k)`, the low-word addition and the subtraction error bound.
+Since `−54 ≤ k ≤ 1016`, both `2^k` and `2^−k` are normal; subtracting
+`bits(2^k)` from `2046·2^52` constructs `2^−k` exactly.
+The interval test uses numerical equality (§3), followed by the same
+power-of-two product as the scalar stage. Small and general evaluations
+run only when the chunk contains an eligible lane, and stage B only when
+stage A leaves an eligible lane undecided. All remaining lanes call scalar
+`expm1`, including the Q128 accurate paths.
+
+These are operation-for-operation SIMD transcriptions of the scalar
+kernels. The scalar Coq theorems and certificates retain their stated
+coverage; the lane equivalence is checked by intermediate-word tests and
+the cross-target digest, not a separate Coq model of SIMD instructions.
 
 ## 5. `ln` and `ln_1p`
 
@@ -179,7 +226,7 @@ writes it.
   down to the scalar backend, each run through the backend's `vectorize` as the
   library runs it. The corpora:
   - every binary64 in the function's reference fixture (`exp.json`,
-    `ln.json`), arguments and results alike;
+    `exp2.json`, `expm1.json`, `ln.json`), arguments and results alike;
   - special values and their neighbours, and every threshold and branch edge
     of [exp.md](exp.md) §1 and [ln.md](ln.md) §7;
   - random encodings; for `exp` the whole domain, `[−30, 0]`, ties of `x/L`
@@ -190,15 +237,19 @@ writes it.
     table intervals' edges at every exponent of its range.
 
   `MORPHIQ_LANE_CASES` sets each random section's size (default 2^18, about
-  1.3 to 2.1 million arguments per function); every remainder and lane
+  0.8 to 2.4 million arguments per function); every remainder and lane
   position is covered by slices of every length from 0 to 17 at eight
   offsets.
 - **The fast values word for word** (`exp/lanes/tests.rs`,
-  `ln/lanes/tests.rs`): on the same corpora, every lane the scalar function
+  `exp2/lanes/tests.rs`, `expm1/lanes/tests.rs`, `ln/lanes/tests.rs`): on the same corpora, every lane the scalar function
   would try its fast path on has the scalar fast value's bits: for `exp`, both
   stages' `(y, l)` on every lane past the screen, stage B's on every lane and
   not only those stage A leaves; for `ln`, `(s, lo, eps)`; for `ln_1p`,
-  stage H's `(s, lo, eps)` on every lane it tries.
+  stage H's `(s, lo, eps)` on every lane it tries. `exp2` checks both stage
+  words and decisions; `expm1` checks both subtraction triples and decisions,
+  and the small polynomial's two words and decision. Rejected fast tests
+  occur in these corpora and are counted. The new slice APIs also run directly
+  against their independent reference fixtures with and without SIMD.
   This shows the kernels transcribe the scalar operations, which the final
   results alone could not: a different but accurate sequence would usually
   round alike.
@@ -215,7 +266,7 @@ writes it.
 - **The public functions** on the dispatched backend, for every length from 0
   to 17 and a long slice, and their length check.
 - **The error-free product** (§2).
-- **The determinism digest's `exp_slice`, `ln_slice` and `ln_1p_slice`
+- **The determinism digest's `exp_slice`, `exp2_slice`, `expm1_slice`, `ln_slice` and `ln_1p_slice`
   sections** ([determinism.md](determinism.md)), with and without `simd`.
 
 **Backends in CI.** `MORPHIQ_REQUIRE_BACKENDS` fails the run when a listed
@@ -282,3 +333,22 @@ A same-host run of the previous `ln` implementation (commit `e053de4`,
 load 2.15) measured 29.81/29.76 ns for the two scalar workloads and
 14.86/14.91 ns for their NEON batches. The reciprocal stage therefore
 improves scalar throughput about 4.6× and batched throughput about 3.0×.
+
+The exponential slice additions were measured on the same M1 Pro with the
+same command and methodology (2026-10-12, Rust 1.97.1). Two consecutive runs,
+with no concurrent build or benchmark, gave:
+
+| Function | Arguments | Scalar loop (ns) | Batched, NEON (ns) | Speed-up |
+|---|---|---|---|---|
+| `exp2` | `[−30, 0]` | 5.05–5.15 | 3.20–3.21 | 1.57–1.61× |
+| `exp2` | `[−1075, 1024]` | 9.29–9.32 | 7.28–7.41 | 1.25–1.28× |
+| `expm1` | `[−30, 0]` | 7.33–7.51 | 4.45–4.48 | 1.65–1.67× |
+| `expm1` | `[−1/32, 1/32]` | 11.13–11.28 | 6.14–6.20 | 1.81–1.82× |
+| `expm1` | `[−37.4, 709]` | 8.20–8.21 | 5.15–5.17 | 1.59× |
+
+Before extracting the shared lane evaluators, the same host measured `exp`
+batches at 2.32/7.44 ns for its two ranges; afterwards, 2.34–2.35/7.51–7.58 ns.
+Wide domains gain less because screened inputs still use scalar fallbacks.
+The scalar accurate-path rates remain those measured in [exp2.md](exp2.md)
+and [expm1.md](expm1.md); SIMD makes the same decisions per argument.
+No native x86 timing is claimed.

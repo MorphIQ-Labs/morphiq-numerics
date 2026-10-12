@@ -10,7 +10,7 @@
 //! [`sin`, `cos`, `sincos` and `tan`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/sin_cos.md),
 //! [`sqrt`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/sqrt.md).
 //!
-//! [`exp_slice`], [`ln_slice`] and [`ln_1p_slice`] apply a function to every
+//! [`exp_slice`], [`exp2_slice`], [`expm1_slice`], [`ln_slice`] and [`ln_1p_slice`] apply a function to every
 //! element of a slice and return its bits exactly. With the `simd` feature they
 //! evaluate several elements at once in SIMD lanes
 //! ([`lanes`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/lanes.md)),
@@ -86,4 +86,17 @@ batched!(
     ln_1p_slice,
     ln_1p,
     crate::ln::lanes::Ln1p
+);
+
+batched!(
+    /// [`exp2`] of every element of `x`, written to `out`, bit for bit.
+    /// With `simd`, stages A and B run in lanes; undecided lanes call [`exp2`].
+    exp2_slice, exp2, crate::exp2::lanes::Exp2
+);
+
+batched!(
+    /// [`expm1`] of every element of `x`, written to `out`, bit for bit.
+    /// With `simd`, the small-argument polynomial and stages A and B run in
+    /// lanes; undecided lanes call [`expm1`].
+    expm1_slice, expm1, crate::expm1::lanes::Expm1
 );

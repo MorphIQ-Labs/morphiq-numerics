@@ -230,3 +230,12 @@ kernel audit and Rust sources.
 - The oracle now requires agreement at two consecutive precisions.
 - Every committed fixture regenerates unchanged under the fix. The `exp`, `ln`,
   `exp2` and `log2`/`log10` references were all correct.
+
+## Batched evaluation
+
+`elementary::expm1_slice` returns the scalar function's bits for every
+element. With `simd`, the small-argument polynomial and both exponential
+stages, including compensated subtraction, run in lanes. Screened and undecided arguments use the
+scalar fallback. The operation sequence, FMA domain, backend equivalence
+tests and same-host measurements are documented in [lanes.md](lanes.md).
+The scalar proof coverage and numerical contract above are unchanged.

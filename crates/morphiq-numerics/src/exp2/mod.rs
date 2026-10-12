@@ -8,6 +8,9 @@
 pub(crate) mod stages;
 mod tables;
 
+#[cfg(feature = "simd")]
+pub(crate) mod lanes;
+
 use crate::double_word::DoubleWord;
 use crate::eft::two_prod;
 use crate::exp::{accurate_at, decide_scaled, fast_at};

@@ -8,7 +8,7 @@ use crate::ln::stages::decide;
 
 pub(super) const E_A: f64 = f64::from_bits(0x3c40_0000_0000_0000); // 2^-59
 pub(super) const E_B: f64 = f64::from_bits(0x3bb0_0000_0000_0000); // 2^-68
-const SUBTRACTION_ERROR: f64 = f64::from_bits(0x3cc0_0000_0000_0000); // 2^-51
+pub(super) const SUBTRACTION_ERROR: f64 = f64::from_bits(0x3cc0_0000_0000_0000); // 2^-51
 
 #[inline]
 pub(crate) fn stages(x: f64) -> Option<f64> {
