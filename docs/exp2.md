@@ -46,7 +46,7 @@ error below `2^−114` suffices ([LM] footnote 10).
 `r` is exact: `n/128` is exact, and for `n ≠ 0` the subtraction is exact by
 Sterbenz's lemma, since `x` and `n/128` are within a factor of 2. For `n = 0`,
 `r = x`. So `2^x = 2^k · 2^(j/128) · e^(r·ln 2)`, with `|r·ln 2| ≤ 0.0027076`.
-That's within [exp] §3's range for its reduced argument, `|r| ≤ 0.0027077`.
+That's within [exp] §8.1's range for its reduced argument, `|r| ≤ 0.0027077`.
 
 ## 3. Fast path
 
@@ -65,15 +65,15 @@ That's within [exp] §3's range for its reduced argument, `|r| ≤ 0.0027077`.
 - `two_prod`'s domain holds: `r` is `0` or at least `2^−59` in magnitude (it is
   a multiple of `ulp(x)` once `|x| ≥ 2^−7`, and `x` itself when smaller).
 
-Then [exp] §4's fast path at `(r_hi, r_lo)` and `j` gives `Y`, within
-`ε₁ = 2^−69` of `2^(j/128 + r)` (`formal/exp/fast.g`). [exp] §5's rounding test
+Then [exp] §8.2's fast path at `(r_hi, r_lo)` and `j` gives `Y`, within
+`ε₁ = 2^−69` of `2^(j/128 + r)` (`formal/exp/fast.g`). [exp] §8.3's rounding test
 returns `y_hi·2^k` for `k ≥ −1021`.
 
 ## 4. Accurate path
 
 `r·ln 2` in `Q128`: `r` converts exactly, and the product with `ln 2` (*generated*,
 relative error below `2^−129.4`) is truncated. So its absolute error is below
-`2^−126·|r| ≤ 2^−134`. Then [exp] §6's series, table product and scaling give
+`2^−126·|r| ≤ 2^−134`. Then [exp] §8.4's series, table product and scaling give
 `2^x`.
 - The series and product contribute below `2^−124`, as in [exp].
 - The argument's error, `2^−134`, contributes below `2^−133.9`.

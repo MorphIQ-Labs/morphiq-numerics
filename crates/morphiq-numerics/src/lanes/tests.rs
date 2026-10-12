@@ -142,11 +142,15 @@ pub(crate) fn ln_1p_corpus() -> Vec<f64> {
     let n = cases();
     let mut v = fixture_values(include_str!("../../../reference/fixtures/ln.json"));
     v.extend(specials());
-    // Each branch edge of docs/ln.md §7, −1 and 2^53, with neighbours.
+    // Each branch edge of docs/ln.md §7 (stage H's and B's screens, B's 2^−9,
+    // the fallback's 2^−54, 2^−7 and 2^53), −1/2 and 2^1020, with neighbours.
     v.extend(with_neighbours(&[
         f64::from_bits(0x3c90_0000_0000_0000),
+        f64::from_bits(0x3d10_0000_0000_0000),
+        f64::from_bits(0x3f60_0000_0000_0000),
         f64::from_bits(0x3f80_0000_0000_0000),
         f64::from_bits(0x4340_0000_0000_0000),
+        f64::from_bits(0x7fb0_0000_0000_0000),
         -0.5,
     ]));
     for _ in 0..n {
@@ -164,6 +168,11 @@ pub(crate) fn ln_1p_corpus() -> Vec<f64> {
         v.push(-1.0 + unit(&mut rng) * f64::from_bits(0x3cb0_0000_0000_0000));
         v.push(binade(&mut rng, -8, -7));
         v.push(binade(&mut rng, 52, 53).abs());
+        // Stage H's table intervals' edges: 1 + x at an edge, give or take
+        // four encodings, at any exponent of its range.
+        let edge = 0x3fe6_a000_0000_0000 + ((rng.next_u64() % 512) << 43) + (rng.next_u64() % 9);
+        let e = rng.next_u64() % 106;
+        v.push(f64::from_bits(edge - 4 + (e << 52)) * f64::from_bits(0x3cb0_0000_0000_0000) - 1.0);
     }
     v
 }

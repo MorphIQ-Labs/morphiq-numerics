@@ -6,3 +6,15 @@ c7 0x1.24923e6ed17a8p-3
 c8 -0x1.00059a9bca3b7p-3
 c9 0x1.ca33216abd50bp-4
 relative_error_bound 0x1.0881be9fed09429c32c7bp-54
+h3 0x1.555555555430cp-2
+h4 -0x1.fffffffffd249p-3
+h5 0x1.9999e2be5698ep-3
+h6 -0x1.555599e7b76d7p-3
+h_relative_error_bound 0x1.b6e001affe406a4739p-41
+b3 0x1.5555555555555p-2
+b4 -0x1p-2
+b5 0x1.9999999a3e0b6p-3
+b6 -0x1.555555558204cp-3
+b7 0x1.249076a775a54p-3
+b8 -0x1.fffec39c0bf07p-4
+b_relative_error_bound 0x1.000002d1cb61218e828p-54

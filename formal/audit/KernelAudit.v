@@ -6,6 +6,7 @@
 
 Require ExpTables ExpReduction ExpFast ExpAccurate ExpSmall LnTables LnTableCheck LnReduction LnAccurate.
 Require TableCheck ExpStageTables ExpStageReduction ExpStageA ExpStageB.
+Require Ln1pTables Ln1pApprox Ln1pReduction Ln1pTest Ln1pStageH Ln1pStageB Ln1pScreen Ln1p.
 
 Print Assumptions ExpTables.exp_l_split.
 Print Assumptions ExpTables.exp_poly_approx.
@@ -49,3 +50,17 @@ Print Assumptions LnAccurate.ln_acc_ok.
 Print Assumptions LnAccurate.ln_accurate_ok.
 Print Assumptions LnAccurate.ln_1p_acc_ok.
 Print Assumptions LnAccurate.rounds_as.
+Print Assumptions Ln1pTables.st_rt_check.
+Print Assumptions Ln1pTables.st_l_check.
+Print Assumptions Ln1pApprox.h_approx.
+Print Assumptions Ln1pApprox.b_approx.
+Print Assumptions Ln1pReduction.split_ok.
+Print Assumptions Ln1pReduction.reduce_ok.
+Print Assumptions Ln1pTest.decide_ok.
+Print Assumptions Ln1pStageH.stage_h_ok.
+Print Assumptions Ln1pStageB.stage_b_ok.
+Print Assumptions Ln1p.ln_1p_stage_h_bits.
+Print Assumptions Ln1p.ln_1p_stage_b_bits.
+Print Assumptions Ln1pScreen.h_screen_ok.
+Print Assumptions Ln1pScreen.b_screen_ok.
+Print Assumptions Ln1p.ln_1p_stages_ok.

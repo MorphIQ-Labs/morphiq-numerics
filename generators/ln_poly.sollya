@@ -1,7 +1,11 @@
-// The fast path's polynomial for ln and ln_1p (docs/ln.md, section 4):
-// ln(1 + z) = z - z^2/2 + z^3 * (c3 + z*(c4 + ... + z*c9)), with c3..c9
-// binary64 (fpminimax, relative error to the cubic tail), on |z| <= A; the
-// approximation error of the tail is bounded rigorously (supnorm, relative).
+// The polynomials of ln and ln_1p (docs/ln.md, sections 4 and 7). Each
+// approximates the cubic tail of ln(1 + z) = z - z^2/2 + z^3 Q(z) by z^3 times
+// a polynomial with binary64 coefficients (fpminimax, relative error to the
+// tail), and the approximation error of the tail is bounded rigorously
+// (supnorm, relative):
+// - the fast path, |z| <= A: c3..c9, degree 9;
+// - ln_1p's stage H, |z| <= 2^-9: h3..h6, degree 6;
+// - ln_1p's stage B, |z| <= 2^-9: b3..b8, degree 8.
 //
 // Run in the pinned image (scripts/check_certificates.sh).
 prec = 300;
@@ -21,4 +25,23 @@ print("c7", c7);
 print("c8", c8);
 print("c9", c9);
 print("relative_error_bound", sup(err));
+
+AS = 2^-9;
+IS = [-AS; AS];
+ph = fpminimax(f, [|3, 4, 5, 6|], [|D, D, D, D|], IS, relative);
+errh = supnorm(ph, f, IS, relative, 2^-25);
+print("h3", coeff(ph, 3));
+print("h4", coeff(ph, 4));
+print("h5", coeff(ph, 5));
+print("h6", coeff(ph, 6));
+print("h_relative_error_bound", sup(errh));
+pb = fpminimax(f, [|3, 4, 5, 6, 7, 8|], [|D, D, D, D, D, D|], IS, relative);
+errb = supnorm(pb, f, IS, relative, 2^-25);
+print("b3", coeff(pb, 3));
+print("b4", coeff(pb, 4));
+print("b5", coeff(pb, 5));
+print("b6", coeff(pb, 6));
+print("b7", coeff(pb, 7));
+print("b8", coeff(pb, 8));
+print("b_relative_error_bound", sup(errb));
 quit;

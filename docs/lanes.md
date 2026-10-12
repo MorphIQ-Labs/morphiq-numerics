@@ -17,10 +17,12 @@ for `exp` and `ln`; correct rounding where its rounding test decides, and
 
 - **Without `simd`** each loops its scalar function.
 - **With `simd`** each runs in lanes ([arch.md](arch.md)). Every lane performs
-  the scalar function's fast path operation for operation: its
+  the scalar function's first stage operation for operation: its
   special-argument screen, its argument reduction, its evaluation and its
-  rounding test (§4, §5). A lane the screen sends elsewhere, or the
-  rounding test doesn't decide, calls the scalar function itself.
+  rounding test (§4, §5); for `ln` that is the double-word fast path, for
+  `exp` its stages, for `ln_1p` stage H. A lane the screen sends elsewhere,
+  or the rounding test doesn't decide, calls the scalar function from that
+  point on (for `ln_1p`, from stage B).
 - **The backend cascade.** The slice runs through the backends the CPU has,
   widest first: AVX-512F, AVX2 and SSE2 on x86-64, and NEON on aarch64. Each
   backend takes as many whole chunks of its own width as remain. So a slice
@@ -39,13 +41,14 @@ for `exp` and `ln`; correct rounding where its rounding test decides, and
 **Why the bits are the scalar function's, by construction.** IEEE 754 fixes
 each binary64 operation's result, and every lane operation is that operation
 ([arch.md](arch.md), "the floating-point environment"). A lane that performs the
-scalar fast path's operations on the same argument therefore computes the
-same double-word `Y`, word for word, and the same rounding test on it. If the
-test passes, the scalar function's fast path passes it too and returns the
-same value; if not, the lane calls the scalar function. The one operation that
+scalar stage's operations on the same argument therefore computes the
+same values, word for word, and the same rounding test on them. If the
+test passes, the scalar function's stage passes it too and returns the
+same value; if not, the lane continues where the scalar function does. The one operation that
 differs between backends is `two_prod`'s error term, which §2 shows is the
 same bits wherever a kernel uses it. The computations written differently are
-`ln`'s rounding test's gap, which §3 shows is the same value, and `exp`'s test
+`ln`'s rounding test's gap and `ln_1p` stage H's equality test, which §3
+shows are the same value, and `exp`'s test
 and scaling, which §4 shows return the same bits.
 
 This doesn't rest on correct rounding. (It would follow from it too for `exp`
@@ -93,8 +96,11 @@ for it:
 
 | Call | Operands | Why on `D` |
 |---|---|---|
-| `ln`, `ln_1p`: `two_prod(y, R[i])` | `y ∈ [0.707, 1.415)`, `R[i]` within 0.8% of `1/y` | ([ln.md](ln.md) §3) |
-| `ln`, `ln_1p`: `two_prod(z_hi, z_hi)` | `z_hi = 0` or `\|z_hi\| ≥ 2^−64` (case A: `\|x\| ≥ 2^−54`) | square zero or at least `2^−128` ([ln.md](ln.md) §3, §7) |
+| `ln`: `two_prod(y, R[i])` | `y ∈ [0.707, 1.415)`, `R[i]` within 0.8% of `1/y` | ([ln.md](ln.md) §3) |
+| `ln`: `two_prod(z_hi, z_hi)` | `z_hi = 0` or `\|z_hi\| ≥ 2^−64` | square zero or at least `2^−128` ([ln.md](ln.md) §3) |
+
+`ln_1p`'s stage H has no `two_prod`: its reduction is exact by construction
+([ln.md](ln.md) §7), with plain products.
 
 A lane the screen sends to the scalar function may carry operands outside `D`
 (a NaN, an infinity), but its value is discarded.
@@ -109,6 +115,12 @@ so no backend uses a fused multiply-add for `exp`.
 
 ## 3. The rounding test's gap
 
+`ln_1p`'s stage H tests `lb == ub` for `lb = s + (lo − eps)` and
+`ub = s + (lo + eps)`, three additions per bound; the lanes perform the same
+additions and compare with `le` both ways. That is `==` for every pair of
+non-NaN operands, signed zeros included (IEEE 754-2019 §5.11), and on a lane
+stage H tries every operand is finite, so `lb` and `ub` are never NaN.
+
 `ln::decide_with` returns `y_hi` when `RN(|y_lo| + RN(eps·|y_hi|)) < g/2`,
 where `g` is `ulp(|y_hi|)`, halved when `|y_hi|` is a power of two
 ([exp.md](exp.md) §8.3). The lane test
@@ -121,7 +133,7 @@ from the exponent field instead of calling `ulp`:
 So the lane computes the same `g` for `|y_hi| ≥ 2^−969` (`B ≥ 54`), and below
 that it reports "not decided", which sends the lane to the scalar function.
 For infinities and NaNs both tests fail. No lane reaches either case in
-practice: `ln`'s and `ln_1p`'s results exceed `2^−55` in magnitude.
+practice: `ln`'s results exceed `2^−55` in magnitude.
 
 ## 4. `exp`
 
@@ -165,21 +177,22 @@ normal (`|k| ≤ 1016`), so it is the same number, with the same encoding.
    them.
 4. **`decide`** in lanes (§3).
 
-**`ln_1p`:**
-1. **The screen** per lane: NaN, `x ≤ −1`, `+∞` and `|x| < 2^−54` go to
-   `ln_1p`. Lanes with `|x| < 2^−7` are case A, the others case B
-   ([ln.md](ln.md) §7).
-2. **Case B's split** in lanes: `(h, l) = two_sum(1, x)` below `2^53`, else
-   `(x, 1)`, chosen per lane by a select. Then `ln`'s in-lane reduction of `h`.
-3. **`z`** per lane: case A's `(x, 0)`, case B's `two_sum(p − 1, q)`, chosen by a
-   select. `ln_1p_double_word(z)` then runs once for both cases: it is the same
-   function on each lane's own `z`.
-4. **Case B continues** in lanes: the table term, `E·ln 2`, and `add_f64(l/h)`.
-   A case-A lane computes these on a placeholder reduction and discards them:
-   a select returns `ln_1p_double_word(z)` itself there. When every lane of a chunk is
-   case A (or screened), steps 2 to 4 reduce to `ln_1p_double_word((x, 0))`
-   alone.
-5. **`decide`** in lanes (§3).
+**`ln_1p`:** stage H ([ln.md](ln.md) §7), as `ln::stages::stage_h_parts`
+writes it.
+1. **The screen** per lane: lanes outside `2^−46 ≤ |x|`, `−1 < x < 2^53`
+   (NaN included) go to `ln_1p` past stage H (stage B, then the fallback),
+   and compute stage H on the placeholder 1, whose result is discarded.
+2. **The split** in lanes: `s0 = 1 + x`, `l = x − (s0 − 1)`.
+3. **The index** per lane, from `s0`'s encoding: `u = bits(s0) − OFF`,
+   `E = u >> 52` (arithmetic), `i` the next 9 bits; `R[i]·2^−E` as the
+   encoding `bits(R[i]) − (E << 52)`; the table loads of `TH`, `TL` and
+   `(E·L1, RN(E·L0))`. No gather instruction is used.
+4. **The evaluation** in lanes: `hh` (`s0` with its low 10 bits cleared, by a
+   mask), `hl = s0 − hh`, `z = (hh·rs − 1) + hl·rs`, the table sums, `l·rs`,
+   the polynomial by Estrin's scheme, `s`, Fast2Sum's `e1`, `lo` and `eps`,
+   each operation as the scalar stage writes it.
+5. **The test** in lanes (§3); lanes it doesn't decide go to `ln_1p` past
+   stage H.
 
 ## 6. Checked by
 
@@ -195,7 +208,8 @@ normal (`|k| ≤ 1016`), so it is the same number, with the same encoding.
     and every binade near zero; for `ln` every positive encoding, `[0.5, 2)`,
     the neighbourhood of 1 and the subnormals; for `ln_1p` `e^d` for
     `d ∈ [−30, 0]`, `z²/4` for `z ∈ [−6, 6]`, `[−1, 2^60]` log-uniform, every
-    magnitude, and the neighbourhoods of −1, `2^−7` and `2^53`.
+    magnitude, the neighbourhoods of −1, `2^−7` and `2^53`, and stage H's
+    table intervals' edges at every exponent of its range.
 
   `MORPHIQ_LANE_CASES` sets each random section's size (default 2^18, about
   1.3 to 2.1 million arguments per function); every remainder and lane
@@ -205,7 +219,8 @@ normal (`|k| ≤ 1016`), so it is the same number, with the same encoding.
   `ln/lanes/tests.rs`): on the same corpora, every lane the scalar function
   would try its fast path on has the scalar fast value's bits: for `exp`, both
   stages' `(y, l)` on every lane past the screen, stage B's on every lane and
-  not only those stage A leaves; for `ln` and `ln_1p`, `y_hi` and `y_lo`.
+  not only those stage A leaves; for `ln`, `y_hi` and `y_lo`; for `ln_1p`,
+  stage H's `(s, lo, eps)` on every lane it tries.
   This shows the kernels transcribe the scalar operations, which the final
   results alone could not: a different but accurate sequence would usually
   round alike.
@@ -238,8 +253,9 @@ The kernels are `O(n)` in the slice length and allocate nothing; each chunk of
 `LANES` elements uses fixed-size arrays on the stack. The per-lane scalar
 parts are the screens, the table indices and the table loads; no gather
 instruction is used. Lanes sent to the scalar function cost a scalar
-evaluation on top: about `2^−16.9` of `exp`'s arguments and `2^−9.4` of `ln`'s
-([exp.md](exp.md) §7, [ln.md](ln.md) §9), plus the screened ones. `exp`'s
+evaluation on top: about `2^−16.9` of `exp`'s arguments, `2^−9.4` of `ln`'s
+and, for `ln_1p`, the `2^−8.6` to `2^−16.7` that stage H leaves to stage B
+([exp.md](exp.md) §7, [ln.md](ln.md) §7, §9), plus the screened ones. `exp`'s
 stage B runs on a chunk only when stage A leaves one of its lanes undecided,
 about one argument in 2^7.3.
 
@@ -259,22 +275,26 @@ cargo run --release --locked -p morphiq-numerics-reference --features simd,std -
 ```
 
 Measured on one Apple M1 Pro (NEON, 2 lanes), `--release`, Rust 1.97.1, with
-the 1-minute load average at 3.2–3.3, one core busy with another job and no
-other benchmark running; two consecutive runs agreed within 0.3 ns:
+the 1-minute load average at 2.1 and no other benchmark or build running; two
+consecutive runs agreed within 0.1 ns:
 
 | Function | Arguments | Scalar loop (ns) | Batched, NEON (ns) | Speed-up |
 |---|---|---|---|---|
-| `exp` | `[−30, 0]` | 4.06 | 2.34 | 1.73× |
-| `exp` | `[−745, 709]` | 9.58 | 7.52 | 1.27× |
-| `ln` | `[0.5, 2)` | 30.51 | 15.17 | 2.01× |
-| `ln` | positive encodings | 30.57 | 15.21 | 2.01× |
-| `ln_1p` | `e^d`, `d ∈ [−30, 0]` | 17.23 | 10.09 | 1.71× |
-| `ln_1p` | `z²/4`, `z ∈ [−6, 6]` | 34.82 | 18.71 | 1.86× |
-| `ln_1p` | `[−1, 2^60]`, log-uniform | 35.99 | 18.83 | 1.91× |
+| `exp` | `[−30, 0]` | 3.91 | 2.25 | 1.74× |
+| `exp` | `[−745, 709]` | 9.26 | 7.30 | 1.27× |
+| `ln` | `[0.5, 2)` | 29.58 | 14.78 | 2.00× |
+| `ln` | positive encodings | 29.62 | 14.80 | 2.00× |
+| `ln_1p` | `e^d`, `d ∈ [−30, 0]` | 4.49 | 3.35 | 1.34× |
+| `ln_1p` | `z²/4`, `z ∈ [−6, 6]` | 4.40 | 3.25 | 1.35× |
+| `ln_1p` | `[−1, 2^60]`, log-uniform | 5.29 | 4.17 | 1.27× |
 
 `exp` on its whole domain gains less: the arguments beyond `exp`'s screen
 (`|x| ≥ 704`, 3.2% of these), among them every subnormal result, go to `exp`
 itself, whose fallback takes its accurate path for the subnormal ones.
+`ln_1p`'s scalar loop is now stage H, about 4.5 ns, so batching it gains less
+than it did over the double-word path. On log-uniform arguments, the lanes
+stage H screens out (`|x|` below `2^−46` or from `2^53`) take stage B or the
+fallback, so they gain least.
 
 Only the NEON figures are measured. SSE2, AVX2 and AVX-512F are checked for
 bit equality, not timed: timing on a CI runner is not evidence, and no x86-64

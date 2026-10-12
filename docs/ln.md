@@ -7,8 +7,8 @@ numbered **decision** is a design choice open to review.
 
 `ln(x)` returns `ln x` rounded to nearest, ties to even, for every binary64 `x`.
 `ln_1p(x)` returns `ln(1 + x)`, without rounding `1 + x`. It is correctly rounded
-whenever its fast path decides the rounding, and otherwise within a proved bound
-(§7). Here `u = 2^−53` and `RN` is round-to-nearest-even.
+whenever one of its stages or its fast path decides the rounding, and otherwise
+within a proved bound (§7). Here `u = 2^−53` and `RN` is round-to-nearest-even.
 
 ## Sources
 
@@ -23,6 +23,10 @@ whenever its fast path decides the rounding, and otherwise within a proved bound
 - **[Ziv]** A. Ziv, "Fast evaluation of elementary mathematical functions with
   correctly rounded last bit", *ACM TOMS* 17(3), 1991: the fast path returns only
   when its result provably rounds correctly.
+- **[Tang]** P. T. P. Tang, "Table-driven implementation of the logarithm
+  function in IEEE floating-point arithmetic", *ACM TOMS* 16(4), 378–400, 1990,
+  doi:10.1145/98267.98294: the table-driven reduction indexed by the leading
+  bits that `ln_1p`'s stages use (§7).
 - **[DW]** This crate's double-word arithmetic ([double-word.md](double-word.md)):
   its operations have machine-checked error bounds in IEEE 754 arithmetic.
 - **[exp]** [exp.md](exp.md): the rounding test (§8.3) and the `Q128` type (§8.4),
@@ -31,6 +35,21 @@ whenever its fast path decides the rounding, and otherwise within a proved bound
 Issue #30 cites Tang's table-driven logarithm (*ACM TOMS* 16(4), 1990). This
 derivation follows [DLM]'s variant instead: its reduction is exact, so the fast
 and accurate paths share it and its tables.
+
+**Provenance of `ln_1p`'s stages (§7).** CORE-MATH (MIT licence), commit
+`cd0b9d9091604338e9ea4f1fcb7bcd92233d6b08`, was consulted for ideas only; no
+code was copied:
+- `src/binary64/log1p/log1p.c`, SHA-256
+  `068da268a928d8f18792e6a9ae8a0c54291925788b4e8c3b3c3c33daac220666`, read in
+  full;
+- `src/binary64/log1p/log1p.wc`, SHA-256
+  `9b4806982f220765e89dd0378e185f68353bca01f7428c8696c2b1c0f46ad1b8`, its hard
+  cases used as test inputs offline, not committed;
+- `LICENSE`, SHA-256
+  `81830875362f4d477637de58eecd6d458db108cc90c40904fca3694807b86de3`.
+
+The ideas taken are listed in §7. glibc, CRlibm, Apple Libm and copyleft or
+unclear-licence sources were not read.
 
 ## 1. Specification
 
@@ -207,7 +226,7 @@ additions certified here.
 
 ## 5. Rounding test
 
-[exp] §5, unchanged, with **`ε₁ = 2^−63`**: `EPS = 2^−63·(1 + 2^−50)`, shared by
+[exp] §8.3, unchanged, with **`ε₁ = 2^−63`**: `EPS = 2^−63·(1 + 2^−50)`, shared by
 `ln` and `ln_1p`. `ln`'s fast path proves `2^−64`, and `ln_1p`'s `2^−63` (§7).
 - The proof needs `ln x` not to be a breakpoint. For rational `x ≠ 1`, `ln x` is
   transcendental (Lindemann: `e^a` is transcendental for algebraic `a ≠ 0`). And
@@ -286,7 +305,190 @@ code's 128-bit value bit for bit on 4,000 `ln` arguments.
 
 ## 7. `ln_1p`
 
-**Decision 5: three branches, none rounding `1 + x`.**
+**Decision 5: two stages before the double-word path, none rounding `1 + x`.**
+`ln_1p` tries stage H (§7.3), then stage B (§7.4), then `ln_1p_reference`
+(§7.6), the double-word and `Q128` paths of earlier releases, unchanged. A
+stage returns only when its rounding test (§7.5) proves its result is
+`RN(ln(1 + x))`, with room for any value within `2^−123` of `ln(1 + x)`. So
+`ln_1p` returns the bits it returned before the stages existed, at every
+argument (§7.7). Every argument a stage doesn't decide, specials included, takes
+the next path.
+
+| Order | Path (`ln/stages.rs`, `ln/mod.rs`) | Screen, on the encoding (false on NaN) | Work |
+|---|---|---|---|
+| 1 | stage H | `2^−46 ≤ \|x\|`, `−1 < x < 2^53` | about 45 binary64 operations; no branch, no select |
+| 2 | stage B | `2^−54 ≤ \|x\|`, `−1 < x < 2^1020` | about 70 operations; one branch, on `\|x\| < 2^−9` |
+| 3 | `ln_1p_reference` | every other argument, and those the stages don't decide | §7.6 |
+
+Measured on 107.4 million arguments (§9), the shares that pass each stage:
+
+| Family | past H (stage B runs) | to `ln_1p_reference` |
+|---|---|---|
+| `e^d`, `d ∈ [−30, 0]` | `2^−8.6` | `2^−19.9` |
+| `z²/4`, `\|z\| ≤ 6` | `2^−11.7` | `2^−21.6` |
+| `1 + x = 2^U`, `U ∈ [−10, 20]` | `2^−16.7` | 0 of 5,000,000 |
+
+The design follows [Tang]'s table-driven reduction indexed by the leading
+bits, with [Ziv]'s rule that a fast result is returned only when it provably
+rounds correctly. CORE-MATH's `log1p` was consulted for ideas (see Sources:
+provenance). Its ideas, not its code: the exponent and index read from the
+encoding, `R[i]` scaled by `2^−E`, `l` folded into the reduced argument,
+Fast2Sum`(1, x)` up to `2^53`, `E·L1 + TH` exact, and the `lb == ub` test. This
+derivation's own: the reciprocals that make `z` exact without FMA, `R = 1`
+around 1, the error bounds' form, the `E·ln 2` table and Estrin's form, stage B,
+and every constant.
+
+### 7.1 Notation
+
+`RN` rounds to nearest, ties to even, and every operation below is one binary64
+operation, in the order written. No operation is fused or reordered: the proofs
+transcribe this order (`formal/ln/Ln1pStageH.v`, `Ln1pStageB.v`), and the
+internal cross-check compares the transcription with the code bit for bit.
+
+### 7.2 The reduction, exact without FMA
+
+**Decision 6: `J = 9`, 512 reciprocals of 10 significant bits.**
+
+1. **The split.** For `x < 2^53`, `s0 = RN(1 + x)` and `l = x − (s0 − 1)`
+   (Fast2Sum, exact for `−1 < x < 2^53`): `1 + x = s0 + l` and
+   `|l| ≤ 2^−53·s0`. Stage B takes `(h, l) = (x, 1)` for `x ≥ 2^53`, where
+   `|l| ≤ 2^−53·h` too. Write `h` for `s0` or `x`.
+2. **The index.** `u = bits(h) − OFF`, `OFF = bits(0x1.6ap−1)`; `E = u >> 52`
+   (arithmetic) and `i = (u >> 43) & 511`. Then `h = 2^E·y` exactly, with
+   `y ∈ [0x1.6ap−1, 0x1.6ap0)` and `y` in interval `i`, which holds `2^43`
+   encodings. Intervals 0–299 lie below 1, 300–511 above; none straddles 1.
+   `h ≥ 2^−53`, so `h` is normal and `−53 ≤ E ≤ 1020`.
+3. **The reciprocal.** `R[i]` has 10 significant bits and
+   `|y·R[i] − 1| ≤ 2^−9` over the interval (*generated* and checked). The three
+   intervals with `y` within `2^−9` of 1 (`i = 298, 299, 300`) take `R[i] = 1`,
+   so arguments near 0 reduce with no table term and stage H needs no
+   small-argument branch.
+4. **`rs = R[i]·2^−E`,** built by subtracting `E·2^52` from `R[i]`'s encoding:
+   exact, and normal for `−53 ≤ E ≤ 1020`.
+5. **`z = y·R[i] − 1`, exactly:** `hh` is `h` with its low 10 bits cleared,
+   `hl = h − hh`, and `z = (hh·rs − 1) + hl·rs`.
+   - `hh` has at most 43 significant bits and `rs` 10, so `hh·rs` is exact;
+     it lies in `[1/2, 2]`, so `hh·rs − 1` is exact (Sterbenz).
+   - `hl` has at most 10 significant bits, so `hl·rs` is exact.
+   - Below 1, `y` is a multiple of `2^−53` and `R[i] ≥ 1` of `2^−9`; above,
+     `2^−52` and `2^−10`. So `z` and both terms are multiples of `2^−62`, and
+     with `|z| ≤ 2^−9` the sum is exact.
+
+   So `z` is 0 or `|z| ≥ 2^−62`, and no FMA is needed.
+6. **Then** `1 + x = 2^E·R[i]^−1·(1 + z + L)`, `L = l·rs`, and
+   `ln(1 + x) = E·ln 2 − ln R[i] + ln(1 + z) + ln(1 + L/(1 + z))`, with
+   `|L| ≤ 2^−53·(1 + 2^−9)`.
+
+**The tables** (`ln/stage_tables.rs`, 14 KiB, *generated*):
+- `T[i] = (TH, TL)`: `TH` is `−ln R[i]` rounded to `2^−43`'s grid, `TL` binary64,
+  and `|TH + TL + ln R[i]| ≤ 2^−97`; `|TH| ≤ 711·2^−11`, `|TL| ≤ 2^−44`.
+- `L1` is `ln 2` rounded to `2^−43`'s grid and `|L1 + L0 − ln 2| ≤ 2^−101`. So
+  `E·L1 + TH` is exact for `|E| ≤ 1020`: both lie on `2^−43`'s grid, below
+  `2^10`.
+- `EL[k] = (E·L1, RN(E·L0))` for `E = k − 64`: stage H's `E·ln 2`, one load.
+- Away from the three intervals around 1, `|TH|` exceeds the interval's
+  largest `|z|` by at least `181·2^−18`, so `|ln1 + z|` stays clear of zero
+  (the Fast2Sum conditions below).
+
+**Machine-checked:**
+- `formal/ln/Ln1pReduction.v`, **`split_ok`** and **`reduce_ok`**: for every
+  finite `h` in `[2^−53, 2^1020]`, the fields read from `h`'s encoding give
+  `h = 2^E·y` with `y` in interval `i`, `rs = R[i]·2^−E`, and
+  `z = y·R[i] − 1` exactly, 0 or at least `2^−62`, at most `2^−9`.
+- `formal/ln/Ln1pTables.v`, which `generators/ln1p_constants.py` writes with
+  the tables, proves every bound above by **one reflective check per table**
+  (`st_rt_check` over the 512 intervals, `st_l_check` over `L1`, `L0` and `EL`),
+  through `formal/ln/Ln1pCheck.v`; `ln` at the rationals involved is enclosed
+  by `formal/ln/LnCheck.v` (§3).
+
+### 7.3 Stage H
+
+```
+s0 = 1 + x;  l = x − (s0 − 1);  (E, i, rs, z) = reduce(s0)
+(th, tl) = T[i];  (eh, el) = EL[E + 64]
+ln1 = eh + th;  ln0 = el + tl;  lr = l·rs
+z2 = z·z;  t0 = z·H0 − 0.5;  t1 = z·H2 + H1;  a1 = z2·H3 + t1
+p = z2·a1 + t0;  q = z2·p                         (q ≈ z²·P(z), Estrin)
+s = ln1 + z;  e1 = z − (s − ln1)                  (Fast2Sum)
+lo = (e1 + (lr·(1 − z) + ln0)) + q
+eps = z2·K_H + (|s|·K2_H + A_H)
+```
+
+`P(z) = −1/2 + H0·z + H1·z² + H2·z³ + H3·z⁴` approximates
+`(ln(1 + z) − z)/z²` on `|z| ≤ 2^−9` (Sollya `fpminimax`, relative error
+`2^−40.22` for `ln(1 + z) − z`, *generated*). The term `L/(1 + z)` enters as
+`lr·(1 − z)`: no division. The Fast2Sum is exact: `ln1 = 0` (`E = 0` and
+`R[i] = 1`) or `|z| ≤ |ln1|`.
+
+**The bound.** `s + lo − ln(1 + x) = z²·Gz + s·Gs + GA`, each term certified:
+
+| Term | Collects | Bound | Certificate |
+|---|---|---|---|
+| `Gz` | `P`'s approximation (`592·2^−60`, proved in `Ln1pApprox.v`) and evaluation (`577·2^−61`, `stage_h_q.g`), `L·z/(1 + z)`, `lo`'s last rounding | `543·2^−59 = 2^−49.92` | `stage_h_gz.g` |
+| `Gs` | the tables' and `E·ln 2`'s errors, `ln0`'s rounding, the Fast2Sum, `lo`'s roundings of `s`-sized terms | `925·2^−94 = 2^−84.15` | `stage_h_gs.g` |
+| `GA` | `lr·(1 − z)`'s roundings (`stage_h_lr.g`), `ln(1 + u) − u`, their propagation | `263·2^−111 = 2^−102.96` | `stage_h_ga.g` |
+
+`K_H = 2^−49`, `K2_H = 2^−83` and `A_H = 2^−102` are those bounds rounded up to
+powers of two. The room between them pays for `eps`'s own roundings, the test's
+`2^−53·(|lo| + eps)` (§7.5) and `2^−123·|ln(1 + x)|`.
+
+**Machine-checked:** `formal/ln/Ln1pStageH.v`, **`stage_h_ok`**: for every
+finite `x` that passes the screen, if stage H returns `v`, then
+`v = RN(ln(1 + x))`, and every real within `2^−123` relatively of
+`ln(1 + x)` rounds to `v`.
+
+### 7.4 Stage B
+
+**`|x| < 2^−9`: `z = x`.**
+```
+(p, pl) = two_prod(x, x);  m = −0.5·p                   (exact)
+s = x + m;  e1 = m − (s − x)                            (Fast2Sum)
+tail = (x·p)·W(x)                                       (W by Horner, B0..B5)
+lo = e1 + (−0.5·pl + tail)
+eps = |x|·(p·K_B + EPS_B_REL)
+```
+`W` approximates `(ln(1 + z) − z + z²/2)/z³` (Sollya, relative error
+`2^−54.0`; the bound proved in `Ln1pApprox.v` is `691·2^−65`). The error is at
+most `|x|³·137·2^−59 + |x|·263·2^−114` (*certified*: `stage_b_small_tail.g`,
+`stage_b_small.g`), under `K_B = 2^−51` and `EPS_B_REL = 2^−102`.
+
+**`|x| ≥ 2^−9`: the reduction of §7.2,** with `(h, l) = (x, 1)` from `2^53`:
+```
+ln1 = E·L1 + TH;  ln0 = E·L0 + TL                       (ln1 exact)
+(p, pl) = two_prod(z, z)
+s1 = ln1 + z;  e1 = z − (s1 − ln1);  m = −0.5·p          (Fast2Sum)
+s = s1 + m;  e2 = m − (s − s1)                          (Fast2Sum)
+tail = (z·p)·W(z);  lrt = lr·(((1 − z) + p) − z·p)
+lo = (e1 + e2) + ((ln0 + lrt) + (−0.5·pl + tail));  eps = EPS_B = 2^−78
+```
+Both Fast2Sums are exact (`|z| ≤ |ln1|` or `ln1 = 0`, then `|m| ≤ |s1|`), and
+both errors are kept. The error is at most `117·2^−86 = 2^−79.13`
+(*certified*: `stage_b_total.g`), from `lo`'s roundings (`415·2^−88`,
+`stage_b_lo.g`), the tables and `E·ln 2` with `ln0`'s roundings
+(`533·2^−95`), `W`'s approximation (`349·2^−91`) and the `l` term
+(`263·2^−97`).
+
+**Machine-checked:** `formal/ln/Ln1pStageB.v`, **`stage_b_ok`**: as
+`stage_h_ok`, on both branches, for every finite `x` that passes stage B's
+screen.
+
+### 7.5 The rounding test
+
+```
+lb = s + (lo − eps);  ub = s + (lo + eps);  return lb if lb == ub
+```
+**Validity** (`formal/ln/Ln1pTest.v`, **`decide_ok`**). If `eps ≥ 0`,
+`|s| ≤ 2^999`, `|lo| + eps ≤ 1` and `lb == ub`, then every real `w` with
+`|w − (s + lo)| + 2^−53·(|lo| + eps) ≤ eps` rounds to `lb`:
+`s + RN(lo − eps) ≤ w ≤ s + RN(lo + eps)`, and rounding is monotone. Nothing
+about `w` is assumed beyond the distance. In particular `w` may be a rounding
+breakpoint, so no worst-case search is needed. Each stage proves the distance
+for `ln(1 + x)` and for every real within `2^−123` relatively of it.
+
+### 7.6 The fallback: `ln_1p_reference`
+
+**Decision 7: three branches, none rounding `1 + x`.** These are the paths of
+`ln_1p_reference`, unchanged from earlier releases.
 
 **`|x| < 2^−54`: return `x`.** This is correctly rounded.
 - For `0 < |x| < 2^−54`, `|ln(1 + x) − x| ≤ x²/(2(1 − |x|))`, which is below
@@ -335,7 +537,7 @@ The fast path is within `2^−64`, and the accurate path within `2^−123`.
   `|ln_1p(x) − ln(1 + x)| ≤ ½·ulp + 2^−123·|ln(1 + x)| < (½ + 2^−70)·ulp`.
 - It is correctly rounded unless `ln(1 + x)` lies within mantissa distance
   `2^−122` of a breakpoint. No published search excludes that, so it isn't
-  claimed.
+  claimed. Only arguments neither stage decides reach this path (§7.7).
 
 **Machine-checked:** `formal/ln/LnAccurate.v` transcribes `ln_1p`'s accurate
 branches (`small_accurate`, and `split`, `Reduced::z_prime` and
@@ -346,6 +548,51 @@ and that `Q128::to_f64` rounds it once. On the general branch it proves
 (`|ln(1 + z'_computed) − ln(1 + z')|` against `ln(1 + 2^−7)`), and that no
 argument takes case A. The internal cross-check compares the transcription
 with the Rust code bit for bit on 4,000 arguments over both branches.
+
+### 7.7 Today's bits
+
+Let a stage return `v` at `x`. Then `v = RN(ln(1 + x))`, and every real within
+`2^−123` relatively of `ln(1 + x)` rounds to `v` (§7.3, §7.4). Before the
+stages, `ln_1p` returned at `x`:
+- its double-word fast path's result, when that path's rounding test passed:
+  `RN(ln(1 + x))` (§5, `fast_ln_1p.g`), which is `v`; or
+- its accurate value rounded once, which is within `2^−123` (§7.6): `v` again.
+
+So `ln_1p` returns the same bits as before at every argument a stage decides,
+and every other argument takes `ln_1p_reference` itself. The determinism
+digest's `ln_1p` and `ln_1p_slice` sections are unchanged.
+
+**Machine-checked:** `formal/ln/Ln1p.v`, **`ln_1p_stage_h_bits`** and
+**`ln_1p_stage_b_bits`**: when a stage returns `v`, `v` is the binary64
+`Q128::to_f64` makes of `ln_1p`'s accurate value (`ln_1p_acc_ok`), encoding for
+encoding (`v` is nonzero: `|ln(1 + x)| ≥ 2^−55`). **`ln_1p_stages_ok`** states
+it for `ln_1p_stages`, the screens and stages as `ln_1p` runs them, for every
+`x`: `formal/ln/Ln1pScreen.v` transcribes both screens on the encoding and
+proves what they admit (**`h_screen_ok`**, **`b_screen_ok`**): a finite `x` in
+the ranges of the table in §7. The double-word fast path's
+step rests on its certificates and the rounding test's proof (§4, §5), as it
+did before; that path's transcription isn't machine-checked end to end.
+
+So wherever a stage decides, `ln_1p` is correctly rounded, which §7.6's bound
+alone doesn't claim.
+
+### 7.8 Review points
+
+- **No FMA.** The 10-bit reciprocals and `h`'s 10-bit split make `z` exact
+  with plain multiplications on every target. An FMA kernel (`z = fma(h, rs,
+  −1)`, about 40% more proof) is a follow-up.
+- **`J = 9` against `J = 10`.** `J = 10` (26 KiB) sends fewer arguments past H
+  (`2^−9.7` against `2^−8.6` on `e^d`) and measured no faster. 14 KiB and
+  `exp`'s 16 KiB table fit a 32 KiB L1 data cache together.
+- **H's floor `2^−46`.** Below it, `A_H` is a large share of an `ulp` of
+  `ln(1 + x)` and H would rarely decide. Stage B's small branch has a relative
+  bound and takes those arguments.
+- **Stage B's constant `eps`.** `|ln(1 + x)| ≥ 2^−9.01` on the table branch,
+  so `2^−78` is far below an `ulp`.
+- **`ln` is unchanged.** Its fast path keeps §4; giving it this reduction is a
+  follow-up.
+- **Lanes.** Stage H has no branch or select, so `ln_1p_slice` runs it in
+  lanes ([lanes.md](lanes.md)).
 
 ## 8. Certificates and generators
 
@@ -363,7 +610,20 @@ with the Rust code bit for bit on 4,000 arguments over both branches.
 | `formal/ln/LnAccurateLevels.v` | Coq, written by `generators/ln_certificates.py` | the accurate certificates restated over reals |
 | `formal/ln/LnCheck.v` | Coq | a reflective enclosure of `ln` at a rational |
 | `formal/ln/LnTableCheck.v` | Coq | the accurate path's `Q128` tables and the case ratios, one reflective check each |
-| `formal/ln/LnAccurate.v` | Coq | the accurate paths of `ln` and `ln_1p`, end to end (§6, §7) |
+| `formal/ln/LnAccurate.v` | Coq | the accurate paths of `ln` and `ln_1p`, end to end (§6, §7.6) |
+| `generators/ln_poly.sollya` (stages) | Sollya 8.0 | `H0`–`H3` (`h3`–`h6`) and `B0`–`B5` (`b3`–`b8`), `fpminimax`, relative on `\|z\| ≤ 2^−9`, with their approximation bounds, in `generators/ln_poly.out` |
+| `generators/ln1p_constants.py` | Python, mpmath | writes `crates/morphiq-numerics/src/ln/stage_tables.rs` and `formal/ln/Ln1pTables.v`: `OFF`, `R`, `T`, `L1`/`L0`, `EL` and the stages' polynomials, each bound of §7.2 checked |
+| `generators/ln1p_certificates.py` | Python, mpmath | writes the stage certificates below and `formal/ln/Ln1pCertificates.v`, their theorems over reals; hypotheses derived, goals widened by at least 1% |
+| `formal/ln/stage_h_q.g`, `_lr.g`, `_gz.g`, `_gs.g`, `_ga.g` | Gappa 1.4.1 | stage H's `q`, `l` term and the three error terms (§7.3) |
+| `formal/ln/stage_b_small_tail.g`, `_small.g` | Gappa | stage B's small branch (§7.4) |
+| `formal/ln/stage_b_lo.g`, `_total.g` | Gappa | stage B's table branch (§7.4) |
+| `formal/ln/Ln1pCheck.v`, `Ln1pTables.v` | Coq | the stage tables, one reflective check each (§7.2) |
+| `formal/ln/Ln1pApprox.v` | Coq | `P`'s and `W`'s approximation bounds, from the series of `ln(1 + z)` |
+| `formal/ln/Ln1pReduction.v` | Coq | the split and the reduction, exact (§7.2) |
+| `formal/ln/Ln1pTest.v` | Coq | the stage test's validity (§7.5) |
+| `formal/ln/Ln1pLemmas.v`, `Ln1pStageH.v`, `Ln1pStageB.v` | Coq | stages H and B, end to end (§7.3, §7.4) |
+| `formal/ln/Ln1pScreen.v` | Coq | the screens, on the encoding (§7) |
+| `formal/ln/Ln1p.v` | Coq | the stages return the accurate path's bits (§7.7) |
 
 Every certificate's Coq proof is also built, with each rewriting hint proved, by the formal job ([exp.md](exp.md), gates).
 
@@ -373,11 +633,13 @@ Every certificate's Coq proof is also built, with each rewriting hint proved, by
   - the binding manifest matches;
   - the Sollya script reproduces its output exactly;
   - every certificate proves its goal.
-- **Replay:** `scripts/check_generators.sh` replays both generators.
+- **Replay:** `scripts/check_generators.sh` replays all four generators.
 
 **The binding** (`formal/ln/binding.sha256`) covers this document, the
 constants, the Sollya script and output, every certificate, and the kernels'
-source (`ln/mod.rs`, `q128.rs`).
+source (`ln/mod.rs`, `ln/stages.rs`, `ln/stage_tables.rs`, `q128.rs`). The
+formal job's manifest (`formal/binding.sha256`) binds the Coq proofs to
+`ln/stages.rs` and `ln/stage_tables.rs` too.
 
 ## 9. Checked by
 
@@ -400,6 +662,23 @@ source (`ln/mod.rs`, `q128.rs`).
   550,857 for `ln_1p`), against the analytic bound `2^−9`; the tests fail above
   four times that.
 - **The rounding test at its boundary,** for both signs and at powers of two.
+- **Each stage against `ln_1p_reference`** (`src/ln/tests.rs`): bit for bit
+  wherever it decides, on about 630,000 arguments across both stages' branches
+  (`e^d`, `z²/4`, log-uniform, random encodings, small `|x|`, near −1,
+  `l ≠ 0`, the table intervals' edges, every threshold ±2,000 encodings and
+  powers of two with their neighbours); each stage must decide at least 63/64
+  of the arguments its screen admits.
+- **The stages against their transcriptions:** the internal cross-check
+  compares `(s, lo, eps)` and the test's result with the extracted
+  `Ln1pStageH.v` and `Ln1pStageB.v`, bit for bit, on 4,000 arguments each, and
+  both screens with `Ln1pScreen.v` on all 7,507 arguments drawn for them.
+- **Offline, before the change:** 107,373,586 arguments, 0 mismatches between
+  `ln_1p` and `ln_1p_reference`, stage by stage and through `ln_1p_slice`: the
+  `e^d` and `z²/4` families (25M each), log-uniform over `(−1, 2^1024)` (20M),
+  `1 + x = 2^U` (5M), random encodings (15M), small `|x|` (6M), near −1 (3M),
+  `l ≠ 0` (3M), the interval edges for `J` = 7 to 10 (4M), the thresholds, the
+  powers of two, the `ln.json` fixture, and CORE-MATH's `log1p.wc` hard cases
+  with their neighbours (1.04M, inputs only, not committed).
 - **The determinism digest's `ln` and `ln_1p` sections** on every target
   ([determinism.md](determinism.md)).
 - Exhaustive checks of chosen sub-intervals against the oracle (scheduled).

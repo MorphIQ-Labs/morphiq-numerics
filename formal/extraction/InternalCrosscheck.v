@@ -2,9 +2,10 @@
     (formal/binary64/RoundingTest.v), exp's stages (formal/exp/ExpStageReduction.v,
     ExpStageA.v, ExpStageB.v, with formal/binary64/RoundingConstant.v), exp's
     fallback reduction, fast value, accurate path and small-argument path
-    (formal/exp/ExpReduction.v, ExpFast.v, ExpAccurate.v, ExpSmall.v), and ln's
-    reduction and accurate paths (formal/ln/LnReduction.v, LnAccurate.v),
-    extracted to OCaml
+    (formal/exp/ExpReduction.v, ExpFast.v, ExpAccurate.v, ExpSmall.v), ln's
+    reduction and accurate paths (formal/ln/LnReduction.v, LnAccurate.v), and
+    ln_1p's screens and stages H and B (formal/ln/Ln1pScreen.v, Ln1pStageH.v,
+    Ln1pStageB.v), extracted to OCaml
     so formal/extraction/internaldriver.ml can run them on the internal
     cross-check corpus and compare with the Rust code bit for bit. A value
     travels as its sign, its exponent and its significand's 64-bit limbs, least
@@ -14,7 +15,7 @@ From Coq Require Import ZArith List Extraction ExtrOcamlBasic.
 From Flocq Require Import IEEE754.Binary IEEE754.Bits.
 From Q Require Import Limbs Digits64 Q128 Q256.
 From Binary64 Require Import IEEE64 RoundingTest.
-Require ExpReduction ExpFast ExpAccurate ExpSmall LnReduction LnAccurate ExpStageReduction ExpStageA ExpStageB.
+Require ExpReduction ExpFast ExpAccurate ExpSmall LnReduction LnAccurate Ln1pScreen ExpStageReduction ExpStageA ExpStageB Ln1pStageH Ln1pStageB.
 Import ListNotations.
 
 Definition limbs (k : nat) (x : Z) : list Z := map (fun i => dig x (Z.of_nat i)) (seq 0 k).
@@ -82,5 +83,17 @@ Definition x_ln_reduce x :=
 Definition x_ln_accurate x := q128_out (LnAccurate.ln_acc (b64_of_bits x)).
 Definition x_ln_1p_accurate x := q128_out (LnAccurate.ln_1p_acc (b64_of_bits x)).
 
-Extraction "internalcrosscheck.ml" x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
+(** ln_1p's stages (Ln1pStageH.v, Ln1pStageB.v): [s], [lo], [eps] and the
+    test's result. *)
+Definition x_ln1p_h x :=
+  let '(s, lo, eps) := Ln1pStageH.stage_h_parts (b64_of_bits x) in
+  (map bits_of_b64 [s; lo; eps], opt_bits (Ln1pStageH.stage_h (b64_of_bits x))).
+Definition x_ln1p_b x :=
+  let '(s, lo, eps) := Ln1pStageB.stage_b_parts (b64_of_bits x) in
+  (map bits_of_b64 [s; lo; eps], opt_bits (Ln1pStageB.stage_b (b64_of_bits x))).
+
+(** ln_1p's screens (Ln1pScreen.v): stage H's, then stage B's. *)
+Definition x_ln1p_screens x := (Ln1pScreen.h_screen (b64_of_bits x), Ln1pScreen.b_screen (b64_of_bits x)).
+
+Extraction "internalcrosscheck.ml" x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
   x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs.

@@ -192,3 +192,93 @@ fn the_rounding_test_decides_at_its_boundary() {
         }
     }
 }
+
+/// Arguments for stages H and B covering every branch (§7): `e^d` and `z²/4`
+/// (the consumers' families), log-uniform over `(−1, 2^1020)`, random
+/// encodings, small `|x|` of both signs, near −1, `l ≠ 0`, the table
+/// intervals' edges at random exponents, every threshold ±2,000 encodings and
+/// powers of two with their neighbours.
+fn stage_corpus() -> std::vec::Vec<f64> {
+    use super::stage_tables::OFF;
+    let mut rng = SplitMix64::new(0x6c6e_3170_7374_6731);
+    let unit = |rng: &mut SplitMix64| (rng.next_u64() >> 11) as f64 / (1u64 << 53) as f64;
+    let binade = |rng: &mut SplitMix64, lo: i64, hi: i64| {
+        let e = lo + (rng.next_u64() % (hi - lo) as u64) as i64;
+        f64::from_bits((((1023 + e) as u64) << 52) | (rng.next_u64() >> 12))
+    };
+    let nudge = |x: f64, d: i64| f64::from_bits((x.to_bits() as i64).wrapping_add(d) as u64);
+    let n = 1 << 16;
+    let mut v = std::vec::Vec::new();
+    for _ in 0..n {
+        v.push(crate::elementary::exp(-30.0 * unit(&mut rng)));
+        let z = 12.0 * unit(&mut rng) - 6.0;
+        v.push(z * z / 4.0);
+        v.push(match rng.next_u64() % 4 {
+            0 | 1 => binade(&mut rng, -60, 1020),
+            2 => -binade(&mut rng, -60, 0),
+            _ => -1.0 + binade(&mut rng, -53, -1),
+        });
+        v.push(f64::from_bits(rng.next_u64()));
+        let s = binade(&mut rng, -60, -6);
+        v.push(if rng.next_u64() & 1 == 0 { s } else { -s });
+        v.push(binade(&mut rng, -7, 60));
+        let i = rng.next_u64() % 512;
+        let d = (rng.next_u64() % 9) as i64 - 4;
+        let e = (rng.next_u64() % 120) as i64 - 6;
+        let h = f64::from_bits((OFF as i64 + (i << 43) as i64 + d + (e << 52)) as u64);
+        v.push(h - 1.0);
+    }
+    let two = |k: i32| f64::from_bits(((1023 + k) as u64) << 52);
+    for c in [
+        two(-54),
+        two(-46),
+        two(-9),
+        two(-10),
+        two(53),
+        two(1020),
+        -1.0,
+        1.0,
+    ] {
+        for sign in [1.0, -1.0] {
+            for d in -2000..=2000 {
+                v.push(nudge(sign * c, d));
+            }
+        }
+    }
+    for e in -60..1023 {
+        for d in -16..=16 {
+            v.push(nudge(two(e), d));
+            v.push(nudge(-two(e.min(-1)), d));
+            v.push(nudge(two(e), d) - 1.0);
+        }
+    }
+    v
+}
+
+#[test]
+fn each_stage_returns_the_reference_bits_wherever_it_decides() {
+    use super::stages::{stage_b_parts, stage_b_screen, stage_h_parts, stage_h_screen};
+    use super::{ln_1p, ln_1p_reference};
+    let (mut h_tried, mut h_decided, mut b_tried, mut b_decided) = (0u32, 0u32, 0u32, 0u32);
+    for x in stage_corpus() {
+        let want = ln_1p_reference(x).to_bits();
+        if stage_h_screen(x) {
+            h_tried += 1;
+            if let Some(y) = stage_h_parts(x).3 {
+                h_decided += 1;
+                assert_eq!(y.to_bits(), want, "stage H at {x:e}");
+            }
+        }
+        if stage_b_screen(x) {
+            b_tried += 1;
+            if let Some(y) = stage_b_parts(x).3 {
+                b_decided += 1;
+                assert_eq!(y.to_bits(), want, "stage B at {x:e}");
+            }
+        }
+        assert_eq!(ln_1p(x).to_bits(), want, "ln_1p at {x:e}");
+    }
+    std::eprintln!("stage H decided {h_decided} of {h_tried}, stage B {b_decided} of {b_tried}");
+    assert!(h_decided > h_tried - h_tried / 64);
+    assert!(b_decided > b_tried - b_tried / 64);
+}

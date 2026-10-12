@@ -3,14 +3,17 @@
 //! (`Stages::of`, `a_value`, `a`, `b_value`, `b`), the fallback's reduction,
 //! fast value (`exp::fast_at`), accurate path (`Reduced::accurate_value`) and
 //! small-argument path (`exp::small_parts`, `exp::small`), and `ln`'s
-//! reduction (`ln::Reduced::of`, `z`, `z_exact`) and the accurate values of
-//! `ln` and `ln_1p` (`Reduced::accurate_value`, `z_prime`, `ln::split`,
-//! `ln::small_accurate`) on reproducible inputs, with this crate's results.
-//! `scripts/check_formal.sh` runs the proved transcriptions (`formal/q`,
-//! `formal/binary64/RoundingTest.v`, `formal/exp/ExpStageReduction.v`,
-//! `ExpStageA.v`, `ExpStageB.v`, `ExpReduction.v`, `ExpFast.v`,
-//! `ExpAccurate.v`, `ExpSmall.v`, `formal/ln/LnReduction.v` and `LnAccurate.v`,
-//! extracted by
+//! reduction (`ln::Reduced::of`, `z`, `z_exact`), the accurate values of `ln`
+//! and `ln_1p` (`Reduced::accurate_value`, `z_prime`, `ln::split`,
+//! `ln::small_accurate`) and `ln_1p`'s screens and stages H and B
+//! (`ln::stages::stage_h_screen`, `stage_b_screen`, `stage_h_parts`,
+//! `stage_b_parts`) on reproducible inputs, with
+//! this crate's results. `scripts/check_formal.sh` runs the proved
+//! transcriptions (`formal/q`, `formal/binary64/RoundingTest.v`,
+//! `formal/exp/ExpStageReduction.v`, `ExpStageA.v`, `ExpStageB.v`,
+//! `ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v`, `ExpSmall.v`,
+//! `formal/ln/LnReduction.v`, `LnAccurate.v`, `Ln1pScreen.v`, `Ln1pStageH.v`
+//! and `Ln1pStageB.v`, extracted by
 //! `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
 //! identical results, which ties the proofs to this code.
 //!
@@ -454,5 +457,76 @@ fn internal_crosscheck_corpus() {
             found += 1;
         }
     }
+    // ln_1p's stages: both screens at every argument, and (s, lo, eps) and
+    // the test's result for arguments each stage's screen admits, across its
+    // branches.
+    let mut rng = SplitMix64::new(0x7163_726f_7373_0002);
+    let (mut h, mut b) = (0, 0);
+    while h < 4000 || b < 4000 {
+        let x = ln_1p_stage_argument(&mut rng);
+        writeln!(
+            out,
+            "ln1p_screens {:016x} : {} {}",
+            x.to_bits(),
+            u8::from(crate::ln::stages::stage_h_screen(x)),
+            u8::from(crate::ln::stages::stage_b_screen(x))
+        )
+        .unwrap();
+        if h < 4000 && crate::ln::stages::stage_h_screen(x) {
+            ln_1p_stage_line(&mut out, "ln1p_h", x, crate::ln::stages::stage_h_parts(x));
+            h += 1;
+        }
+        if b < 4000 && crate::ln::stages::stage_b_screen(x) {
+            ln_1p_stage_line(&mut out, "ln1p_b", x, crate::ln::stages::stage_b_parts(x));
+            b += 1;
+        }
+    }
     std::fs::write(path, out).unwrap();
+}
+
+/// An argument of `ln_1p`'s stages: small of either sign, near −1, below and
+/// above `2^53`, any encoding, or at a table interval's edge.
+fn ln_1p_stage_argument(rng: &mut SplitMix64) -> f64 {
+    let binade = |rng: &mut SplitMix64, low: u64, width: u64| {
+        f64::from_bits(((low + rng.next_u64() % width) << 52) | (rng.next_u64() >> 12))
+    };
+    match rng.next_u64() % 6 {
+        // 2^-60 ..= 2^-6, either sign
+        0 => {
+            let x = binade(rng, 963, 55);
+            if rng.next_u64() & 1 == 1 { -x } else { x }
+        }
+        // −1 + 2^-53 ..= −1/2
+        1 => -1.0 + binade(rng, 970, 52),
+        // 2^-6 ..= 2^60
+        2 => binade(rng, 1017, 66),
+        // 2^53 ..= 2^1023
+        3 => binade(rng, 1076, 947),
+        4 => f64::from_bits(rng.next_u64()),
+        _ => {
+            // h at a table interval's edge, give or take 4 encodings: 1 + x = h.
+            let i = rng.next_u64() % 512;
+            let e = rng.next_u64() % 100;
+            let d = rng.next_u64() % 9;
+            f64::from_bits(0x3fe6_a000_0000_0000 + (i << 43) + (e << 52) + d - 4) - 1.0
+        }
+    }
+}
+
+fn ln_1p_stage_line(
+    out: &mut String,
+    op: &str,
+    x: f64,
+    (s, lo, eps, y): (f64, f64, f64, Option<f64>),
+) {
+    writeln!(
+        out,
+        "{op} {:016x} : {:016x} {:016x} {:016x} {}",
+        x.to_bits(),
+        s.to_bits(),
+        lo.to_bits(),
+        eps.to_bits(),
+        opt(y)
+    )
+    .unwrap();
 }
