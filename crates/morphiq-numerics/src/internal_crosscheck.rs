@@ -3,12 +3,14 @@
 //! (`Stages::of`, `a_value`, `a`, `b_value`, `b`), the fallback's reduction,
 //! fast value (`exp::fast_at`), accurate path (`Reduced::accurate_value`) and
 //! small-argument path (`exp::small_parts`, `exp::small`), and `ln`'s
-//! reduction (`ln::Reduced::of`, `z`, `z_exact`) on reproducible inputs, with
-//! this crate's results. `scripts/check_formal.sh` runs the proved
-//! transcriptions (`formal/q`, `formal/binary64/RoundingTest.v`,
-//! `formal/exp/ExpStageReduction.v`, `ExpStageA.v`, `ExpStageB.v`,
-//! `ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v`, `ExpSmall.v` and
-//! `formal/ln/LnReduction.v`, extracted by
+//! reduction (`ln::Reduced::of`, `z`, `z_exact`) and the accurate values of
+//! `ln` and `ln_1p` (`Reduced::accurate_value`, `z_prime`, `ln::split`,
+//! `ln::small_accurate`) on reproducible inputs, with this crate's results.
+//! `scripts/check_formal.sh` runs the proved transcriptions (`formal/q`,
+//! `formal/binary64/RoundingTest.v`, `formal/exp/ExpStageReduction.v`,
+//! `ExpStageA.v`, `ExpStageB.v`, `ExpReduction.v`, `ExpFast.v`,
+//! `ExpAccurate.v`, `ExpSmall.v`, `formal/ln/LnReduction.v` and `LnAccurate.v`,
+//! extracted by
 //! `formal/extraction/InternalCrosscheck.v`) on the same inputs and requires
 //! identical results, which ties the proofs to this code.
 //!
@@ -207,6 +209,30 @@ fn ln_argument(rng: &mut SplitMix64) -> f64 {
     }
 }
 
+/// An argument of `ln_1p`'s accurate path, `|x| ≥ 2^−54` and `x > −1`:
+/// either branch (`|x| < 2^−7` and not), log-uniform in magnitude, both signs,
+/// near −1 and around `2^53`, where `1 + x` splits as `(x, 1)`.
+fn ln_1p_argument(rng: &mut SplitMix64) -> f64 {
+    let magnitude = |rng: &mut SplitMix64, lo: u64, width: u64| {
+        (1.0 + unit(rng)) * f64::from_bits((lo + rng.next_u64() % width) << 52)
+    };
+    match rng.next_u64() % 5 {
+        // 2^−54 <= |x| < 2^−7, both signs.
+        0 => {
+            let x = magnitude(rng, 1023 - 54, 47);
+            if rng.next_u64() & 1 == 1 { -x } else { x }
+        }
+        // 2^−7 <= x < 2^60.
+        1 => magnitude(rng, 1023 - 7, 67),
+        // −1 < x <= −2^−7.
+        2 => -(1.0 - unit(rng) * (1.0 - f64::from_bits(0x3f80_0000_0000_0000))),
+        // Near −1.
+        3 => -1.0 + magnitude(rng, 1023 - 53, 40),
+        // Around 2^53.
+        _ => f64::from_bits(0x4340_0000_0000_0000 - 64 + rng.next_u64() % 128),
+    }
+}
+
 #[test]
 #[ignore = "writes the internal cross-check corpus for scripts/check_formal.sh"]
 fn internal_crosscheck_corpus() {
@@ -329,6 +355,26 @@ fn internal_crosscheck_corpus() {
             q128(reduced.z_exact())
         )
         .unwrap();
+        // ln's accurate value at the same argument (x = 1 never reaches it).
+        if x != 1.0 {
+            writeln!(
+                out,
+                "ln_accurate {:016x} : {}",
+                x.to_bits(),
+                q128(reduced.accurate_value(reduced.z_exact()))
+            )
+            .unwrap();
+        }
+        // ln_1p's accurate value, on both branches, as ln_1p computes it.
+        let x = ln_1p_argument(&mut rng);
+        let value = if x.abs() < f64::from_bits(0x3f80_0000_0000_0000) {
+            crate::ln::small_accurate(x)
+        } else {
+            let (h, l) = crate::ln::split(x);
+            let reduced = crate::ln::Reduced::of(h);
+            reduced.accurate_value(reduced.z_prime(l))
+        };
+        writeln!(out, "ln_1p_accurate {:016x} : {}", x.to_bits(), q128(value)).unwrap();
 
         let (a, b) = (r128(&mut rng), r128(&mut rng));
         // Cancellation: b near −a.

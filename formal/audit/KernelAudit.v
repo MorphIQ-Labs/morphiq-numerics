@@ -4,7 +4,7 @@
     their global axioms to be among formal/axioms.expected and, for the
     constants CoqInterval proves, formal/axioms.int63.expected. *)
 
-Require ExpTables ExpReduction ExpFast ExpAccurate ExpSmall LnTables LnReduction.
+Require ExpTables ExpReduction ExpFast ExpAccurate ExpSmall LnTables LnTableCheck LnReduction LnAccurate.
 Require TableCheck ExpStageTables ExpStageReduction ExpStageA ExpStageB.
 
 Print Assumptions ExpTables.exp_l_split.
@@ -38,3 +38,14 @@ Print Assumptions LnTables.ln_r_table_ok.
 Print Assumptions LnReduction.reduce_ok.
 Print Assumptions LnReduction.z_ok.
 Print Assumptions LnReduction.z_exact_ok.
+Print Assumptions LnTableCheck.neg_ln_r_q_ok.
+Print Assumptions LnTableCheck.ln2_q_ok.
+Print Assumptions LnTableCheck.recip_q_ok.
+Print Assumptions LnTableCheck.ratios_ok.
+Print Assumptions LnTableCheck.ln_r_one.
+Print Assumptions LnAccurate.series_ok.
+Print Assumptions LnAccurate.acc_value_ok.
+Print Assumptions LnAccurate.ln_acc_ok.
+Print Assumptions LnAccurate.ln_accurate_ok.
+Print Assumptions LnAccurate.ln_1p_acc_ok.
+Print Assumptions LnAccurate.rounds_as.

@@ -130,7 +130,8 @@ echo "certificates in Coq: $certificates proved"
 cp formal/exp/*.v formal/ln/*.v formal/audit/KernelAudit.v "$work/gappa/"
 (cd "$work/gappa" \
   && for proof in ExpTables ExpReduction ExpFast ExpAccurateLevels ExpAccurate ExpSmall \
-       TableCheck ExpStageTables StageGappa ExpStageReduction ExpStageA ExpStageB LnTables LnReduction; do
+       TableCheck ExpStageTables StageGappa ExpStageReduction ExpStageA ExpStageB \
+       LnCheck LnTables LnTableCheck LnReduction LnAccurateLevels LnAccurate; do
        coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" "$proof.v" || exit 1
      done \
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" KernelAudit.v) > "$work/kernel-audit.log"

@@ -141,6 +141,16 @@ argument is needed.
 
 Every certificate's hypotheses carry these bounds widened by at least 1%.
 
+**Machine-checked:** `formal/ln/LnTableCheck.v` proves, by one reflective
+computation over the 128 intervals (`ratios_ok`), the bounds the accurate
+certificates take for cases B and C (§6): `|ln(1 + z)/ln x|` below `533/1024`
+in case B, and `|−ln R[i]/ln x|`, `|ln(1 + z)/ln x|` and `|E·ln 2/ln x|` below
+`514/512`, `752/2^16` and `2071/1024` in case C, for every `E ≠ 0` and every
+`y` in its interval widened by `2^−52`. Each interval's endpoints, `R[i]` and
+`ln 2` are enclosed by `formal/ln/LnCheck.v`, a reflective enclosure of `ln`
+at a rational (the series of `2·artanh`, its remainder bounded by the mean
+value theorem, evaluated in integers rounded outward).
+
 ## 4. Fast path (after [DLM] §3.3)
 
 **Decision 2: [DLM]'s portable evaluation, on the crate's proved double-word
@@ -246,6 +256,34 @@ conversion from and rounding to binary64).
 That is a mantissa distance below `2^−122`, against `2^−118` needed (§2). So
 rounding `Y` once rounds `ln x` correctly.
 
+**Machine-checked:** `formal/ln/LnAccurate.v` transcribes `series`,
+`Reduced::accurate_value` and `ln`'s accurate branch on the proved `Q128`
+transcription (`formal/q`) and proves them:
+- **`series_ok`:** the seventeen Horner levels compose, so `G_1` is within
+  `782·2^−135` of the exact partial series at the computed `z`. Each level is
+  its certificate's theorem (`formal/ln/LnAccurateLevels.v`, which
+  `generators/ln_certificates.py` writes with the same bounds as the `.g`
+  files). Its hypotheses are proved about the transcription: the `mul` and
+  `add` contracts, the reciprocals' errors, and every partial series in the
+  certificate's range.
+- **The truncation:** `|X_1 − ln(1 + z)/z| ≤ 28·2^−135`, from
+  `|ln(1 + z) − Σ_(j ≤ 18) (−1)^(j+1) z^j/j| ≤ |z|^19/(19·(1 − |z|))`, proved by
+  the mean value theorem.
+- **`acc_value_ok`:** `accurate_value` is within `2^−123` relatively of
+  `E·ln 2 + ln y`, by case, through `accurate_sum_a.g`, `_b.g` and `_c.g`. The
+  constants are proved by one reflective check per table
+  (`formal/ln/LnTableCheck.v`: `−ln R[i]`, `ln 2` and `1/k` within `2^−127`),
+  and the case ratios as in §3.
+- **`ln_acc_ok`:** for every finite `x > 0`, `x ≠ 1`, the value is within
+  `2^−123` relatively of `ln x`, and `Q128::to_f64` rounds it once.
+- **`ln_accurate_ok`:** if `ln x` keeps [LM]'s mantissa distance `2^−118`
+  from every rounding breakpoint (Property 2, the one stated hypothesis, as
+  for `exp`), the accurate path returns `RN(ln x)`. `rounds_as` is the
+  rounding step for either sign.
+
+The internal cross-check compares the extracted transcription with the Rust
+code's 128-bit value bit for bit on 4,000 `ln` arguments.
+
 ## 7. `ln_1p`
 
 **Decision 5: three branches, none rounding `1 + x`.**
@@ -299,19 +337,33 @@ The fast path is within `2^−64`, and the accurate path within `2^−123`.
   `2^−122` of a breakpoint. No published search excludes that, so it isn't
   claimed.
 
+**Machine-checked:** `formal/ln/LnAccurate.v` transcribes `ln_1p`'s accurate
+branches (`small_accurate`, and `split`, `Reduced::z_prime` and
+`accurate_value`), and `ln_1p_acc_ok` proves, for every finite `x > −1` with
+`|x| ≥ 2^−54`, that the value is within `2^−123` relatively of `ln(1 + x)`
+and that `Q128::to_f64` rounds it once. On the general branch it proves
+`1 + x = 2^E·y'` with `y'` within `2^−52` of `h`'s interval, the `dz` bound
+(`|ln(1 + z'_computed) − ln(1 + z')|` against `ln(1 + 2^−7)`), and that no
+argument takes case A. The internal cross-check compares the transcription
+with the Rust code bit for bit on 4,000 arguments over both branches.
+
 ## 8. Certificates and generators
 
 | Artifact | Tool | Establishes |
 |---|---|---|
-| `generators/ln_constants.py` | mpmath 1.4.1 | writes `crates/morphiq-numerics/src/ln/tables.rs`: `R[i]`, `−ln R[i]` (double-word and `Q128`), `LN2_HI`/`LN2_LO`, `ln 2` and `1/k` in `Q128`, `c3`–`c9`, each checked against its bound; derives `E·ln 2`'s error, the case ratios (§3) and the series degree (§6) |
+| `generators/ln_constants.py` | mpmath 1.4.1 | writes `crates/morphiq-numerics/src/ln/tables.rs` and `formal/ln/LnTables.v`: `R[i]`, `−ln R[i]` (double-word and `Q128`), `LN2_HI`/`LN2_LO`, `ln 2` and `1/k` in `Q128`, `c3`–`c9`, each checked against its bound; derives `E·ln 2`'s error, the case ratios (§3) and the series degree (§6) |
 | `generators/ln_poly.sollya` | Sollya 8.0 | `c3`–`c9` (`fpminimax`, relative) and the approximation bound (`supnorm`), in `generators/ln_poly.out` |
-| `generators/ln_certificates.py` | Python, mpmath | writes every certificate below from those values, with each hypothesis widened by at least 1%; no number in a certificate is typed by hand |
+| `generators/ln_certificates.py` | Python, mpmath | writes every certificate below from those values, with each hypothesis widened by at least 1%, and `formal/ln/LnAccurateLevels.v`; no number in a certificate is typed by hand |
 | `formal/ln/tail.g` | Gappa 1.4.1 | the cubic tail, within `2^−50` relative |
 | `formal/ln/p.g` | Gappa | `P` against `ln(1 + z)`, within `3·2^−66` relative |
 | `formal/ln/fast_a.g`, `_b.g`, `_c.g` | Gappa | `ln`'s fast path, within `2^−64` relative, by case |
 | `formal/ln/fast_ln_1p.g` | Gappa | `ln_1p`'s fast path, within `2^−63` |
 | `formal/ln/accurate_level_*.g` | Gappa | the series' Horner levels |
 | `formal/ln/accurate_sum_a.g`, `_b.g`, `_c.g` | Gappa | the accurate result, within `2^−123` relative, by case |
+| `formal/ln/LnAccurateLevels.v` | Coq, written by `generators/ln_certificates.py` | the accurate certificates restated over reals |
+| `formal/ln/LnCheck.v` | Coq | a reflective enclosure of `ln` at a rational |
+| `formal/ln/LnTableCheck.v` | Coq | the accurate path's `Q128` tables and the case ratios, one reflective check each |
+| `formal/ln/LnAccurate.v` | Coq | the accurate paths of `ln` and `ln_1p`, end to end (§6, §7) |
 
 Every certificate's Coq proof is also built, with each rewriting hint proved, by the formal job ([exp.md](exp.md), gates).
 
