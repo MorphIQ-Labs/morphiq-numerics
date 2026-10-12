@@ -2,8 +2,9 @@
 
 `morphiq_numerics::elementary::exp2` (`crates/morphiq-numerics/src/exp2/`)
 follows this derivation. It reduces `x` to `exp`'s reduced argument, then runs
-[exp.md](exp.md)'s fast path, rounding test and accurate path unchanged. Only
-the reduction is new, and its error is certified here (§3).
+the fast value, rounding test and accurate path of `exp`'s fallback
+([exp.md](exp.md) §8) unchanged. Only the reduction is new, and its error is
+certified here (§3).
 
 `exp2(x)` returns `2^x` rounded to nearest, ties to even, for every binary64
 `x`, subnormal results included. `2^n` is exact for every integer `n` where it
@@ -14,8 +15,8 @@ is representable.
 - **[LM]** V. Lefèvre, J.-M. Muller, "Worst cases for correct rounding of the
   elementary functions in double precision", revised 2003: Property 3 and
   Table 6.
-- **[exp]** [exp.md](exp.md): the table `2^(j/128)`, the fast path, the rounding
-  test and the `Q128` accurate path.
+- **[exp]** [exp.md](exp.md) §8: the table `2^(j/128)`, the fast value, the
+  rounding test and the `Q128` accurate path of `exp`'s fallback.
 
 ## 1. Specification
 

@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
 """The constants of exp (docs/exp.md), with their errors.
 
-Writes crates/morphiq-numerics/src/exp/tables.rs and formal/exp/ExpTables.v;
-with --check, fails if a committed file differs from a fresh generation. Needs
+Writes crates/morphiq-numerics/src/exp/tables.rs, formal/exp/ExpTables.v and
+formal/exp/ExpStageTables.v; with --check, fails if a committed file differs
+from a fresh generation. Needs
 mpmath (generators/requirements.txt). Every value is computed from its
 definition with mpmath at 600 bits and rounded once, in integer arithmetic, to
 the stated format; each error is checked against the bound docs/exp.md and the
-certificates rely on. ExpTables.v states the fast path's constants by their
-encodings and proves each of those bounds with CoqInterval, so the proofs don't
-rest on this script's arithmetic.
+certificates rely on. ExpTables.v and ExpStageTables.v state the constants by
+their encodings and prove each of those bounds in Coq (CoqInterval, and for
+the 512-entry table a reflective check, formal/exp/TableCheck.v), so the
+proofs don't rest on this script's arithmetic.
+
+Stages A and B (sections 3 to 5):
+- INV_N = RN(512 / ln 2).
+- S_L1, S_L2: L = ln 2 / 512 rounded to 31 significant bits, and the rest
+  rounded to 31 bits, so n * S_L1 and n * S_L2 are exact for |n| < 2^22;
+  S_L3 = RN(L - S_L1 - S_L2), and |L - (S_L1 + S_L2 + S_L3)| < 2^-129.
+- S_L2D = RN(L - S_L1), stage A's second word: |L - (S_L1 + S_L2D)| < 2^-98.
+- S_T[j] = 2^(j/512), j = 0..511, as a double-word (hi, lo), within 2^-106.
+- d3..d5: the stages' polynomial, read from generators/exp_poly.out.
 
 - INV_L = RN(128 / ln 2), and the shifter 1.5 * 2^52 (section 3, steps 1 and 2).
 - L1..L4: L = ln 2 / 128 split so that n * L1 is exact for |n| < 2^18 (L1 has
@@ -31,6 +42,7 @@ import mpmath
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'crates/morphiq-numerics/src/exp/tables.rs'
 COQ_OUTPUT = ROOT / 'formal/exp/ExpTables.v'
+STAGE_COQ_OUTPUT = ROOT / 'formal/exp/ExpStageTables.v'
 POLY = ROOT / 'generators/exp_poly.out'
 PREC = 600
 
@@ -135,7 +147,7 @@ def coq_tables(l_split, poly, poly_bound, table_dw, table_q, reciprocals):
         'Open Scope R_scope.',
         '',
         '(** [L = ln 2 / 128 = L1 + L2 + L3 + L4 + dL] with [|dL| <= 2^-206]',
-        '    (docs/exp.md, section 3; [dL] in formal/exp/reduction.g). *)',
+        '    (docs/exp.md, section 8.1; [dL] in formal/exp/reduction.g). *)',
     ]
     for i, x in enumerate(l_split, 1):
         lines += coq_value(f'exp_l{i}', x)
@@ -288,18 +300,174 @@ def coq_tables(l_split, poly, poly_bound, table_dw, table_q, reciprocals):
     return '\n'.join(lines) + '\n'
 
 
-def read_poly():
-    """c3..c6 and the supnorm bound, as generators/exp_poly.sollya printed them.
-    Each coefficient must be exactly a binary64: parsed as a float and as an
-    arbitrary-precision number, the two must agree."""
+def read_poly(names, bound):
+    """The named coefficients and the supnorm bound, as
+    generators/exp_poly.sollya printed them. Each coefficient must be exactly a
+    binary64: its hex literal, read exactly, must equal the float parsed from it."""
     values = dict(line.split() for line in POLY.read_text().split('\n') if line.strip())
     coefficients = []
-    for k in (3, 4, 5, 6):
-        c = float.fromhex(values[f'c{k}'])
-        with mpmath.workprec(PREC):
-            assert mpmath.mpf(c) == mpmath.mpf(mpmath.mpmathify(float.fromhex(values[f'c{k}'])))
+    for name in names:
+        c = float.fromhex(values[name])
+        num, k = hex_rational(values[name])
+        assert mpmath.mpf(num) / mpmath.mpf(2) ** k == mpmath.mpf(c), f'{name} is not a binary64'
         coefficients.append(c)
-    return coefficients, values['error_bound']
+    return coefficients, values[bound]
+
+
+# Stages A and B (docs/exp.md, sections 3 to 6).
+STAGE_N = 512
+# |n| <= 520,018 on the stages' range |x| < 704 (section 3): 20 bits.
+STAGE_N_MAX = 520018
+# The stages' reduced argument, |x - n L| <= 0.000677 (section 3).
+STAGE_R = '0.000677'
+# |S_T[j] - 2^(j/512)| <= 2^-104: the table's bound in formal/exp/stage_*.g.
+STAGE_T_BOUND = 104
+
+
+def coq_stage_tables(inv, split, l2d, poly, bound, table):
+    """formal/exp/ExpStageTables.v: the stages' constants and their bounds."""
+    lines = [
+        '(** Constants of [exp]\'s stages A and B, written by',
+        '    generators/exp_constants.py; do not edit. Each is given by its binary64',
+        '    encoding, as in crates/morphiq-numerics/src/exp/tables.rs, with its value.',
+        '    Each bound the certificates take about them is proved here: by',
+        '    CoqInterval from the definitions of [ln] and [exp], and for the table by',
+        '    one reflective check (formal/exp/TableCheck.v). *)',
+        '',
+        'From Coq Require Import Reals ZArith List Lia.',
+        'From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.',
+        'From Binary64 Require Import IEEE64 Grid Encodings.',
+        'From Interval Require Import Tactic.',
+        'Require Import TableCheck.',
+        'Import ListNotations.',
+        '',
+        'Open Scope R_scope.',
+        '',
+        '(** [RN(512 / ln 2)]. *)',
+    ]
+    lines += coq_value('st_inv', inv)
+    lines += [
+        'Theorem st_inv_close : Rabs (B st_inv - 512 / ln 2) <= / 2 ^ 42.',
+        'Proof. rewrite st_inv_val. interval with (i_prec 100). Qed.',
+        '',
+        '(** [L = ln 2 / 512 = L1 + L2 + L3 + dL] with [|dL| <= 2^-129], and',
+        '    [L = L1 + L2D + dL\'] with [|dL\'| <= 2^-98] (docs/exp.md, section 3). *)',
+    ]
+    for name, x in zip(['st_l1', 'st_l2', 'st_l3'], split):
+        lines += coq_value(name, x)
+    lines += coq_value('st_l2d', l2d)
+    lines += [
+        'Theorem st_l_split : Rabs (B st_l1 + B st_l2 + B st_l3 - ln 2 / 512) <= / 2 ^ 129.',
+        'Proof.',
+        '  rewrite st_l1_val, st_l2_val, st_l3_val.',
+        '  interval with (i_prec 200).',
+        'Qed.',
+        'Theorem st_l_split_d : Rabs (B st_l1 + B st_l2d - ln 2 / 512) <= / 2 ^ 98.',
+        'Proof.',
+        '  rewrite st_l1_val, st_l2d_val.',
+        '  interval with (i_prec 160).',
+        'Qed.',
+        '',
+        f'(** The stages\' polynomial and its approximation error on [|r| <= {STAGE_R}]',
+        '    (generators/exp_poly.sollya\'s supnorm bound; [a] in formal/exp/stage_a.g',
+        '    and stage_b.g). *)',
+    ]
+    for name, x in zip(['st_d3', 'st_d4', 'st_d5'], poly):
+        lines += coq_value(name, x)
+    num, k = hex_rational(bound)
+    lines += [
+        f'Definition st_poly_bound : R := {num} / 2 ^ {k}.',
+        f'Theorem st_poly_approx r : Rabs r <= {STAGE_R} ->',
+        '  Rabs (exp r - 1 - r - r * r * (1 / 2 + r * (B st_d3 + r * (B st_d4 + r * B st_d5)))) <= st_poly_bound.',
+        'Proof.',
+        '  intros H. rewrite st_d3_val, st_d4_val, st_d5_val. unfold st_poly_bound.',
+        '  interval with (i_taylor r, i_degree 10, i_bisect r, i_prec 140, i_depth 16).',
+        'Qed.',
+        '',
+        f'(** [T_j = 2^(j/{STAGE_N})] as a double-word [(hi, lo)] of binary64 encodings,',
+        f'    within [2^-{STAGE_T_BOUND}] ([Dt] in formal/exp/stage_a.g and stage_b.g),',
+        '    checked by one reflective computation. *)',
+        'Definition st_t_bits : list (Z * Z) := [',
+    ]
+    pairs = [(to_bits(hi), to_bits(lo)) for hi, lo in table]
+    lines += [f'  ({h}%Z, {l}%Z){";" if j < STAGE_N - 1 else ""}' for j, (h, l) in enumerate(pairs)]
+    lines += [
+        '].',
+        f'Definition st_t_hi (j : nat) : f64 := b64_of_bits (fst (nth j st_t_bits (0%Z, 0%Z))).',
+        f'Definition st_t_lo (j : nat) : f64 := b64_of_bits (snd (nth j st_t_bits (0%Z, 0%Z))).',
+        '',
+        f'Lemma st_t_check : table_check 9 {STAGE_T_BOUND} st_t_bits = true.',
+        'Proof. vm_compute. reflexivity. Qed.',
+        '',
+        f'Theorem st_t_ok j : (j < {STAGE_N})%nat ->',
+        '  entry_ok (fst (nth j st_t_bits (0%Z, 0%Z))) (snd (nth j st_t_bits (0%Z, 0%Z)))',
+        f'    (exp (INR j * ln 2 / {STAGE_N})) {STAGE_T_BOUND}.',
+        'Proof. intros H. exact (table_check_ok 9 104 st_t_bits j st_t_check H). Qed.',
+    ]
+    return '\n'.join(lines) + '\n'
+
+
+def stage_constants():
+    """The stages' constants, each checked against its bound; the tables.rs
+    lines and formal/exp/ExpStageTables.v."""
+    mpmath.mp.prec = PREC
+    ln2 = mpmath.log(2)
+    L = ln2 / STAGE_N
+    inv = rn_bits(STAGE_N / ln2, 53)
+    l1 = rn_bits(L, 31)
+    l2 = rn_bits(L - l1, 31)
+    l3 = rn_bits(L - l1 - l2, 53)
+    l2d = rn_bits(L - l1, 53)
+    residual = abs(L - (mpmath.mpf(l1) + l2 + l3))
+    residual_d = abs(L - (mpmath.mpf(l1) + l2d))
+    # ExpStageTables.v proves both tails; formal/exp/stage_*_reduction.g take them.
+    assert residual < mpmath.mpf(2) ** -129, f'residual 2^{float(mpmath.log(residual, 2))}'
+    assert residual_d < mpmath.mpf(2) ** -98, f'residual 2^{float(mpmath.log(residual_d, 2))}'
+    for x in (l1, l2):
+        m, _ = mpmath.mpf(x).man_exp
+        assert abs(int(m)).bit_length() <= 31
+    assert abs(mpmath.mpf(inv) - STAGE_N / ln2) <= mpmath.mpf(2) ** -42
+
+    table, worst = [], 0
+    for j in range(STAGE_N):
+        t = mpmath.mpf(2) ** (mpmath.mpf(j) / STAGE_N)
+        hi = rn_bits(t, 53)
+        lo = rn_bits(t - hi, 53) if t != hi else 0.0
+        assert hi + lo == hi, 'double-word: hi = RN(hi + lo)'
+        assert 1 <= hi < 2 and abs(lo) <= 2.0 ** -53
+        worst = max(worst, abs(t - hi - lo))
+        table.append((hi, lo))
+    assert worst <= mpmath.mpf(2) ** -106, 'stage table error'
+
+    poly, bound = read_poly(['d3', 'd4', 'd5'], 'stage_error_bound')
+
+    log2 = lambda v: float(mpmath.log(v, 2))  # noqa: E731
+    f = lambda x: f'f64::from_bits(0x{to_bits(x):016x})'  # noqa: E731
+    rust = [
+        '',
+        '/// Stages A and B (`docs/exp.md` §3–§6): `RN(512 / ln 2)`.',
+        f'pub(super) const INV_N: f64 = {f(inv)};',
+        f'/// `L = ln 2 / 512 = S_L1 + S_L2 + S_L3` to within 2^{log2(residual):.1f}; `S_L1` and',
+        '/// `S_L2` have 31 significant bits, so `n * S_L1` and `n * S_L2` are exact for',
+        '/// `|n| < 2^22`.',
+        f'pub(super) const S_L1: f64 = {f(l1)};',
+        f'pub(super) const S_L2: f64 = {f(l2)};',
+        f'pub(super) const S_L3: f64 = {f(l3)};',
+        f'/// Stage A\'s second word: `L = S_L1 + S_L2D` to within 2^{log2(residual_d):.1f}.',
+        f'pub(super) const S_L2D: f64 = {f(l2d)};',
+        '/// The stages\' polynomial (`generators/exp_poly.sollya`):',
+        f'/// `|e^r - 1 - r - r^2 (1/2 + r (d3 + r (d4 + r d5)))| <= {bound}` on `|r| <= {STAGE_R}`.',
+        'pub(super) const POLY_S: [f64; 3] = [',
+        *[f'    {f(c)},' for c in poly],
+        '];',
+        f'/// `2^(j/{STAGE_N})` as a double-word `(hi, lo)`, as binary64 encodings, `hi` in',
+        f'/// `[1, 2)`; absolute error below 2^{log2(worst):.1f}.',
+        f'pub(super) static S_T: [(u64, u64); {STAGE_N}] = [',
+        *[f'    (0x{to_bits(hi):016x}, 0x{to_bits(lo):016x}),' for hi, lo in table],
+        '];',
+    ]
+    coq = coq_stage_tables(inv, (l1, l2, l3), l2d, poly, bound, table)
+    return rust, coq
 
 
 def generate():
@@ -342,7 +510,7 @@ def generate():
         reciprocals.append((m, e))
     assert worst_r < mpmath.mpf(2) ** -127
 
-    poly, poly_bound = read_poly()
+    poly, poly_bound = read_poly(['c3', 'c4', 'c5', 'c6'], 'error_bound')
 
     log2 = lambda v: float(mpmath.log(v, 2))  # noqa: E731
     f = lambda x: f'f64::from_bits(0x{to_bits(x):016x})'  # noqa: E731
@@ -380,9 +548,12 @@ def generate():
         *[f'    (0x{m:032x}, {e}),' for m, e in reciprocals],
         '];',
     ]
+    stage_rust, stage_coq = stage_constants()
+    lines += stage_rust
     return {
         OUTPUT: '\n'.join(lines) + '\n',
         COQ_OUTPUT: coq_tables((l1, l2, l3, l4), poly, poly_bound, table_dw, table_q, reciprocals),
+        STAGE_COQ_OUTPUT: stage_coq,
     }
 
 

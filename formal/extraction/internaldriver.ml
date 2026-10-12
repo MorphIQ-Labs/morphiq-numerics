@@ -1,13 +1,16 @@
 (* Runs the extracted Q128 and Q256 transcriptions, rounding tests, exp's
-   reduction, fast value, accurate path and small-argument path, and ln's reduction
+   stages, exp's fallback reduction, fast value, accurate path and
+   small-argument path, and ln's reduction
    (InternalCrosscheck.v) on the internal cross-check corpus and compares each result
    with the Rust library's.
 
    Each line is "op args : result". A value is "n e k l1 .. lk": its sign
    (0 or 1), its exponent in decimal, its limb count and its 64-bit limbs in
    hex, least significant first; a binary64 is 16 hex digits; a rounding
-   test's result is a binary64 or "none"; a reduction's is its six words, and a
-   fast value's its two. Exits 1 on a mismatch or a malformed line. *)
+   test's result is a binary64 or "none"; a reduction's is its six words, a
+   fast value's its two, and a stage line's is n, r1, j and k, then each
+   stage's two words and its test's result. Exits 1 on a mismatch or a
+   malformed line. *)
 
 open Internalcrosscheck
 
@@ -98,6 +101,14 @@ let compute op args =
            let ((h, ((n, e), l)), v) = x_small (z_of_u64 (hex x)) in
            String.concat " " [show_bits h; show (n, e, l); show_bits v]
        | _ -> failwith "small takes one word")
+  | "stage" ->
+      (match args with
+       | [x] ->
+           let ((((((nr, j), k), a), ra), b), rb) = x_stage (z_of_u64 (hex x)) in
+           String.concat " "
+             (List.map show_bits nr @ [string_of_int (int_of_z j); string_of_int (int_of_z k)]
+              @ List.map show_bits a @ [show_opt ra] @ List.map show_bits b @ [show_opt rb])
+       | _ -> failwith "stage takes one word")
   | "ln_reduce" ->
       (match args with
        | [x] ->

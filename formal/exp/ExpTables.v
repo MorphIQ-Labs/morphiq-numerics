@@ -13,7 +13,7 @@ Import ListNotations.
 Open Scope R_scope.
 
 (** [L = ln 2 / 128 = L1 + L2 + L3 + L4 + dL] with [|dL| <= 2^-206]
-    (docs/exp.md, section 3; [dL] in formal/exp/reduction.g). *)
+    (docs/exp.md, section 8.1; [dL] in formal/exp/reduction.g). *)
 Definition exp_l1 : f64 := b64_of_bits 4572893336921964544.
 Lemma exp_l1_val : B exp_l1 = 6243314768281600 / 2 ^ 60.
 Proof. exact (bits_val 4572893336921964544 false 6243314768281600 60 eq_refl). Qed.

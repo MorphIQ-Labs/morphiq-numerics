@@ -197,17 +197,6 @@ pub(crate) fn dw_add<K: Simd>(k: K, x: Dw<K>, y: Dw<K>) -> Dw<K> {
     fast_two_sum(k, v_hi, w)
 }
 
-/// `DoubleWord::mul`, operation for operation.
-#[inline(always)]
-pub(crate) fn dw_mul<K: Simd>(k: K, x: Dw<K>, y: Dw<K>) -> Dw<K> {
-    let (c_hi, c_lo1) = two_prod(k, x.0, y.0);
-    let t_lo1 = k.mul(x.0, y.1);
-    let t_lo2 = k.mul(x.1, y.0);
-    let c_lo2 = k.add(t_lo1, t_lo2);
-    let c_lo3 = k.add(c_lo1, c_lo2);
-    fast_two_sum(k, c_hi, c_lo3)
-}
-
 /// `ln::decide_with`'s test on lanes: true where it returns `y_hi`, for
 /// `|y_hi| ≥ 2^−969`, and false below, where the scalar function decides
 /// instead (§3).

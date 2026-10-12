@@ -1,7 +1,7 @@
 (** ln/mod.rs's [decide_with] and exp/mod.rs's [decide_scaled], transcribed on binary64,
     and proved: when the test passes, the returned word is the correctly rounded
     value of every real within [ε₁] of the double-word, scaled exactly by [2^k]
-    for [decide_scaled] (docs/exp.md §5). *)
+    for [decide_scaled] (docs/exp.md §8.3). *)
 
 From Coq Require Import ZArith Reals Lia Lra Psatz.
 From Flocq Require Import Core Relative IEEE754.Binary IEEE754.Bits.

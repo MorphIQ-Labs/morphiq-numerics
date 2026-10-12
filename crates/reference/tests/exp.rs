@@ -1,6 +1,6 @@
 //! `exp` against its reference fixture (`generators/exp_reference.py`), bit
 //! for bit: the published worst cases, every threshold and its neighbour,
-//! special values, regressions and random arguments (docs/exp.md §8).
+//! special values, regressions and random arguments (docs/exp.md §10).
 
 use morphiq_numerics::elementary::exp;
 use serde_json::Value;

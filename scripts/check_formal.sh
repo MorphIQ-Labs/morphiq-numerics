@@ -15,7 +15,8 @@
 #      formal/gappa/Hints.v, so no hypothesis is left; and each final theorem's
 #      global axioms are among formal/axioms.expected.
 #   6. The kernels' transcriptions and proofs (formal/exp/*.v, formal/ln/*.v),
-#      which apply the certificates' theorems, build; and the global axioms the
+#      which apply the certificates' theorems, build (formal/exp/ExpStageTables.v
+#      checks exp's 512-entry table by one reflective computation); and the global axioms the
 #      theorems in formal/audit/KernelAudit.v rest on are among
 #      formal/axioms.expected and formal/axioms.int63.expected. The second list is Coq's primitive 63-bit
 #      integers: CoqInterval, which proves the kernels' constants, computes with
@@ -62,7 +63,7 @@ done)
 (cd "$work/two-prod" && coqc TwoProdBinary64.v)
 (cd "$work/binary64" && for proof in Binary64Add Instances Binary64Mul Grid Binary64Div \
     IEEE64 IEEE64Add IEEE64Mul IEEE64Div IEEE64Eft IEEE64Sqrt \
-    Isqrt SqrtRound SqrtAlgorithm RoundingGaps RoundingCore RoundingTest Encodings; do
+    Isqrt SqrtRound SqrtAlgorithm RoundingGaps RoundingCore RoundingTest Encodings RoundingConstant; do
   coqc -R ../double-word Double -R . Binary64 -R ../two-prod "" "$proof.v" || exit 1
 done)
 
@@ -128,7 +129,8 @@ echo "certificates in Coq: $certificates proved"
 # The kernels' proofs, beside the certificates' modules they apply.
 cp formal/exp/*.v formal/ln/*.v formal/audit/KernelAudit.v "$work/gappa/"
 (cd "$work/gappa" \
-  && for proof in ExpTables ExpReduction ExpFast ExpAccurateLevels ExpAccurate ExpSmall LnTables LnReduction; do
+  && for proof in ExpTables ExpReduction ExpFast ExpAccurateLevels ExpAccurate ExpSmall \
+       TableCheck ExpStageTables StageGappa ExpStageReduction ExpStageA ExpStageB LnTables LnReduction; do
        coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" "$proof.v" || exit 1
      done \
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" KernelAudit.v) > "$work/kernel-audit.log"

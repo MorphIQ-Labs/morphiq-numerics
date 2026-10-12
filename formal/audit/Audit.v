@@ -10,7 +10,7 @@ From Double Require Import DWPlus DWTimesFP DWTimesDW DWDivFP DWDivDW.
 Require Import TwoProdBinary64.
 From Binary64 Require Binary64Add Instances Binary64Mul Binary64Div.
 From Binary64 Require IEEE64Add IEEE64Mul IEEE64Div IEEE64Eft IEEE64Sqrt.
-From Binary64 Require Isqrt SqrtAlgorithm RoundingTest.
+From Binary64 Require Isqrt SqrtAlgorithm RoundingTest RoundingConstant.
 From Q Require Q128 Q256.
 
 Print Assumptions DWPlusFP_correct.
@@ -45,6 +45,8 @@ Print Assumptions Isqrt.isqrt_correct.
 Print Assumptions SqrtAlgorithm.sqrt_rs_ieee.
 Print Assumptions RoundingTest.decide_with_ok.
 Print Assumptions RoundingTest.decide_scaled_ok.
+Print Assumptions RoundingConstant.const_test_real.
+Print Assumptions RoundingConstant.decide_const_ok.
 Print Assumptions Q128.mul_value.
 Print Assumptions Q128.add_ok.
 Print Assumptions Q128.to_f64_ok.

@@ -1,4 +1,4 @@
-# The fast path's relative error eps1 (docs/exp.md, section 4): Y against
+# The fast path's relative error eps1 (docs/exp.md, section 8.2): Y against
 # T_j * e^R, where R = x - n*L is the exact reduced argument.
 #
 # Hypotheses, each from its own certificate or proof:

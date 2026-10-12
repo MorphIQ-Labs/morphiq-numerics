@@ -1,21 +1,29 @@
 # `exp`: correctly rounded exponential
 
 `morphiq_numerics::elementary::exp` (`crates/morphiq-numerics/src/exp/`) follows
-this derivation step for step; its accurate path uses the `Q128` type of §6
-(`crates/morphiq-numerics/src/q128.rs`). Every bound below is certified, and
-every constant generated, by the artifacts in §7. Each numbered **decision** is
-a design choice open to review, and one argument is marked for a second reader
-(§2).
+this derivation step for step. Every bound below is certified, and every
+constant generated, by the artifacts in §9; §10 lists what checks the code
+against them. Each numbered **decision** is a design choice open to review, and
+each **review point** is an argument a second reader should check.
 
 `exp(x)` returns `e^x` rounded to nearest, ties to even, for every binary64 `x`.
-Subnormal results are rounded once. Here `u = 2^−53`, `RN` is round-to-nearest-even,
-and `L = ln 2 / 128`.
+Subnormal results are rounded once. Here `u = 2^−53`, `RN` is
+round-to-nearest-even, and `L = ln 2 / 512`.
+
+**Paths.** A screen (§3) sends every `|x| < 704` to two fast stages: stage A
+(§5), a lean evaluation that decides all but about one argument in 2^7.4, then
+stage B (§6), a tighter one that decides all but about one in 2^17. Each
+returns its result only when a rounding test with a constant error bound (§7)
+proves it is `RN(e^x)`. Everything else goes to the fallback (§8): the special
+values of §1, `|x| ≥ 704`, and the arguments neither stage decides, which take
+a third fast path and, past it, an accurate path in 128-bit arithmetic whose
+error bound is proved against [LM]'s worst cases.
 
 ## Sources
 
 - **[Tang]** P. T. P. Tang, "Table-driven implementation of the exponential function
   in IEEE floating-point arithmetic", *ACM TOMS* 15(2), 1989: the table-driven
-  reduction and reconstruction (§3, §4).
+  reduction and reconstruction (§3, §8).
 - **[LM]** V. Lefèvre, J.-M. Muller, "Worst cases for correct rounding of the
   elementary functions in double precision", revised 2003: the accuracy that
   decides every case (Property 1, Tables 2 and 4).
@@ -25,6 +33,15 @@ and `L = ln 2 / 128`.
   otherwise.
 - **[DW]** This crate's double-word arithmetic ([double-word.md](double-word.md)):
   its operations have machine-checked error bounds in IEEE 754 arithmetic.
+- **[CM]** CORE-MATH's binary64 `exp`, `src/binary64/exp/exp.c` at commit
+  `81a899d6` (SHA-256 `39b15256ce4632b163a9f93325c9ada678aacedcdf46cb32ee56f44860a87e64`),
+  MIT. It was consulted during the research for this design (issue #114), for
+  ideas only: the rounding test with a constant bound (§7), a lean first stage
+  (§5), assembling the result as `th + (tl + th·u)`, scaling on the exponent
+  field (§7) and reading the index from the shifter's encoding (§3). No code was
+  taken, so no notice is carried. Every constant here comes from this
+  repository's generators, and stage B's exact product (§6) is this
+  derivation's own.
 
 ## 1. Specification
 
@@ -39,8 +56,8 @@ and `L = ln 2 / 128`.
 Covered by those rows: `+∞` (first row), `−∞` (second) and `±0` (third).
 
 The thresholds come from `generators/exp_reference.py`, which derives them by
-bisection with a rigorous interval oracle. That generator is already on `main`,
-and its fixture `crates/reference/fixtures/exp.json` is the test reference:
+bisection with a rigorous interval oracle. Its fixture
+`crates/reference/fixtures/exp.json` is the test reference:
 - `X_OVERFLOW = 709.7827128933841` (`0x40862E42FEFA39F0`);
 - `X_ZERO = −745.1332191019412` (`0xC0874910D52D3052`).
 
@@ -59,9 +76,248 @@ binade, which [LM]'s search covers. Its first interval in Table 4 starts at
 `ln(2^−1074)`. So the `2^−113` bound applies to them as well.
 - **Review point:** this argument should be checked by a second reader.
 
-## 3. Argument reduction (after [Tang] §4, Step 2)
+The stages need none of this: their test (§7) proves its result is `RN(e^x)`
+from the error bound alone, without any distance from a breakpoint. [LM]
+matters only to the fallback's accurate path (§8.4), which must decide every
+argument.
 
-**Decision 1: a table of `N = 128` entries `T_j = 2^(j/128)`.** This keeps
+## 3. The screen and the stages' reduction (after [Tang] §4, Step 2)
+
+**The screen.** `x.to_bits() & !SIGN < 704.to_bits()`: one unsigned comparison
+on `|x|`'s encoding. It holds exactly for finite `|x| < 704`; NaN and the
+infinities have larger encodings, so they fail it and go to the fallback, with
+`|x| ≥ 704`.
+
+**Decision 1: `|x| < 704`.** There `k` (below) lies in `[−1016, 1016]`, so
+every result the stages form, `2^k` times a number in `[0.9, 2.1]`, is normal
+and finite, and the scaling is exact (§7). The arguments between 704 and the
+thresholds of §1 (about 3% of the interval between them, all with results
+above `2^1015` or below `2^−1015`) take the fallback.
+
+**Decision 2: a table of `N = 512` entries `T_j = 2^(j/512)`** (8 KiB, §4). It
+keeps `|r| ≤ 2^−10.5`, where a degree-5 polynomial is accurate to `2^−75.9`.
+`N = 1024` (16 KiB) would cut stage A's undecided rate from `2^−7.4` to
+`2^−8.4` and stage B's from `2^−16.9` to `2^−18` (the research's measurements,
+issue #114); measured inside a consumer's EM loop on an Apple M1 Pro, `N = 512`
+cost 2.6% more. The smaller table was chosen to leave
+room in a 32 KiB L1 data cache, as on many x86-64 cores, for a consumer's own
+working set and `ln_1p`'s table. That trade-off is inferred for x86-64, not
+measured there (§11).
+
+1. `t = RN(RN(x·INV_N) + S)`, with `INV_N = RN(512 / ln 2)` (*generated*) and
+   the shifter `S = 1.5·2^52`. `|x·INV_N| < 520,017`, so `t` lies in
+   `[2^52, 2^53)`, where binary64 numbers are the integers: `t = S + ni` with
+   `ni` the integer nearest `RN(x·INV_N)`, ties to even.
+2. `n = t − S`, exact, and `ni` itself as `t`'s encoding minus `S`'s: in that
+   binade the encoding is `0x4330… + t − 2^52`.
+3. `j = ni & 511` and `k = ni >> 9` (two's complement), so `ni = 512k + j`,
+   `0 ≤ j < 512`, and `|ni| ≤ 520,018` gives `|k| ≤ 1016`.
+4. `|x/L − ni| ≤ 1/2 + 2^−31`: the half from rounding to an integer, the rest
+   from `INV_N`'s error (`2^−42`) and `x·INV_N`'s rounding. So the exact reduced
+   argument `R = x − ni·L` has `|R| ≤ (1/2 + 2^−31)·L < 0.000677`.
+5. `L` is split as `L1 + L2 + L3`, with `L1` and `L2` rounded to 31 significant
+   bits and `L3 = RN(L − L1 − L2)`, so `|L − (L1 + L2 + L3)| < 2^−129`; and as
+   `L1 + L2D`, `L2D = RN(L − L1)`, with `|L − (L1 + L2D)| < 2^−98` (*generated*).
+   `ni·L1` and `ni·L2` are exact: `|ni| < 2^20` and 31 bits leave 51.
+6. `r1 = x − n·L1`, exact. For `ni = 0`, `r1 = x`. Otherwise
+   `|x| ≥ (1/2 − 2^−31)·L > 2^−11`, so `x` is a multiple of `2^−63`, as is
+   `ni·L1` (a multiple of `2^−40`), and `|r1| ≤ |R| + |ni|·|L − L1| < 2^−10`
+   needs at most 53 bits at that quantum.
+
+Then `e^x = 2^k·T_j·e^R`. Stage A (§5) and stage B (§6) finish the reduction
+in their own ways.
+
+**Machine-checked:** `formal/exp/ExpStageReduction.v` transcribes `Stages::of`
+on binary64 and proves steps 1–6 for every finite `|x| < 704` (`stage_of_ok`),
+`ni` read from the encoding as the Rust code reads it. The bounds on `L`'s
+splits and `INV_N` are proved with CoqInterval in `formal/exp/ExpStageTables.v`
+(`st_l_split`, `st_l_split_d`, `st_inv_close`). The screen is
+`formal/exp/ExpStageB.v`'s `screen_ok`: an encoding that passes it is finite
+and below 704 in magnitude.
+
+## 4. The table
+
+`T_j = 2^(j/512)` for `0 ≤ j < 512` as a double-word `(th, tl)`:
+`th = RN(T_j)` in `[1, 2)` and `tl = RN(T_j − th)`, `|tl| ≤ 2^−53`, both
+binary64 encodings (`S_T`, *generated* by `generators/exp_constants.py`, which
+checks `|th + tl − T_j| < 2^−107` in 600-bit arithmetic).
+
+**Decision 3: one reflective check proves the whole table.**
+`formal/exp/TableCheck.v` defines a boolean function over the list of encodings
+and proves it sound (`table_check_ok`); `ExpStageTables.v` evaluates it once by
+`vm_compute` (`st_t_check`). For each entry it decodes both words, requires
+`th` in `[1, 2)` and `|tl| ≤ 2^−53`, and bounds `|th + tl − T_j| ≤ 2^−104`
+without evaluating `T_j`: `v ↦ v^512` is increasing on the nonnegative reals
+and `T_j^512 = 2^j`, so it suffices that
+
+    (th + tl − 2^−104)^512 ≤ 2^j ≤ (th + tl + 2^−104)^512.
+
+Each power is nine squarings in integer arithmetic, rounded outward to 128 bits
+after each, so the computed bounds enclose the exact powers. The actual error,
+below `2^−106`, leaves a margin near `2^−96` relatively after the 512th power,
+far above the squarings' `2^−118`. The bound `2^−104` is what the certificates
+take (`Dt` in `formal/exp/stage_a.g` and `stage_b.g`). Building
+`ExpStageTables.v`, the check included, takes about 20 seconds on an Apple M1
+Pro.
+
+## 5. Stage A
+
+A lean evaluation in binary64, which decides most arguments.
+
+1. `r = RN(r1 − RN(ni·L2D))`. `r1 − RN(ni·L2D) = R + dr` with `|dr| ≤ 2^−77`:
+   the tail `ni·(L − L1 − L2D)` and the rounding of `ni·L2D`
+   (*certified*: `formal/exp/stage_a_reduction.g`).
+2. `u = RN(r + RN(RN(r·r)·h))`, `h = RN(1/2 + RN(r·RN(d3 + RN(r·RN(d4 + RN(r·d5))))))`:
+   `e^r − 1` to degree 5. `d3`–`d5` are binary64 coefficients from Sollya's
+   `fpminimax` for `e^r − 1 − r − r²/2` on `|r| ≤ 0.000677`, and the
+   approximation error is below `0x1.11efe3daa4fb92df2df8cp−76 ≈ 2^−75.9`
+   (*generated*: `generators/exp_poly.sollya`'s `supnorm`; proved again with
+   CoqInterval in `ExpStageTables.v`, `st_poly_approx`). Stage B uses the same
+   polynomial.
+3. `y = th` and `l = RN(tl + RN(th·u))`.
+
+**Error: `|th + l − T_j·e^R| ≤ 0x1.2ep−61 < 2^−60.76`** (*certified*:
+`formal/exp/stage_a.g`, which also bounds `|l| ≤ 0x1.6ap−10 < 2^−9.5`). Its
+hypotheses, each certified or proved: the reduction (step 1); the
+approximation error (step 2); the table's `2^−104` (§4); and `m`, the cost of
+evaluating the polynomial at `r` instead of `R`: `|r − R| ≤ ulp(r)/2 + 2^−77
+< 0x1.01p−64`, so `|m| ≤ 2^−74` (*certified*: `formal/exp/stage_mvt.g`). The
+dominant terms are the roundings of `r`, `u`, `th·u` and `l`, each at most
+`2^−63`.
+
+**`E_A = 1.5·2^−61`,** the bound the test (§7) takes: the certified error plus
+the test's own rounding, `0x1.2ep−61 + 2^−63 = 1.43·2^−61`, rounded up. The
+research prototype took `E_A` from the same analytic estimate; the certificate
+confirms it with a margin of `0.07·2^−61`.
+
+**Machine-checked:** `formal/exp/ExpStageA.v` transcribes `Stages::a_value`
+and `Stages::a` on binary64. `stage_a_value_ok` proves the error bound for the
+transcription: every operation is finite and rounds as `stage_a.g` models it,
+and each hypothesis holds (the reduction, `stage_mvt.g`, the approximation and
+table bounds). `exp_stage_a_ok` composes it with the test (§7): for every finite
+`|x| < 704`, a value stage A returns is `RN(e^x)`.
+
+## 6. Stage B
+
+A tighter evaluation for the arguments stage A leaves undecided, with one
+exact product doing the work of a double-word multiplication.
+
+1. **The reduced argument as `r_h + r_t`.** `r0 = RN(r1 − ni·L2)` (`ni·L2`
+   exact), and `r_h = RN(RN(r0 + SPLIT) − SPLIT)` with `SPLIT = 1.5·2^12`: in
+   `[2^12, 2^13)` binary64 numbers are the multiples of `2^−40`, so `r_h` is
+   `r0` rounded to that grid, ties to even, exactly, with `|r_h − r0| ≤ 2^−41`
+   and `|r_h| ≤ 0.000678` (at most 30 significant bits). Then
+   `r_t = RN(RN(RN(r1 − r_h) − ni·L2) − RN(ni·L3))`, whose first two
+   operations are exact:
+   - `r1 − r_h`: for `ni ≠ 0` both are multiples of `2^−63` and the
+     difference is below `2^−10`; for `ni = 0`, `r_h` is `x` rounded to `2^−40`'s
+     grid, so either `r_h = 0` or `|x| ≥ 2^−41`, and `x − r_h` is a multiple of
+     `2^−93` below `2^−41`;
+   - minus `ni·L2`: for `ni ≠ 0` all three are multiples of `2^−72` and the
+     result, `r0 − r_h` plus `r0`'s rounding error, is below `2^−40`; for
+     `ni = 0`, `ni·L2 = 0`.
+
+   So `|r_h + r_t − R| ≤ 2^−93` and `|r_t| ≤ 2^−40` (*certified*:
+   `formal/exp/stage_b_reduction.g`).
+2. `r_hi = RN(r_h + r_t)` and `q = RN(RN(r_hi·r_hi)·RN(1/2 + r_hi·(d3 + …)))`,
+   the same polynomial at `r_hi`, within `2^−73` of its exact value, with
+   `0 ≤ q ≤ 2^−22` (*certified*: `formal/exp/stage_b_poly.g`).
+3. **The exact product.** `A = th` with the low 32 bits of its encoding
+   cleared: its 21 leading significant bits, a multiple of `2^−20` in `[1, 2)`.
+   - `d = RN(th − A) = th − A`, exactly: `0 ≤ d < 2^−20`, a multiple of `2^−52`.
+   - `A·r_h` is exact: `A = a·2^−20` with `a < 2^21` and `r_h = b·2^−40` with
+     `|b| < 2^30`, so `A·r_h = ab·2^−60` with `|ab| < 2^51`.
+   - `(y, e) = Fast2Sum(th, A·r_h)`: `y = RN(th + A·r_h)` and `y + e = th + A·r_h`
+     exactly, since `th ≥ 1 > |A·r_h|`.
+4. `l = RN(e + rest)`, with
+   `rest = RN(tl + RN(RN(tl·r_hi) + RN(RN(d·r_h) + RN(th·RN(r_t + q)))))`.
+
+So `y + l` approximates `th·(1 + r_h + r_t + q) + tl·(1 + r_hi)`: the leading
+term `th + th·r_h` is carried exactly by `y + e`, and only terms below `2^−20`
+go through rounded binary64 operations.
+
+**Error: `|y + l − T_j·e^R| ≤ 0x1.a2p−71 < 2^−70.29`** (*certified*:
+`formal/exp/stage_b.g`, which also bounds `|l| ≤ 2^−20`). Its hypotheses: the
+reduction (step 1), the polynomial's evaluation (step 2), the approximation
+error (§5), `m` at `r_hi` (`|R − r_hi| ≤ 2^−64 + 2^−93`, `stage_mvt.g`), the
+table (§4), and the exactness facts of step 3.
+
+**`E_B = 2^−70`:** the certified error plus the test's rounding,
+`0x1.a2p−71 + 2^−73 = 1.88·2^−71`, rounded up.
+
+- **Review point:** the exactness of `r1 − r_h` and of the subtraction of
+  `ni·L2`, in both cases of step 1, and of step 3's product.
+
+**Machine-checked:** `formal/exp/ExpStageB.v` transcribes `Stages::b_value` and
+`Stages::b`, the bit mask included (`mask_ok`, on the encoding as Rust computes
+it), and proves the exactness facts and the error bound
+(`stage_b_value_ok`, with `ExpStageReduction.v`'s `stage_b_r_ok` for step 1),
+and `exp_stage_b_ok`: a value stage B returns is `RN(e^x)`. `exp_stages_ok`
+composes the screen and both stages as `exp` runs them.
+
+## 7. The rounding test, and the scaling
+
+**Decision 4: a test with a constant absolute bound, before scaling** (after
+[Ziv], in the form [CM] uses). With `Z = T_j·e^R = e^x / 2^k`, a stage has
+`(y, l)` with `|Z − (y + l)| ≤ ε`, and a binary64 constant `E`:
+
+    low  = RN(y + RN(l − E))
+    high = RN(y + RN(l + E))
+    return low·2^k   if   low == high
+    otherwise the next stage, or the fallback
+
+**Proof.** Let `|l| + E ≤ 2^em` (stage A: `em = −9`; stage B: `em = −19`).
+Then `|l ± E| ≤ 2^em`, and rounding a number that small errs by at most
+`2^(em−54)` (half an ulp below `2^em`; zero at `2^em` itself, which is
+representable). If `E ≥ ε + 2^(em−54)`:
+- `RN(l − E) ≤ l − E + 2^(em−54) ≤ l − ε ≤ Z − y`, and likewise
+  `RN(l + E) ≥ Z − y`;
+- so `y + RN(l − E) ≤ Z ≤ y + RN(l + E)`, and rounding is monotone:
+  `low ≤ RN(Z) ≤ high`;
+- when `low = high`, `RN(Z) = low`.
+
+Unlike §8.3's relative test, this needs no fact about `Z`: not that it is
+transcendental, nor its distance from a breakpoint. Stage A's `E_A` and stage
+B's `E_B` meet the condition (§5, §6).
+
+**Why the bound is constant.** `Z` lies in `[0.9, 2.1]` before scaling
+(`T_j ∈ [1, 2)`, `|R| < 0.000677`), where an absolute bound plays the role a
+relative one plays across binades; scaling by `2^k` then carries the decided
+`RN(Z)` to `RN(e^x)`, because rounding commutes with exact scaling while both
+are normal. So one comparison of two roundings replaces the ulp computation of
+§8.3.
+
+**The scaling** adds `k` to the exponent field:
+`low.to_bits().wrapping_add((k << 52) as u64)`. `low = RN(Z)` lies in
+`[0.5, 4)`, a normal number whose biased exponent is 1022 to 1024, and
+`|k| ≤ 1016` keeps the sum's exponent field in `[6, 2040]`: the encoding of
+`low·2^k`, exact and normal.
+
+**The undecided rate** is near `2E/ulp(y) ≈ 2E·2^52`: `3·2^−9 ≈ 2^−7.4` for
+stage A and `2^−17` for stage B. Measured on 2^28 arguments (§10; three in
+four uniform in `|x| < 704`, the rest of magnitude `2^−64` to 1): stage A
+leaves `2^−7.33`, and stage B `2^−16.9` of all arguments.
+
+**Machine-checked:** `formal/binary64/RoundingConstant.v` transcribes the test
+and the scaling (`decide_const`, from the encodings as Rust forms them) and
+proves `const_test_real` (the argument above) and `decide_const_ok`: when the
+test passes, the returned value is `RN(Z·2^k)`.
+
+## 8. The fallback
+
+`fallback(x)` is `exp` before the stages, unchanged: the special values of §1,
+then a reduction with a 128-entry table, a fast value in double-word
+arithmetic with a relative rounding test, and an accurate path in 128-bit
+arithmetic. Arguments reach it from the screen (`|x| ≥ 704`, NaN, infinities)
+and when neither stage decides, about one in 2^17 of the rest. It also serves
+as the test oracle for the stages (§10), and `exp2` and `expm1` share its
+fast value and test.
+
+Within this section, `L = ln 2 / 128`.
+
+### 8.1 Argument reduction (after [Tang] §4, Step 2)
+
+**Decision 5: a table of `N = 128` entries `T_j = 2^(j/128)`.** This keeps
 `|r| ≤ L/2 ≈ 2^−8.53`, so a degree-6 polynomial meets the fast path's budget,
 with a table of 2 KiB for the fast path and 2 KiB for the accurate path.
 [Tang] uses 32 entries for a 0.54-ulp result; correct rounding needs a tighter
@@ -96,7 +352,7 @@ fast path.
      `|r_hi + r_lo − (x − n·L)|` is below `2^−113` (*certified*:
      `formal/exp/reduction.g`), and `|r_lo| ≤ 2^−62`.
    - **Accurate path:** `r1`, `p2`, `e2`, `(p3, e3) = two_prod(n, L3)` and
-     `RN(n·L4)` are summed in 128-bit arithmetic (§5).
+     `RN(n·L4)` are summed in 128-bit arithmetic (§8.4).
 
 Then `e^x = 2^k · T_j · e^r`.
 
@@ -114,9 +370,9 @@ within `2^−206` of `ln 2 / 128`, so `L` is exactly `ln 2 / 128`. The formal jo
 compares the transcription with the Rust code bit for bit on the internal
 cross-check corpus: arguments across the domain, at ties of `x/L`, and tiny.
 
-## 4. Fast path
+### 8.2 Fast value
 
-**Decision 2: everything after the polynomial uses the crate's proved
+**Decision 6: everything after the polynomial uses the crate's proved
 double-word operations,** so the only new error analysis is the polynomial's.
 
 1. **Polynomial.** `q = r_hi² · (½ + r_hi·(c3 + r_hi·(c4 + r_hi·(c5 + r_hi·c6))))`
@@ -144,8 +400,8 @@ double-word operations,** so the only new error analysis is the polynomial's.
   in [double-word.md](double-word.md));
 - the table's error.
 
-At that bound the rounding test (§5) should send roughly one argument in 2^15 to
-the accurate path; measured, it sends one in 2^15.4 (§8).
+At that bound the rounding test (§8.3) should send roughly one argument in 2^15 to
+the accurate path; measured, it sends one in 2^15.4 (§10).
 
 **Machine-checked:** `formal/exp/ExpFast.v` transcribes `fast_at` on binary64
 and proves `ε₁` for it (`fast_ok`): for `(r_hi, r_lo)` within `2^−113` of `R`,
@@ -172,18 +428,18 @@ corpus's reduced arguments, cycling through every table index.
 CoqInterval computes with Coq's primitive 63-bit integers, so these theorems
 also rest on their specification, listed in `formal/axioms.int63.expected`.
 
-**Decision 3: the fast path doesn't handle results that may be subnormal**
+**Decision 7: the fast path doesn't handle results that may be subnormal**
 (`k < −1021`). They go straight to the accurate path, which rounds once. Scaling
 a rounded fast result by `2^k` there would round twice.
 
-## 5. Rounding test
+### 8.3 Rounding test
 
 `Y = (y_hi, y_lo)` is a double-word number, so `y_hi = RN(y_hi + y_lo)`. `y_hi` is
 the correctly rounded `e^x / 2^k` whenever the interval
 `y_hi + y_lo ± ε₁·|Y|` contains no rounding breakpoint. Those are the midpoints
 between `y_hi` and its neighbours.
 
-**Decision 4: the test, with the crate's exact `ulp`:**
+**Decision 8: the test, with the crate's exact `ulp`:**
 ```
 g = ulp(y_hi), halved when y_hi is a power of two     (the smaller gap)
 return y_hi · 2^k   if   RN(|y_lo| + RN(EPS · |y_hi|))  <  g / 2
@@ -219,16 +475,16 @@ threshold so both outcomes occur.
 **Scaling:** `y_hi · 2^k` is exact for `k ≥ −1021`. For `k = 1024`, where `Y < 1`
 near overflow, it's applied as `(y_hi · 2^(k−1)) · 2`.
 
-## 6. Accurate path
+### 8.4 Accurate path
 
-**Decision 5 (made): 128-bit significand arithmetic,** not triple-word.
+**Decision 9 (made): 128-bit significand arithmetic,** not triple-word.
 - **Why not triple-word:** Fabiano, Muller and Picot's triple-word algorithms
   assume a fused multiply-add, which `core` doesn't offer. Their bounds don't
   hold verbatim without one.
 - **The type:** a private sign-magnitude type `Q128 = (sign, m: u128, e: i32)`,
   with value `±m·2^e`, and `m` normalized (top bit set) or zero. It is
   deterministic on every target and uses only integer instructions.
-- **Its contract,** which the certificates assume. It is proved in Coq (§8):
+- **Its contract,** which the certificates assume. It is proved in Coq (§10):
   - **Multiplication:** the exact product, truncated toward zero to 128 bits.
     Relative error in `[−2^−127, 0]`.
   - **Addition:** absolute error at most `2^−126·max(|a|, |b|)`. That allows the
@@ -325,19 +581,45 @@ on binary64 and the proved `Q128` transcription, and proves them.
 The formal job compares `h`, `w` and `small`'s result with the Rust code bit for
 bit on the internal cross-check corpus.
 
-## 7. Certificates and generators
+## 9. Certificates, proofs and generators
 
 | Artifact | Tool | Establishes |
 |---|---|---|
-| `generators/exp_constants.py` | mpmath 1.4.1 | writes `crates/morphiq-numerics/src/exp/tables.rs`: `INV_L`, `L1`–`L4`, `T_j` (double-word and `Q128`), `1/k` in `Q128`, each checked against its bound |
-| `generators/exp_poly.sollya` | Sollya 8.0 | `c3`–`c6` (`fpminimax`) and the approximation error (`supnorm`), in `generators/exp_poly.out` |
-| `formal/exp/reduction.g` | Gappa 1.4.1 | the fast path's reduced argument, within `2^−113` |
-| `formal/exp/poly.g` | Gappa | the polynomial's evaluation error, below `2^−70` |
-| `formal/exp/mvt.g` | Gappa | `Q(r) − Q(r_hi)`, below `0x1.9p−71` |
+| `generators/exp_constants.py` | mpmath 1.4.1 | writes `crates/morphiq-numerics/src/exp/tables.rs`, `formal/exp/ExpTables.v` and `formal/exp/ExpStageTables.v`: the stages' `INV_N`, `S_L1`–`S_L3`, `S_L2D`, the 512-entry table `S_T` and the polynomial; the fallback's `INV_L`, `L1`–`L4`, `T_j` (double-word and `Q128`) and `1/k` in `Q128`; each checked against its bound |
+| `generators/exp_poly.sollya` | Sollya 8.0 | the stages' `d3`–`d5` and the fallback's `c3`–`c6` (`fpminimax`), with their approximation errors (`supnorm`), in `generators/exp_poly.out` |
+| `formal/exp/stage_a_reduction.g` | Gappa 1.4.1 | stage A's reduced argument: `r1 − RN(ni·L2D)` within `2^−77` of `R` |
+| `formal/exp/stage_a.g` | Gappa | stage A's error, `0x1.2ep−61`, and `\|l\| ≤ 0x1.6ap−10` |
+| `formal/exp/stage_b_reduction.g` | Gappa | stage B's `r_h + r_t` within `2^−93` of `R`, `\|r_t\| ≤ 2^−40` |
+| `formal/exp/stage_b_poly.g` | Gappa | stage B's polynomial evaluation, within `2^−73` |
+| `formal/exp/stage_mvt.g` | Gappa | the polynomial at `r` instead of `R`, within `2^−74` (both stages) |
+| `formal/exp/stage_b.g` | Gappa | stage B's error, `0x1.a2p−71`, and `\|l\| ≤ 2^−20` |
+| `formal/exp/reduction.g` | Gappa | the fallback's reduced argument, within `2^−113` |
+| `formal/exp/poly.g` | Gappa | the fallback's polynomial evaluation error, below `2^−70` |
+| `formal/exp/mvt.g` | Gappa | `Q(r) − Q(r_hi)` in the fallback, below `0x1.9p−71` |
 | `formal/exp/fast.g` | Gappa | `ε₁ ≤ 2^−69` |
 | `formal/exp/accurate_level_*.g`, `accurate_y.g` | Gappa | the accurate path's series and result, within `2^−124` |
 | `formal/exp/small.g` | Gappa | the small-argument path's `d`, within `2^−122` relative |
 | `generators/exp_accurate_certificates.py` | Python | writes the per-level certificates, with their bounds |
+
+**The Coq proofs** (`formal/exp`, `formal/binary64`), each a transcription of
+the Rust code on binary64 with its theorem:
+
+| File | Proves |
+|---|---|
+| `ExpStageTables.v` (*generated*) | the stages' constants: `L`'s splits, `INV_N`, the polynomial's approximation error (CoqInterval), and the table by one reflective check (`st_t_ok`) |
+| `TableCheck.v` | the reflective table check is sound (`table_check_ok`) |
+| `StageGappa.v` | tactics that apply the stage certificates' theorems |
+| `ExpStageReduction.v` | the screen's reduction (`stage_of_ok`), stage A's `r` (`stage_a_r_ok`), stage B's `r_h` and `r_t` (`stage_b_r_ok`) |
+| `ExpStageA.v` | stage A's error (`stage_a_value_ok`) and result (`exp_stage_a_ok`) |
+| `ExpStageB.v` | stage B's exact product (`mask_ok`), error (`stage_b_value_ok`) and result (`exp_stage_b_ok`); the screen (`screen_ok`); both stages as `exp` runs them (`exp_stages_ok`) |
+| `RoundingConstant.v` | the constant-bound test and the scaling (`decide_const_ok`) |
+| `ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v`, `ExpSmall.v`, `ExpTables.v` | the fallback (§8) |
+
+Each stage theorem holds for every finite `|x| < 704` and states its result is
+`RN(e^x)` with no hypothesis left: the certificates' theorems are applied
+through Gappa's Coq proofs, and every hypothesis they take is proved about the
+transcription. The fallback's accurate-path theorems keep their one stated
+hypothesis, [LM]'s distance (§8.4).
 
 **Gates:**
 - **Certificates:** `scripts/check_certificates.sh`, the `certificates (sollya, gappa)`
@@ -354,7 +636,12 @@ bit on the internal cross-check corpus.
   by `formal/gappa/Hints.v`, so no hint is assumed. A hint that divides states
   its denominators' nonzero conditions (`{ x <> 0 }`), which Gappa proves from
   the bounds. The final theorems' axioms must be among
-  `formal/axioms.expected`.
+  `formal/axioms.expected` (and, for the constants CoqInterval proves,
+  `formal/axioms.int63.expected`). The job then extracts the transcriptions
+  and compares them with the Rust code bit for bit on the internal cross-check
+  corpus: `Stages::of`'s words, both stages' values and their tests' outcomes
+  on arguments across `|x| < 704`, at ties of `x/L` and tiny, including
+  arguments where stage B's test fails.
 - **Replay:** `scripts/check_generators.sh` replays the Python generators.
 
 **The binding:** it covers this document, the constants, the Sollya script and
@@ -362,28 +649,39 @@ output, every certificate, and the kernel's source (`exp/mod.rs`, `q128.rs`).
 Editing any of them fails the gate until the certificates are rerun and the
 manifest is updated.
 
-## 8. Checked by
+## 10. Checked by
 
 - **Bit-exact agreement** with `crates/reference/fixtures/exp.json`, 4,286 cases
   (`crates/reference/tests/exp.rs`):
   - [LM] Table 4's worst cases. They are hard for the directed roundings only:
     each `e^x` lies within `2^−58` ulp of a binary64 number, but half an ulp
-    from every midpoint, so none reaches the accurate path;
+    from every midpoint;
   - **near midpoints, constructed:** for `x = (2k+1)·2^−53`, `1 + x` is a
     midpoint and `e^x` lies within about `(2k+1)²·2^−55` ulp of it (and below 1
-    with `x = −(2k+1)·2^−54`). These make the rounding test fail and decide the
-    result on the small-argument path;
+    with `x = −(2k+1)·2^−54`). Every test fails on these, and the fallback's
+    small-argument path decides them;
   - every threshold and its neighbour, special values, a regression (`−0.6`)
     and random arguments.
 - **Every unrounded result within its certified bound,** against `e^x` to 192
   bits for 1,200 arguments (the fixture's `precise` section), in exact
-  arithmetic (`src/exp/tests.rs`): the fast path's `Y` within `2^−69`, the
-  accurate path's `Q128` value within `2^−123.9`, and the small-argument path's
-  `h + w` within `2^−178`. This catches accuracy defects that no rounded result
-  shows.
-- **The fast path against the accurate path** on 2^20 arguments: equal whenever
-  the fast path returns. It sent 23 of 1,021,637 (`2^−15.4`) to the accurate
-  path, against the analytic `2^−15`; the test fails above four times that.
+  arithmetic (`src/exp/tests.rs`): stage A's `y + l` within `5·2^−63` and stage
+  B's within `7·2^−73` of `e^x/2^k` (above the certified `0x1.2ep−61` and
+  `0x1.a2p−71`), the fallback's fast value within `2^−69`, the accurate path's
+  `Q128` value within `2^−123.9`, and the small-argument path's `h + w` within
+  `2^−178`. This catches accuracy defects that no rounded result shows.
+- **The stages against the old algorithm.** `exp` before this change is the
+  fallback, so `src/exp/tests.rs` compares each stage's result, wherever its
+  test passes, and `exp` itself with `fallback` bit for bit: on 2^20 arguments
+  in every test run (uniform in `|x| < 704`, and one in four of magnitude
+  `2^−64` to 1), and on 2^28 on demand
+  (`stages_agree_on_a_large_corpus`). Stage B is run on every argument, not
+  only those stage A leaves, so it is checked everywhere. The run also bounds
+  the undecided rates: stage A at most twice its analytic `2^−7.4` and stage B
+  at most four times its `2^−17`.
+- **The fallback's fast value against the accurate path** on 2^20 arguments:
+  equal whenever the fast value decides. It sent 23 of 1,021,637 (`2^−15.4`) to
+  the accurate path, against the analytic `2^−15`; the test fails above four
+  times that.
 - **The `Q128` contract, proved:** `formal/q` proves the contract for any
   significand width (`QSpec.v`, `QRound.v`) and that a step-for-step
   transcription of `q128.rs` computes it (`Q128.v`: `mul_value`, `add_ok`,
@@ -392,5 +690,35 @@ manifest is updated.
   internal cross-check corpus (`src/internal_crosscheck.rs`). `src/q128/tests.rs` also checks
   the contract in exact big-integer arithmetic, ties and subnormals included.
 - **The determinism digest's `exp` section** on every target
-  ([determinism.md](determinism.md)).
+  ([determinism.md](determinism.md)), unchanged by the stages: a correctly
+  rounded function's bits don't depend on how they are computed.
+- **The lanes** ([lanes.md](lanes.md) §4) transcribe the stages operation for
+  operation, checked word for word against `Stages::a_value` and `b_value`.
 - Exhaustive checks of chosen sub-intervals against the oracle (scheduled).
+
+## 11. Cost
+
+**Stage A** is about 20 floating-point operations after the reduction's 5,
+with one table load; **stage B**, which runs for about one argument in 2^7.3,
+about 30 more. The fallback costs about 20 ns on its fast value and 210–240 ns
+on its accurate path, for about one argument in 2^17 inside the screen.
+
+**Local measurement** (one Apple M1 Pro, release build, Rust 1.97.1,
+`cargo test --release -p morphiq-numerics --lib exp::tests::measure_cost --
+--ignored --nocapture`; not a gate). The 1-minute load average was 3.2–3.3,
+with one core busy with another job and no other benchmark running. Each
+figure is the median of seven rounds; two runs agreed within 2%. Throughput
+is independent calls over a shuffled grid of 4,096 arguments; latency chains
+each argument to the previous result. `fallback` is `exp` before the stages,
+the same code in the same build:
+
+| Arguments | `exp` throughput | `fallback` throughput | `exp` latency | `fallback` latency |
+|---|---|---|---|---|
+| `[−30, 0]` | 4.04 ns | 20.00 ns | 25.6 ns | 56.5 ns |
+| `[−1, 1]` | 4.06 ns | 20.01 ns | 25.6 ns | 56.5 ns |
+| `[−700, 700]` | 4.04 ns | 20.02 ns | 25.7 ns | 56.5 ns |
+
+That is about 5× the throughput and 2.2× shorter latency. Batched, two NEON
+lanes take 2.34 ns per argument on `[−30, 0]` ([lanes.md](lanes.md) §7). Only
+this host is measured. On x86-64 the table's smaller footprint (§3) is
+expected to matter more than here, but that is inferred, not measured.

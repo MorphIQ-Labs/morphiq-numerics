@@ -3,7 +3,7 @@
 //!
 //! The contract the certificates assume is in
 //! [`docs/exp.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/exp.md)
-//! §6:
+//! §8.4:
 //! - multiplication: the exact product truncated toward zero to 128 bits,
 //!   relative error in `[−2^−127, 0]`;
 //! - addition: absolute error at most `2^−126·max(|a|, |b|)`, from truncating
