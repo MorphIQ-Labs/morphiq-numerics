@@ -205,9 +205,10 @@ normal (`|k| ≤ 1016`), so it is the same number, with the same encoding.
   `ln/lanes/tests.rs`): on the same corpora, every lane the scalar function
   would try its fast path on has the scalar fast value's bits: for `exp`, both
   stages' `(y, l)` on every lane past the screen, stage B's on every lane and
-  not only those stage A leaves; for `ln` and `ln_1p`, `y_hi` and `y_lo`. This shows the kernels transcribe the scalar operations, which the
-  final results alone could not: a different but accurate sequence would
-  usually round alike.
+  not only those stage A leaves; for `ln` and `ln_1p`, `y_hi` and `y_lo`.
+  This shows the kernels transcribe the scalar operations, which the final
+  results alone could not: a different but accurate sequence would usually
+  round alike.
 - **Every cascade** (`every_lanes_cascade_returns_the_scalar_bits`): each
   subset of the CPU's lane backends, widest first, forced in turn, then the
   scalar function. It runs on slices of every length from 0 to 17 at eight
