@@ -110,6 +110,12 @@ let compute op args =
              (List.map show_bits nr @ [string_of_int (int_of_z j); string_of_int (int_of_z k)]
               @ List.map show_bits a @ [show_opt ra] @ List.map show_bits b @ [show_opt rb])
        | _ -> failwith "stage takes one word")
+  | "expm1_small" ->
+      (match args with
+       | [x] ->
+           let (((words, result), ((n, e), l)), rounded) = x_expm1_small (z_of_u64 (hex x)) in
+           String.concat " " (List.map show_bits words @ [show_opt result; show (n, e, l); show_bits rounded])
+       | _ -> failwith "expm1_small takes one word")
   | "expm1_general" ->
       (match args with
        | [x] ->
@@ -117,6 +123,10 @@ let compute op args =
            String.concat " " ([string_of_int (int_of_z j); string_of_int (int_of_z k)]
              @ List.map show_bits words @ [show_opt result; show (n, e, l); show_bits rounded])
        | _ -> failwith "expm1_general takes one word")
+  | "expm1_entry" ->
+      (match args with
+       | [x] -> show_bits (x_expm1_entry (z_of_u64 (hex x)))
+       | _ -> failwith "expm1_entry takes one word")
   | "exp2_entry" ->
       (match args with
        | [x] -> show_bits (x_exp2_entry (z_of_u64 (hex x)))

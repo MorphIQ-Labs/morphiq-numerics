@@ -108,3 +108,20 @@ Print Assumptions Expm1GeneralFast.em_general_fast_bound.
 Print Assumptions Expm1GeneralFast.em_general_fast_ok.
 Print Assumptions Expm1GeneralAccurate.em_general_accurate_bound.
 Print Assumptions Expm1GeneralAccurate.em_general_accurate_round.
+
+Require Expm1Series Expm1SmallAdd Expm1SmallSquare Expm1SmallApprox Expm1SmallFast Expm1SmallAccurate Expm1Thresholds Expm1.
+Print Assumptions Expm1Series.exp_taylor_bound.
+Print Assumptions Expm1SmallAdd.em_add_scalar_left.
+Print Assumptions Expm1SmallSquare.em_half_square_ok.
+Print Assumptions Expm1SmallApprox.em_small_polynomial_bound.
+Print Assumptions Expm1SmallFast.em_small_fast_bound.
+Print Assumptions Expm1SmallFast.em_small_fast_ok.
+Print Assumptions Expm1SmallAccurate.em_small_accurate_bound.
+Print Assumptions Expm1SmallAccurate.em_small_accurate_round.
+Print Assumptions Expm1Thresholds.em_tiny_round.
+Print Assumptions Expm1Thresholds.em_overflow_screen.
+Print Assumptions Expm1Thresholds.em_minus_one_round.
+Print Assumptions Expm1.expm1_entry_finite.
+Print Assumptions Expm1.expm1_entry_nan.
+Print Assumptions Expm1.expm1_entry_infinities.
+Print Assumptions Expm1.expm1_entry_signed_zeros.

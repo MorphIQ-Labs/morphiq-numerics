@@ -21,7 +21,7 @@ use tables::{POLY, RECIPROCALS};
 /// The least `x` whose `e^x − 1` rounds to `+∞` (§1; the reference fixture's
 /// threshold "least x overflowing").
 const X_OVERFLOW: f64 = f64::from_bits(0x4086_2e42_fefa_39f0);
-/// The least `x` whose `e^x − 1` rounds to `−1` (§1; "least x rounding to -1").
+/// The largest `x` whose `e^x − 1` rounds to `−1` (§1; "largest x rounding to -1").
 const X_MINUS_ONE: f64 = f64::from_bits(0xc042_b708_8723_20e2);
 /// `2^−54`: below it, `expm1(x) = x` (§1).
 const TINY: f64 = f64::from_bits(0x3c90_0000_0000_0000);
@@ -138,6 +138,13 @@ pub(crate) fn crosscheck_general(x: f64) -> (usize, i32, DoubleWord, Option<f64>
         decide_with(fast, EPS),
         general_accurate(&reduced),
     )
+}
+
+/// Both small-path results, including rejected rounding decisions.
+#[cfg(test)]
+pub(crate) fn crosscheck_small(x: f64) -> (DoubleWord, Option<f64>, Q128) {
+    let fast = small_fast(x);
+    (fast, decide_with(fast, EPS), small_accurate(x))
 }
 
 #[cfg(test)]

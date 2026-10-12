@@ -71,6 +71,12 @@ threshold, [exp]'s fast error, amplified by the cancellation
    - The tail's error, weighted by `x²/6 ≤ 2^−12.6`, dominates. That is why this
      function's `ε₁` is `2^−62` (§6).
 
+`Expm1SmallApprox.v` independently proves the approximation bound for the
+stored binary64 coefficients. `Expm1SmallSquare.v`, `Expm1SmallAdd.v` and
+`Expm1SmallPoly.v` establish exact halving, double-word normalization and
+binary64 evaluation. `Expm1SmallFast.v` composes those facts with the
+certificates and proves every accepted small-path result correctly rounded.
+
 ## 4. Small arguments, accurate path
 
 `(e^x − 1)/x = 1 + x/2·(1 + x/3·(1 + …))` in `Q128`:
@@ -78,12 +84,20 @@ threshold, [exp]'s fast error, amplified by the cancellation
 - then `x·H_2`.
 
 **The degree** `d = 15` is the least whose truncation, at most
-`A^(d+1)/(d+2)!` over `(e^x − 1)/x ≥ 1 − A/2`, is at most `2^−125`
+`(26/25)·A^(d+1)/(d+2)!` over `(e^x − 1)/x ≥ 1 − A/2`, is at most `2^−125`
 (*generated*: `generators/expm1_constants.py`, with `1/m` as `Q128` constants).
+Taylor’s theorem supplies the factor `exp(t·x)`, `0 < t < 1`;
+`exp(A) < 26/25` bounds it for either sign. The first omitted term alone
+does not bound the positive-input tail.
 
 Each level's error is bounded from the previous one (*certified*:
 `formal/expm1/accurate_level_02.g` to `_16.g`). The result is within `2^−123`
-of `e^x − 1` (*certified*: `formal/expm1/accurate_small.g`, proves `2^−125.6`).
+of `e^x − 1` (*certified*: `formal/expm1/accurate_small.g`).
+
+`Expm1Series.v` proves the Taylor remainder from the definition of `exp`.
+`Expm1SmallAccurate.v` connects all 15 levels to the executable Q128
+operations and generated reciprocal encodings, proves the relative bound,
+and proves the final binary64 conversion rounds that approximation once.
 
 ## 5. Other arguments
 
@@ -159,7 +173,7 @@ arithmetic and proves the `2^−118` relative bound before conversion.
 `em_general_accurate_round` proves the final conversion is finite and rounds
 that approximation once. Neither theorem assumes a published worst-case
 separation for `expm1`; the accurate branch retains the bounded contract in §6.
-The small-argument paths in §3–4 have the certificate coverage listed below.
+The small-argument proofs in §3–4 establish the corresponding bounds.
 
 ## 6. Rounding test and bound
 
@@ -179,14 +193,26 @@ For these fallback paths, at that `ε₁` the test sends about one argument in 2
 - It is correctly rounded unless `e^x − 1` lies within mantissa distance
   `2^−117` of a breakpoint. No published search excludes that.
 
+`formal/exp/Expm1.v` transcribes the public entry, including every comparison,
+accepted stage, fallback decision and final conversion. Its finite-input
+theorem proves overflow returns positive infinity; otherwise the result is
+`RN(z)` for an approximation `z` within `2^−118` relatively of `exp(x)−1`.
+The accepted fast-path theorems establish `z = exp(x)−1`. The entry theorem
+adds no worst-case separation assumption. `Expm1Thresholds.v` proves the
+screens for overflow, rounding to `−1`, and returning `x`, including
+subnormal inputs. Separate entry theorems cover NaNs, infinities and signed
+zeros.
+
 ## 7. Certificates, generators and tests
 
 | Artifact | Establishes |
 |---|---|
 | `formal/exp/Expm1Subtract.v`, `Expm1Scale.v`, `Expm1Stages.v` | screened exponential stages, including cancellation and exact scaling |
+| `formal/exp/Expm1Small*.v`, `Expm1Series.v` | small fast decision, exact square/halving, Q128 series and Taylor remainder |
+| `formal/exp/Expm1.v`, `Expm1Thresholds.v` | public entry and special-value screens |
 | `formal/exp/Expm1General*.v` | general fallback reduction, fast decision and accurate Q128 bound with single rounding |
 | `generators/expm1_poly.sollya` (Sollya 8.0) | `c3`–`c9` and their bound, with the remainder, in `generators/expm1_poly.out` |
-| `generators/expm1_constants.py` | `src/expm1/tables.rs`: `c3`–`c9`, `1/m` in `Q128`, the series degree |
+| `generators/expm1_constants.py` | `src/expm1/tables.rs` and `Expm1Tables.v`: coefficients, Q128 reciprocals, degree and checked encodings |
 | `generators/expm1_certificates.py` | writes every certificate below; the ratio `kq` is enclosed with `mpmath.iv` |
 | `formal/expm1/tail.g`, `p.g` | the small fast path: `2^−50`, then `2^−62.3` |
 | `formal/expm1/accurate_level_*.g`, `accurate_small.g` | the small accurate path: `2^−123` |
@@ -220,7 +246,14 @@ kernel audit and Rust sources.
   both fast words, decision, Q128 value and rounded accurate result. The corpus
   covers every table index, both decisions, fixture inputs, cancellation edges
   and `k = −54` and `1024`, plus finite inputs outside the proved domain.
-- The determinism digest's `expm1` section on every target.
+- The extracted small paths against Rust: both fast words, decision, Q128
+  value and rounded accurate result, across all small-path binades, both
+  decisions, the fixtures and the screen edges. The complete extracted entry
+  also matches Rust for fixture inputs, boundary neighbours, NaN payloads,
+  signed zeros, subnormals and arbitrary encodings.
+- The determinism digest's `expm1` section and SIMD lane-equivalence tests on
+  every supported backend. The proof changes leave runtime arithmetic and
+  result bits unchanged.
 
 **A defect this work found in the oracle,** fixed in
 `generators/oracle/__init__.py`:

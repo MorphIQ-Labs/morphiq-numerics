@@ -26,7 +26,7 @@ checked against the bound docs/ln.md relies on.
   monotonicity argument is needed. Each expression uses ln y once, so its
   enclosure is tight.
 - DEGREE: the accurate path's series degree (section 6), the least d whose
-  truncation |z|^d / (d + 1) is at most 2^-125, negligible next to Q128's own
+  truncation |z|^d / ((d + 1) (1 - |z|)) is at most 2^-125, negligible next to Q128's own
   rounding (2^-127 per operation).
 - RECIPROCALS[k] = 1/k, k = 1..DEGREE, as 128-bit significands with exponents.
 - c3..c9: the fast path's polynomial, read from generators/ln_poly.out, which
@@ -49,7 +49,7 @@ POLY = ROOT / 'generators/ln_poly.out'
 PREC = 600
 Z_MAX = mpmath.mpf(2) ** -7
 Z_BOUND = Fraction(78126, 10_000_000)  # |z| <= 0.0078126, Z_MAX with margin for ln_1p
-DEGREE = next(d for d in range(1, 64) if Z_BOUND ** d / (d + 1) <= Fraction(1, 2**125))
+DEGREE = next(d for d in range(1, 64) if Z_BOUND ** d / (d + 1) / (1 - Z_BOUND) <= Fraction(1, 2**125))
 
 
 def to_bits(x):
