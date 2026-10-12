@@ -23,7 +23,7 @@ Qed.
     [|l| + RN(eps·h) < g/2] with [g] at most both gaps around [h], every [Z]
     within [e1] of [h + l] rounds to [h]. *)
 Lemma ziv_pos (h l eps e1 Z g : R) :
-  F64 h -> bpow radix2 (-900) <= h -> h <= bpow radix2 1000 ->
+  F64 h -> bpow radix2 (-900) <= h ->
   h = RNE (h + l) ->
   g <= ulp radix2 fexp64 h -> g <= h - pred radix2 fexp64 h ->
   bpow radix2 (-80) <= e1 <= bpow radix2 (-60) -> e1 * (1 + bpow radix2 (-50)) <= eps <= 1 ->
@@ -31,7 +31,7 @@ Lemma ziv_pos (h l eps e1 Z g : R) :
   Rabs l + RNE (eps * h) < g / 2 ->
   RNE Z = h.
 Proof.
-  intros Fh Hlo Hhi Hdw G1 G2 [E80 E1] [Ee Ee1] HZ Ht.
+  intros Fh Hlo Hdw G1 G2 [E80 E1] [Ee Ee1] HZ Ht.
   assert (E0 : 0 < e1) by (pose proof (bpow_gt_0 radix2 (-80)); lra).
   assert (P60 : bpow radix2 (-60) = / 1152921504606846976) by reflexivity.
   assert (P50 : bpow radix2 (-50) = / 1125899906842624) by reflexivity.

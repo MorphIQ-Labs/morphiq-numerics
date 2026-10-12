@@ -53,7 +53,7 @@ Proof.
 Qed.
 
 (** A power of two, halved. *)
-Lemma half_f x e : finite x -> B x = bpow radix2 e -> (-1073 <= e <= 970)%Z ->
+Lemma half_f x e : finite x -> B x = bpow radix2 e -> (-1073 <= e <= 1023)%Z ->
   finite (fmul x half) /\ B (fmul x half) = bpow radix2 (e - 1).
 Proof.
   intros Fx Bx He. destruct (pow2_f (-1) ltac:(lia)) as [Bh Fh].
@@ -87,9 +87,10 @@ Proof.
     rewrite <- Hdw in H. assert (bpow radix2 (-1022) < bpow radix2 (-900)) by (apply bpow_lt; lia). lra.
 Qed.
 
-Theorem decide_with_ok hi lo eps (Z e1 : R) v :
+Theorem decide_with_bounded_ok hi lo eps (Z e1 : R) v :
   finite hi -> finite lo -> finite eps ->
-  bpow radix2 (-900) <= Rabs (B hi) <= bpow radix2 1000 ->
+  bpow radix2 (-900) <= Rabs (B hi) < bpow radix2 1024 ->
+  B eps * Rabs (B hi) <= bpow radix2 1020 ->
   B hi = rndF (B hi + B lo) ->
   bpow radix2 (-80) <= e1 <= bpow radix2 (-60) ->
   e1 * (1 + bpow radix2 (-50)) <= B eps <= 1 ->
@@ -97,7 +98,7 @@ Theorem decide_with_ok hi lo eps (Z e1 : R) v :
   decide_with hi lo eps = Some v ->
   v = hi /\ rndF Z = B hi.
 Proof.
-  intros Fhi Flo Feps [Hlo Hhi] Hdw He1 Heps HZ Hd.
+  intros Fhi Flo Feps [Hlo Hhi] Hprod Hdw He1 Heps HZ Hd.
   destruct hi as [s | s | s pl Hpl | s mx ex Hx]; try discriminate.
   { exfalso. simpl in Hlo. rewrite Rabs_R0 in Hlo. pose proof (bpow_gt_0 radix2 (-900)). lra. }
   set (hi := B754_finite 53 1024 s mx ex Hx) in *.
@@ -120,16 +121,18 @@ Proof.
   assert (U2 : bpow radix2 ex <= h * bpow radix2 (-52)).
   { rewrite <- Ulp. replace (-52)%Z with (1 - 53)%Z by reflexivity. rewrite <- (Rabs_pos_eq h) at 2 by lra.
     apply ulp_FLT_le. rewrite Rabs_pos_eq by lra. apply Rle_trans with (2 := Hlo). apply bpow_le. lia. }
-  assert (Ex : (-953 <= ex <= 948)%Z).
+  assert (Ex : (-953 <= ex <= 971)%Z).
   { split.
     - cut (-954 < ex)%Z; [lia | ]. apply (lt_bpow radix2). apply Rle_lt_trans with (2 := U1).
       apply Rle_trans with (bpow radix2 (-900) * bpow radix2 (-53)).
       + rewrite <- bpow_plus. apply bpow_le. lia.
       + apply Rmult_le_compat_r; [apply bpow_ge_0 | lra].
-    - apply (le_bpow radix2). apply Rle_trans with (1 := U2).
-      apply Rle_trans with (bpow radix2 1000 * bpow radix2 (-52)).
-      + apply Rmult_le_compat_r; [apply bpow_ge_0 | lra].
-      + rewrite <- bpow_plus. apply bpow_le. lia. }
+    - assert (E : (ex < 972)%Z).
+      { apply (lt_bpow radix2). apply Rle_lt_trans with (1 := U2).
+        replace (bpow radix2 972) with (bpow radix2 1024 * bpow radix2 (-52))
+          by (rewrite <- bpow_plus; reflexivity).
+        apply Rmult_lt_compat_r; [apply bpow_gt_0 | exact Hhi]. }
+      lia. }
   assert (Hm : h = IZR (Zpos mx) * bpow radix2 ex) by (rewrite Habs; reflexivity).
   assert (Mx : (2 ^ 52 <= Zpos mx < 2 ^ 53)%Z).
   { pose proof (bpow_gt_0 radix2 ex) as Pe. split.
@@ -181,18 +184,18 @@ Proof.
   assert (Ep : 0 < B eps).
   { destruct He1 as [A _]. destruct Heps as [C _].
     pose proof (bpow_gt_0 radix2 (-80)). pose proof (bpow_gt_0 radix2 (-50)). nra. }
-  assert (Bp : bnd 1 1000 (B eps * B (b64_abs hi))).
-  { unfold bnd. rewrite Bm. fold h. rewrite Rabs_mult, (Rabs_pos_eq h) by lra. rewrite (Rabs_pos_eq (B eps)) by lra.
-    rewrite Rmult_1_l. apply Rle_trans with (1 * h); [apply Rmult_le_compat_r; lra | lra]. }
-  destruct (fmul_ok 1 1000 eps (b64_abs hi) Feps Fm ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia) Bp) as [Fp BpV].
+  assert (Bp : bnd 1 1020 (B eps * B (b64_abs hi))).
+  { unfold bnd. rewrite Bm. fold h. rewrite Rabs_pos_eq by nra. rewrite Rmult_1_l. exact Hprod. }
+  destruct (fmul_ok 1 1020 eps (b64_abs hi) Feps Fm ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia) Bp) as [Fp BpV].
   pose proof (lo_bound (B hi) (B lo) Hlo Hdw) as Lb. fold h in Lb.
-  assert (Ba : bnd 2 1000 (B (b64_abs lo) + B (fmul eps (b64_abs hi)))).
+  assert (Ba : bnd 2 1020 (B (b64_abs lo) + B (fmul eps (b64_abs hi)))).
   { replace 2%Z with (1 + 1)%Z by reflexivity. apply bnd_plus.
-    - unfold bnd. rewrite B_abs, Rabs_Rabsolu. apply Rle_trans with (1 := Lb).
-      apply Rle_trans with (1 * h); [apply Rmult_le_compat_r; [lra | ] | lra].
-      change (bpow radix2 (-52) <= 1). apply Rlt_le, (bpow_lt radix2 (-52) 0); lia.
+    - unfold bnd. rewrite B_abs, Rabs_Rabsolu, Rmult_1_l. apply Rle_trans with (1 := Lb).
+      apply Rle_trans with (bpow radix2 (-52)*bpow radix2 1024).
+      + apply Rmult_le_compat_l; [apply bpow_ge_0 | lra].
+      + rewrite <- bpow_plus. apply bpow_le; lia.
     - rewrite BpV. apply bnd_round; [lia | lia | exact Bp]. }
-  destruct (fadd_ok 2 1000 (b64_abs lo) (fmul eps (b64_abs hi)) ltac:(reflexivity || (unfold b64_abs; destruct lo; simpl in *; congruence)) Fp ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia) Ba) as [Fa BaV].
+  destruct (fadd_ok 2 1020 (b64_abs lo) (fmul eps (b64_abs hi)) ltac:(reflexivity || (unfold b64_abs; destruct lo; simpl in *; congruence)) Fp ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia) Ba) as [Fa BaV].
   destruct (Bcompare 53 1024 _ _) eqn:Cmp in Hd; [ | discriminate].
   destruct c; try discriminate. injection Hd as <-.
   rewrite Bcompare_correct in Cmp by assumption. injection Cmp as Cmp.
@@ -216,7 +219,7 @@ Proof.
       rewrite E. change (RNE (- (B hi + B lo))) with (round radix2 fexp64 ZnearestE (- (B hi + B lo))).
       rewrite round_NE_opp. change (round radix2 fexp64 ZnearestE (B hi + B lo)) with (rndF (B hi + B lo)).
       rewrite <- Hdw, Hn. ring. }
-    pose proof (ziv_pos h (- B lo) (B eps) e1 (- Z) (bpow radix2 eg) Fh Hlo Hhi Hdw' Gu Gp He1 Heps
+    pose proof (ziv_pos h (- B lo) (B eps) e1 (- Z) (bpow radix2 eg) Fh Hlo Hdw' Gu Gp He1 Heps
                   ltac:(rewrite Rabs_Ropp; replace (- Z - (h + - B lo)) with (- (Z - (B hi + B lo))) by (rewrite Hn; ring); rewrite Rabs_Ropp; exact HZ)
                   ltac:(rewrite Rabs_Ropp; rewrite <- RNE_rndF in Ex2; exact Ex2)) as R.
     rewrite Hn. change rndF with (round radix2 fexp64 ZnearestE).
@@ -225,6 +228,25 @@ Proof.
     rewrite Hp in Hdw, HZ |- *. rewrite <- RNE_rndF in Hdw, Ex2 |- *.
     apply (ziv_pos h (B lo) (B eps) e1 Z (bpow radix2 eg)); assumption.
 Qed.
+(** The existing bounded interface, retained for the other kernels. *)
+Theorem decide_with_ok hi lo eps (Z e1 : R) v :
+  finite hi -> finite lo -> finite eps ->
+  bpow radix2 (-900) <= Rabs (B hi) <= bpow radix2 1000 ->
+  B hi = rndF (B hi + B lo) ->
+  bpow radix2 (-80) <= e1 <= bpow radix2 (-60) ->
+  e1 * (1 + bpow radix2 (-50)) <= B eps <= 1 ->
+  Rabs (Z - (B hi + B lo)) <= e1 * Rabs Z ->
+  decide_with hi lo eps = Some v ->
+  v = hi /\ rndF Z = B hi.
+Proof.
+ intros Fh Fl Fe [Lo Hi] Dw E Ep Err D.
+ apply (decide_with_bounded_ok hi lo eps Z e1 v); try assumption.
+ - split; [exact Lo | apply Rle_lt_trans with (1 := Hi); apply bpow_lt; lia].
+ - apply Rle_trans with (1 * Rabs (B hi)).
+   + apply Rmult_le_compat_r; [apply Rabs_pos | exact (proj2 Ep)].
+   + rewrite Rmult_1_l. apply Rle_trans with (1 := Hi). apply bpow_le; lia.
+Qed.
+
 (** Rounding commutes with a power-of-two scaling while both sides are
     normal. *)
 Lemma round_scale x k : x <> 0 -> (-1021 <= mag radix2 x)%Z -> (-1021 <= mag radix2 x + k)%Z ->

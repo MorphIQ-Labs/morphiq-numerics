@@ -22,7 +22,7 @@ Proof.
    rewrite Rabs_left; lra.
 Qed.
 
-Lemma em_unscaled_range x z k : (-54 <= k <= 1016)%Z -> /32 <= Rabs x ->
+Lemma em_unscaled_range x z k : (-54 <= k <= 1024)%Z -> /32 <= Rabs x ->
  9/10 <= z <= 21/10 -> exp x = z * bpow radix2 k ->
  bpow radix2 (-8) <= Rabs (z - bpow radix2 (-k)) /\
  Rabs (z - bpow radix2 (-k)) <= bpow radix2 55 /\
@@ -99,7 +99,7 @@ Proof.
  intros H. injection H as <-.
  destruct (decide_bounded_ok s lo eps u Fs Flo Fe E0 As Alow D) as [Fu Bu].
  specialize (Bu (z - B (em_pow2 (-k))) Error). rewrite Bc in Bu.
- destruct (em_unscaled_range x z k K X Z Ex) as [Wl [Wh Wp]].
+ destruct (em_unscaled_range x z k ltac:(lia) X Z Ex) as [Wl [Wh Wp]].
  assert (Eq : exp x - 1 = (z - bpow radix2 (-k)) * bpow radix2 k).
  { rewrite Ex, Rmult_minus_distr_r, <- bpow_plus, Z.add_opp_diag_l. reflexivity. }
  rewrite Eq. apply em_scale_ok; try assumption. symmetry; exact Bu.

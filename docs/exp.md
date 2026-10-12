@@ -409,12 +409,15 @@ and proves `ε₁` for it (`fast_ok`): for `(r_hi, r_lo)` within `2^−113` of `
 double-word number within `2^−69` relatively of `2^(j/128)·e^R`, with `y_hi` in
 `[3/4, 4]`. The more general `fast_reduced_ok` needs only the high word on
 `2^−151`'s grid and the low word on `2^−967`'s grid; `exp2` uses this form.
+`fast_reduced_grid_ok` also proves both output words lie on `2^−1020`'s grid,
+which makes `expm1`'s subsequent scaling exact.
 - **The certificates' theorems,** applied through Gappa's Coq proofs:
   `fast.g`, and `mvt.g` for `Q(r) − Q(r_hi)`.
 - **Their hypotheses about the transcription.** The polynomial is `fast.g`'s
   rounded Horner chain. The double-word steps meet their machine-checked bounds
-  and return double-word numbers. Every word stays on `2^−967`'s grid, so the
-  last product's low terms are normal or zero, as its bound requires.
+  and return double-word numbers. The inputs to the final product
+  stay on `2^−967`'s grid, so its low terms are normal or zero, as its bound
+  requires.
 - **The constants,** in `formal/exp/ExpTables.v`, which
   `generators/exp_constants.py` writes from the same encodings as `tables.rs`.
   CoqInterval proves Sollya's approximation bound, every table pair within
@@ -449,8 +452,8 @@ otherwise take the accurate path
 with `EPS = ε₁·(1 + 2^−50) = 2^−69·(1 + 2^−50)`, a binary64 constant.
 
 **Proof.** Let `Z = T_j·e^r`, the exact value `Y` approximates, with
-`|Y − Z| ≤ ε₁·|Z|`. `Z` isn't a breakpoint: `e^x` is transcendental for `x ≠ 0`
-(Lindemann), and `x = 0` never reaches this point (§1).
+`|Y − Z| ≤ ε₁·|Z|`. The strict comparison establishes that the entire error
+interval lies inside the returned word's rounding cell.
 1. **The computed comparison implies the exact one.**
    - `g/2` is a power of two, so representable, and `RN` is monotone. So
      `RN(a) < g/2` implies `a < g/2`.
@@ -471,7 +474,10 @@ real within `ε₁` of `y_hi + y_lo`, for `2^−80 ≤ ε₁ ≤ 2^−60` (`deci
 and for `decide_scaled` the exact scaling makes it `RN(Z·2^k)`
 (`decide_scaled_ok`). The formal job compares the transcriptions with the Rust
 code bit for bit on the internal cross-check corpus, with cases at the test's
-threshold so both outcomes occur.
+threshold so both outcomes occur. `decide_with_bounded_ok` extends the
+unscaled test through the largest finite binade, provided
+`EPS·|y_hi| ≤ 2^1020`; `decide_with_ok` retains its original `|y_hi| ≤ 2^1000`
+interface. The real rounding-cell proof has no upper-magnitude premise.
 
 **Scaling:** `y_hi · 2^k` is exact for `k ≥ −1021`. For `k = 1024`, where `Y < 1`
 near overflow, it's applied as `(y_hi · 2^(k−1)) · 2`.
