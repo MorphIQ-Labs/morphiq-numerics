@@ -16,10 +16,10 @@ Proof. exact (bits_val 4358002977218854975 false 7525737178955839 108 eq_refl). 
 Lemma e2_ll_finite : finite e2_ll.
 Proof. exact (bits_finite 4358002977218854975 _ _ _ eq_refl). Qed.
 Lemma e2_lh_range : 0.69 <= B e2_lh <= 0.7.
-Proof. rewrite e2_lh_val. split; interval. Qed.
+Proof. rewrite e2_lh_val. split; interval with (i_prec 64). Qed.
 Lemma e2_lh_close : Rabs (B e2_lh - ln 2) <= / 2 ^ 55.
 Proof. rewrite e2_lh_val. interval with (i_prec 100). Qed.
 Lemma e2_ll_bound : Rabs (B e2_ll) <= / 2 ^ 55.
-Proof. rewrite e2_ll_val. interval. Qed.
+Proof. rewrite e2_ll_val. interval with (i_prec 64). Qed.
 Lemma e2_l_split : Rabs (B e2_lh + B e2_ll - ln 2) <= / 2 ^ 109.
 Proof. rewrite e2_lh_val, e2_ll_val. interval with (i_prec 180). Qed.

@@ -89,7 +89,7 @@ Proof.
  { pose proof (Rabs_triang_inv (B rh) (B p)) as T. rewrite Rabs_minus_sym in T. bpow_num_in Dh. lra. }
  assert (Dprod : Rabs (B d * B e2_ll) <= bpow radix2 (-65)).
  { rewrite Rabs_mult. replace (-65)%Z with (-10 + -55)%Z by reflexivity. rewrite bpow_plus.
-   apply Rmult_le_compat; try apply Rabs_pos; [exact Ad | change (Rabs (B e2_ll) <= / 36028797018963968); rewrite e2_ll_val; interval]. }
+   apply Rmult_le_compat; try apply Rabs_pos; [exact Ad | change (Rabs (B e2_ll) <= / 36028797018963968); rewrite e2_ll_val; interval with (i_prec 64)]. }
  destruct (fmul_s d e2_ll Fd e2_ll_finite) as [Ft Bt].
  { apply Rle_trans with (1 := Dprod). apply bpow_le; lia. }
  assert (Terr : Rabs (B (fmul d e2_ll) - B d * B e2_ll) <= bpow radix2 (-119)).

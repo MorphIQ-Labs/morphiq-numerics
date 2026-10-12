@@ -29,7 +29,7 @@ Lemma exp2_residual_range d : Rabs d <= bpow radix2 (-10) ->
 Proof.
  intros Ad.
  assert (L : Rabs (ln 2) <= 0.693148) by interval with (i_prec 64).
- assert (H : Rabs (B e2_lh) <= 0.693148) by (rewrite e2_lh_val; interval).
+ assert (H : Rabs (B e2_lh) <= 0.693148) by (rewrite e2_lh_val; interval with (i_prec 64)).
  split; rewrite Rabs_mult; apply Rle_trans with (bpow radix2 (-10) * 0.693148);
  [apply Rmult_le_compat; try apply Rabs_pos; assumption | bpow_num; lra
  |apply Rmult_le_compat; try apply Rabs_pos; assumption | bpow_num; lra].
