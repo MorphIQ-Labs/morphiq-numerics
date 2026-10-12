@@ -1,0 +1,87 @@
+# morphiq-numerics release: release-plz keeps a "chore: release" pull request
+# open with the version bump and the CHANGELOG.md section, written from the
+# conventional-commit subjects since the last tag; merging it tags v{version}
+# and creates the GitHub release (release-plz.toml).
+#
+# Releases are git tags only. Nothing is published to crates.io before 0.1
+# (milestone M6, issue #90); consumers pin the tag.
+#
+# release runs before release-pr, so a merged release pull request is tagged
+# before the next proposal is calculated. Tools are pinned by version and
+# archive SHA-256 (.cargo/release-plz-*, .cargo/semver-checks-*); actions by
+# full commit SHA, the comment naming the release.
+
+name: release
+
+on:
+  push:
+    branches: [main]
+  # Exercises the release path without a commit. release-plz proposes nothing
+  # when the last tag is already at HEAD, and tags only a merged release pull
+  # request, so a manual run is safe.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: release / release-plz
+    runs-on: ubuntu-24.04
+    # Granted here, not org-wide: the organization default is read.
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_NET_RETRY: "3"
+      CARGO_TERM_COLOR: always
+    steps:
+      # Must not be GITHUB_TOKEN: a pull request it opens does not trigger the
+      # pull_request workflows, so the release pull request would never get the
+      # checks the "Main branch protection" ruleset requires.
+      - name: Require release token
+        env:
+          RELEASE_PLZ_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_PLZ_TOKEN" ]; then
+            echo 'RELEASE_PLZ_TOKEN is not available to this repository' >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Tags and full history: the last release is found by its tag, and
+          # the changelog by the commits since it.
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PLZ_TOKEN }}
+          # release-plz pushes the release branch with these credentials.
+          persist-credentials: true
+
+      - name: Install release-plz and cargo-semver-checks
+        run: |
+          ./scripts/install_release_tools.sh "$RUNNER_TEMP/tools"
+          echo "$RUNNER_TEMP/tools/bin" >> "$GITHUB_PATH"
+
+      - name: Release git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Tag a merged release pull request
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+        run: |
+          release-plz release --config release-plz.toml --forge github --git-token "$GITHUB_TOKEN"
+          git fetch --force --tags origin
+
+      - name: Open or update the release pull request
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+        run: |
+          release-plz release-pr --config release-plz.toml --forge github --git-token "$GITHUB_TOKEN" \
+            --repo-url "https://github.com/${GITHUB_REPOSITORY}"

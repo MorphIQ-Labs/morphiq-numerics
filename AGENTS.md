@@ -90,7 +90,11 @@ rustfmt defaults; `snake_case` functions, `UpperCamelCase` types, `SCREAMING_SNA
 
 Every change lands through a pull request; `main` accepts no direct pushes. The pull request title is a conventional commit (`feat(elementary): correctly rounded exp`), checked by CI, and becomes the squash commit's subject, which release automation reads. A pull request states what changed and why, its numerical impact (which functions' results can change, and why that is correct), and closes the issues it resolves (`Closes #N`).
 
-Releases follow the MorphIQ Labs model: after each merge a release pull request bumps the version and writes `CHANGELOG.md`; merging it tags `v{version}` and publishes to crates.io through Trusted Publishing. The crate stays `publish = false` until the 0.1 contracts in the plan are met.
+Releases follow the MorphIQ Labs model, driven by release-plz (`.github/workflows/release.yml`, `release-plz.toml`). After each merge to `main` it opens or refreshes a `chore: release` pull request that bumps the workspace version and writes the `CHANGELOG.md` section from the conventional-commit subjects since the last tag. That pull request is reviewed, checked and squash-merged like any other; merging it tags `v{version}`, one tag for the workspace, and creates the GitHub release. Never hand-cut a tag, hand-edit a released changelog section or bump the version outside the release pull request.
+
+- **Until 0.1, releases are git tags only.** `morphiq-numerics` and `morphiq-numerics-arch` keep `publish = false`, and consumers pin `tag = "v0.0.N"`. The 0.0.x series exists so consumers can pin a release rather than a commit; 0.1.0 is reserved for the first crates.io release, through Trusted Publishing, once the 0.1 contracts are met (milestone M6, #90).
+- **Only the library and its lane crate are released.** The digest, the embedded digest and the reference oracles are never released; release-plz manages an allowlist that excludes them.
+- **The release workflow needs the `RELEASE_PLZ_TOKEN` secret.** A pull request opened with the workflow's own `GITHUB_TOKEN` would not trigger the required checks, so it could never merge.
 
 ## Repository and Branch Settings
 

@@ -1,0 +1,69 @@
+# release-plz configuration (pinned version: .github/workflows/release.yml).
+#
+# A release is: merge the "chore: release" pull request release-plz keeps
+# open, and the tag follows. The version and changelog come from the commit
+# subjects since the last tag, which is why CI rejects a pull request title
+# that is not a conventional commit: the squash subject is the input.
+#
+# Releases are git tags only. Until 0.1 (milestone M6, issue #90) nothing goes
+# to crates.io; consumers pin the tag. The manifests keep `publish = false` as
+# the registry guard, and git-only mode releases (tags) such packages anyway.
+
+[workspace]
+# release-plz's own registry switch, separate from the manifest key: never run
+# `cargo publish`. git_only below requires that this is not `true`.
+publish = false
+
+# An allowlist: only the packages below are managed. The test, digest and
+# oracle crates (morphiq-numerics-digest, -digest-embedded, -reference) are
+# never released and get no entry.
+release = false
+
+# Tag only when the current commit is a merged `release-plz-*` pull request.
+# Without this an ordinary commit on main, including the first one in an
+# untagged repository, would cut a tag on its own.
+release_always = false
+
+# Requires cargo-semver-checks on PATH; the release workflow installs a pinned
+# one, so this is a check and not a silent no-op.
+semver_check = true
+
+# One tag and one GitHub release for the workspace, as in the other MorphIQ
+# repositories, rather than release-plz's default of one per package.
+git_tag_name = "v{{ version }}"
+git_release_name = "v{{ version }}"
+
+# morphiq-numerics owns the tag, the release and the root CHANGELOG.md, which
+# also records changes to the lane crate. The lane crate is versioned with it
+# and creates no tag of its own; without that both would race to create the
+# same v{{ version }} ref.
+[[package]]
+name = "morphiq-numerics"
+release = true
+git_only = true
+version_group = "morphiq-numerics"
+changelog_path = "./CHANGELOG.md"
+changelog_include = ["morphiq-numerics-arch"]
+
+[[package]]
+name = "morphiq-numerics-arch"
+release = true
+git_only = true
+version_group = "morphiq-numerics"
+changelog_update = false
+git_tag_enable = false
+git_release_enable = false
+
+# release-plz's default groups, plus Performance: perf commits are a large part
+# of this library's history and belong under their own heading, not "Other".
+[changelog]
+commit_parsers = [
+  { message = "^feat", group = "added" },
+  { message = "^changed", group = "changed" },
+  { message = "^deprecated", group = "deprecated" },
+  { message = "^removed", group = "removed" },
+  { message = "^fix", group = "fixed" },
+  { message = "^perf", group = "performance" },
+  { message = "^security", group = "security" },
+  { message = ".*", group = "other" },
+]

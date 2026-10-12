@@ -57,6 +57,18 @@ cargo deny --locked check licenses
 Every CI job is a required check, and `main` accepts changes only through
 squash-merged pull requests.
 
+## Releases
+
+Releases are automated by release-plz. After each merge it keeps a
+`chore: release` pull request open with the version bump and the
+`CHANGELOG.md` section written from the squash subjects; a maintainer merges
+it like any other pull request once its checks pass, and that merge tags
+`v{version}` and creates the GitHub release. Never push a tag, bump the
+version or edit a released changelog section by hand.
+
+Until 0.1 a release is a git tag only (`v0.0.N`); 0.1.0 is reserved for the
+first crates.io release ([#90](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/90)).
+
 ## License
 
 By contributing, you agree that your contributions are dual licensed under
