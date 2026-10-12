@@ -23,15 +23,20 @@ impl WithSimd for FastValues<'_> {
             let mut x = K::Array::default();
             x.as_mut().copy_from_slice(chunk);
             let (y, scalar_lanes) = fast_ln(k, &x);
-            let (hi, lo) = (k.store(y.0), k.store(y.1));
+            let (hi, lo, eps) = (k.store(y.0), k.store(y.1), k.store(y.2));
             for (i, &xi) in chunk.iter().enumerate() {
                 if scalar_lanes >> i & 1 == 1 {
                     continue;
                 }
-                let want = Reduced::of(xi).fast_value();
+                let reduced = Reduced::of(xi);
+                let want = crate::ln::stage::parts(reduced.e, reduced.y);
                 assert_eq!(
-                    (hi.as_ref()[i].to_bits(), lo.as_ref()[i].to_bits()),
-                    (want.hi().to_bits(), want.lo().to_bits()),
+                    (
+                        hi.as_ref()[i].to_bits(),
+                        lo.as_ref()[i].to_bits(),
+                        eps.as_ref()[i].to_bits()
+                    ),
+                    (want.0.to_bits(), want.1.to_bits(), want.2.to_bits()),
                     "ln's fast value at {xi:e} on {}",
                     K::NAME
                 );

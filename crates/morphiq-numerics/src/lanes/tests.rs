@@ -121,6 +121,20 @@ pub(crate) fn ln_corpus() -> Vec<f64> {
     let n = cases();
     let mut v = fixture_values(include_str!("../../../reference/fixtures/ln.json"));
     v.extend(specials());
+    // Every reciprocal-table boundary and both adjacent encodings, at
+    // exponents spanning the normal domain; include subnormal scaling too.
+    for i in 0..=512u64 {
+        for e in [1u64, 2, 511, 1022, 1023, 1024, 1535, 2045] {
+            let bits = (e << 52) + (0x6_a000_0000_0000 + (i << 43));
+            for b in [bits - 1, bits, bits + 1] {
+                let x = f64::from_bits(b);
+                v.push(x);
+                if e == 1 {
+                    v.push(x * f64::from_bits(0x3c90_0000_0000_0000));
+                }
+            }
+        }
+    }
     for _ in 0..n {
         v.push(f64::from_bits(rng.next_u64()));
         // Every positive encoding, subnormals included.

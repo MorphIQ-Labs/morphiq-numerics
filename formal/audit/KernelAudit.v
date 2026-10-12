@@ -64,3 +64,7 @@ Print Assumptions Ln1p.ln_1p_stage_b_bits.
 Print Assumptions Ln1pScreen.h_screen_ok.
 Print Assumptions Ln1pScreen.b_screen_ok.
 Print Assumptions Ln1p.ln_1p_stages_ok.
+
+Require LnStage.
+Print Assumptions LnStage.ln_stage_ok.
+Print Assumptions LnStage.ln_stage_accurate_value.

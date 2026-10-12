@@ -15,16 +15,8 @@ use morphiq_numerics_arch::{Simd, WithSimd};
 
 /// Veltkamp's splitting constant `2^27 + 1`, as in `eft.rs` (Dekker 1971,
 /// (6.2)); the lane split is checked against `eft::two_prod` bit for bit.
+#[cfg(test)]
 const SPLITTER: f64 = 134_217_729.0;
-/// The binary64 exponent field.
-const EXPONENT: u64 = 0x7ff << 52;
-/// The binary64 fraction field.
-const FRACTION: u64 = (1 << 52) - 1;
-/// `2^−969`: from it up, `ulp` of a binary64 number is `2^(biased − 1075)`
-/// and half of it is normal, so the rounding test's gap is computed from the
-/// exponent field alone (§3).
-const GAP_FLOOR: f64 = f64::from_bits(54 << 52);
-
 /// A function evaluated on lanes: its scalar form, and its fast path on one
 /// backend's lanes, which returns the scalar function's bits on every lane.
 pub(crate) trait Kernel {
@@ -128,17 +120,6 @@ pub(crate) fn run<G: Kernel, K: Simd>(k: K, xs: &[f64], out: &mut [f64]) {
 /// A double-word number on lanes: `(hi, lo)` per lane.
 pub(crate) type Dw<K> = (<K as Simd>::F, <K as Simd>::F);
 
-/// `eft::two_sum`, operation for operation.
-#[inline(always)]
-pub(crate) fn two_sum<K: Simd>(k: K, a: K::F, b: K::F) -> Dw<K> {
-    let s = k.add(a, b);
-    let a_prime = k.sub(s, b);
-    let b_prime = k.sub(s, a_prime);
-    let delta_a = k.sub(a, a_prime);
-    let delta_b = k.sub(b, b_prime);
-    (s, k.add(delta_a, delta_b))
-}
-
 /// `eft::fast_two_sum`, operation for operation.
 #[inline(always)]
 pub(crate) fn fast_two_sum<K: Simd>(k: K, a: K::F, b: K::F) -> Dw<K> {
@@ -152,6 +133,7 @@ pub(crate) fn fast_two_sum<K: Simd>(k: K, a: K::F, b: K::F) -> Dw<K> {
 /// `eft::two_prod`'s Dekker product, operation for operation. On that domain
 /// both return the same bits (§2).
 #[inline(always)]
+#[cfg(test)]
 pub(crate) fn two_prod<K: Simd>(k: K, a: K::F, b: K::F) -> Dw<K> {
     let p = k.mul(a, b);
     if let Some(e) = k.mul_add(a, b, k.neg(p)) {
@@ -171,50 +153,12 @@ pub(crate) fn two_prod<K: Simd>(k: K, a: K::F, b: K::F) -> Dw<K> {
 
 /// `eft::split`, operation for operation.
 #[inline(always)]
+#[cfg(test)]
 fn split<K: Simd>(k: K, x: K::F) -> Dw<K> {
     let p = k.mul(x, k.splat(SPLITTER));
     let q = k.sub(x, p);
     let head = k.add(q, p);
     (head, k.sub(x, head))
-}
-
-/// `DoubleWord::add_f64`, operation for operation.
-#[inline(always)]
-pub(crate) fn dw_add_f64<K: Simd>(k: K, x: Dw<K>, y: K::F) -> Dw<K> {
-    let (s_hi, s_lo) = two_sum(k, x.0, y);
-    let v = k.add(x.1, s_lo);
-    fast_two_sum(k, s_hi, v)
-}
-
-/// `DoubleWord::add`, operation for operation.
-#[inline(always)]
-pub(crate) fn dw_add<K: Simd>(k: K, x: Dw<K>, y: Dw<K>) -> Dw<K> {
-    let (s_hi, s_lo) = two_sum(k, x.0, y.0);
-    let (t_hi, t_lo) = two_sum(k, x.1, y.1);
-    let c = k.add(s_lo, t_hi);
-    let (v_hi, v_lo) = fast_two_sum(k, s_hi, c);
-    let w = k.add(t_lo, v_lo);
-    fast_two_sum(k, v_hi, w)
-}
-
-/// `ln::decide_with`'s test on lanes: true where it returns `y_hi`, for
-/// `|y_hi| ≥ 2^−969`, and false below, where the scalar function decides
-/// instead (§3).
-#[inline(always)]
-pub(crate) fn decide<K: Simd>(k: K, y: Dw<K>, eps: f64) -> K::M {
-    let magnitude = k.abs(y.0);
-    let bits = k.to_bits(magnitude);
-    let exponent = k.and_u(bits, k.splat_bits(EXPONENT));
-    // ulp(magnitude) = 2^(biased − 1075), and half of it 2^(biased − 1076).
-    let ulp = k.to_float(k.sub_u(exponent, k.splat_bits(52 << 52)));
-    let half_ulp = k.to_float(k.sub_u(exponent, k.splat_bits(53 << 52)));
-    let power_of_two = k.eq_u(k.and_u(bits, k.splat_bits(FRACTION)), k.splat_bits(0));
-    let g = k.select(power_of_two, half_ulp, ulp);
-    let error = k.add(k.abs(y.1), k.mul(k.splat(eps), magnitude));
-    k.and_m(
-        k.le(k.splat(GAP_FLOOR), magnitude),
-        k.lt(error, k.mul(g, k.splat(0.5))),
-    )
 }
 
 #[cfg(test)]

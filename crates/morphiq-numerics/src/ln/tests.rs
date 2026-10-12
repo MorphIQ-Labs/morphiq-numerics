@@ -37,6 +37,13 @@ fn every_unrounded_ln_is_within_its_certified_bound() {
     assert_eq!(cases.len(), 1200);
     for (x, reference) in cases {
         let reduced = Reduced::of(x);
+        let (s, lo, eps, _) = super::stage::parts(reduced.e, reduced.y);
+        let exact = |x| Exact::of(Q128::from_f64(x));
+        let error = exact(s).add(&exact(lo)).sub(&reference).abs();
+        assert!(
+            error.cmp(&exact(eps)) != core::cmp::Ordering::Greater,
+            "reciprocal stage, ln({x:e})"
+        );
         // §4: 2^-64. §6: 2^-123.
         assert!(
             double_word(reduced.fast_value()).within(&reference, 1, 64),
@@ -85,6 +92,7 @@ const ANALYTIC_MISS_RATE: f64 = 1.0 / 512.0;
 fn ln_fast_path_agrees_with_the_accurate_path_and_mostly_decides() {
     let mut rng = SplitMix64::new(0x6c6e_5f70_6173_7331);
     let (mut tried, mut missed) = (0u32, 0u32);
+    let mut stage_missed = 0u32;
     for n in 0..(1u32 << 20) {
         // Every positive finite encoding, and arguments near 1.
         let x = if n % 2 == 0 {
@@ -97,14 +105,25 @@ fn ln_fast_path_agrees_with_the_accurate_path_and_mostly_decides() {
         }
         let reduced = Reduced::of(x);
         tried += 1;
+        let accurate = reduced.accurate_value(reduced.z_exact()).to_f64();
+        if let Some(y) = super::stage::parts(reduced.e, reduced.y).3 {
+            assert_eq!(
+                y.to_bits(),
+                accurate.to_bits(),
+                "reciprocal stage ln({x:e})"
+            );
+        } else {
+            stage_missed += 1;
+        }
         match decide(reduced.fast_value()) {
             Some(y) => {
-                let accurate = reduced.accurate_value(reduced.z_exact()).to_f64();
                 assert_eq!(y.to_bits(), accurate.to_bits(), "ln({x:e})");
             }
             None => missed += 1,
         }
     }
+    std::eprintln!("ln reciprocal stage: {stage_missed} of {tried} sent to the fallback");
+    assert!(stage_missed < tried / 64);
     let rate = f64::from(missed) / f64::from(tried);
     std::eprintln!("ln fast path: {missed} of {tried} sent to the accurate path ({rate:.3e})");
     assert!(rate <= 4.0 * ANALYTIC_MISS_RATE, "miss rate {rate:e}");

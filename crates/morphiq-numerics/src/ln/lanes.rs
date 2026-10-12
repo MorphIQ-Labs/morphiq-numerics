@@ -1,5 +1,5 @@
 //! `ln` and `ln_1p` on lanes ([`docs/lanes.md`] §5): `ln`'s screen,
-//! `Reduced::of`, `ln_1p_double_word`, `fast_value` and `decide`, and
+//! `Reduced::of` and the reciprocal stage, and
 //! `ln_1p`'s stage H, operation for operation, with the scalar function on
 //! every lane they don't decide.
 //!
@@ -7,11 +7,10 @@
 
 use morphiq_numerics_arch::Simd;
 
-use super::stage_tables::{EL, H, OFF, R, T};
+use super::stage_tables::{EL, H, L0, L1, OFF, R, T};
 use super::stages::{A_H, K_H, K2_H, TWO_53, TWO_M46};
-use super::tables::{LN2_HI, LN2_LO, NEG_LN_R_BITS, POLY, R_BITS};
-use super::{EPS, FRACTION, TWO_54, ln, ln_1p, ln_1p_after_h};
-use crate::lanes::{Dw, Kernel, decide, dw_add, dw_add_f64, two_prod, two_sum};
+use super::{FRACTION, TWO_54, ln, ln_1p, ln_1p_after_h};
+use crate::lanes::Kernel;
 
 /// `ln` as a lane kernel.
 pub(crate) struct Ln;
@@ -25,13 +24,12 @@ const HIGH_INDEX: f64 = 1.0 + 53.0 / 128.0;
 /// `2^52`, whose encoding's low bits hold an integer below `2^52` exactly.
 const TWO_52: f64 = f64::from_bits(0x4330_0000_0000_0000);
 
-/// `Reduced::of` on every lane of `x`, with its values: `(y, R[i], E, −ln R[i]
-/// as a double-word)`. Lanes whose bit in `skip` is set reduce 1 instead, and
+/// `Reduced::of` on every lane of `x`, returning `(y, E)`. Lanes whose bit in `skip` is set reduce 1 instead, and
 /// are discarded. Everything but the table loads is in lanes, as `Reduced::of`
 /// computes it, with its integer steps done exactly in binary64 (docs/lanes.md
 /// §5).
 #[inline(always)]
-fn reduce<K: Simd>(k: K, x: K::F, skip: u64) -> (K::F, K::F, K::F, Dw<K>) {
+fn reduce<K: Simd>(k: K, x: K::F, skip: u64) -> (K::F, K::F) {
     let x = k.select(lane_mask(k, skip), k.splat(1.0), x);
     // Step 1: a subnormal x is scaled by 2^54, exactly.
     let tiny = k.lt(x, k.splat(f64::MIN_POSITIVE));
@@ -54,69 +52,79 @@ fn reduce<K: Simd>(k: K, x: K::F, skip: u64) -> (K::F, K::F, K::F, Dw<K>) {
         k.select(tiny, k.splat(54.0), k.splat(0.0)),
     );
     let e = k.sub(biased, offset);
-    // Step 3, per lane: the tables at i.
-    let index = k.store(k.to_float(k.shr_u(fraction, 45)));
-    let (mut r, mut n_hi, mut n_lo) = (
+    (y, e)
+}
+
+/// `stage::parts`, operation for operation, after normalization.
+#[inline(always)]
+fn fast_value<K: Simd>(k: K, (y, e): (K::F, K::F)) -> StageH<K> {
+    let hb = k.to_bits(y);
+    let u = k.sub_u(hb, k.splat_bits(OFF));
+    let words = k.store(k.to_float(u));
+    let (mut r, mut th, mut tl, mut re) = (
+        K::Array::default(),
         K::Array::default(),
         K::Array::default(),
         K::Array::default(),
     );
-    for (lane, word) in index.as_ref().iter().enumerate() {
-        #[allow(clippy::cast_possible_truncation)] // 7 bits
-        let i = word.to_bits() as usize;
-        r.as_mut()[lane] = f64::from_bits(R_BITS[i]);
-        let (hi, lo) = NEG_LN_R_BITS[i];
-        n_hi.as_mut()[lane] = f64::from_bits(hi);
-        n_lo.as_mut()[lane] = f64::from_bits(lo);
+    for (lane, word) in words.as_ref().iter().enumerate() {
+        let u = word.to_bits();
+        #[allow(clippy::cast_possible_truncation)] // nine bits
+        let i = ((u >> 43) & 511) as usize;
+        #[allow(clippy::cast_possible_wrap, clippy::cast_precision_loss)] // signed 12-bit exponent
+        {
+            re.as_mut()[lane] = ((u as i64) >> 52) as f64;
+        }
+        r.as_mut()[lane] = f64::from_bits(R[i]);
+        (th.as_mut()[lane], tl.as_mut()[lane]) = T[i];
     }
-    (y, k.load(r), e, (k.load(n_hi), k.load(n_lo)))
+    let rs = k.to_float(k.sub_u(k.to_bits(k.load(r)), k.and_u(u, k.splat_bits(!FRACTION))));
+    let hh = k.to_float(k.and_u(hb, k.splat_bits(!0x3ff)));
+    let hl = k.sub(y, hh);
+    let z = k.add(k.sub(k.mul(hh, rs), k.splat(1.0)), k.mul(hl, rs));
+    let e = k.add(e, k.load(re));
+    let ln1 = k.add(k.mul(e, k.splat(L1)), k.load(th));
+    let ln0 = k.add(k.mul(e, k.splat(L0)), k.load(tl));
+    let z2 = k.mul(z, z);
+    let t0 = k.sub(k.mul(z, k.splat(H[0])), k.splat(0.5));
+    let t1 = k.add(k.mul(z, k.splat(H[2])), k.splat(H[1]));
+    let a1 = k.add(k.mul(z2, k.splat(H[3])), t1);
+    let p = k.add(k.mul(z2, a1), t0);
+    let q = k.mul(z2, p);
+    let s = k.add(ln1, z);
+    let e1 = k.sub(z, k.sub(s, ln1));
+    let pre = k.add(e1, ln0);
+    let lo = k.add(pre, q);
+    let eps = k.add(
+        k.mul(z2, k.splat(K_H)),
+        k.add(k.mul(k.abs(s), k.splat(K2_H)), k.splat(A_H)),
+    );
+    (s, lo, eps)
 }
 
-/// `Reduced::fast_value` from the gathered reduction: `ln_y_fast`, then the
-/// `E·ln 2` term.
-#[inline(always)]
-fn fast_value<K: Simd>(k: K, (y, r, e, neg_ln_r): (K::F, K::F, K::F, Dw<K>)) -> Dw<K> {
-    // ln_y_fast: z = y·R[i] − 1 exactly, as a double-word.
-    let (p, q) = two_prod(k, y, r);
-    let ln_1p_z = ln_1p_double_word(k, two_sum(k, k.sub(p, k.splat(1.0)), q));
-    let ln_y = dw_add(k, two_sum(k, neg_ln_r.0, neg_ln_r.1), ln_1p_z);
-    let e_ln2 = two_sum(k, k.mul(e, k.splat(LN2_HI)), k.mul(e, k.splat(LN2_LO)));
-    dw_add(k, e_ln2, ln_y)
-}
-
-/// `ln_1p_double_word`, operation for operation.
-#[inline(always)]
-fn ln_1p_double_word<K: Simd>(k: K, z: Dw<K>) -> Dw<K> {
-    let (z_hi, z_lo) = z;
-    let [c3, c4, c5, c6, c7, c8, c9] = POLY;
-    let w8 = k.add(k.splat(c8), k.mul(z_hi, k.splat(c9)));
-    let w7 = k.add(k.splat(c7), k.mul(z_hi, w8));
-    let w6 = k.add(k.splat(c6), k.mul(z_hi, w7));
-    let w5 = k.add(k.splat(c5), k.mul(z_hi, w6));
-    let w4 = k.add(k.splat(c4), k.mul(z_hi, w5));
-    let w = k.add(k.splat(c3), k.mul(z_hi, w4));
-    let (s_hi, s_lo) = two_prod(k, z_hi, z_hi);
-    let t = k.mul(k.mul(z_hi, s_hi), w);
-    let b = two_sum(k, k.mul(k.splat(-0.5), s_hi), k.mul(k.splat(-0.5), s_lo));
-    let v = k.sub(t, k.mul(z_hi, z_lo));
-    dw_add_f64(k, dw_add(k, z, b), v)
-}
-
-/// `y_hi` on each lane `decide` accepts and outside `scalar_lanes`, `scalar`
-/// on every other.
+/// Finish the interval test, falling back on each undecided lane.
 #[inline(always)]
 fn finish<K: Simd>(
     k: K,
     x: &K::Array,
-    y: Dw<K>,
+    (s, lo, eps): StageH<K>,
     scalar_lanes: u64,
     scalar: fn(f64) -> f64,
 ) -> K::Array {
-    let decided = k.mask_bits(decide(k, y, EPS)) & !scalar_lanes;
-    let mut out = k.store(y.0);
-    for (i, o) in out.as_mut().iter_mut().enumerate() {
-        if decided >> i & 1 == 0 {
-            *o = scalar(x.as_ref()[i]);
+    let lb = k.add(s, k.sub(lo, eps));
+    let ub = k.add(s, k.add(lo, eps));
+    let decided = k.mask_bits(k.and_m(k.le(lb, ub), k.le(ub, lb))) & !scalar_lanes;
+    let mut out = k.store(lb);
+    let all = if K::LANES == 64 {
+        u64::MAX
+    } else {
+        (1 << K::LANES) - 1
+    };
+    if decided != all {
+        for (i, o) in out.as_mut().iter_mut().enumerate() {
+            if decided >> i & 1 == 0 {
+                *o = scalar(x.as_ref()[i]);
+            }
         }
     }
     out
@@ -135,10 +143,10 @@ impl Kernel for Ln {
     }
 }
 
-/// `ln`'s fast value on every lane, `Reduced::fast_value`, and the lanes (bit
+/// `ln`'s reciprocal stage on every lane, and the lanes (bit
 /// `i` set) that `ln` screens out: NaN, `x ≤ 0`, `+∞` and 1.
 #[inline(always)]
-pub(super) fn fast_ln<K: Simd>(k: K, x: &K::Array) -> (Dw<K>, u64) {
+pub(super) fn fast_ln<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
     let mut scalar_lanes = 0_u64;
     for (i, &xi) in x.as_ref().iter().enumerate() {
         if !(xi > 0.0 && xi < f64::INFINITY) || xi == 1.0 {
@@ -159,24 +167,7 @@ impl Kernel for Ln1p {
     #[inline(always)]
     fn lanes<K: Simd>(k: K, x: K::Array) -> K::Array {
         let ((s, lo, eps), scalar_lanes) = stage_h(k, &x);
-        let lb = k.add(s, k.sub(lo, eps));
-        let ub = k.add(s, k.add(lo, eps));
-        // lb == ub: neither is NaN or zero on a lane stage H tries.
-        let all = if K::LANES == 64 {
-            u64::MAX
-        } else {
-            (1 << K::LANES) - 1
-        };
-        let decided = k.mask_bits(k.and_m(k.le(lb, ub), k.le(ub, lb))) & !scalar_lanes;
-        let mut out = k.store(lb);
-        if decided != all {
-            for (i, o) in out.as_mut().iter_mut().enumerate() {
-                if decided >> i & 1 == 0 {
-                    *o = ln_1p_after_h(x.as_ref()[i]);
-                }
-            }
-        }
-        out
+        finish(k, &x, (s, lo, eps), scalar_lanes, ln_1p_after_h)
     }
 }
 
