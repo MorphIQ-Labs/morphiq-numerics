@@ -12,7 +12,9 @@
 use std::hint::black_box;
 use std::time::Instant;
 
-use morphiq_numerics::elementary::{exp, exp_slice, ln, ln_1p, ln_1p_slice, ln_slice};
+use morphiq_numerics::elementary::{
+    exp, exp_slice, exp2, exp2_slice, expm1, expm1_slice, ln, ln_1p, ln_1p_slice, ln_slice,
+};
 use morphiq_numerics_reference::Words;
 
 const N: usize = 4096;
@@ -96,6 +98,11 @@ fn main() {
     let wide: Vec<f64> = (0..N)
         .map(|_| -1.0 + morphiq_numerics::elementary::exp2(62.0 * unit(&mut words) - 2.0))
         .collect();
+    let exp2_domain: Vec<f64> = (0..N)
+        .map(|_| -1075.0 + 2099.0 * unit(&mut words))
+        .collect();
+    let small: Vec<f64> = (0..N).map(|_| (unit(&mut words) - 0.5) / 16.0).collect();
+    let expm1_domain: Vec<f64> = (0..N).map(|_| -37.4 + 746.4 * unit(&mut words)).collect();
     println!("| Function | Arguments | Scalar loop (ns) | Batched (ns) | Speed-up |");
     println!("|---|---|---|---|---|");
     row("exp", "`[−30, 0]`", &d, exp, exp_slice);
@@ -111,4 +118,9 @@ fn main() {
         ln_1p,
         ln_1p_slice,
     );
+    row("exp2", "`[−30, 0]`", &d, exp2, exp2_slice);
+    row("exp2", "`[−1075, 1024]`", &exp2_domain, exp2, exp2_slice);
+    row("expm1", "`[−30, 0]`", &d, expm1, expm1_slice);
+    row("expm1", "`[−1/32, 1/32]`", &small, expm1, expm1_slice);
+    row("expm1", "`[−37.4, 709]`", &expm1_domain, expm1, expm1_slice);
 }

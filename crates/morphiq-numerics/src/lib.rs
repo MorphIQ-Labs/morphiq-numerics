@@ -8,7 +8,7 @@
 //!   relative error bounds;
 //! - [`elementary`]: correctly rounded `exp`, `expm1`, `exp2`, `ln`, `ln_1p`,
 //!   `log2`, `log10`, `sin`, `cos`, `sincos`, `tan` and `sqrt`, each with its
-//!   stated domain of correct rounding, and `exp_slice`, `ln_slice` and
+//!   stated domain of correct rounding, and `exp_slice`, `exp2_slice`, `expm1_slice`, `ln_slice` and
 //!   `ln_1p_slice`, which return the same bits for a whole slice, in SIMD
 //!   lanes with the `simd` feature;
 //! - [`log_space`]: `log_sum_exp` and `log_diff_exp`, logarithms of sums and

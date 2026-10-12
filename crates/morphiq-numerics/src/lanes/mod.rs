@@ -15,7 +15,6 @@ use morphiq_numerics_arch::{Simd, WithSimd};
 
 /// Veltkamp's splitting constant `2^27 + 1`, as in `eft.rs` (Dekker 1971,
 /// (6.2)); the lane split is checked against `eft::two_prod` bit for bit.
-#[cfg(test)]
 const SPLITTER: f64 = 134_217_729.0;
 /// A function evaluated on lanes: its scalar form, and its fast path on one
 /// backend's lanes, which returns the scalar function's bits on every lane.
@@ -33,7 +32,19 @@ pub(crate) trait Kernel {
 /// function. On x86-64 the cascade is AVX-512F, AVX2, SSE2; on aarch64 NEON.
 /// Every backend returns the scalar bits, so the cascade does too.
 pub(crate) fn map<G: Kernel>(xs: &[f64], out: &mut [f64]) {
+    #[cfg(any(
+        all(target_arch = "x86_64", target_feature = "sse2"),
+        all(target_arch = "aarch64", target_feature = "neon")
+    ))]
     let mut done = 0;
+    // The scalar backend consumes no whole chunks (LANES == 1), leaving
+    // every element to G::scalar below. Keeping it in the dispatch also
+    // type-checks the kernels on targets without vector instructions.
+    #[cfg(not(any(
+        all(target_arch = "x86_64", target_feature = "sse2"),
+        all(target_arch = "aarch64", target_feature = "neon")
+    )))]
+    let done = chunks::<G, _>(morphiq_numerics_arch::Scalar::new(), xs, out);
     #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
     {
         use morphiq_numerics_arch::{Avx2, Avx512, Sse2};
@@ -133,7 +144,6 @@ pub(crate) fn fast_two_sum<K: Simd>(k: K, a: K::F, b: K::F) -> Dw<K> {
 /// `eft::two_prod`'s Dekker product, operation for operation. On that domain
 /// both return the same bits (§2).
 #[inline(always)]
-#[cfg(test)]
 pub(crate) fn two_prod<K: Simd>(k: K, a: K::F, b: K::F) -> Dw<K> {
     let p = k.mul(a, b);
     if let Some(e) = k.mul_add(a, b, k.neg(p)) {
@@ -153,12 +163,44 @@ pub(crate) fn two_prod<K: Simd>(k: K, a: K::F, b: K::F) -> Dw<K> {
 
 /// `eft::split`, operation for operation.
 #[inline(always)]
-#[cfg(test)]
 fn split<K: Simd>(k: K, x: K::F) -> Dw<K> {
     let p = k.mul(x, k.splat(SPLITTER));
     let q = k.sub(x, p);
     let head = k.add(q, p);
     (head, k.sub(x, head))
+}
+
+/// `eft::two_sum`, operation for operation.
+#[inline(always)]
+pub(crate) fn two_sum<K: Simd>(k: K, a: K::F, b: K::F) -> Dw<K> {
+    let s = k.add(a, b);
+    let a1 = k.sub(s, b);
+    let b1 = k.sub(s, a1);
+    (s, k.add(k.sub(a, a1), k.sub(b, b1)))
+}
+
+/// Bits `0..LANES` set.
+#[inline(always)]
+pub(crate) fn lanes_mask<K: Simd>() -> u64 {
+    (1_u64 << K::LANES) - 1
+}
+
+/// The lane mask with lane `i` true when bit `i` of `bits` is set.
+#[inline(always)]
+pub(crate) fn mask_from<K: Simd>(k: K, bits: u64) -> K::M {
+    let mut words = K::Words::default();
+    for (i, w) in words.as_mut().iter_mut().enumerate() {
+        *w = bits >> i & 1;
+    }
+    k.eq_u(k.load_bits(words), k.splat_bits(1))
+}
+
+/// Equal rounded interval endpoints, using numerical equality (including ±0).
+#[inline(always)]
+pub(crate) fn decide<K: Simd>(k: K, y: Dw<K>, eps: K::F) -> (K::F, u64) {
+    let low = k.add(y.0, k.sub(y.1, eps));
+    let high = k.add(y.0, k.add(y.1, eps));
+    (low, k.mask_bits(k.and_m(k.le(low, high), k.le(high, low))))
 }
 
 #[cfg(test)]

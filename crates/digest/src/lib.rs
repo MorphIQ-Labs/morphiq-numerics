@@ -12,8 +12,8 @@
 use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::elementary::{
-    cos, exp, exp_slice, exp2, expm1, ln, ln_1p, ln_1p_slice, ln_slice, log2, log10, sin, sincos,
-    sqrt, tan,
+    cos, exp, exp_slice, exp2, exp2_slice, expm1, expm1_slice, ln, ln_1p, ln_1p_slice, ln_slice,
+    log2, log10, sin, sincos, sqrt, tan,
 };
 use morphiq_numerics::log_space::{
     log_diff_exp, log_sum_exp, log_sum_exp_and_normalize, log_sum_exp_pairs,
@@ -787,6 +787,67 @@ pub fn corpus_digest() -> [u8; 32] {
         0x433f_ffff_ffff_ffff,
     ];
     batched_section(&mut r, &mut words, ln_1p_slice, &ln_1p_edges, (-1.0, 9.0));
+
+    r.label("exp2_slice");
+    let exp2_edges = [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        1,
+        (1023 - 55) << 52,
+        ((1023 - 55) << 52) - 1,
+        1016.0_f64.to_bits(),
+        (-1016.0_f64).to_bits(),
+        1024.0_f64.to_bits(),
+        1024.0_f64.to_bits() - 1,
+        (-1075.0_f64).to_bits(),
+        (-1075.0_f64).to_bits() - 1,
+    ];
+    batched_section(
+        &mut r,
+        &mut words,
+        exp2_slice,
+        &exp2_edges,
+        (-1076.0, 1025.0),
+    );
+    r.label("expm1_slice");
+    let expm1_edges = [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        1,
+        0x3c90_0000_0000_0000,
+        0x3c8f_ffff_ffff_ffff,
+        0x3fa0_0000_0000_0000,
+        0x3f9f_ffff_ffff_ffff,
+        0xbfa0_0000_0000_0000,
+        0xbf9f_ffff_ffff_ffff,
+        (-37.0_f64).to_bits(),
+        704.0_f64.to_bits(),
+        0xc042_b708_8723_20e2,
+        0xc042_b708_8723_20e1,
+        0x4086_2e42_fefa_39f0,
+        0x4086_2e42_fefa_39ef,
+    ];
+    batched_section(
+        &mut r,
+        &mut words,
+        expm1_slice,
+        &expm1_edges,
+        (-38.0, 710.0),
+    );
+    r.label("expm1_slice_small");
+    batched_section(
+        &mut r,
+        &mut words,
+        expm1_slice,
+        &expm1_edges,
+        (-0.03125, 0.03125),
+    );
 
     r.0.finalize().into()
 }

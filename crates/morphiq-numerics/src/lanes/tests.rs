@@ -15,6 +15,8 @@ use morphiq_numerics_arch::{Scalar, Simd, WithSimd};
 
 use super::{Kernel, chunks, run, two_prod};
 use crate::exp::lanes::Exp;
+use crate::exp2::lanes::Exp2;
+use crate::expm1::lanes::Expm1;
 use crate::internal_crosscheck::reduction_argument;
 use crate::ln::lanes::{Ln, Ln1p};
 use crate::random::SplitMix64;
@@ -112,6 +114,55 @@ pub(crate) fn exp_corpus() -> Vec<f64> {
         // Near the overflow and subnormal thresholds.
         v.push(709.0 + unit(&mut rng));
         v.push(-746.0 + 40.0 * unit(&mut rng));
+    }
+    v
+}
+
+/// Binary reduction ties, screens, fixtures and broad random coverage.
+pub(crate) fn exp2_corpus() -> Vec<f64> {
+    let mut v = fixture_values(include_str!("../../../reference/fixtures/exp2.json"));
+    v.extend(specials());
+    v.extend(with_neighbours(&[
+        f64::from_bits((1023 - 55) << 52),
+        1016.0,
+        1024.0,
+        -1075.0,
+    ]));
+    for e in [-1015, -54, -1, 0, 1, 1015] {
+        for j in 0..512 {
+            v.extend(with_neighbours(&[
+                f64::from(e) + (f64::from(j) + 0.5) / 512.0
+            ]));
+        }
+    }
+    let mut rng = SplitMix64::new(0x6c61_6e65_6578_7032);
+    for _ in 0..cases() {
+        v.push(f64::from_bits(rng.next_u64()));
+        v.push(-1076.0 + 2101.0 * unit(&mut rng));
+        v.push(binade(&mut rng, -60, 0));
+    }
+    v
+}
+
+pub(crate) fn expm1_corpus() -> Vec<f64> {
+    let mut v = fixture_values(include_str!("../../../reference/fixtures/expm1.json"));
+    v.extend(specials());
+    v.extend(with_neighbours(&[
+        f64::from_bits(0x3c90_0000_0000_0000),
+        1.0 / 32.0,
+        -37.0,
+        704.0,
+        f64::from_bits(0xc042_b708_8723_20e2),
+        f64::from_bits(0x4086_2e42_fefa_39f0),
+    ]));
+    let mut rng = SplitMix64::new(0x6c61_6e65_6578_6d31);
+    for _ in 0..cases() {
+        v.push(f64::from_bits(rng.next_u64()));
+        v.push(-38.0 + 748.0 * unit(&mut rng));
+        v.push(-30.0 * unit(&mut rng));
+        v.push((unit(&mut rng) - 0.5) / 16.0);
+        v.push(binade(&mut rng, -60, -5));
+        v.push(reduction_argument(&mut rng));
     }
     v
 }
@@ -410,6 +461,8 @@ fn lanes_of(backend: &Backend) -> usize {
 fn every_lanes_cascade_returns_the_scalar_bits() {
     let short = |v: Vec<f64>| -> Vec<f64> { v.into_iter().step_by(7).take(4_000).collect() };
     check_cascades::<Exp>("exp", &short(exp_corpus()));
+    check_cascades::<Exp2>("exp2", &short(exp2_corpus()));
+    check_cascades::<Expm1>("expm1", &short(expm1_corpus()));
     check_cascades::<Ln>("ln", &short(ln_corpus()));
     check_cascades::<Ln1p>("ln_1p", &short(ln_1p_corpus()));
 }
@@ -450,7 +503,19 @@ fn batched_entry_points_return_the_scalar_bits() {
         Vec<f64>,
     );
     let short = |v: Vec<f64>| -> Vec<f64> { v.into_iter().step_by(7).take(4_000).collect() };
-    let entries: [Entry; 3] = [
+    let entries: [Entry; 5] = [
+        (
+            "exp2_slice",
+            crate::elementary::exp2_slice,
+            crate::exp2::exp2,
+            short(exp2_corpus()),
+        ),
+        (
+            "expm1_slice",
+            crate::elementary::expm1_slice,
+            crate::expm1::expm1,
+            short(expm1_corpus()),
+        ),
         (
             "exp_slice",
             crate::elementary::exp_slice,
@@ -539,4 +604,13 @@ fn lane_two_prod_is_efts_two_prod() {
     for backend in backends() {
         backend.vectorize(TwoProd);
     }
+}
+
+#[test]
+fn exp2_lanes_return_scalar_bits_on_every_backend() {
+    check_all::<Exp2>("exp2", &exp2_corpus());
+}
+#[test]
+fn expm1_lanes_return_scalar_bits_on_every_backend() {
+    check_all::<Expm1>("expm1", &expm1_corpus());
 }

@@ -5,13 +5,13 @@ use super::tables::{LN2_HI, LN2_LO};
 use crate::eft::two_prod;
 use crate::exp::{decide, stage_a_at, stage_b_at};
 
-const SHIFTER: f64 = f64::from_bits(0x4338_0000_0000_0000);
+pub(super) const SHIFTER: f64 = f64::from_bits(0x4338_0000_0000_0000);
 /// Stage A includes the error of rounding ln(2) before multiplying.
-const E_A: f64 = f64::from_bits(0x3c40_0000_0000_0000); // 2^-59
+pub(super) const E_A: f64 = f64::from_bits(0x3c40_0000_0000_0000); // 2^-59
 /// The compensated product satisfies exp's original stage B bound.
-const E_B: f64 = f64::from_bits(0x3b90_0000_0000_0000); // 2^-70
-const FLOOR: u64 = (1023 - 55) << 52;
-const LIMIT: u64 = 1016.0_f64.to_bits();
+pub(super) const E_B: f64 = f64::from_bits(0x3b90_0000_0000_0000); // 2^-70
+pub(super) const FLOOR: u64 = (1023 - 55) << 52;
+pub(super) const LIMIT: u64 = 1016.0_f64.to_bits();
 
 #[inline]
 pub(crate) fn stages(x: f64) -> Option<f64> {

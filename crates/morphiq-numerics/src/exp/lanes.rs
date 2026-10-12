@@ -8,7 +8,7 @@ use morphiq_numerics_arch::Simd;
 
 use super::tables::{INV_N, POLY_S, S_L1, S_L2, S_L2D, S_L3, S_T, SHIFTER};
 use super::{E_A, E_B, HIGH_21, SPLIT, exp};
-use crate::lanes::{Dw, Kernel, fast_two_sum};
+use crate::lanes::{Dw, Kernel, fast_two_sum, lanes_mask, mask_from};
 
 /// `exp` as a lane kernel.
 pub(crate) struct Exp;
@@ -33,7 +33,7 @@ impl Kernel for Exp {
         }
         // The scaling: an exact product by 2^k, the value the scalar code
         // forms by adding k to the exponent field (§4; docs/exp.md §7).
-        let mut out = k.store(k.mul(low, reduced.scale));
+        let mut out = k.store(k.mul(low, reduced.table.scale));
         for (i, o) in out.as_mut().iter_mut().enumerate() {
             if decided >> i & 1 == 0 {
                 *o = exp(x.as_ref()[i]);
@@ -43,41 +43,42 @@ impl Kernel for Exp {
     }
 }
 
-/// Bits `0..LANES` set.
-#[inline(always)]
-fn lanes_mask<K: Simd>() -> u64 {
-    (1_u64 << K::LANES) - 1
-}
-
-/// The lane mask with lane `i` true when bit `i` of `bits` is set.
-#[inline(always)]
-fn mask_from<K: Simd>(k: K, bits: u64) -> K::M {
-    let mut words = K::Words::default();
-    for (i, w) in words.as_mut().iter_mut().enumerate() {
-        *w = bits >> i & 1;
-    }
-    k.eq_u(k.load_bits(words), k.splat_bits(1))
-}
-
 /// `Stages::of` on every lane, with the table pair and `2^k` loaded per lane.
-pub(super) struct Reduced<K: Simd> {
+pub(crate) struct Reduced<K: Simd> {
     n: K::F,
     r1: K::F,
-    t_hi: K::F,
-    t_lo: K::F,
-    scale: K::F,
+    pub(crate) table: Table<K>,
     /// The lanes (bit `i` set) that `exp`'s screen sends to the fallback.
-    pub(super) screened: u64,
+    pub(crate) screened: u64,
 }
 
 #[inline(always)]
-pub(super) fn reduce<K: Simd>(k: K, x: &K::Array) -> Reduced<K> {
+pub(crate) fn reduce<K: Simd>(k: K, x: &K::Array) -> Reduced<K> {
     let xv = k.load(*x);
     // The screen, |x| < 704: an ordered comparison, false for NaN as the
     // encoding comparison is.
     let screened = !k.mask_bits(k.lt(k.abs(xv), k.splat(704.0))) & lanes_mask::<K>();
     let t = k.add(k.mul(xv, k.splat(INV_N)), k.splat(SHIFTER));
     let n = k.sub(t, k.splat(SHIFTER));
+    Reduced {
+        n,
+        r1: k.sub(xv, k.mul(n, k.splat(S_L1))),
+        table: table(k, t, screened),
+        screened,
+    }
+}
+
+/// A generated table pair and exact normal power-of-two scaling.
+pub(crate) struct Table<K: Simd> {
+    hi: K::F,
+    lo: K::F,
+    pub(crate) scale: K::F,
+}
+
+/// Load the shared 512-entry table from a shifted reduction integer.
+/// Unscreened exponents must lie in [-1022, 1023].
+#[inline(always)]
+pub(crate) fn table<K: Simd>(k: K, t: K::F, screened: u64) -> Table<K> {
     let t_lanes = k.store(t);
     let (mut t_hi, mut t_lo, mut scale) = (
         K::Array::default(),
@@ -103,36 +104,45 @@ pub(super) fn reduce<K: Simd>(k: K, x: &K::Array) -> Reduced<K> {
         let biased = ((n_int >> 9) + 1023) as u64;
         scale.as_mut()[i] = f64::from_bits(biased << 52);
     }
-    Reduced {
-        n,
-        r1: k.sub(xv, k.mul(n, k.splat(S_L1))),
-        t_hi: k.load(t_hi),
-        t_lo: k.load(t_lo),
+    Table {
+        hi: k.load(t_hi),
+        lo: k.load(t_lo),
         scale: k.load(scale),
-        screened,
     }
 }
 
 /// `Stages::a_value` on every lane.
 #[inline(always)]
-pub(super) fn stage_a<K: Simd>(k: K, s: &Reduced<K>) -> Dw<K> {
+pub(crate) fn stage_a<K: Simd>(k: K, s: &Reduced<K>) -> Dw<K> {
     let r = k.sub(s.r1, k.mul(s.n, k.splat(S_L2D)));
+    stage_a_at(k, &s.table, r)
+}
+
+/// Shared scalar `exp::stage_a_at`, operation for operation.
+#[inline(always)]
+pub(crate) fn stage_a_at<K: Simd>(k: K, t: &Table<K>, r: K::F) -> Dw<K> {
     let [d3, d4, d5] = POLY_S;
     let p = k.add(
         k.splat(d3),
         k.mul(r, k.add(k.splat(d4), k.mul(r, k.splat(d5)))),
     );
     let u = k.add(r, k.mul(k.mul(r, r), k.add(k.splat(0.5), k.mul(r, p))));
-    (s.t_hi, k.add(s.t_lo, k.mul(s.t_hi, u)))
+    (t.hi, k.add(t.lo, k.mul(t.hi, u)))
 }
 
 /// `Stages::b_value` on every lane.
 #[inline(always)]
-pub(super) fn stage_b<K: Simd>(k: K, s: &Reduced<K>) -> Dw<K> {
+pub(crate) fn stage_b<K: Simd>(k: K, s: &Reduced<K>) -> Dw<K> {
     let p2 = k.mul(s.n, k.splat(S_L2));
     let r0 = k.sub(s.r1, p2);
     let r_h = k.sub(k.add(r0, k.splat(SPLIT)), k.splat(SPLIT));
     let r_t = k.sub(k.sub(k.sub(s.r1, r_h), p2), k.mul(s.n, k.splat(S_L3)));
+    stage_b_at(k, &s.table, r_h, r_t)
+}
+
+/// Shared scalar `exp::stage_b_at`, operation for operation.
+#[inline(always)]
+pub(crate) fn stage_b_at<K: Simd>(k: K, t: &Table<K>, r_h: K::F, r_t: K::F) -> Dw<K> {
     let r_hi = k.add(r_h, r_t);
     let [d3, d4, d5] = POLY_S;
     let p = k.add(
@@ -140,7 +150,7 @@ pub(super) fn stage_b<K: Simd>(k: K, s: &Reduced<K>) -> Dw<K> {
         k.mul(r_hi, k.add(k.splat(d4), k.mul(r_hi, k.splat(d5)))),
     );
     let q = k.mul(k.mul(r_hi, r_hi), k.add(k.splat(0.5), k.mul(r_hi, p)));
-    let (th, tl) = (s.t_hi, s.t_lo);
+    let (th, tl) = (t.hi, t.lo);
     let a = k.to_float(k.and_u(k.to_bits(th), k.splat_bits(HIGH_21)));
     let rest = k.add(
         tl,
@@ -158,7 +168,7 @@ pub(super) fn stage_b<K: Simd>(k: K, s: &Reduced<K>) -> Dw<K> {
 /// positive normal numbers (`y + l` lies near `[1, 2]`), so equal encodings
 /// are equal numbers, as the scalar `==` tests.
 #[inline(always)]
-fn decide<K: Simd>(k: K, y: Dw<K>, e: f64) -> (K::F, u64) {
+pub(crate) fn decide<K: Simd>(k: K, y: Dw<K>, e: f64) -> (K::F, u64) {
     let low = k.add(y.0, k.sub(y.1, k.splat(e)));
     let high = k.add(y.0, k.add(y.1, k.splat(e)));
     (low, k.mask_bits(k.eq_u(k.to_bits(low), k.to_bits(high))))
