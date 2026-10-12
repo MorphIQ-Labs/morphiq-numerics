@@ -10,6 +10,13 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.2](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.1...v0.0.2) - 2026-10-12
+
+### Performance
+
+- *(elementary)* prove exp2 and expm1 exponential stages ([#131](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/131))
+- *(ln)* prove and vectorize the reciprocal first stage ([#130](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/130))
+
 ## [0.0.1](https://github.com/MorphIQ-Labs/morphiq-numerics/releases/tag/v0.0.1) - 2026-10-12
 
 ### Added
