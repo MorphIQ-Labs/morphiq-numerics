@@ -5,8 +5,12 @@ elementary functions, seeded random streams and the normal family. Every
 function is derived from first principles, with machine-checked error
 bounds.
 
-> **Status: pre-release.** Nothing is published yet. The scope of release 0.1
-> and the remaining work are tracked in its
+> **Status: pre-release.** Nothing is on crates.io yet. Releases before 0.1
+> are git tags only ([releases](https://github.com/MorphIQ-Labs/morphiq-numerics/releases)),
+> which a consumer pins:
+> `morphiq-numerics = { git = "https://github.com/MorphIQ-Labs/morphiq-numerics", tag = "v0.0.1" }`.
+> 0.1.0 is reserved for the first crates.io release; its scope and the
+> remaining work are tracked in its
 > [epic](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/100) and the
 > repository's [milestones](https://github.com/MorphIQ-Labs/morphiq-numerics/milestones).
 

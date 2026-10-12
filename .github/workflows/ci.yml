@@ -75,10 +75,12 @@ jobs:
         # Target independence and clean provenance rest on the library being
         # self-contained; its one dependency is the optional first-party lane
         # crate, which itself takes none. Any other needs a decision recorded
-        # in AGENTS.md.
+        # in AGENTS.md. Its version requirement is the workspace version, which
+        # the release pull request bumps in both places.
         run: |
           deps() { awk '/^\[(build-|dev-)?dependencies/{f=1;next} /^\[/{f=0} f && NF && !/^#/' "$1"; }
-          allowed='morphiq-numerics-arch = { path = "../morphiq-numerics-arch", version = "0.0.0", optional = true }'
+          version="$(awk -F'"' '/^\[/{f=($0=="[workspace.package]");next} f && /^version = /{print $2}' Cargo.toml)"
+          allowed="morphiq-numerics-arch = { path = \"../morphiq-numerics-arch\", version = \"$version\", optional = true }"
           if [ "$(deps crates/morphiq-numerics/Cargo.toml)" != "$allowed" ]; then
             echo 'crates/morphiq-numerics declares a dependency other than the optional arch crate:' >&2
             deps crates/morphiq-numerics/Cargo.toml >&2
