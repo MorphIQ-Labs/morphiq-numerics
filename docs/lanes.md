@@ -253,8 +253,9 @@ The kernels are `O(n)` in the slice length and allocate nothing; each chunk of
 `LANES` elements uses fixed-size arrays on the stack. The per-lane scalar
 parts are the screens, the table indices and the table loads; no gather
 instruction is used. Lanes sent to the scalar function cost a scalar
-evaluation on top: about `2^−16.9` of `exp`'s arguments and `2^−9.4` of `ln`'s
-([exp.md](exp.md) §7, [ln.md](ln.md) §9), plus the screened ones. `exp`'s
+evaluation on top: about `2^−16.9` of `exp`'s arguments, `2^−9.4` of `ln`'s
+and, for `ln_1p`, the `2^−8.6` to `2^−16.7` that stage H leaves to stage B
+([exp.md](exp.md) §7, [ln.md](ln.md) §7, §9), plus the screened ones. `exp`'s
 stage B runs on a chunk only when stage A leaves one of its lanes undecided,
 about one argument in 2^7.3.
 
@@ -274,22 +275,26 @@ cargo run --release --locked -p morphiq-numerics-reference --features simd,std -
 ```
 
 Measured on one Apple M1 Pro (NEON, 2 lanes), `--release`, Rust 1.97.1, with
-the 1-minute load average at 3.2–3.3, one core busy with another job and no
-other benchmark running; two consecutive runs agreed within 0.3 ns:
+the 1-minute load average at 2.1 and no other benchmark or build running; two
+consecutive runs agreed within 0.1 ns:
 
 | Function | Arguments | Scalar loop (ns) | Batched, NEON (ns) | Speed-up |
 |---|---|---|---|---|
-| `exp` | `[−30, 0]` | 4.06 | 2.34 | 1.73× |
-| `exp` | `[−745, 709]` | 9.58 | 7.52 | 1.27× |
-| `ln` | `[0.5, 2)` | 30.51 | 15.17 | 2.01× |
-| `ln` | positive encodings | 30.57 | 15.21 | 2.01× |
-| `ln_1p` | `e^d`, `d ∈ [−30, 0]` | 17.23 | 10.09 | 1.71× |
-| `ln_1p` | `z²/4`, `z ∈ [−6, 6]` | 34.82 | 18.71 | 1.86× |
-| `ln_1p` | `[−1, 2^60]`, log-uniform | 35.99 | 18.83 | 1.91× |
+| `exp` | `[−30, 0]` | 3.91 | 2.25 | 1.74× |
+| `exp` | `[−745, 709]` | 9.26 | 7.30 | 1.27× |
+| `ln` | `[0.5, 2)` | 29.58 | 14.78 | 2.00× |
+| `ln` | positive encodings | 29.62 | 14.80 | 2.00× |
+| `ln_1p` | `e^d`, `d ∈ [−30, 0]` | 4.49 | 3.35 | 1.34× |
+| `ln_1p` | `z²/4`, `z ∈ [−6, 6]` | 4.40 | 3.25 | 1.35× |
+| `ln_1p` | `[−1, 2^60]`, log-uniform | 5.29 | 4.17 | 1.27× |
 
 `exp` on its whole domain gains less: the arguments beyond `exp`'s screen
 (`|x| ≥ 704`, 3.2% of these), among them every subnormal result, go to `exp`
 itself, whose fallback takes its accurate path for the subnormal ones.
+`ln_1p`'s scalar loop is now stage H, about 4.5 ns, so batching it gains less
+than it did over the double-word path. On log-uniform arguments, the lanes
+stage H screens out (`|x|` below `2^−46` or from `2^53`) take stage B or the
+fallback, so they gain least.
 
 Only the NEON figures are measured. SSE2, AVX2 and AVX-512F are checked for
 bit equality, not timed: timing on a CI runner is not evidence, and no x86-64
