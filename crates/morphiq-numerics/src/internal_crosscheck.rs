@@ -244,6 +244,39 @@ fn internal_crosscheck_corpus() {
     let path = std::env::var("MORPHIQ_INTERNAL_CORPUS").expect("MORPHIQ_INTERNAL_CORPUS");
     let mut rng = SplitMix64::new(0x7163_726f_7373_0001);
     let mut out = String::new();
+    // Cover the corrected reciprocal's full exponent range, including each
+    // power-of-two boundary and its adjacent binary64 values.
+    let mut erfcx_rng = SplitMix64::new(0x6572_6663_785f_0001);
+    for bits in (4_u64..=9)
+        .flat_map(|e| {
+            let b = (1023 + e) << 52;
+            [b - 1, b, b + 1]
+        })
+        .chain((0..4000).map(|_| {
+            let e = 1027 + erfcx_rng.next_u64() % 5;
+            (e << 52) | (erfcx_rng.next_u64() & ((1_u64 << 52) - 1))
+        }))
+    {
+        let x = f64::from_bits(bits);
+        if (16.0..=512.0).contains(&x) {
+            let (_, _, th, tl) = crate::erfcx::reciprocal_square(x);
+            writeln!(
+                out,
+                "erfcx_reciprocal_square {bits:016x} : {:016x} {:016x}",
+                th.to_bits(),
+                tl.to_bits()
+            )
+            .unwrap();
+            let (h, l) = crate::erfcx::reciprocal(x);
+            writeln!(
+                out,
+                "erfcx_reciprocal {bits:016x} : {:016x} {:016x}",
+                h.to_bits(),
+                l.to_bits()
+            )
+            .unwrap();
+        }
+    }
     for i in 0..4000 {
         // decide_with: leading words across the proved range, both signs.
         let eps = f64::from_bits(EPS[usize::try_from(rng.next_u64() % 4).unwrap()]);

@@ -98,8 +98,8 @@ lemmas; an unchecked algebraic identity is not accepted as a proof.
 | Component | Certified bound | Assumptions still needed at the entry |
 |---|---|---|
 | `T*.g` | Relative table evaluation error `2^-67` against the polynomial | Exact reduction, split products, coefficient differences and Fast2Sum calls |
-| `reciprocal.g` | Relative error `2^-98` for corrected `1/x`, `16 <= x <= 512` | Exact TwoProd and `1-p` |
-| `middle_square*.g` | Absolute error `2^-102` against `1/x²` | Reciprocal theorem and exact TwoProd |
+| `reciprocal.g` | Relative error `2^-98` for corrected `1/x`, `16 <= x <= 512` | Discharged by `ErfcxReciprocal.reciprocal_ieee` |
+| `middle_square*.g` | Absolute error `2^-102` against `1/x²` | Discharged by `ErfcxSquare.reciprocal_square_ieee` |
 | `middle_polynomial.g`, `middle_mvt.g` | Evaluation error `0x1.5p-68`; sensitivity error `2^-101` | Exact EFTs and halvings; bounds on the square's words |
 | `dw_product.g` | Relative multiplication error `2^-100` | Exact TwoProd/Fast2Sum, bounded low words, normal or exact-zero roundings |
 | `middle_composition.g` | Relative error `2^-67` | The preceding components and approximation bounds below |
@@ -137,7 +137,15 @@ be reused unchanged. When the positive reflection term is omitted, the
 simple uniform bound on that term relative to the exponential is `2^-105`;
 the former `2^-110` comment was too strong near exponent 105.
 
-These statements do not yet prove the binary64 entry hypotheses, the
+The reciprocal and square entry theorems start from a finite binary64
+input in `[16, 512]`. They prove that every intermediate is finite, that
+TwoProd and the Sterbenz subtraction are exact, and that scaling the high
+reciprocal by two is exact. The composed theorem bounds the actual two-word
+square against `1/x²` by `2^-102`, including the low word. Both transcriptions
+are extracted and cross-checked against the Rust operations on exponent
+boundaries, adjacent values and reproducible random inputs.
+
+The remaining components do not yet prove their binary64 entry hypotheses, the
 Q256 remainder and arithmetic error, the special-value thresholds or the
 public rounding tests. Source binding identifies the implementation being
 analyzed; it does not discharge a missing mathematical hypothesis.

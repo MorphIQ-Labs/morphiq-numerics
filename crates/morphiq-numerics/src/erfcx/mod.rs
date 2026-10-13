@@ -195,16 +195,30 @@ fn dw_mul(ah: f64, al: f64, bh: f64, bl: f64) -> (f64, f64) {
     fast_two_sum(p, e + (ah * bl + al * bh))
 }
 
-/// Double-word erfcx for `16 ≤ x < 512`.
+/// Corrected reciprocal for the middle positive region.
 #[inline]
-pub(super) fn ya_eval(x: f64) -> (f64, f64) {
+pub(crate) fn reciprocal(x: f64) -> (f64, f64) {
     // y = 1/x as a double-word: 1 − x·yh is exact (Sterbenz, after two_prod).
     let yh = 1.0 / x;
     let (p, pe) = two_prod(x, yh);
     let yl = ((1.0 - p) - pe) * yh;
+    (yh, yl)
+}
+
+/// Square of the corrected reciprocal, retaining both words.
+#[inline]
+pub(crate) fn reciprocal_square(x: f64) -> (f64, f64, f64, f64) {
+    let (yh, yl) = reciprocal(x);
     // t = y² as a double-word.
     let (th, tl0) = two_prod(yh, yh);
     let tl = tl0 + 2.0 * yh * yl;
+    (yh, yl, th, tl)
+}
+
+/// Double-word erfcx for `16 ≤ x < 512`.
+#[inline]
+pub(super) fn ya_eval(x: f64) -> (f64, f64) {
+    let (yh, yl, th, tl) = reciprocal_square(x);
     let mut pp = f(PA[PA.len() - 1]);
     for j in (0..PA.len() - 1).rev() {
         pp = f(PA[j]) + th * pp;

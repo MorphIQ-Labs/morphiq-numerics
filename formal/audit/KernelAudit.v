@@ -149,3 +149,10 @@ Print Assumptions LnEntry.ln_entry_nan.
 Print Assumptions LnEntry.ln1p_entry_nan.
 Print Assumptions LnEntry.ln_entry_negative.
 Print Assumptions LnEntry.ln1p_entry_below_domain.
+
+Require ErfcxReciprocal.
+Print Assumptions ErfcxReciprocal.reciprocal_ieee.
+
+Require ErfcxSquare.
+Print Assumptions ErfcxSquare.square_ieee.
+Print Assumptions ErfcxSquare.reciprocal_square_ieee.

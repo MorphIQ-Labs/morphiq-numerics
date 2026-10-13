@@ -86,6 +86,12 @@ let compute op args =
        | [hi; lo; eps; k] ->
            show_opt (x_decide_scaled (z_of_u64 (hex hi)) (z_of_u64 (hex lo)) (z_of_u64 (hex eps)) (z_of_int (int_of_string k)))
        | _ -> failwith "decide_scaled takes three words and an exponent")
+  | "erfcx_reciprocal" | "erfcx_reciprocal_square" ->
+      (match args with
+       | [x] ->
+           let f = if op = "erfcx_reciprocal" then x_erfcx_reciprocal else x_erfcx_reciprocal_square in
+           String.concat " " (List.map show_bits (f (z_of_u64 (hex x))))
+       | _ -> failwith "erfcx reciprocal operations take one word")
   | "reduce" ->
       (match args with
        | [x] -> String.concat " " (List.map show_bits (x_reduce (z_of_u64 (hex x))))
