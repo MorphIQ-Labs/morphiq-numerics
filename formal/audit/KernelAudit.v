@@ -304,3 +304,9 @@ Print Assumptions ErfcxAccurateSeries.asym_term_step.
 Print Assumptions ErfcxAccurateSeries.accurate_series_remainder.
 Print Assumptions ErfcxAccurateSeries.accurate_series_cap_remainder.
 Print Assumptions ErfcxAccurateSeries.accurate_series_stopped_remainder.
+
+Require ErfcxAccurateTerms.
+Print Assumptions Q256Real.top_small.
+Print Assumptions Q256Real.mul_pow2_any.
+Print Assumptions ErfcxAccurateTerms.q_asym_term_error.
+Print Assumptions ErfcxAccurateTerms.q_asym_stop_remainder.

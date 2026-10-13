@@ -244,6 +244,7 @@ fn internal_crosscheck_corpus() {
     let path = std::env::var("MORPHIQ_INTERNAL_CORPUS").expect("MORPHIQ_INTERNAL_CORPUS");
     let mut rng = SplitMix64::new(0x7163_726f_7373_0001);
     let mut out = String::new();
+    q256_exponent_corpus(&mut out);
     // Cover the corrected reciprocal's full exponent range, including each
     // power-of-two boundary and its adjacent binary64 values.
     let mut erfcx_rng = SplitMix64::new(0x6572_6663_785f_0001);
@@ -1158,6 +1159,38 @@ fn internal_crosscheck_corpus() {
 
 /// An argument of `ln_1p`'s stages: small of either sign, near −1, below and
 /// above `2^53`, any encoding, or at a table interval's edge.
+fn q256_exponent_corpus(out: &mut String) {
+    let mut rng = SplitMix64::new(0x7132_3536_6578_7001);
+    for i in 0..12_000 {
+        let exponent = match i {
+            0..=4 => [-518, -517, -516, -1277, 768][i],
+            _ => i32::try_from(rng.next_u64() % 1_638_401).unwrap() - 819_200,
+        };
+        let (_, significand, _) = r256(&mut rng).parts();
+        let q = if i.is_multiple_of(17) {
+            Q256::ZERO
+        } else {
+            Q256::new(rng.next_u64() & 1 != 0, significand, exponent)
+        };
+        let power = match i % 7 {
+            0 => 0,
+            1 => -600,
+            2 => 600,
+            3 => -1024,
+            4 => 1024,
+            _ => i32::try_from(rng.next_u64() % 4097).unwrap() - 2048,
+        };
+        writeln!(out, "q256_top {} : {}", q256(q), q.top()).unwrap();
+        writeln!(
+            out,
+            "q256_mul_pow2 {} {power} : {}",
+            q256(q),
+            q256(q.mul_pow2(power))
+        )
+        .unwrap();
+    }
+}
+
 fn ln_1p_stage_argument(rng: &mut SplitMix64) -> f64 {
     let binade = |rng: &mut SplitMix64, low: u64, width: u64| {
         f64::from_bits(((low + rng.next_u64() % width) << 52) | (rng.next_u64() >> 12))

@@ -121,3 +121,26 @@ Proof.
       rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra. exact E.
     + field. exact P.
 Qed.
+
+(** Integer-exponent helpers used by the erfcx fallback. *)
+Definition top x : Z :=
+  if is_zero (m x) then (-1073741824)%Z else (e x+255)%Z.
+Definition mul_pow2 x power := Q (neg x) (m x) (e x+power).
+
+Theorem top_small x n : valid x -> (top x<n)%Z -> Rabs (qval x)<bpow radix2 n.
+Proof.
+  intros [O N] Small. unfold top in Small. rewrite is_zero_ok in Small by apply O.
+  destruct (Z.eqb_spec (v (m x)) 0) as [Z | Z].
+  - rewrite (qval_zero x Z),Rabs_R0. apply bpow_gt_0.
+  - destruct N as [N | N]; [contradiction | ].
+    pose proof (mag_bounds x N) as [Low High]. rewrite mag_abs in High by exact O.
+    eapply Rlt_le_trans; [exact High | ]. apply bpow_le. lia.
+Qed.
+
+Theorem mul_pow2_any x power : valid x ->
+  valid (mul_pow2 x power) /\ qval (mul_pow2 x power)=qval x*bpow radix2 power.
+Proof.
+  intros [O N]. split; [split; assumption | ].
+  unfold mul_pow2,qval,val,F2R. cbn [neg m e Fnum Fexp].
+  rewrite bpow_plus. destruct (neg x); ring.
+Qed.

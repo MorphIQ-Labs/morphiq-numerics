@@ -155,6 +155,16 @@ accumulated Q256 evaluation error requires the loop's arithmetic proof.
 zero operands and preserves normalization through construction, conversion,
 negation, addition and multiplication.
 
+`ErfcxAccurateTerms.q_asym_term_error` proves the Q256 term recurrence has
+relative error at most `n*2^-246` through step 400, given a reciprocal-square
+relative error of at most `2^-249` and exact odd integer factors. This
+discharges the early-exit magnitude condition above, with the implemented
+`top() < -262` test, in `q_asym_stop_remainder`. The reciprocal-square and
+integer-factor setup and the sum's accumulated error remain composition
+obligations. `Q256Real.top_small` and `mul_pow2_any` prove the integer-exponent
+helpers; their extracted transcriptions are checked against the Rust fields
+and results, including zero, the stopping boundary and large exponents.
+
 A relative approximation bound is not an ulp bound. For a positive normal
 value z, `z / ulp(z)` is between `2^52` and `2^53`; therefore relative error
 epsilon corresponds to as much as `2^53 epsilon` ulp before final rounding.

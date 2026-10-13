@@ -13,7 +13,7 @@
 
 From Coq Require Import ZArith List Extraction ExtrOcamlBasic.
 From Flocq Require Import IEEE754.Binary IEEE754.Bits.
-From Q Require Import Limbs Digits64 Q128 Q256.
+From Q Require Import Limbs Digits64 Q128 Q256 Q256Real.
 From Binary64 Require Import IEEE64 RoundingTest.
 Require ExpReduction ExpFast ExpAccurate ExpSmall LnReduction LnAccurate Ln1pScreen ExpStageReduction ExpStageA ExpStageB Ln1pStageH Ln1pStageB.
 Require Exp2Stages Expm1Stages Exp2FallbackReduction Exp2FallbackAccurate Exp2FallbackFast Exp2.
@@ -40,6 +40,8 @@ Definition x_q256_add n1 e1 l1 n2 e2 l2 := q256_out (Q256.add (q256_in n1 e1 l1)
 Definition x_q256_to_f64 n e l := bits_of_b64 (Q256.to_f64 (q256_in n e l)).
 Definition x_q256_from_f64 bits := q256_out (Q256.from_f64 bits).
 Definition x_q256_from_limbs n e l := q256_out (Q256.from_limbs n l e).
+Definition x_q256_top n e l := Q256Real.top (q256_in n e l).
+Definition x_q256_mul_pow2 n e l power := q256_out (Q256Real.mul_pow2 (q256_in n e l) power).
 
 (** The rounding tests (RoundingTest.v), on binary64 encodings. *)
 Definition opt_bits (o : option f64) : option Z := match o with Some v => Some (bits_of_b64 v) | None => None end.
@@ -234,4 +236,4 @@ Definition x_erfcx_tail_unscaled_fast x :=
  end.
 
 Extraction "internalcrosscheck.ml" x_erfcx_table_fast x_erfcx_tail_scaled_fast x_erfcx_tail_subnormal_fast x_erfcx_middle_fast x_erfcx_tail_unscaled_fast x_erfcx_reflection_fast x_erfcx_reflection_value x_erfcx_reflection_square x_erfcx_reflection_exp x_erfcx_table_value x_erfcx_table_reduce x_erfcx_table_leading x_erfcx_table_split x_erfcx_tail x_erfcx_tail_correction x_erfcx_quotient x_erfcx_scaled_quotient x_erfcx_middle x_erfcx_product x_erfcx_reciprocal_correction x_erfcx_reciprocal_square x_erfcx_reciprocal x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
-  x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs.
+  x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs x_q256_top x_q256_mul_pow2.

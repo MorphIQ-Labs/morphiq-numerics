@@ -64,6 +64,16 @@ let show_opt = function None -> "none" | Some z -> show_bits z
 
 let compute op args =
   match op with
+  | "q256_top" ->
+      let ((n, e, l), _) = value args in
+      string_of_int (int_of_z (x_q256_top n e l))
+  | "q256_mul_pow2" ->
+      let ((n, e, l), rest) = value args in
+      (match rest with
+       | [power] ->
+           let ((n, e), l) = x_q256_mul_pow2 n e l (z_of_int (int_of_string power)) in
+           show (n, e, l)
+       | _ -> failwith "q256_mul_pow2 takes a value and exponent")
   | "q128_mul" | "q128_add" | "q256_mul" | "q256_add" ->
       let ((n1, e1, l1), rest) = value args in
       let ((n2, e2, l2), _) = value rest in
