@@ -7,7 +7,7 @@ B = A * W * (1 + em1);
 Y = B * (1 + em2);
 { S in [0.998, 1] /\ ec in [-1b-110, 1b-110] /\ ey in [-1b-98, 1b-98]
   /\ ep in [-0x1.5p-68, 0x1.5p-68] /\ ev in [-1b-101, 1b-101]
-  /\ ea in [-1b-74, 1b-74] /\ em1 in [-1b-100, 1b-100] /\ em2 in [-1b-100, 1b-100]
+  /\ ea in [-1b-74, 1b-74] /\ em1 in [-1b-77, 1b-77] /\ em2 in [-1b-77, 1b-77]
   -> (Y - S) / S in [-1b-67, 1b-67] }
 Y - S -> ep + ev + ea + (A - 1) * W + A * W * em1 + B * em2;
 A - 1 -> ec + ey + ec * ey;

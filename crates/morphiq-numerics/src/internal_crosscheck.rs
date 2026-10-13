@@ -267,6 +267,22 @@ fn internal_crosscheck_corpus() {
                 tl.to_bits()
             )
             .unwrap();
+            let (w, wl) = crate::erfcx::middle_correction(th, tl);
+            writeln!(
+                out,
+                "erfcx_reciprocal_correction {bits:016x} : {:016x} {:016x}",
+                w.to_bits(),
+                wl.to_bits()
+            )
+            .unwrap();
+            let (zh, zl) = crate::erfcx::ya_eval(x);
+            writeln!(
+                out,
+                "erfcx_middle {bits:016x} : {:016x} {:016x}",
+                zh.to_bits(),
+                zl.to_bits()
+            )
+            .unwrap();
             let (h, l) = crate::erfcx::reciprocal(x);
             writeln!(
                 out,
@@ -276,6 +292,36 @@ fn internal_crosscheck_corpus() {
             )
             .unwrap();
         }
+    }
+    for i in 0..8000 {
+        let mut operand = |salt: u64| {
+            let e = 1013 + erfcx_rng.next_u64() % 11;
+            let h = f64::from_bits((e << 52) | (erfcx_rng.next_u64() & ((1_u64 << 52) - 1)));
+            let l = match (i + salt) % 8 {
+                0 => 0.0,
+                1 => f64::from_bits(1),
+                2 => f64::from_bits((1_u64 << 52) - 1),
+                3 => f64::from_bits(1_u64 << 52),
+                4 => f64::from_bits(23_u64 << 52),
+                5 => f64::from_bits(523_u64 << 52),
+                _ => h * f64::from_bits(969_u64 << 52) * unit(&mut erfcx_rng),
+            };
+            (h, if erfcx_rng.next_u64() & 1 == 0 { l } else { -l })
+        };
+        let (ah, al) = operand(0);
+        let (bh, bl) = operand(3);
+        let (h, l) = crate::erfcx::dw_mul(ah, al, bh, bl);
+        writeln!(
+            out,
+            "erfcx_product {:016x} {:016x} {:016x} {:016x} : {:016x} {:016x}",
+            ah.to_bits(),
+            al.to_bits(),
+            bh.to_bits(),
+            bl.to_bits(),
+            h.to_bits(),
+            l.to_bits()
+        )
+        .unwrap();
     }
     for i in 0..4000 {
         // decide_with: leading words across the proved range, both signs.

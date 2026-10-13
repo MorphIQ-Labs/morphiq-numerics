@@ -156,3 +156,14 @@ Print Assumptions ErfcxReciprocal.reciprocal_ieee.
 Require ErfcxSquare.
 Print Assumptions ErfcxSquare.square_ieee.
 Print Assumptions ErfcxSquare.reciprocal_square_ieee.
+
+Require ErfcxMiddlePolynomial.
+Print Assumptions ErfcxMiddlePolynomial.poly_ieee.
+Print Assumptions ErfcxMiddlePolynomial.correction_ieee.
+Print Assumptions ErfcxMiddlePolynomial.reciprocal_correction_ieee.
+
+Require ErfcxProduct.
+Print Assumptions ErfcxProduct.product_ieee.
+
+Require ErfcxMiddleValue.
+Print Assumptions ErfcxMiddleValue.middle_ieee.

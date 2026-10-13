@@ -86,10 +86,19 @@ let compute op args =
        | [hi; lo; eps; k] ->
            show_opt (x_decide_scaled (z_of_u64 (hex hi)) (z_of_u64 (hex lo)) (z_of_u64 (hex eps)) (z_of_int (int_of_string k)))
        | _ -> failwith "decide_scaled takes three words and an exponent")
-  | "erfcx_reciprocal" | "erfcx_reciprocal_square" ->
+  | "erfcx_product" ->
+      (match args with
+       | [ah; al; bh; bl] -> String.concat " " (List.map show_bits
+           (x_erfcx_product (z_of_u64 (hex ah)) (z_of_u64 (hex al)) (z_of_u64 (hex bh)) (z_of_u64 (hex bl))))
+       | _ -> failwith "erfcx_product takes four words")
+  | "erfcx_reciprocal" | "erfcx_reciprocal_square" | "erfcx_reciprocal_correction" | "erfcx_middle" ->
       (match args with
        | [x] ->
-           let f = if op = "erfcx_reciprocal" then x_erfcx_reciprocal else x_erfcx_reciprocal_square in
+           let f = match op with
+             | "erfcx_reciprocal" -> x_erfcx_reciprocal
+             | "erfcx_reciprocal_square" -> x_erfcx_reciprocal_square
+             | "erfcx_reciprocal_correction" -> x_erfcx_reciprocal_correction
+             | _ -> x_erfcx_middle in
            String.concat " " (List.map show_bits (f (z_of_u64 (hex x))))
        | _ -> failwith "erfcx reciprocal operations take one word")
   | "reduce" ->

@@ -100,9 +100,9 @@ lemmas; an unchecked algebraic identity is not accepted as a proof.
 | `T*.g` | Relative table evaluation error `2^-67` against the polynomial | Exact reduction, split products, coefficient differences and Fast2Sum calls |
 | `reciprocal.g` | Relative error `2^-98` for corrected `1/x`, `16 <= x <= 512` | Discharged by `ErfcxReciprocal.reciprocal_ieee` |
 | `middle_square*.g` | Absolute error `2^-102` against `1/x²` | Discharged by `ErfcxSquare.reciprocal_square_ieee` |
-| `middle_polynomial.g`, `middle_mvt.g` | Evaluation error `0x1.5p-68`; sensitivity error `2^-101` | Exact EFTs and halvings; bounds on the square's words |
-| `dw_product.g` | Relative multiplication error `2^-100` | Exact TwoProd/Fast2Sum, bounded low words, normal or exact-zero roundings |
-| `middle_composition.g` | Relative error `2^-67` | The preceding components and approximation bounds below |
+| `middle_polynomial.g`, `middle_mvt.g` | Evaluation error `0x1.5p-68`; sensitivity error `2^-101` | Discharged by `ErfcxMiddlePolynomial.reciprocal_correction_ieee` |
+| `dw_product.g` | Relative multiplication error `2^-77` | Discharged on the stated middle-tail range by `ErfcxProduct.product_ieee`, including gradual underflow |
+| `middle_composition.g` | Relative error `2^-67` | IEEE composition discharged by `ErfcxMiddleValue.middle_ieee`; analytic constant and approximation bounds below remain explicit hypotheses |
 | `tail_quotient.g` | Relative error `2^-101` against the stored constant divided by x | Exact EFTs and commutation of quotient/residual roundings with binade scaling |
 | `tail_square.g`, `tail_polynomial.g`, `tail_composition.g` | Relative reconstructed tail error `2^-67` | Normalized quotient model, first-omitted-term bound, and the stated relative/absolute rounding bounds |
 | `tail_scaled.g` | Relative error `2^-99` when omitting the correction above `1e270` | Quotient theorem and `1/(2x²) < 2^-1794` |
@@ -144,6 +144,25 @@ reciprocal by two is exact. The composed theorem bounds the actual two-word
 square against `1/x²` by `2^-102`, including the low word. Both transcriptions
 are extracted and cross-checked against the Rust operations on exponent
 boundaries, adjacent values and reproducible random inputs.
+
+The correction-polynomial entry proves every Horner operation finite, both
+Fast2Sum calls exact, and high-word halving exact. Low-word halving uses the
+binary64 rounding model, including subnormal results. The multiplication
+entry uses a conservative `2^-77` relative bound on leading words in
+`[2^-10, 2]`; it includes underflow in all low-word operations and proves the
+final Fast2Sum condition. Substituting this bound for both products still
+proves the middle composition's `2^-67` budget. The tighter relative-only
+multiplication model is unnecessary for this region.
+
+The middle-tail value theorem composes these IEEE operations, proving a
+`2^-67` relative error against `c*S/x` when `c` is positive, the stored
+constant approximates it within `2^-110` relative error, `S` is in
+`[0.998, 1]`, and the exact correction polynomial approximates `S` within
+`2^-74` absolute error. These analytic hypotheses are explicit; the theorem
+does not itself identify `c` with `1/sqrt(pi)` or `S` with
+`x*sqrt(pi)*erfcx(x)`. The generated approximation evidence below supplies
+the intended budgets, while their mathematical composition remains a
+separate obligation.
 
 The remaining components do not yet prove their binary64 entry hypotheses, the
 Q256 remainder and arithmetic error, the special-value thresholds or the

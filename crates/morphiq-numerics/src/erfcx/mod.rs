@@ -190,7 +190,7 @@ pub(super) fn fast_t(x: f64) -> Option<f64> {
 // ---------------------------------------------------------------- region Y
 
 #[inline]
-fn dw_mul(ah: f64, al: f64, bh: f64, bl: f64) -> (f64, f64) {
+pub(crate) fn dw_mul(ah: f64, al: f64, bh: f64, bl: f64) -> (f64, f64) {
     let (p, e) = two_prod(ah, bh);
     fast_two_sum(p, e + (ah * bl + al * bh))
 }
@@ -215,10 +215,9 @@ pub(crate) fn reciprocal_square(x: f64) -> (f64, f64, f64, f64) {
     (yh, yl, th, tl)
 }
 
-/// Double-word erfcx for `16 ≤ x < 512`.
+/// Compensated middle-tail correction polynomial, given both square words.
 #[inline]
-pub(super) fn ya_eval(x: f64) -> (f64, f64) {
-    let (yh, yl, th, tl) = reciprocal_square(x);
+pub(crate) fn middle_correction(th: f64, tl: f64) -> (f64, f64) {
     let mut pp = f(PA[PA.len() - 1]);
     for j in (0..PA.len() - 1).rev() {
         pp = f(PA[j]) + th * pp;
@@ -229,6 +228,14 @@ pub(super) fn ya_eval(x: f64) -> (f64, f64) {
     let v = (th * (th + 2.0 * tl)) * pp;
     let (w, e3) = fast_two_sum(w, v);
     let wl = e3 + (ew - 0.5 * tl);
+    (w, wl)
+}
+
+/// Double-word erfcx for `16 ≤ x < 512`.
+#[inline]
+pub(crate) fn ya_eval(x: f64) -> (f64, f64) {
+    let (yh, yl, th, tl) = reciprocal_square(x);
+    let (w, wl) = middle_correction(th, tl);
     let (zh, zl) = dw_mul(f(CS.0), f(CS.1), yh, yl);
     dw_mul(zh, zl, w, wl)
 }
