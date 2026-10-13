@@ -68,7 +68,8 @@ A rejection evaluates the Q256 path. The arithmetic certificates fit within
 this guard. The table evaluation error is proved at its binary64 entry;
 the negative fast-path rounding decision and final scaling are proved under
 an explicit analytic table contract. Function approximation/remainder bounds,
-scaled positive-tail final rounding, and the accurate path still require proofs. The guard is not an end-to-end error proof.
+scaled positive-tail normal-output rounding, and the accurate path still require
+proofs. The guard is not an end-to-end error proof.
 
 For a subnormal output, the leading candidate is scaled first. It is then
 mapped back exactly to the unscaled domain, where the binary64 subnormal
@@ -149,8 +150,17 @@ proved normalization and high-word ranges. `ErfcxMiddleFast.v` and
 `ErfcxTailFast.v` compose these facts with the encoded `2^-66` rounding
 guard. An accepted result is the nearest binary64 value of the corresponding
 analytic expression, under its stated approximation or remainder contract.
-The scaled large-tail decision, including its final subnormal grid, is a
-separate path.
+`ErfcxSubnormalFast.tail_subnormal_fast_ieee` composes the scaled quotient
+with final-grid rounding for inputs at least `2^1021`, under the explicit
+omitted-correction bound `0 <= correction <= 2^-1794`. The actual subnormal
+branch starts at `X_SUB`, within this domain. `ErfcxSubnormalValue.v` proves
+the high/low word ranges and normalization needed by the test;
+`ErfcxSubnormalCandidate.v` proves the initial scaling and either adjacent
+encoding preserve its candidate bounds. `ErfcxSubnormal.v` accounts for
+rounding in the residual, margin product, and final comparison. Acceptance
+places the exact target strictly within `2^-1075` of the final candidate,
+so ties cannot be accepted incorrectly. The scaled normal-output decision
+has a separate exponent-scaling obligation.
 
 The direct quotient certificates cover `[2^9, 2^897]` in 28 adjacent
 exponent windows. Every operation uses binary64 rounding, including gradual

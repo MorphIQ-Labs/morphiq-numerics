@@ -241,3 +241,14 @@ Print Assumptions ErfcxTailValue.tail_reconstruct_normalized_ieee.
 Print Assumptions ErfcxTailValue.tail_normalized_ieee.
 Print Assumptions ErfcxMiddleFast.middle_fast_ieee.
 Print Assumptions ErfcxTailFast.tail_unscaled_fast_ieee.
+
+Require ErfcxSubnormal ErfcxSubnormalBits ErfcxSubnormalCandidate ErfcxSubnormalValue ErfcxSubnormalFast.
+Print Assumptions ErfcxQuotient.normalized_quotient_words_ieee.
+Print Assumptions ErfcxSubnormal.binary64_round_absolute.
+Print Assumptions ErfcxSubnormal.subnormal_accept_ieee.
+Print Assumptions ErfcxSubnormalBits.small_bits_value.
+Print Assumptions ErfcxSubnormalBits.small_positive_encoding.
+Print Assumptions ErfcxSubnormalCandidate.subnormal_candidate_ieee.
+Print Assumptions ErfcxSubnormalCandidate.subnormal_fast_ieee.
+Print Assumptions ErfcxSubnormalValue.subnormal_value_words_ieee.
+Print Assumptions ErfcxSubnormalFast.tail_subnormal_fast_ieee.

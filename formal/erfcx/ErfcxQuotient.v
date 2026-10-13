@@ -79,10 +79,11 @@ Qed.
 Definition normalized_quotient64 x : f64*f64 :=
  let '(q,ql) := quotient64 x in fast_two_sum64 q ql.
 
-Theorem normalized_quotient_ieee x : finite x -> 512 <= B x <= bpow radix2 897 ->
+Theorem normalized_quotient_words_ieee x : finite x -> 512 <= B x <= bpow radix2 897 ->
  let '(h,l) := normalized_quotient64 x in
  finite h /\ finite l /\
- - bpow radix2 (-70) <= ((B h+B l)-(B cs+B csl)/B x)/((B cs+B csl)/B x) <= bpow radix2 (-70).
+ - bpow radix2 (-70) <= ((B h+B l)-(B cs+B csl)/B x)/((B cs+B csl)/B x) <= bpow radix2 (-70) /\
+ B h = rndF (B h+B l).
 Proof.
  intros Fx X. pose proof (quotient_ieee x Fx X) as Q.
  unfold normalized_quotient64. destruct (quotient64 x) as [q ql].
@@ -98,5 +99,16 @@ Proof.
    ltac:(apply Rle_trans with 1; [lra | change 1 with (bpow radix2 0); apply bpow_le; lia])
    ltac:(right; left; exact Dom)) as FS.
  destruct (fast_two_sum64 q ql) as [h l].
- destruct FS as [Fh [Fl [_ Sum]]]. rewrite Sum. repeat split; tauto.
+ destruct FS as [Fh [Fl [High Sum]]].
+ split; [exact Fh | split; [exact Fl | split; [rewrite Sum; exact E | rewrite Sum; exact High]]].
+Qed.
+
+
+Theorem normalized_quotient_ieee x : finite x -> 512 <= B x <= bpow radix2 897 ->
+ let '(h,l) := normalized_quotient64 x in
+ finite h /\ finite l /\
+ - bpow radix2 (-70) <= ((B h+B l)-(B cs+B csl)/B x)/((B cs+B csl)/B x) <= bpow radix2 (-70).
+Proof.
+ intros Fx X. pose proof (normalized_quotient_words_ieee x Fx X) as Q.
+ destruct (normalized_quotient64 x) as [h l]. tauto.
 Qed.

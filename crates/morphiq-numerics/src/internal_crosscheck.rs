@@ -330,6 +330,21 @@ fn internal_crosscheck_corpus() {
         };
         writeln!(out, "{name} {bits:016x} : {}", opt(result)).unwrap();
     }
+    for i in 0..24_000_u64 {
+        let low = crate::erfcx::X_SUB.to_bits();
+        let high = f64::MAX.to_bits();
+        let bits = match i % 4 {
+            0 => low + (i / 4) % 64,
+            1 => high - (i / 4) % 64,
+            _ => low + erfcx_rng.next_u64() % (high - low + 1),
+        };
+        writeln!(
+            out,
+            "erfcx_tail_subnormal_fast {bits:016x} : {}",
+            opt(crate::erfcx::fast_yb(f64::from_bits(bits)))
+        )
+        .unwrap();
+    }
     for bits in (4_u64..=9)
         .flat_map(|e| {
             let b = (1023 + e) << 52;
