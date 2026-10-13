@@ -6,6 +6,10 @@ pub(crate) use accurate::{asym as accurate_asym, reflected_exponential as accura
 pub(crate) fn accurate_taylor(x: f64) -> crate::q256::Q256 {
     accurate::taylor(x)
 }
+#[cfg(test)]
+pub(crate) fn accurate_negative(x: f64) -> crate::q256::Q256 {
+    accurate::neg(x)
+}
 mod accurate_tables;
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;

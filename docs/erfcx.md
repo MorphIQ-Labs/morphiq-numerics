@@ -247,7 +247,25 @@ proved to recover the same bounded integer as the shifter result's `i32`
 conversion. `ErfcxAccurateExponential.q_reflection_big_error` composes the
 actual square, reduction, polynomial, table product and scaling, proving
 relative error at most `2^-238` against `2*exp(x²)` on the implemented finite
-negative-reflection domain. The reflected subtraction remains a separate obligation.
+negative-reflection domain.
+
+`ErfcxAccurateReflectionEntry.q_negative_error` composes both positive
+correction branches and the actual Q256 subtraction. Its relative error
+against the finite Gaussian definition is at most `2^-123`. The Taylor
+branch uses the reflection identity and its absolute error bound. The
+far-negative branch has the tighter `2^-236` relative bound: an integral
+estimate bounds the finite Gaussian correction relative to `exp(x²)` by
+`2^-350`, while the computed asymptotic correction has magnitude at most
+one. This argument does not assume an unproved identity between finite and
+improper Gaussian integrals.
+
+`ErfcxAccurateReflectionRange.accurate_reflection_target_range` uses the
+binary64 input spacing above the overflow boundary to prove sufficient
+headroom for Q256 error and final rounding. The complete converted result
+is finite and has the form `erfcx(x)*(1+d)+a`, where
+`|d| <= 2^-53 + 2^-122` and `|a| <= 2^-1075`, as established by
+`ErfcxAccurateReflectionRounded.q_negative_rounded`. This is a proved error
+bound, not a whole-domain correct-rounding guarantee.
 
 A relative approximation bound is not an ulp bound. For a positive normal
 value z, `z / ulp(z)` is between `2^52` and `2^53`; therefore relative error
@@ -465,9 +483,8 @@ independent interval proof. `ErfcxMiddleAnalytic.middle_fast_analytic_ieee`
 instantiates `S = J(1/x²)` and discharges both analytic hypotheses using the
 signed integral remainder and the stored-polynomial CoqInterval check.
 
-The remaining components do not yet prove their binary64 entry hypotheses, the
-Q256 remainder and arithmetic error, the special-value thresholds or the
-public rounding tests. Source binding identifies the implementation being
+The table approximation contract, the special-value thresholds and the
+complete public-entry composition remain separate proof obligations. Source binding identifies the implementation being
 analyzed; it does not discharge a missing mathematical hypothesis.
 
 ## SIMD operation order

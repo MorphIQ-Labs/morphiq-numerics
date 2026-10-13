@@ -248,6 +248,7 @@ fn internal_crosscheck_corpus() {
     erfcx_accurate_tail_corpus(&mut out);
     erfcx_accurate_exponential_corpus(&mut out);
     erfcx_accurate_taylor_corpus(&mut out);
+    erfcx_accurate_negative_corpus(&mut out);
     // Cover the corrected reciprocal's full exponent range, including each
     // power-of-two boundary and its adjacent binary64 values.
     let mut erfcx_rng = SplitMix64::new(0x6572_6663_785f_0001);
@@ -1158,6 +1159,42 @@ fn internal_crosscheck_corpus() {
     assert_eq!((least_k, greatest_k), (-54, 1024), "expm1 scaling extremes");
     logarithm_fallback_corpus(&mut out);
     std::fs::write(path, out).unwrap();
+}
+
+/// The complete negative fallback, including both correction branches.
+fn erfcx_accurate_negative_corpus(out: &mut String) {
+    let mut rng = SplitMix64::new(0x6572_6663_786e_6567);
+    let lower = crate::erfcx::X_OVF.next_up();
+    let upper = (-0.5_f64).next_down();
+    let mut branches = [0; 2];
+    for sample in 0..2048 {
+        let x = if sample < 128 {
+            f64::from_bits(lower.to_bits() - sample)
+        } else if sample < 256 {
+            -f64::from_bits(16.0_f64.to_bits() - 64 + sample - 128)
+        } else if sample < 384 {
+            f64::from_bits(upper.to_bits() + sample - 256)
+        } else if sample % 2 == 0 {
+            lower + (upper - lower) * unit(&mut rng)
+        } else {
+            -f64::from_bits(
+                0.5_f64.to_bits() + 1 + rng.next_u64() % ((-lower).to_bits() - 0.5_f64.to_bits()),
+            )
+        }
+        .clamp(lower, upper);
+        branches[usize::from(-x >= 16.0)] += 1;
+        writeln!(
+            out,
+            "erfcx_accurate_negative {:016x} : {}",
+            x.to_bits(),
+            q256(crate::erfcx::accurate_negative(x))
+        )
+        .unwrap();
+    }
+    assert!(
+        branches.into_iter().all(|count| count >= 256),
+        "both accurate erfcx reflection corrections"
+    );
 }
 
 /// Accurate Taylor fields: every center, interval boundaries, tiny residuals.
