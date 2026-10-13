@@ -265,3 +265,11 @@ Print Assumptions ErfcxTableEntry.table_polynomial_normalized_ieee.
 Print Assumptions ErfcxTableEntry.table_eval_normalized_ieee.
 Print Assumptions ErfcxTableFast.table_composed_error.
 Print Assumptions ErfcxTableFast.table_fast_ieee.
+
+Require ErfcxExpRemainder ErfcxMoments ErfcxTailIntegral ErfcxScaledAnalytic.
+Print Assumptions ErfcxExpRemainder.exp_negative_taylor_remainder.
+Print Assumptions ErfcxMoments.exponential_moment_integral_limit.
+Print Assumptions ErfcxTailIntegral.tail_integral_limit.
+Print Assumptions ErfcxTailIntegral.tail_integral_correction.
+Print Assumptions ErfcxScaledAnalytic.scaled_tail_analytic_correction.
+Print Assumptions ErfcxScaledAnalytic.tail_scaled_fast_analytic_ieee.

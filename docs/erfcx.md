@@ -41,6 +41,24 @@ at 600 and 1000 bits. High-precision dyadics are rounded once, in integer
 arithmetic, on the binary64 grid; converting first to a 53-bit normal number
 would permit double rounding at underflow.
 
+For `x > 0`, substituting `u = 2*x*v` in the defining integral gives
+
+```
+F(x) = (1/(x*sqrt(pi))) J(1/x²),
+J(t) = integral_0^infinity exp(-u) exp(-t*u²/4) du.
+```
+
+`ErfcxTailIntegral.v` constructs `J` as the finite limit of integrals on
+`[0, n]`, proves `0 <= J(t) <= 1` for `t >= 0`, and proves
+`0 <= 1-J(t) <= t/2`. The proof integrates `1-s <= exp(-s) <= 1` using
+`ErfcxMoments.v`, whose exponential moments have exact limits `n!`.
+The encoded `1e270` cutoff exceeds `3*2^895`; consequently the omitted
+correction is at most `2^-1794` throughout the scaled branch.
+`ErfcxScaledAnalytic.tail_scaled_fast_analytic_ieee` therefore proves that
+accepted scaled-tail results round to this integral-defined target without
+an assumed analytic error bound. This does not cover rejected inputs, which
+use the Q256 accurate path.
+
 ## Scalar kernels
 
 * **Table (`-1/2 <= x < 16`).** There are 177 intervals: centers at `k/32`
@@ -69,8 +87,9 @@ this guard. The table evaluation error is proved at its binary64 entry;
 the negative fast-path rounding decision and final scaling are proved under
 an explicit analytic table contract. The scaled positive-tail final rounding
 is proved on both sides of the subnormal boundary under its omitted-correction
-contract. Function approximation/remainder bounds and the accurate path still
-require proofs. The guard is not an end-to-end error proof.
+contract; that correction is derived from the normalized defining integral
+for the actual scaled domain. The other approximation/remainder bounds and
+the accurate path still require proofs. The guard is not an end-to-end error proof.
 
 For a subnormal output, the leading candidate is scaled first. It is then
 mapped back exactly to the unscaled domain, where the binary64 subnormal
@@ -121,7 +140,7 @@ lemmas; an unchecked algebraic identity is not accepted as a proof.
 | `tail_quotient_*.g` | Relative error `2^-70` against the stored constant divided by x | Discharged on `[2^9, 2^897]` by `ErfcxQuotient.quotient_ieee`; exact scaling by `ErfcxQuotientScale.scaled_quotient_ieee` |
 | `tail_correction.g` | Absolute correction error `2^-69` against the cubic at exact `1/x²` | Discharged by `ErfcxTailCorrection.tail_correction_ieee`, including underflow |
 | `tail_composition.g` | Relative reconstructed tail error `2^-67` | IEEE composition discharged by `ErfcxTailValue.tail_with_pi_ieee`; first-omitted-term bound remains an explicit hypothesis |
-| `tail_scaled.g` | Relative error `2^-68` when omitting the correction above `1e270` | IEEE composition discharged by `ErfcxTailValue.scaled_tail_with_pi_ieee`; omitted-correction bound remains an explicit hypothesis |
+| `tail_scaled.g` | Relative error `2^-68` when omitting the correction above `1e270` | IEEE composition discharged by `ErfcxTailValue.scaled_tail_with_pi_ieee`; omitted-correction bound is discharged on `x > 1e270` by `ErfcxScaledAnalytic.tail_scaled_fast_analytic_ieee` |
 | `reflection_reduction.g` | Absolute reduction error `2^-92` | Integer index, exact differences and shifter, `s < 710`, `abs(se) <= 2^-44` |
 | `../exp/stage_b.g` | Absolute exponential-stage error `0x1.a2p-71` before scaling | Adapted reduction plus the shared polynomial and table hypotheses |
 | `reflection_composition.g` | Relative reflected error `2^-67` | Table/exponential bounds and stated word ranges; IEEE EFT/scaling conditions discharged |
