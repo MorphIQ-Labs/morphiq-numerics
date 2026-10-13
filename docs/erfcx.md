@@ -153,9 +153,30 @@ all actual derivatives. The local integral identity bounds `|F(c+h)|` by
 512 for `|c| <= 16`, `|h| <= 1/8`, and the certified center range.
 The derivative majorant `512 * 40^n` through order 100 gives a
 `2^-280` absolute truncation bound for the degree-99 Taylor polynomial in
-`ErfcxTaylorRemainder.table_taylor_cap_remainder`. These are exact-series
-and center-value bounds; Q256 evaluation and early stopping are separate
-obligations.
+`ErfcxTaylorRemainder.table_taylor_cap_remainder`. The Q256 composition below includes evaluation and early stopping.
+
+`ErfcxAccurateTaylorCoefficients.q_taylor_coefficient_errors` bounds every
+computed coefficient through degree 99 by `2^-136` absolutely. Its integer
+error majorant includes the stored center and reciprocal errors, and all
+Q256 multiplications and additions. The repeated residual powers and term
+products give term error at most `2^-135`; accumulated prefixes differ from
+their exact polynomials by at most `2^-126`. Two consecutive terms passing
+the implemented top-bit test bound the uncomputed polynomial tail by
+`2^-125`. `ErfcxAccurateTaylorLoop.q_taylor_series_prefix` proves that the
+actual bounded loop returns one of these prefixes, with the two tested
+terms when it exits early.
+
+`ErfcxAccurateTaylorEntry.q_taylor_error` includes binary64 reduction,
+center indexing, exact Q256 conversion and the zero-residual shortcut.
+For every finite `-1/2 <= x < 16`, its Q256 result has absolute error at most
+`2^-124` against the defining Gaussian integral. Final conversion is finite
+and has the form `F(x)*(1+d)+a`, where `|d| <= 2^-53` and
+`|a| <= 2^-123 + 2^-1075`, proved in
+`ErfcxAccurateTaylorRounded.q_taylor_rounded`. This conservative bound does
+not establish correct rounding. Extracted Q256 fields are cross-checked
+against Rust over every table center, interval edges, adjacent values,
+signed zero and tiny residuals. The cross-check entry is test-only and
+changes no release-build arithmetic.
 
 The Q256 reciprocal starts with binary64 division. At the largest inputs,
 that seed is subnormal and its relative rounding error can exceed `2^-53`.
@@ -226,8 +247,7 @@ proved to recover the same bounded integer as the shifter result's `i32`
 conversion. `ErfcxAccurateExponential.q_reflection_big_error` composes the
 actual square, reduction, polynomial, table product and scaling, proving
 relative error at most `2^-238` against `2*exp(x²)` on the implemented finite
-negative-reflection domain. The Taylor approximation and its subtraction
-from this exponential remain separate obligations.
+negative-reflection domain. The reflected subtraction remains a separate obligation.
 
 A relative approximation bound is not an ulp bound. For a positive normal
 value z, `z / ulp(z)` is between `2^52` and `2^53`; therefore relative error

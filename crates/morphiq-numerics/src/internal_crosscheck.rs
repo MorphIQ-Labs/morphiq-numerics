@@ -247,6 +247,7 @@ fn internal_crosscheck_corpus() {
     q256_exponent_corpus(&mut out);
     erfcx_accurate_tail_corpus(&mut out);
     erfcx_accurate_exponential_corpus(&mut out);
+    erfcx_accurate_taylor_corpus(&mut out);
     // Cover the corrected reciprocal's full exponent range, including each
     // power-of-two boundary and its adjacent binary64 values.
     let mut erfcx_rng = SplitMix64::new(0x6572_6663_785f_0001);
@@ -1157,6 +1158,72 @@ fn internal_crosscheck_corpus() {
     assert_eq!((least_k, greatest_k), (-54, 1024), "expm1 scaling extremes");
     logarithm_fallback_corpus(&mut out);
     std::fs::write(path, out).unwrap();
+}
+
+/// Accurate Taylor fields: every center, interval boundaries, tiny residuals.
+fn erfcx_accurate_taylor_corpus(out: &mut String) {
+    let mut rng = SplitMix64::new(0x6572_6663_7874_6179);
+    let mut seen = [false; 177];
+    for sample in 0..4096 {
+        let x = if sample < 177 * 9 {
+            let i = u32::try_from(sample / 9).unwrap();
+            let (center, radius) = if i < 49 {
+                ((f64::from(i) - 16.0) / 32.0, 1.0 / 64.0)
+            } else {
+                let scale = f64::from(1_u32 << ((i - 49) / 32));
+                (
+                    scale * (1.0 + f64::from(2 * ((i - 49) % 32) + 1) / 64.0),
+                    scale / 64.0,
+                )
+            };
+            match sample % 9 {
+                0 => center,
+                1 => center.next_down(),
+                2 => center.next_up(),
+                3 => center - radius,
+                4 => center + radius,
+                5 => (center - radius).next_down(),
+                6 => (center - radius).next_up(),
+                7 => (center + radius).next_down(),
+                _ => (center + radius).next_up(),
+            }
+        } else {
+            match sample - 177 * 9 {
+                0 => 0.0,
+                1 => -0.0,
+                2 => f64::from_bits(1),
+                3 => -f64::from_bits(1),
+                4 => f64::MIN_POSITIVE,
+                5 => -f64::MIN_POSITIVE,
+                6 => f64::from_bits(f64::MIN_POSITIVE.to_bits() - 1),
+                7 => -f64::from_bits(f64::MIN_POSITIVE.to_bits() - 1),
+                _ if sample % 2 == 0 => -0.5 + 16.5 * unit(&mut rng),
+                _ => {
+                    let negative = rng.next_u64() & 1 != 0;
+                    let upper = if negative {
+                        0.5_f64.to_bits()
+                    } else {
+                        16.0_f64.to_bits()
+                    };
+                    let bits = rng.next_u64() % upper;
+                    f64::from_bits(bits | if negative { 1_u64 << 63 } else { 0 })
+                }
+            }
+        }
+        .clamp(-0.5, 16.0_f64.next_down());
+        seen[crate::erfcx::t_reduce(x).0] = true;
+        writeln!(
+            out,
+            "erfcx_accurate_taylor {:016x} : {}",
+            x.to_bits(),
+            q256(crate::erfcx::accurate_taylor(x))
+        )
+        .unwrap();
+    }
+    assert!(
+        seen.into_iter().all(core::convert::identity),
+        "every accurate erfcx Taylor center"
+    );
 }
 
 /// Every accurate exponential table index, exact squares, and reduction edges.

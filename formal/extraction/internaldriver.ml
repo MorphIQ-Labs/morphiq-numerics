@@ -100,6 +100,10 @@ let compute op args =
       (match args with
        | [s; se] -> let ((n, e), l) = x_erfcx_accurate_exp (z_of_u64 (hex s)) (z_of_u64 (hex se)) in show (n, e, l)
        | _ -> failwith "erfcx_accurate_exp takes two words")
+  | "erfcx_accurate_taylor" ->
+      (match args with
+       | [x] -> let ((n, e), l) = x_erfcx_accurate_taylor (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "erfcx_accurate_taylor takes a word")
   | "erfcx_accurate_tail" ->
       (match args with
        | [x] -> let ((n, e), l) = x_erfcx_accurate_tail (z_of_u64 (hex x)) in show (n, e, l)
