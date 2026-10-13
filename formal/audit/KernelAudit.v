@@ -166,7 +166,7 @@ Require ErfcxProduct.
 Print Assumptions ErfcxProduct.product_ieee.
 
 Require ErfcxMiddleValue.
-Print Assumptions ErfcxMiddleValue.middle_ieee.
+Print Assumptions ErfcxMiddleValue.middle_with_pi_ieee.
 
 Require ErfcxQuotient ErfcxQuotientScale.
 Print Assumptions ErfcxQuotient.quotient_ieee.
@@ -178,8 +178,8 @@ Require ErfcxRounding ErfcxTailCorrection ErfcxTailValue.
 Print Assumptions ErfcxRounding.rounding_decomposition.
 Print Assumptions ErfcxTailCorrection.tail_correction_ieee.
 Print Assumptions ErfcxTailValue.tail_reconstruct_ieee.
-Print Assumptions ErfcxTailValue.tail_ieee.
-Print Assumptions ErfcxTailValue.scaled_tail_ieee.
+Print Assumptions ErfcxTailValue.tail_with_pi_ieee.
+Print Assumptions ErfcxTailValue.scaled_tail_with_pi_ieee.
 
 Require ErfcxTableSplit.
 Print Assumptions ErfcxTableSplit.table_split_ieee.
@@ -188,3 +188,6 @@ Print Assumptions ErfcxTableSplit.table_square_ieee.
 Require ErfcxTableCoefficient ErfcxTableProducts.
 Print Assumptions ErfcxTableCoefficient.coefficient_check_ok.
 Print Assumptions ErfcxTableProducts.table_leading_value_ieee.
+
+Require ErfcxConstants.
+Print Assumptions ErfcxConstants.cs_split_bound.

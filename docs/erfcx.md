@@ -102,11 +102,11 @@ lemmas; an unchecked algebraic identity is not accepted as a proof.
 | `middle_square*.g` | Absolute error `2^-102` against `1/x²` | Discharged by `ErfcxSquare.reciprocal_square_ieee` |
 | `middle_polynomial.g`, `middle_mvt.g` | Evaluation error `0x1.5p-68`; sensitivity error `2^-101` | Discharged by `ErfcxMiddlePolynomial.reciprocal_correction_ieee` |
 | `dw_product.g` | Relative multiplication error `2^-77` | Discharged on the stated middle-tail range by `ErfcxProduct.product_ieee`, including gradual underflow |
-| `middle_composition.g` | Relative error `2^-67` | IEEE composition discharged by `ErfcxMiddleValue.middle_ieee`; analytic constant and approximation bounds below remain explicit hypotheses |
+| `middle_composition.g` | Relative error `2^-67` | IEEE composition discharged by `ErfcxMiddleValue.middle_with_pi_ieee`; analytic approximation bounds below remain explicit hypotheses |
 | `tail_quotient_*.g` | Relative error `2^-70` against the stored constant divided by x | Discharged on `[2^9, 2^897]` by `ErfcxQuotient.quotient_ieee`; exact scaling by `ErfcxQuotientScale.scaled_quotient_ieee` |
 | `tail_correction.g` | Absolute correction error `2^-69` against the cubic at exact `1/x²` | Discharged by `ErfcxTailCorrection.tail_correction_ieee`, including underflow |
-| `tail_composition.g` | Relative reconstructed tail error `2^-67` | IEEE composition discharged by `ErfcxTailValue.tail_ieee`; constant and first-omitted-term bounds remain explicit hypotheses |
-| `tail_scaled.g` | Relative error `2^-68` when omitting the correction above `1e270` | IEEE composition discharged by `ErfcxTailValue.scaled_tail_ieee`; constant and omitted-correction bounds remain explicit hypotheses |
+| `tail_composition.g` | Relative reconstructed tail error `2^-67` | IEEE composition discharged by `ErfcxTailValue.tail_with_pi_ieee`; first-omitted-term bound remains an explicit hypothesis |
+| `tail_scaled.g` | Relative error `2^-68` when omitting the correction above `1e270` | IEEE composition discharged by `ErfcxTailValue.scaled_tail_with_pi_ieee`; omitted-correction bound remains an explicit hypothesis |
 | `reflection_reduction.g` | Absolute reduction error `2^-92` | Integer index, exact differences and shifter, `s < 710`, `abs(se) <= 2^-44` |
 | `reflection_stage.g` | Absolute exponential-stage error `0x1.a2p-71` before scaling | Adapted reduction plus the shared polynomial and table hypotheses |
 | `reflection_composition.g` | Relative reflected error `2^-67` | Table/exponential bounds, exact EFTs and power-of-two scaling |
@@ -120,7 +120,9 @@ each successive magnitude ratio is at most `63/512 < 1`. Multiplication by
 for the correction polynomial, gives absolute error below `2^-74` for
 `1-t/2+t²P(t)`. The generated double-word `1/sqrt(pi)` has relative error
 below `2^-110`. Generator replay checks these three budgets using exact
-decimal rationals.
+decimal rationals. `ErfcxConstants.cs_split_bound` independently verifies
+the stored constant against the real `1/sqrt(pi)` with CoqInterval at
+200-bit working precision, proving relative error at most `2^-110`.
 
 For the large tail, the first omitted term after the cubic is
 `105 t^4 / 16`, bounded by `7 * 2^-72` when `t <= 2^-18`. The direct
@@ -134,9 +136,9 @@ error into relative error at most `2^-53` and absolute error at most
 `2^-1075`. Dividing the absolute term by a leading quotient at least
 `2^-899` gives a bound below `2^-170`. It proves the final Fast2Sum
 precondition and a `2^-67` relative error against
-`(c/x)*(1+P(1/x²)+rem)` for positive `c`, stored-constant relative error at
-most `2^-110`, and `0 <= rem <= 7*2^-72`. Identifying that expression with
-erfcx requires the stated analytic constant and asymptotic remainder bounds.
+`(1/(sqrt(pi)*x))*(1+P(1/x²)+rem)` when `0 <= rem <= 7*2^-72`.
+The constant's error is discharged independently. Identifying that expression
+with erfcx requires the stated asymptotic remainder bound.
 The extracted correction and reconstruction are checked against Rust across
 the exponent range, including adjacent square-underflow boundaries.
 
@@ -197,14 +199,13 @@ proves the middle composition's `2^-67` budget. The tighter relative-only
 multiplication model is unnecessary for this region.
 
 The middle-tail value theorem composes these IEEE operations, proving a
-`2^-67` relative error against `c*S/x` when `c` is positive, the stored
-constant approximates it within `2^-110` relative error, `S` is in
-`[0.998, 1]`, and the exact correction polynomial approximates `S` within
-`2^-74` absolute error. These analytic hypotheses are explicit; the theorem
-does not itself identify `c` with `1/sqrt(pi)` or `S` with
-`x*sqrt(pi)*erfcx(x)`. The generated approximation evidence below supplies
-the intended budgets, while their mathematical composition remains a
-separate obligation.
+`2^-67` relative error against `S/(sqrt(pi)*x)` when `S` is in `[0.998, 1]`
+and the exact correction polynomial approximates `S` within `2^-74`
+absolute error. The constant is tied to the real `1/sqrt(pi)` by the
+independent interval proof. The approximation hypothesis remains explicit;
+the theorem does not itself identify `S` with `x*sqrt(pi)*erfcx(x)`. The
+generated approximation evidence below supplies the intended budget, while
+its mathematical composition remains a separate obligation.
 
 The remaining components do not yet prove their binary64 entry hypotheses, the
 Q256 remainder and arithmetic error, the special-value thresholds or the

@@ -159,3 +159,27 @@ Proof.
  { field. repeat split; lra. }
  rewrite Id in Bound. repeat split; tauto.
 Qed.
+
+
+Require Import ErfcxConstants.
+Theorem tail_with_pi_ieee x rem : finite x -> 512 <= B x <= bpow radix2 897 ->
+ 0 <= rem <= 7/2^72 ->
+ let '(h,l) := tail64 x in
+ finite h /\ finite l /\
+ - /2^67 <= ((B h+B l)-(inv_sqrt_pi/B x)*(1+tail_polynomial ((1/B x)*(1/B x))+rem))/
+ ((inv_sqrt_pi/B x)*(1+tail_polynomial ((1/B x)*(1/B x))+rem)) <= /2^67.
+Proof.
+ intros Fx X R. pose proof (Rabs_le_inv _ _ cs_split_bound) as C.
+ exact (tail_ieee x inv_sqrt_pi rem Fx X inv_sqrt_pi_positive C R).
+Qed.
+
+Theorem scaled_tail_with_pi_ieee x correction : finite x -> bpow radix2 896 <= B x ->
+ 0 <= correction <= bpow radix2 (-1794) ->
+ let '(h,l) := scaled_quotient64 x in
+ finite h /\ finite l /\
+ - /2^68 <= ((B h+B l)*bpow radix2 (-600)-(inv_sqrt_pi/B x)*(1-correction))/
+ ((inv_sqrt_pi/B x)*(1-correction)) <= /2^68.
+Proof.
+ intros Fx X R. pose proof (Rabs_le_inv _ _ cs_split_bound) as C.
+ exact (scaled_tail_ieee x inv_sqrt_pi correction Fx X inv_sqrt_pi_positive C R).
+Qed.

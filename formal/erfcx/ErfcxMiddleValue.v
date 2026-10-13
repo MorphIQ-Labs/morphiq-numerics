@@ -98,3 +98,16 @@ Proof.
  { field. repeat split; lra. }
  rewrite Eq in Bound. repeat split; tauto.
 Qed.
+
+
+Require Import ErfcxConstants.
+Theorem middle_with_pi_ieee x s : finite x -> 16 <= B x <= 512 ->
+ 998/1000 <= s <= 1 ->
+ - /2^74 <= correction_exact ((1/B x)*(1/B x))-s <= /2^74 ->
+ let '(h,l) := middle64 x in
+ finite h /\ finite l /\
+ - /2^67 <= ((B h+B l)-(inv_sqrt_pi/B x)*s)/((inv_sqrt_pi/B x)*s) <= /2^67.
+Proof.
+ intros Fx X S A. pose proof (Rabs_le_inv _ _ cs_split_bound) as C.
+ exact (middle_ieee x inv_sqrt_pi s Fx X inv_sqrt_pi_positive C S A).
+Qed.
