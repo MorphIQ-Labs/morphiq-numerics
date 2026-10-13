@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.5](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.4...v0.0.5) - 2026-10-13
+
+### Performance
+
+- *(log-space)* specialize scalar two-term log-sum-exp ([#143](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/143))
+
 ## [0.0.4](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.3...v0.0.4) - 2026-10-13
 
 ### Added
