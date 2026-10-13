@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory() as tmp:
                     str(ROOT/'generators/erfcx/tables.out'),tmp],check=True)
     subprocess.run([sys.executable,str(ROOT/'generators/erfcx/tail_certificates.py'),tmp],check=True)
     generated = sorted(pathlib.Path(tmp).glob('*.g'))
-    assert len(generated) == 181
+    assert len(generated) == 208
     for src in generated:
         dst = OUT/src.name
         if '--check' in sys.argv:

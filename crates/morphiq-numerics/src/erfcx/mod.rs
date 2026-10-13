@@ -245,20 +245,27 @@ pub(super) fn fast_ya(x: f64) -> Option<f64> {
     decide(yh, yl, EPS_Y)
 }
 
+/// Corrected stored-constant quotient for a reduced positive-tail input.
+#[inline]
+pub(crate) fn quotient(x: f64) -> (f64, f64) {
+    let (ch, cl) = (f(CS.0), f(CS.1));
+    let q = ch / x;
+    let (p, pe) = two_prod(q, x);
+    let r = ((ch - p) - pe) + cl;
+    let ql = r / x;
+    (q, ql)
+}
+
 /// Double-word erfcx for finite `x ≥ 512`, as `(hi, lo, k)` with value
 /// `(hi + lo)·2^k`.
 #[inline]
-pub(super) fn yb_eval(x: f64) -> (f64, f64, i32) {
+pub(crate) fn yb_eval(x: f64) -> (f64, f64, i32) {
     let (xs, k) = if x > 1e270 {
         (x * pow2(-600), -600)
     } else {
         (x, 0)
     };
-    let (ch, cl) = (f(CS.0), f(CS.1));
-    let q = ch / xs;
-    let (p, pe) = two_prod(q, xs);
-    let r = ((ch - p) - pe) + cl;
-    let ql = r / xs;
+    let (q, ql) = quotient(xs);
     if k != 0 {
         // x > 1e270 implies RN((1/x)^2) = +0. Its polynomial is -0,
         // so the correction contributes nothing to this positive result.

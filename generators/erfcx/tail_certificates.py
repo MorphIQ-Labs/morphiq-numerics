@@ -82,11 +82,11 @@ s += r"""{ T in [1b-18, 1b-8] /\ dt in [-1b-102, 1b-102]
 s += f"St - ST -> dt * (-(1 / 2) + {difference('t', 'T', 2, 9, 2)});\n"
 (out / "middle_mvt.g").write_text(s)
 
-s = header + """# Quotient correction in normalized coordinates, conditional on exact scaling,
-# TwoProd and the Sterbenz subtraction ch-p. The entry proof must justify
-# commutation of each rounding with scaling, including small residuals.
-@rnd = float<ieee_64, ne>;
-"""
+# Bounded exponent windows retain a useful absolute-to-relative conversion
+# for the final division's error, while modeling gradual underflow directly.
+# The union is [2^9, 2^897], covering both unscaled and scaled tail inputs.
+s = header + "# Direct IEEE quotient correction; exact TwoProd/Sterbenz are entry obligations.\n"
+s += "@rnd = float<ieee_64, ne>;\n"
 s += f"ch = {constants['CS']};\ncl = {constants['CSL']};\n"
 s += r"""x = rnd(x_);
 q = rnd(ch / x);
@@ -97,11 +97,20 @@ r = rnd(r1 + cl);
 ql = rnd(r / x);
 Q = q + ql;
 C = (ch + cl) / x;
-{ x in [1, 2] -> (Q - C) / C in [-1b-101, 1b-101] /\ ql / q in [-1b-51, 1b-51] }
+{ x in [LOWER, UPPER] -> (Q - C) / C in [-1b-70, 1b-70] /\ ql / q in [-1b-51, 1b-51]
+ /\ q in [1b-899,1b-9] /\ p in [0.5,0.625] /\ pe in [-1b-52,1b-52]
+ /\ r1 in [-1b-50,1b-50] /\ r in [-1b-50,1b-50] /\ ql in [-1b-59,1b-59] }
 Q - C -> (ql - r / x) + ((r - (r1 + cl)) + (r1 - ((ch - p) - pe))) / x { x <> 0 };
 ch - p - pe -> -(q - ch / x) * x { x <> 0 };
+q*x -> ch*(1+(q-ch/x)/(ch/x)) { x <> 0, ch <> 0 };
+ch-p-pe -> -((q-ch/x)/(ch/x))*ch { x <> 0, ch <> 0 };
+(Q-C)/C -> ((ql-r/x)*x + (r-(r1+cl)) + (r1-((ch-p)-pe)))/(ch+cl) { x <> 0, ch+cl <> 0 };
+ql/q -> ((ql-r/x)*x+r)/(q*x) { q <> 0, x <> 0 };
 """
-(out / "tail_quotient.g").write_text(s)
+for index, lower in enumerate(range(9, 897, 32)):
+    upper = min(lower + 32, 897)
+    certificate = s.replace("LOWER", f"1b{lower}").replace("UPPER", f"1b{upper}")
+    (out / f"tail_quotient_{index:02}.g").write_text(certificate)
 
 # The operation sequence is exactly the existing shared exponential stage B.
 # Adapt only the reduction-error hypothesis; erfcx appends the square's low word.

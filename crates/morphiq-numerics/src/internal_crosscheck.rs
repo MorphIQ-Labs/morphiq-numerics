@@ -323,6 +323,38 @@ fn internal_crosscheck_corpus() {
         )
         .unwrap();
     }
+    for i in 0..12000 {
+        let e = 1032 + erfcx_rng.next_u64() % 888;
+        let bits = (e << 52) | (erfcx_rng.next_u64() & ((1_u64 << 52) - 1));
+        let bits = match i {
+            0 => 1032_u64 << 52,
+            1 => 1920_u64 << 52,
+            _ => bits,
+        };
+        let (h, l) = crate::erfcx::quotient(f64::from_bits(bits));
+        writeln!(
+            out,
+            "erfcx_quotient {bits:016x} : {:016x} {:016x}",
+            h.to_bits(),
+            l.to_bits()
+        )
+        .unwrap();
+        let low = 1e270_f64.to_bits() + 1;
+        let high = f64::MAX.to_bits();
+        let bits = match i {
+            0 => low,
+            1 => high,
+            _ => low + erfcx_rng.next_u64() % (high - low + 1),
+        };
+        let (h, l, _) = crate::erfcx::yb_eval(f64::from_bits(bits));
+        writeln!(
+            out,
+            "erfcx_scaled_quotient {bits:016x} : {:016x} {:016x}",
+            h.to_bits(),
+            l.to_bits()
+        )
+        .unwrap();
+    }
     for i in 0..4000 {
         // decide_with: leading words across the proved range, both signs.
         let eps = f64::from_bits(EPS[usize::try_from(rng.next_u64() % 4).unwrap()]);

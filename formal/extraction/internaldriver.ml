@@ -91,14 +91,16 @@ let compute op args =
        | [ah; al; bh; bl] -> String.concat " " (List.map show_bits
            (x_erfcx_product (z_of_u64 (hex ah)) (z_of_u64 (hex al)) (z_of_u64 (hex bh)) (z_of_u64 (hex bl))))
        | _ -> failwith "erfcx_product takes four words")
-  | "erfcx_reciprocal" | "erfcx_reciprocal_square" | "erfcx_reciprocal_correction" | "erfcx_middle" ->
+  | "erfcx_reciprocal" | "erfcx_reciprocal_square" | "erfcx_reciprocal_correction" | "erfcx_middle" | "erfcx_quotient" | "erfcx_scaled_quotient" ->
       (match args with
        | [x] ->
            let f = match op with
              | "erfcx_reciprocal" -> x_erfcx_reciprocal
              | "erfcx_reciprocal_square" -> x_erfcx_reciprocal_square
              | "erfcx_reciprocal_correction" -> x_erfcx_reciprocal_correction
-             | _ -> x_erfcx_middle in
+             | "erfcx_middle" -> x_erfcx_middle
+             | "erfcx_quotient" -> x_erfcx_quotient
+             | _ -> x_erfcx_scaled_quotient in
            String.concat " " (List.map show_bits (f (z_of_u64 (hex x))))
        | _ -> failwith "erfcx reciprocal operations take one word")
   | "reduce" ->

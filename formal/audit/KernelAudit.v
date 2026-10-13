@@ -167,3 +167,9 @@ Print Assumptions ErfcxProduct.product_ieee.
 
 Require ErfcxMiddleValue.
 Print Assumptions ErfcxMiddleValue.middle_ieee.
+
+Require ErfcxQuotient ErfcxQuotientScale.
+Print Assumptions ErfcxQuotient.quotient_ieee.
+Print Assumptions ErfcxQuotient.normalized_quotient_ieee.
+Print Assumptions ErfcxQuotientScale.scale_input_ieee.
+Print Assumptions ErfcxQuotientScale.scaled_quotient_ieee.
