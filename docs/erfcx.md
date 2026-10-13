@@ -110,7 +110,7 @@ lemmas; an unchecked algebraic identity is not accepted as a proof.
 | `tail_scaled.g` | Relative error `2^-68` when omitting the correction above `1e270` | IEEE composition discharged by `ErfcxTailValue.scaled_tail_with_pi_ieee`; omitted-correction bound remains an explicit hypothesis |
 | `reflection_reduction.g` | Absolute reduction error `2^-92` | Integer index, exact differences and shifter, `s < 710`, `abs(se) <= 2^-44` |
 | `../exp/stage_b.g` | Absolute exponential-stage error `0x1.a2p-71` before scaling | Adapted reduction plus the shared polynomial and table hypotheses |
-| `reflection_composition.g` | Relative reflected error `2^-67` | Table/exponential bounds, exact EFTs and power-of-two scaling |
+| `reflection_composition.g` | Relative reflected error `2^-67` | Table/exponential bounds and stated word ranges; IEEE EFT/scaling conditions discharged |
 | `reflection_omitted.g` | Relative error `2^-69` after omitting the positive term | Exponential bound, `0 <= erfcx(-x) <= 1`, exponent greater than 104 |
 
 For the middle tail, the generated polynomial approximates the finite
@@ -172,9 +172,19 @@ absolute error at most `209 * 2^-78` before power-of-two scaling against
 the two-word sum, lies in `[0.999, 2.001]`, and its low word is at most
 `2^-52` in magnitude. The dispatch theorem proves `0 <= k <= 1023` on
 the implemented negative branch and `1/2 < -x < 9` when `k <= 104`.
-These theorems establish the exponential component;
-the reflected subtraction, analytic function bounds and final decision
-remain separate obligations. When the positive reflection term is omitted, the
+
+`ErfcxReflectionScale.v` proves the high table word scales exactly.
+For the low word it permits gradual underflow: words at least `2^-746`
+in magnitude scale exactly, and smaller words have absolute scaling error
+at most `2^-800`. The composition certificate includes this error.
+`ErfcxReflectionSubtract.v` proves finite intermediates, exact TwoSum,
+Fast2Sum dominance and normalization, and relative error at most `2^-67`
+against the reflected expression, under the stated table and exponential
+word ranges and approximation bounds. The complete negative kernel is
+also transcribed for extraction; this cross-check is not an analytic
+function-error proof.
+
+When the positive reflection term is omitted, the
 simple uniform bound on that term relative to the exponential is `2^-105`;
 the former `2^-110` comment was too strong near exponent 105.
 

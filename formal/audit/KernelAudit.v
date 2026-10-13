@@ -218,3 +218,7 @@ Print Assumptions ErfcxReflectionReduction.reflection_reduce_ieee.
 Print Assumptions ErfcxReflectionExp.reflection_exp_ieee.
 Print Assumptions ErfcxReflectionExp.reflection_square_exp_ieee.
 Print Assumptions ErfcxReflectionExp.reflection_dispatch_range.
+
+Require ErfcxReflectionScale ErfcxReflectionSubtract.
+Print Assumptions ErfcxReflectionScale.reflection_scaled_word_ieee.
+Print Assumptions ErfcxReflectionSubtract.reflection_subtract_ieee.

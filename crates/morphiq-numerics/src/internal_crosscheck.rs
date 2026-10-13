@@ -267,6 +267,14 @@ fn internal_crosscheck_corpus() {
             error.to_bits()
         )
         .unwrap();
+        let (nh, nl, nk) = crate::erfcx::n_eval(x);
+        writeln!(
+            out,
+            "erfcx_reflection_value {bits:016x} : {nk} {:016x} {:016x}",
+            nh.to_bits(),
+            nl.to_bits()
+        )
+        .unwrap();
         let (s, se) = if i % 2 == 0 {
             (square, error)
         } else {
