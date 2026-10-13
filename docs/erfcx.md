@@ -135,6 +135,28 @@ alternating asymptotic series in the positive tail, and a Q256 exponential
 and reflection for negative inputs. Constants are generated independently
 at 600 and 1000 bits and must agree after rounding to 256 bits.
 
+The stored Taylor centers are independently certified against
+`exp(c²) * (1 - (2/sqrt(pi)) * integral_0^c exp(-u²) du)`.
+`ErfcxGaussianSeries.gaussian_integral_remainder` scales the integral to
+`[0,1]`, integrates its exponential polynomial, and bounds the remainder
+for either sign of c. `ErfcxGaussianBox.gaussian_boxes_correct` proves a
+fixed-point interval replay with outward-rounded integer divisions.
+`generators/erfcx_center_certificates.py` emits the checks for all 177 stored
+Q256 values, using 400–1200 bits and polynomial degrees 100–1100; Coq
+replays every integer step and CoqInterval checks the final transcendental
+expression. The truncation bound is `2^-350`.
+`ErfcxAccurateCenters.q_center_ok` includes both errors and proves
+`|stored_F(c) - F(c)| <= 2^-251` for every center.
+
+`ErfcxTaylorDerivatives.taylor_derivative_n` connects the ODE recurrence to
+all actual derivatives. The local integral identity bounds `|F(c+h)|` by
+512 for `|c| <= 16`, `|h| <= 1/8`, and the certified center range.
+The derivative majorant `512 * 40^n` through order 100 gives a
+`2^-280` absolute truncation bound for the degree-99 Taylor polynomial in
+`ErfcxTaylorRemainder.table_taylor_cap_remainder`. These are exact-series
+and center-value bounds; Q256 evaluation and early stopping are separate
+obligations.
+
 The Q256 reciprocal starts with binary64 division. At the largest inputs,
 that seed is subnormal and its relative rounding error can exceed `2^-53`.
 `ErfcxAccurateReciprocal.accurate_reciprocal_seed_ieee` proves its error is
