@@ -204,3 +204,6 @@ Print Assumptions ErfcxTableEvaluation.horner_ieee.
 Print Assumptions ErfcxTableEvaluation.table_rest_ieee.
 Print Assumptions ErfcxTableEvaluation.table_sum_ieee.
 Print Assumptions ErfcxTableEntry.table_eval_ieee.
+
+Require ErfcxTableBound.
+Print Assumptions ErfcxTableBound.table_evaluation_error.

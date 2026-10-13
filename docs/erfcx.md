@@ -65,8 +65,9 @@ would permit double rounding at underflow.
 
 The current fast-path tests use a provisional relative guard of `2^-66`.
 A rejection evaluates the Q256 path. The arithmetic certificates fit within
-this guard, but applying them to the binary64 entry points still requires
-discharging their hypotheses. The guard is not an end-to-end error proof.
+this guard. The table evaluation error is proved at its binary64 entry;
+connecting its approximation to the function, the reflection entry and final
+rounding still requires further proofs. The guard is not an end-to-end error proof.
 
 For a subnormal output, the leading candidate is scaled first. It is then
 mapped back exactly to the unscaled domain, where the binary64 subnormal
@@ -97,7 +98,7 @@ lemmas; an unchecked algebraic identity is not accepted as a proof.
 
 | Component | Certified bound | Assumptions still needed at the entry |
 |---|---|---|
-| `T*.g` | Relative table evaluation error `2^-67` against the polynomial | Residual split, square, coefficient products and differences discharged by `ErfcxTableSplit` and `ErfcxTableProducts`; reduction and Fast2Sum calls remain |
+| `T*.g` | Relative table evaluation error `2^-67` against the polynomial | All arithmetic entry hypotheses discharged by `ErfcxTableBound.table_evaluation_error`; the polynomial/function approximation bound remains separate |
 | `reciprocal.g` | Relative error `2^-98` for corrected `1/x`, `16 <= x <= 512` | Discharged by `ErfcxReciprocal.reciprocal_ieee` |
 | `middle_square*.g` | Absolute error `2^-102` against `1/x²` | Discharged by `ErfcxSquare.reciprocal_square_ieee` |
 | `middle_polynomial.g`, `middle_mvt.g` | Evaluation error `0x1.5p-68`; sensitivity error `2^-101` | Discharged by `ErfcxMiddlePolynomial.reciprocal_correction_ieee` |
@@ -198,9 +199,13 @@ Fast2Sum precondition, including the final normalization.
 `ErfcxTableEntry.table_eval_ieee` composes the reduction, split, leading
 products, Horner loop and reconstruction for every finite input in
 `[-1/2,16)`. It identifies the returned words' exact sum with the real
-rounding model used by the table certificates. This arithmetic model still
-needs its per-row approximation bounds and final rounding decision connected
-to the mathematical function.
+rounding model used by the table certificates. The generated bridge decodes
+and checks every coefficient and masked coefficient against the exact Gappa
+constant. `ErfcxTableBound.table_evaluation_error` selects the certificate
+corresponding to the actual reduction index and proves relative evaluation
+error at most `2^-67` against the stored polynomial for all finite inputs in
+`[-1/2,16)`. Connecting the polynomial's approximation and the final rounding
+decision to the mathematical function remains separate.
 
 The reciprocal and square entry theorems start from a finite binary64
 input in `[16, 512]`. They prove that every intermediate is finite, that
@@ -253,8 +258,8 @@ scaled reciprocals keep large inputs away from Dekker splitter overflow.
 * `generators/erfcx/tables.sollya`: Sollya 8.0 `fpminimax` and `supnorm`,
   400-bit working precision. All coefficients originate here.
 * `generators/erfcx_constants.py`: fast and Q256 table replay.
-* `generators/erfcx_table_data.py`: exact table-word transcription for the
-  Coq coefficient checks.
+* `generators/erfcx_table_data.py`: exact table-word transcription, coefficient
+  range checks and per-row Gappa bindings.
 * `generators/erfcx_reference.py`: independent mpmath witnesses, including
   binade edges, interval boundaries, thresholds, and both tails.
 * `formal/erfcx/T*.g`: 177 Gappa table-evaluation certificates. They prove
