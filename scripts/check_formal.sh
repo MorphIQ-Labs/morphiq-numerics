@@ -184,8 +184,8 @@ touch "$build/.built"
 # on Linux; reserve 32 MiB for compilation. This applies to both extractions
 # and is scoped to the compiler, not the proof auditors or corpus executables.
 compile_extraction() (
-  ulimit -s 32768
-  ocamlfind ocamlopt "$@"
+  ulimit -s 32768 || exit 1
+  exec ocamlfind ocamlopt "$@"
 )
 
 # The audits and the cross-checks are independent, so they run at once; each is
