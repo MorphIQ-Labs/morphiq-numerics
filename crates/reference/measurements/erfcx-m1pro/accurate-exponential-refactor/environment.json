@@ -1,0 +1,36 @@
+{
+  "baseline_commit": "5451204",
+  "target": "aarch64-apple-darwin",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: aarch64-apple-darwin\nrelease: 1.97.1\nLLVM version: 22.1.6\n",
+  "profile": "release; simd,std; forced accurate negative calls; 4096 inputs; one warmup; 31 alternating process pairs",
+  "elapsed_seconds": 2.7990570068359375,
+  "load_average_at_start": [
+    13.88427734375,
+    22.26220703125,
+    29.7626953125
+  ],
+  "load_average_at_end": [
+    13.33251953125,
+    22.0087890625,
+    29.62890625
+  ],
+  "task_owned_proof_pids_paused": [
+    26345,
+    50938,
+    50941,
+    50939,
+    50943,
+    50940,
+    50945,
+    50944,
+    51218,
+    50177
+  ],
+  "host_control": "Unrelated host activity, frequency and power were not controlled.",
+  "candidate_accurate_rs_sha256": "b8597ce0e7fb2381427fd05fe9dacf9d806dd3cb82cdd34c475ddcb844d87faf",
+  "median_ns_per_argument": {
+    "baseline": 3743.896484375,
+    "candidate": 3747.283935546875
+  }
+}

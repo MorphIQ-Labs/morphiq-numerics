@@ -188,6 +188,25 @@ reciprocal seeds, and the longer loops near 16. `Q256Real.top_small` and
 helpers; their extracted transcriptions are checked against the Rust fields
 and results, including zero, the stopping boundary and large exponents.
 
+The accurate reflected exponential is bounded separately from the final
+subtraction. `ErfcxAccurateConstants.q_reciprocal_ok` checks all 100 stored
+reciprocals with exact integer inequalities. CoqInterval independently
+bounds `ln(2)/128` and all 128 Q256 exponential-table constants in
+`ErfcxAccurateTranscendentals.v`; `generators/erfcx_accurate_data.py`
+transcribes their exact limbs from the generated Rust tables.
+
+`ErfcxAccurateHorner.q_exp_horner_error` bounds the 24-level Q256 Horner
+sequence by `2^-252` absolutely for a residual of magnitude at most `1/256`.
+Its degree-24 truncation error is at most `2^-282` on that interval.
+`ErfcxAccurateReduction.accurate_residual_error` includes the exact square's
+low word and bounds reduction error by `2^-241`. The integer decoder is
+proved to recover the same bounded integer as the shifter result's `i32`
+conversion. `ErfcxAccurateExponential.q_reflection_big_error` composes the
+actual square, reduction, polynomial, table product and scaling, proving
+relative error at most `2^-238` against `2*exp(x²)` on the implemented finite
+negative-reflection domain. The Taylor approximation and its subtraction
+from this exponential remain separate obligations.
+
 A relative approximation bound is not an ulp bound. For a positive normal
 value z, `z / ulp(z)` is between `2^52` and `2^53`; therefore relative error
 epsilon corresponds to as much as `2^53 epsilon` ulp before final rounding.
@@ -482,6 +501,15 @@ library. Only a panic source-location record changes in the assembly.
 `crates/reference/measurements/erfcx-m1pro/table-products-codegen.json`
 records the toolchain, command, source revision and assembly hashes for this
 comparison; it is code-generation evidence, not a new timing measurement.
+
+The accurate reflected-exponential helper refactor changed AArch64 register
+allocation and reduced its affected stack frame from 432 to 400 bytes.
+A separate forced-accurate negative-path comparison gave median costs of
+3743.90 ns before and 3747.28 ns after (+0.09%), over 31 alternating process
+pairs. Proof processes were paused; unrelated host activity and power were
+uncontrolled. [Inputs, benchmark, raw rounds and source binding](../crates/reference/measurements/erfcx-m1pro/accurate-exponential-refactor/)
+record this comparison. It is separate from the normal-dispatch throughput
+measurements above.
 
 ## Mathematical sources and provenance
 

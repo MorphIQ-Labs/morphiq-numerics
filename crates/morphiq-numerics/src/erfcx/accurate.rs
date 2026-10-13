@@ -74,6 +74,14 @@ pub(crate) fn asym(x: f64) -> Q256 {
 
 pub(super) fn neg(x: f64) -> Q256 {
     let (s, se) = two_prod(x, x);
+    let big = reflected_exponential(s, se);
+    let g = if -x < 16.0 { taylor(-x) } else { asym(-x) };
+    big.add(g.neg())
+}
+
+/// Twice the exponential of an exact double-word square.
+#[inline]
+pub(crate) fn reflected_exponential(s: f64, se: f64) -> Q256 {
     let n = (s * INV_L + SHIFTER) - SHIFTER;
     let n_int = n as i32;
     let j = n_int.rem_euclid(128) as usize;
@@ -86,7 +94,5 @@ pub(super) fn neg(x: f64) -> Q256 {
         hh = Q256::ONE.add(r.mul(q(RECIP[level - 1])).mul(hh));
     }
     let big = q(T2[j]).mul(hh);
-    let big = big.mul_pow2(k + 1);
-    let g = if -x < 16.0 { taylor(-x) } else { asym(-x) };
-    big.add(g.neg())
+    big.mul_pow2(k + 1)
 }

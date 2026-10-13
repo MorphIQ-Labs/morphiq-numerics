@@ -246,6 +246,7 @@ fn internal_crosscheck_corpus() {
     let mut out = String::new();
     q256_exponent_corpus(&mut out);
     erfcx_accurate_tail_corpus(&mut out);
+    erfcx_accurate_exponential_corpus(&mut out);
     // Cover the corrected reciprocal's full exponent range, including each
     // power-of-two boundary and its adjacent binary64 values.
     let mut erfcx_rng = SplitMix64::new(0x6572_6663_785f_0001);
@@ -1156,6 +1157,49 @@ fn internal_crosscheck_corpus() {
     assert_eq!((least_k, greatest_k), (-54, 1024), "expm1 scaling extremes");
     logarithm_fallback_corpus(&mut out);
     std::fs::write(path, out).unwrap();
+}
+
+/// Every accurate exponential table index, exact squares, and reduction edges.
+fn erfcx_accurate_exponential_corpus(out: &mut String) {
+    let mut rng = SplitMix64::new(0x6572_6663_7865_7870);
+    let mut seen = [false; 128];
+    for i in 0..2048 {
+        let (s, se) = if i < 384 {
+            let k = [1, 512, 1023][i / 128];
+            let n = f64::from(u32::try_from(k * 128 + i % 128).unwrap());
+            (n / crate::exp::tables::INV_L, 0.0)
+        } else {
+            let bits = match i {
+                384 => 0.5_f64.to_bits(),
+                385 => (-crate::erfcx::X_OVF).to_bits() - 1,
+                386 => 16.0_f64.to_bits(),
+                _ => {
+                    0.5_f64.to_bits()
+                        + rng.next_u64() % ((-crate::erfcx::X_OVF).to_bits() - 0.5_f64.to_bits())
+                }
+            };
+            let x = f64::from_bits(bits);
+            crate::eft::two_prod(x, x)
+        };
+        let n = (s * crate::exp::tables::INV_L + crate::exp::tables::SHIFTER)
+            - crate::exp::tables::SHIFTER;
+        #[allow(clippy::cast_possible_truncation)] // integer shifter result, 46..=131071
+        let index = (n as i32).rem_euclid(128);
+        seen[usize::try_from(index).unwrap()] = true;
+        let value = crate::erfcx::accurate_reflected_exp(s, se);
+        writeln!(
+            out,
+            "erfcx_accurate_exp {:016x} {:016x} : {}",
+            s.to_bits(),
+            se.to_bits(),
+            q256(value)
+        )
+        .unwrap();
+    }
+    assert!(
+        seen.into_iter().all(core::convert::identity),
+        "every accurate erfcx exponential table index"
+    );
 }
 
 /// Accurate erfcx tails: loop-heavy inputs, every input binade, and subnormal seeds.

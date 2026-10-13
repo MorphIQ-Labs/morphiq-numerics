@@ -334,3 +334,18 @@ Require ErfcxAccurateProduct ErfcxAccurateRounded.
 Print Assumptions ErfcxAccurateProduct.q_cs_error.
 Print Assumptions ErfcxAccurateProduct.q_asym_error.
 Print Assumptions ErfcxAccurateRounded.q_asym_rounded.
+
+Require ErfcxAccurateConstants ErfcxAccurateTranscendentals ErfcxAccurateHorner
+  ErfcxAccurateExpSeries ErfcxAccurateReduction ErfcxAccurateIndex ErfcxAccurateExponential.
+Print Assumptions ErfcxAccurateConstants.q_reciprocal_ok.
+Print Assumptions ErfcxAccurateTranscendentals.q_logstep_ok.
+Print Assumptions ErfcxAccurateTranscendentals.q_exp_table_ok.
+Print Assumptions ErfcxAccurateHorner.q_exp_horner_error.
+Print Assumptions ErfcxAccurateExpSeries.exp_horner_truncation.
+Print Assumptions ErfcxAccurateExpSeries.q_exp_horner_exp.
+Print Assumptions ErfcxAccurateReduction.accurate_n_ieee.
+Print Assumptions ErfcxAccurateReduction.accurate_residual_error.
+Print Assumptions ErfcxAccurateIndex.accurate_index_ok.
+Print Assumptions ErfcxAccurateExponential.q_exp_scaled_error.
+Print Assumptions ErfcxAccurateExponential.q_reflection_exponential_error.
+Print Assumptions ErfcxAccurateExponential.q_reflection_big_error.
