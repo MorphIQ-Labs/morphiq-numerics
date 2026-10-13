@@ -214,7 +214,8 @@ changes:
   skipping each `ehᵢ = 0` before its `dlᵢ` is used, as decision 3 does. Every
   summand, and the order in which it is added, is step 4's, so `t̂` and the
   result are the same bits. A slice of at most two elements has at most one
-  other term, which gains nothing from lanes, so it keeps the scalar loop.
+  other term, which gains nothing from lanes, so it uses scalar arithmetic;
+  a pair takes the specialization in decision 9.
 - **`log_sum_exp_pairs`** performs steps 1 and 2 per pair, then evaluates
   every pair's `exp(dh)` together, forms each pair's `t̂` by step 4, and
   evaluates every `ln_1p(t̂)` together. A pair without a second finite term
@@ -243,6 +244,21 @@ is evaluated once.
 
 Without the `simd` feature `log_sum_exp` loops `exp` term by term and
 `log_sum_exp_pairs` calls `log_sum_exp` on each pair.
+
+**Decision 9: specialize scalar pairs without changing the arithmetic.** For
+exactly two elements, `pair_sum` classifies the first and then the second
+NaN before checking either infinity. It selects the second maximum only
+when strictly larger, exactly as step 1 does. If the other entry is `−∞`,
+the result is the maximum (including two `−∞` entries or a lone `−0`).
+Otherwise there is precisely one retained term: `two_sum(v, −m)`, `exp(dh)`,
+one call to the unchanged `Sum2Stream::add`, its unchanged `total`, and
+step 5. In particular the `exp(dh) = 0` guard still precedes use of `dl`,
+and the compensated sum is not replaced by an ordinary addition. This
+removes general-slice scanning and index bookkeeping; it changes no
+operation in the numerical reduction, output bit, bound, or public API.
+The lane pair APIs already reduce one other entry directly, so their
+arithmetic remains unchanged. Without SIMD, `log_sum_exp_pairs` inherits
+this scalar specialization through its existing call to `log_sum_exp`.
 
 ## 4. `log_sum_exp`: error bound
 
@@ -379,11 +395,11 @@ These implement the requirements recorded on #44:
 
 ## 8. Cost
 
-- **`log_sum_exp`:** one pass to classify and find `m`. A second pass costs,
+- **`log_sum_exp`:** for lengths other than two, one pass to classify and find `m`. A second pass costs,
   per element, one `two_sum`, one `exp`, one multiplication and a `two_sum`
   step of Sum2. One `ln_1p` follows. That is `O(n)` time with no allocation.
-  For `n = 2` it is one `exp`, one `ln_1p` and a handful of exact
-  operations.
+  For `n = 2` it classifies the two entries directly, then performs one
+  `exp`, one `ln_1p` and the same compensated operations (decision 9).
 - **`log_sum_exp_pairs`:** per pair, `log_sum_exp`'s work for `n = 2`. With
   the `simd` feature the `N` exponentials and the `N` logarithms each run in
   lanes. No allocation; its arrays are on the stack. `log_sum_exp`'s
@@ -420,7 +436,49 @@ makes it 1.66× faster.
 
 On AVX2 and AVX-512F, a batch of two pairs is shorter than one lane chunk.
 The backend cascade ([lanes.md](lanes.md) §1) runs it on SSE2's two lanes.
-No x86-64 host was timed, so the gain there is inferred, not measured.
+That lane-pair comparison was not timed on x86-64.
+
+**Scalar pair specialization, native x86-64.** `bench-log-space` reuses the
+fixed-seed input and timing approach of `bench-batched`, retaining every
+sample as CSV. Build the same harness at both revisions and alternate fresh
+processes. `dependent` feeds the previous output's low bit into the next
+input selection; the reported latency includes indexing and black-box
+overhead. `independent` loops independent scalar calls. Neither batches
+calls into SIMD lanes. Reproduce with:
+
+```sh
+cargo build --release --locked -p morphiq-numerics-reference --features simd,std --bin bench-log-space
+target/release/bench-log-space --calls 100000 --rounds 1
+# Repeat without --features simd,std for the scalar-only build.
+```
+
+Measured on a shared Intel i9-10920X (12 cores / 24 threads), Linux x86-64,
+Rust 1.97.1 release, default target features, with seven alternating AB/BA
+pairs of fresh processes per feature configuration. Each case has 4,096
+untimed warmup calls and 100,000 timed calls. No concurrent build or
+benchmark was started by this experiment; one-minute host load ranged
+from 5.80 to 6.22. Baseline is `1818ab9` plus the identical harness;
+candidate adds decision 9. These are local measurements, not CI gates.
+
+| Dependent calls, ns/call (median) | Baseline, `simd,std` | Pair specialization, `simd,std` | Baseline, no features | Pair specialization, no features |
+| --- | ---: | ---: | ---: | ---: |
+| Near-equal terms | 56.79 | 52.94 | 55.95 | 52.66 |
+| Separated terms | 52.29 | 50.27 | 50.97 | 48.40 |
+| Cancellation near zero | 56.63 | 49.98 | 55.83 | 50.29 |
+| Nonzero subtraction tail | 56.78 | 52.88 | 55.66 | 53.04 |
+| Exponential fallback, subnormal mass | 306.82 | 300.16 | 309.38 | 301.79 |
+| Underflow to zero mass | 11.71 | 7.02 | 9.26 | 6.99 |
+| Eight-term control | 134.97 | 134.30 | 134.33 | 137.56 |
+
+The ordinary pair distributions improve by about 4–12% with `simd,std`;
+the fallback-heavy case improves much less. The scalar-only eight-term
+control is 2.4% slower in this sample, while its independent loop is 0.4%
+slower. This does not establish a gain for arbitrary slice lengths or
+other hosts. [All samples](evidence/log-space-two-term-x86.csv), including
+independent loops, and [run metadata](evidence/log-space-two-term-x86.json)
+retain the ranges, process CPU times, load, compiler and executable hashes.
+Process CPU covers input construction, warmup and formatting as well as
+timed loops; it is distinct from the per-loop wall measurements above.
 
 ## 9. Evidence
 
