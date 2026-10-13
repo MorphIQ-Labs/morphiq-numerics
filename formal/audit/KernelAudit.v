@@ -191,3 +191,8 @@ Print Assumptions ErfcxTableProducts.table_leading_value_ieee.
 
 Require ErfcxConstants.
 Print Assumptions ErfcxConstants.cs_split_bound.
+
+Require ErfcxTableReduction.
+Print Assumptions ErfcxTableReduction.table_uniform_ieee.
+Print Assumptions ErfcxTableReduction.table_binade_ieee.
+Print Assumptions ErfcxTableReduction.table_reduce_ieee.

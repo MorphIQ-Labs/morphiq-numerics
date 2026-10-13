@@ -168,8 +168,16 @@ word is exact, and their sum is exactly `h`. The low word has magnitude at
 most `2^(e-24)`. A separate theorem proves the high-word square exact from
 its grid and magnitude. The extracted split and square are checked against
 Rust at positive and negative rounding ties, their neighbours, interval
-endpoints, and subnormal residuals. These lemmas assume the reduction has
-already supplied the stated residual bound.
+endpoints, and subnormal residuals. `ErfcxTableReduction.table_reduce_ieee`
+proves that the actual reduction supplies this residual bound for every
+finite input in `[-1/2,16)`. The uniform branch rounds `32*x` to nearest-even,
+proves that its integer is within the Rust cast's range, and subtracts the
+selected centre exactly, including for subnormal inputs. The binade branch
+proves the exponent and midpoint masks select the stated row and centre;
+its subtraction is exact on the input's grid. Both branches return a valid
+index, a finite centre and residual, and exponent `0 <= e <= 3`. Extracted
+reduction checks include all uniform ties and all binade cell edges and
+centres, their neighbours, and both signed zeros.
 
 The leading-coefficient checker decodes the actual binary64 words and the
 same bit masks used by Rust. Coq evaluates this check for both leading

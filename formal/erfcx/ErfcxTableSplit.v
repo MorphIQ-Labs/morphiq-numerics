@@ -65,6 +65,47 @@ Proof.
 Qed.
 
 Require Import Ln1pReduction.
+(** A nearest-grid split has an exactly representable low word, including
+    the zero-high-word case for subnormal inputs. *)
+Lemma nearest_residual_ieee v h g K : finite v -> finite h -> (-1021<=g<=1)%Z ->
+ B h=IZR K*bpow radix2 g -> Rabs (B v*bpow radix2 (-g)-IZR K)<=/2 ->
+ finite (fsub v h) /\ B (fsub v h)=B v-B h /\ Rabs (B v-B h)<=bpow radix2 (g-1).
+Proof.
+ intros Fv Fh G Bh Near.
+ assert (Scale : bpow radix2 g*bpow radix2 (-g)=1).
+ { rewrite <-bpow_plus. replace (g+-g)%Z with 0%Z by ring. reflexivity. }
+ assert (P : 0<bpow radix2 g) by apply bpow_gt_0.
+ assert (Dh : Rabs (B v-B h)<=bpow radix2 (g-1)).
+ { rewrite Bh.
+   replace (B v-IZR K*bpow radix2 g) with ((B v*bpow radix2 (-g)-IZR K)*bpow radix2 g)
+     by (rewrite Rmult_minus_distr_r,Rmult_assoc;rewrite (Rmult_comm (bpow radix2 (-g)) (bpow radix2 g)),Scale;ring).
+   replace (g-1)%Z with (-1+g)%Z by ring. rewrite bpow_plus.
+   change (bpow radix2 (-1)) with (/2).
+   rewrite Rabs_mult,(Rabs_pos_eq (bpow radix2 g)) by lra.
+   apply Rmult_le_compat_r;lra. }
+ assert (Hg : on_grid g (B h)) by (exists K;exact Bh).
+ assert (Fmt : fmtF (B v-B h)).
+ { destruct (Z.eq_dec K 0) as [K0|Kn].
+   - rewrite Bh,K0. replace (B v-IZR 0*bpow radix2 g) with (B v) by (simpl;ring). apply B_fmt.
+   - assert (Hlow : bpow radix2 g<=Rabs (B h)) by (apply grid_nonzero;[exact Hg|rewrite Bh;intro Zero;apply Kn;apply eq_IZR;simpl;nra]).
+     assert (Vlow : bpow radix2 (g-1)<=Rabs (B v)).
+     { pose proof (Rabs_triang_inv (B h) (B h-B v)) as D.
+       replace (B h-(B h-B v)) with (B v) in D by ring. rewrite Rabs_minus_sym in D.
+       assert (Two : bpow radix2 g=2*bpow radix2 (g-1)).
+       { change 2 with (bpow radix2 1). rewrite <-bpow_plus. f_equal;lia. } lra. }
+     apply (grid_repr (g-53));[lia| |].
+     + apply grid_minus.
+       * replace (g-53)%Z with ((g-1)-52)%Z by ring.
+         apply (grid_fmt_bound (FLT_exp emin prec));[intros;unfold FLT_exp,emin,prec;lia|apply B_fmt|right;exact Vlow].
+       * apply grid_le with g;[lia|exact Hg].
+     + apply Rle_lt_trans with (1:=Dh). apply bpow_lt;lia. }
+ assert (Dsmall : Rabs (B v-B h)<=1).
+ { apply Rle_trans with (1:=Dh). change 1 with (bpow radix2 0). apply bpow_le;lia. }
+ destruct (fsub_ok 1 0 v h Fv Fh ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia)
+  ltac:(unfold bnd;rewrite Rmult_1_l;change (bpow radix2 0) with 1;exact Dsmall)) as [Fl Bl].
+ rewrite round_generic in Bl by (exact _ || exact Fmt). repeat split;assumption.
+Qed.
+
 Theorem table_split_residual v sh g : finite v -> finite sh -> (-23 <= g <= -20)%Z ->
  B sh=IZR (3*2^51)*bpow radix2 g -> Rabs (B v)<=131072*bpow radix2 g ->
  let h := fsub (fadd v sh) sh in
@@ -75,44 +116,13 @@ Proof.
  intros Fv Fs G Bs V h.
  destruct (table_split_round v sh g Fv Fs G Bs V) as [Fh [Bh Kb]]. fold h in Fh,Bh.
  set (K := Znearest ne (B v*bpow radix2 (-g))) in *.
- assert (Near : Rabs (B v*bpow radix2 (-g)-IZR K)<=/2) by (unfold K; apply Znearest_half).
- assert (Scale : bpow radix2 g*bpow radix2 (-g)=1).
- { rewrite <- bpow_plus. replace (g+-g)%Z with 0%Z by ring. reflexivity. }
- assert (P : 0<bpow radix2 g) by apply bpow_gt_0.
- assert (Dh : Rabs (B v-B h)<=bpow radix2 (g-1)).
- { rewrite Bh.
-   replace (B v-IZR K*bpow radix2 g) with ((B v*bpow radix2 (-g)-IZR K)*bpow radix2 g)
-     by (rewrite Rmult_minus_distr_r,Rmult_assoc; rewrite (Rmult_comm (bpow radix2 (-g)) (bpow radix2 g)),Scale;ring).
-   replace (g-1)%Z with (-1+g)%Z by ring. rewrite bpow_plus.
-   change (bpow radix2 (-1)) with (/2).
-   rewrite Rabs_mult,(Rabs_pos_eq (bpow radix2 g)) by lra.
-   apply Rmult_le_compat_r; lra. }
- assert (Hg : on_grid g (B h)) by (exists K; exact Bh).
+ assert (Near : Rabs (B v*bpow radix2 (-g)-IZR K)<=/2) by (unfold K;apply Znearest_half).
+ destruct (nearest_residual_ieee v h g K Fv Fh ltac:(lia) Bh Near) as [Fl [Bl Dh]].
+ assert (Hg : on_grid g (B h)) by (exists K;exact Bh).
  assert (Hb : Rabs (B h)<=131072*bpow radix2 g).
- { rewrite Bh,Rabs_mult,(Rabs_pos_eq (bpow radix2 g)) by lra.
-   apply Rmult_le_compat_r; [lra | rewrite <-abs_IZR; apply IZR_le; exact Kb]. }
- assert (Fmt : fmtF (B v-B h)).
- { destruct (Z.eq_dec K 0) as [K0|Kn].
-   - rewrite Bh,K0. replace (B v-IZR 0*bpow radix2 g) with (B v) by (simpl;ring). apply B_fmt.
-   - assert (Hlow : bpow radix2 g<=Rabs (B h)) by (apply grid_nonzero; [exact Hg | rewrite Bh; intro Zero; apply Kn; apply eq_IZR; simpl; nra]).
-     assert (Vlow : bpow radix2 (g-1)<=Rabs (B v)).
-     { pose proof (Rabs_triang_inv (B h) (B h-B v)) as D.
-       replace (B h-(B h-B v)) with (B v) in D by ring.
-       rewrite Rabs_minus_sym in D.
-       assert (Two : bpow radix2 g=2*bpow radix2 (g-1)).
-       { change 2 with (bpow radix2 1). rewrite <- bpow_plus. f_equal. lia. } lra. }
-     apply (grid_repr (g-53)); [lia | | ].
-     + apply grid_minus.
-       * replace (g-53)%Z with ((g-1)-52)%Z by ring.
-         apply (grid_fmt_bound (FLT_exp emin prec)); [intros; unfold FLT_exp,emin,prec;lia | apply B_fmt | right;exact Vlow].
-       * apply grid_le with g; [lia | exact Hg].
-     + apply Rle_lt_trans with (1:=Dh). apply bpow_lt;lia. }
- assert (Dsmall : Rabs (B v-B h)<=1).
- { apply Rle_trans with (1:=Dh). change 1 with (bpow radix2 0). apply bpow_le;lia. }
- destruct (fsub_ok 1 0 v h Fv Fh ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia)
-  ltac:(unfold bnd;rewrite Rmult_1_l; change (bpow radix2 0) with 1;exact Dsmall)) as [Fl Bl].
- rewrite round_generic in Bl by (exact _ || exact Fmt).
- repeat split; tauto.
+ { rewrite Bh,Rabs_mult,(Rabs_pos_eq (bpow radix2 g)) by apply bpow_ge_0.
+   apply Rmult_le_compat_r;[apply bpow_ge_0|rewrite <-abs_IZR;apply IZR_le;exact Kb]. }
+ repeat split;assumption.
 Qed.
 
 Definition table_shifter e : f64 := b64_of_bits ((1052+e)*2^52+2^51).

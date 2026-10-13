@@ -389,6 +389,66 @@ fn internal_crosscheck_corpus() {
         )
         .unwrap();
     }
+    // Actual table reduction: all uniform ties and binade boundaries,
+    // adjacent encodings, signed zero and both signs of subnormal input.
+    for sample in 0_u64..24000 {
+        let x = if sample < 12000 {
+            match sample {
+                0 => -0.5,
+                1 => f64::from_bits(1.0_f64.to_bits() - 1),
+                2 => 0.0,
+                3 => -0.0,
+                4 => f64::from_bits(1),
+                5 => -f64::from_bits(1),
+                6..=149 => {
+                    let k = ((sample - 6) / 3) as i32 - 16;
+                    let tie = (k as f64 + 0.5) / 32.0;
+                    let bits = match (sample - 6) % 3 {
+                        0 => tie.to_bits() - 1,
+                        1 => tie.to_bits(),
+                        _ => tie.to_bits() + 1,
+                    };
+                    f64::from_bits(bits)
+                }
+                _ => {
+                    let negative = erfcx_rng.next_u64() & 1 != 0;
+                    let limit = if negative {
+                        0.5_f64.to_bits() + 1
+                    } else {
+                        1.0_f64.to_bits()
+                    };
+                    let bits = erfcx_rng.next_u64() % limit;
+                    f64::from_bits(bits | if negative { 1_u64 << 63 } else { 0 })
+                }
+            }
+        } else {
+            let j = sample - 12000;
+            let low = 1.0_f64.to_bits();
+            let high = 16.0_f64.to_bits() - 1;
+            let bits = match j {
+                0..=767 => {
+                    let boundary = low + ((j / 3) << 46);
+                    match j % 3 {
+                        0 => boundary.saturating_sub(1).max(low),
+                        1 => boundary,
+                        _ => boundary + 1,
+                    }
+                }
+                768 => high,
+                _ => low + erfcx_rng.next_u64() % (high - low + 1),
+            };
+            f64::from_bits(bits)
+        };
+        let (idx, c, h, e) = crate::erfcx::t_reduce(x);
+        writeln!(
+            out,
+            "erfcx_table_reduce {:016x} : {idx} {e} {:016x} {:016x}",
+            x.to_bits(),
+            c.to_bits(),
+            h.to_bits()
+        )
+        .unwrap();
+    }
     for idx in 0_usize..177 {
         let e = if idx < 49 {
             0
