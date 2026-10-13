@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.3](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.2...v0.0.3) - 2026-10-13
+
+### Added
+
+- *(formal)* complete expm1 small paths and entry proofs ([#138](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/138))
+
 ## [0.0.2](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.1...v0.0.2) - 2026-10-12
 
 ### Added
