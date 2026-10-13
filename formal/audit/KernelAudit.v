@@ -310,3 +310,22 @@ Print Assumptions Q256Real.top_small.
 Print Assumptions Q256Real.mul_pow2_any.
 Print Assumptions ErfcxAccurateTerms.q_asym_term_error.
 Print Assumptions ErfcxAccurateTerms.q_asym_stop_remainder.
+
+Require ErfcxAccurateTermBounds ErfcxAccurateSum ErfcxAccurateLoop ErfcxAccurateSquare ErfcxAccurateInputs.
+Print Assumptions ErfcxAccurateTermBounds.asym_terms_bounded.
+Print Assumptions ErfcxAccurateSum.q_asym_sum_error.
+Print Assumptions ErfcxAccurateSum.q_asym_sum_integral.
+Print Assumptions ErfcxAccurateLoop.q_asym_loop_prefix.
+Print Assumptions ErfcxAccurateLoop.q_asym_series_integral.
+Print Assumptions ErfcxAccurateSquare.q_half_square_error.
+Print Assumptions ErfcxAccurateInputs.q_float_ok.
+Print Assumptions ErfcxAccurateInputs.q_to_float_round.
+Print Assumptions ErfcxAccurateInputs.q_float_roundtrip.
+Print Assumptions ErfcxAccurateInputs.q_odd_ok.
+
+
+Require ErfcxAccurateNewton ErfcxAccurateSetup.
+Print Assumptions ErfcxAccurateNewton.q_newton_error.
+Print Assumptions ErfcxAccurateNewton.q_refine3_error.
+Print Assumptions ErfcxAccurateSetup.q_recip_float_error.
+Print Assumptions ErfcxAccurateSetup.q_tail_series_integral.

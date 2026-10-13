@@ -140,8 +140,10 @@ that seed is subnormal and its relative rounding error can exceed `2^-53`.
 `ErfcxAccurateReciprocal.accurate_reciprocal_seed_ieee` proves its error is
 at most `2^-51` for every finite input at least 16. The shared Newton
 certificates include this larger seed budget and still bound the third
-iteration by `650*2^-262 < 2^-252`. The seed theorem and Newton certificates
-are components; the complete Q256 tail composition remains separate.
+iteration by `650*2^-262 < 2^-252`. `ErfcxAccurateNewton.q_refine3_error` separately composes the actual
+Q256 operation sequence, including zero residuals, with a final bound
+of `2^-252`. `ErfcxAccurateSetup.q_recip_float_error` connects it to
+the input conversion and hardware division without a seed-error assumption.
 
 `ErfcxAccurateSeries.v` proves the exact term recurrence
 `a[k+1] = -(t/2)*(2*k+1)*a[k]` and bounds the integral remainder by the
@@ -149,8 +151,8 @@ first omitted term for every truncation index. At the fixed loop limit,
 the remainder after term 399 is at most `2^-319` for `0 <= t <= 2^-8`.
 For an early exit, the remainder is at most `2^-261` if the computed
 omitted term is at most `2^-262` and differs from its exact value by at most
-half that value's magnitude. Establishing the latter condition and the
-accumulated Q256 evaluation error requires the loop's arithmetic proof.
+half that value's magnitude. The term and sum proofs below supply these
+conditions under the stated reciprocal contract.
 `formal/q/Q256Real.v` extends the existing limb-level contracts to include
 zero operands and preserves normalization through construction, conversion,
 negation, addition and multiplication.
@@ -159,9 +161,21 @@ negation, addition and multiplication.
 relative error at most `n*2^-246` through step 400, given a reciprocal-square
 relative error of at most `2^-249` and exact odd integer factors. This
 discharges the early-exit magnitude condition above, with the implemented
-`top() < -262` test, in `q_asym_stop_remainder`. The reciprocal-square and
-integer-factor setup and the sum's accumulated error remain composition
-obligations. `Q256Real.top_small` and `mul_pow2_any` prove the integer-exponent
+`top() < -262` test, in `q_asym_stop_remainder`.
+`ErfcxAccurateSum.q_asym_sum_error` bounds accumulated term and addition
+error by `n*2^-235` through term 399. The early-exit loop transcription in
+`ErfcxAccurateLoop.q_asym_series_integral` therefore differs from `J(t)` by
+at most `2^-226`, including either termination condition.
+
+`ErfcxAccurateSquare.q_half_square_error` establishes the reciprocal-square
+contract from a reciprocal with relative error at most `2^-252`.
+`ErfcxAccurateInputs.v` proves binary64/Q256 conversion and round-trip
+values, rounding of finite Q256 outputs, and the exact odd integer factors.
+`ErfcxAccurateSetup.q_tail_series_integral` composes these results:
+for every finite binary64 input `x >= 16`, the computed series differs
+from `J(1/x²)` by at most `2^-226`, without assumptions on intermediate
+errors. The final scaled product and output rounding remain separate. `Q256Real.top_small` and
+`mul_pow2_any` prove the integer-exponent
 helpers; their extracted transcriptions are checked against the Rust fields
 and results, including zero, the stopping boundary and large exponents.
 
