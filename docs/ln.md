@@ -260,6 +260,15 @@ Each certificate composes four things:
 the degree-9 polynomial against [DLM]'s degree 7, with the double-word
 additions certified here.
 
+The executable fallback proof starts with `LnFastKernel.lf_polynomial_ok`:
+the generated coefficients, separate binary64 Horner operations, exact
+negative half-square, low-word correction and both double-word additions
+produce a normalized pair within `3·2^−66` relatively of `ln(1 + z)`. The zero residual
+is checked separately, for both signs of each zero word. Reconstruction
+proves `7·2^−67` for `ln y`, then `2^−64` for `ln x`. The cancellation bounds
+are established from the table-interval ratios before applying the
+normalization theorem; normalized outputs are proved as well as error bounds.
+
 ## 5. Rounding test
 
 [exp] §8.3, unchanged, with **`ε₁ = 2^−63`**: `EPS = 2^−63·(1 + 2^−50)`, shared by
@@ -552,8 +561,14 @@ The fast path is within `2^−64`, and the accurate path within `2^−123`.
   - `Y_h` is `ln`'s fast path at `h` (§4), within `2^−64` of `ln h`.
   - Then `Y = Y_h.add_f64(RN(l/h))`.
   - Using `l/h` for `ln(1 + l/h)` costs at most `(l/h)²/(2(1 − |l/h|))`.
-  - The bound is `2^−63` relative to `ln(1 + x)` (*certified*:
-    `formal/ln/fast_ln_1p.g`, proves `2^−64.0`).
+  - The quotient can be subnormal for large `h`. Its rounding error is
+    bounded absolutely: `|RN(l/h) − l/h| ≤ 2^−104` from `|l/h| ≤ 2^−52`,
+    including gradual underflow. Along with the logarithmic correction and
+    `|ln(1 + x)| ≥ 2^−8`, this gives
+    `|RN(l/h) − ln(1 + l/h)| ≤ 2^−93·|ln(1 + x)|`.
+  - The full bound is `2^−63` relative to `ln(1 + x)` (*certified*:
+    `formal/ln/fast_ln_1p.g`; proved from the executable split and division
+    by `Ln1pFastGeneral.v`).
 - **Accurate path:** `z' = (y·R[i] − 1) + R[i]·l·2^−E`. With `y`, `E` and `i`
   from `h`, `ln(1 + x) = E·ln 2 − ln R[i] + ln(1 + z')`.
   - The first term is exact, as in §6, and the second is an exact `Q128`
@@ -604,9 +619,14 @@ encoding (`v` is nonzero: `|ln(1 + x)| ≥ 2^−55`). **`ln_1p_stages_ok`** stat
 it for `ln_1p_stages`, the screens and stages as `ln_1p` runs them, for every
 `x`: `formal/ln/Ln1pScreen.v` transcribes both screens on the encoding and
 proves what they admit (**`h_screen_ok`**, **`b_screen_ok`**): a finite `x` in
-the ranges of the table in §7. The double-word fast path's
-step rests on its certificates and the rounding test's proof (§4, §5), as it
-did before; that path's transcription isn't machine-checked end to end.
+the ranges of the table in §7. The double-word fallback is checked end to
+end by `LnFastKernel.v`, `LnFastValue.v`, `Ln1pFast.v` and
+`LnFastDecision.v`: the executable binary64 values satisfy the bounds
+used by their rounding tests. `LnEntry.v` composes both public entries,
+including tiny inputs, special values, every stage and the accurate paths.
+`ln_entry_regular` retains the published midpoint-distance hypothesis for
+`ln`; `ln1p_entry_regular` returns a rounded real within `2^−123` relatively
+of the exact logarithm, preserving `ln_1p`'s bounded contract.
 
 So wherever a stage decides, `ln_1p` is correctly rounded, which §7.6's bound
 alone doesn't claim.
@@ -633,7 +653,7 @@ alone doesn't claim.
 
 | Artifact | Tool | Establishes |
 |---|---|---|
-| `generators/ln_constants.py` | mpmath 1.4.1 | writes `crates/morphiq-numerics/src/ln/tables.rs` and `formal/ln/LnTables.v`: `R[i]`, `−ln R[i]` (double-word and `Q128`), `LN2_HI`/`LN2_LO`, `ln 2` and `1/k` in `Q128`, `c3`–`c9`, each checked against its bound; derives `E·ln 2`'s error, the case ratios (§3) and the series degree (§6) |
+| `generators/ln_constants.py` | mpmath 1.4.1 | writes `crates/morphiq-numerics/src/ln/tables.rs` and `formal/ln/LnTables.v` / `LnFastTables.v`: `R[i]`, `−ln R[i]` (double-word and `Q128`), `LN2_HI`/`LN2_LO`, `ln 2` and `1/k` in `Q128`, `c3`–`c9`, each checked against its bound; derives `E·ln 2`'s error, the case ratios (§3) and the series degree (§6) |
 | `generators/ln_poly.sollya` | Sollya 8.0 | `c3`–`c9` (`fpminimax`, relative) and the approximation bound (`supnorm`), in `generators/ln_poly.out` |
 | `generators/ln_certificates.py` | Python, mpmath | writes every certificate below from those values, with each hypothesis widened by at least 1%, and `formal/ln/LnAccurateLevels.v`; no number in a certificate is typed by hand |
 | `formal/ln/tail.g` | Gappa 1.4.1 | the cubic tail, within `2^−50` relative |
@@ -646,6 +666,12 @@ alone doesn't claim.
 | `formal/ln/LnCheck.v` | Coq | a reflective enclosure of `ln` at a rational |
 | `formal/ln/LnTableCheck.v` | Coq | the accurate path's `Q128` tables and the case ratios, one reflective check each |
 | `formal/ln/LnAccurate.v` | Coq | the accurate paths of `ln` and `ln_1p`, end to end (§6, §7.6) |
+| `formal/ln/LnFastApprox.v`, `LnFastCertificates.v` | Coq | analytic polynomial bound and Gappa certificate bridges |
+| `formal/ln/LnFastAdd.v`, `LnFastCompose.v` | Coq | double-word normalization under bounded cancellation and reconstruction error composition |
+| `formal/ln/LnFastPoly.v`, `LnFastSquare.v`, `LnFastSum.v`, `LnFastCorrection.v`, `LnFastKernel.v`, `LnFastZero.v` | Coq | every binary64 operation of the shared polynomial, including zero residuals |
+| `formal/ln/LnFastTableCheck.v`, `LnFastLn2.v`, `LnFastReduced.v`, `LnFastY.v`, `LnFastValue.v` | Coq | table encodings and errors, exact reduction, and full `ln` reconstruction |
+| `formal/ln/Ln1pFastGeneral.v`, `Ln1pFast.v`, `LnFastDecision.v` | Coq | both `ln_1p` fallback branches and both logarithms' rounding tests |
+| `formal/ln/LnEntryLemmas.v`, `LnEntry.v` | Coq | tiny-input rounding and complete public-entry composition |
 | `generators/ln_poly.sollya` (stages) | Sollya 8.0 | `H0`–`H3` (`h3`–`h6`) and `B0`–`B5` (`b3`–`b8`), `fpminimax`, relative on `\|z\| ≤ 2^−9`, with their approximation bounds, in `generators/ln_poly.out` |
 | `generators/ln1p_constants.py` | Python, mpmath | writes `crates/morphiq-numerics/src/ln/stage_tables.rs` and `formal/ln/Ln1pTables.v`: `OFF`, `R`, `T`, `L1`/`L0`, `EL` and the stages' polynomials, each bound of §7.2 checked |
 | `generators/ln1p_certificates.py` | Python, mpmath | writes the stage certificates below and `formal/ln/Ln1pCertificates.v`, their theorems over reals; hypotheses derived, goals widened by at least 1% |

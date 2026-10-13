@@ -193,27 +193,25 @@ def least_ln_1p():
 
 def fast_ln_1p():
     """ln_1p's fast path (section 7): Y_h from ln's fast path at h, plus d = RN(l/h)."""
-    v = least_ln_1p()
-    t = Fraction(1, 2**53) * (1 + Fraction(1, 2**52))  # |l/h| <= u (1 + 2u)
-    # delta = ln(1 + l/h): |delta| <= t / (1 - t), and |l/h - delta| <= t^2 / (2 (1 - t)).
-    kd = up(t / (1 - t) / v)
-    rr = up(t * t / (2 * (1 - t)) / v)
-    return f'''# ln_1p's fast path on its general branch (docs/ln.md, section 7), |x| >= 2^-7:
-# (h, l) = two_sum(1, x), so ln(1 + x) = ln h + delta, delta = ln(1 + l/h).
-#   Yh = ln h (1 + eh): ln's fast path at h (formal/ln/fast_b.g, fast_c.g);
-#   d = RN(l / h) = (l / h)(1 + eq); Y = add_f64(Yh, d), relative error e3.
-# Over v = ln(1 + x), |v| >= ln(1 + 2^-7): kd = delta / v and kw = ln h / v =
-# 1 - kd; rr = (l/h - delta) / v. Written by generators/ln_certificates.py.
+    return f'''# ln_1p's general fast path (docs/ln.md, section 7), |x| >= 2^-7.
+# q = l/h, delta = ln(1+q), v = ln(1+x), and ln h = v-delta.
+# The split gives |q| <= 2^-52 and |v| >= 2^-8. Binary64 rounding
+# gives |RN(q)-q| <= 2^-104, including subnormal quotients. Together
+# with |ln(1+q)-q| <= 2^-102, this gives |(RN(q)-delta)/v| <= 2^-93.
+# Thus kd=delta/v and ed=(RN(q)-delta)/v cover gradual underflow.
+# Ln1pFastGeneral.v proves these bounds from the executable split and division.
+# Written by generators/ln_certificates.py.
 
 kw = 1 - kd;
-Y = (kw * (1 + eh) + (kd + rr) * (1 + eq)) * (1 + e3);
+Y = (kw * (1 + eh) + kd + ed) * (1 + e3);
 
-{{ {sym('kd', kd)} /\\ {sym('rr', rr)} /\\ {sym('eh', FAST)}
-  /\\ {sym('eq', '1b-53')} /\\ {sym('e3', '1b-105')}
+{{ {sym('kd', '1b-43')} /\\ {sym('ed', '1b-93')} /\\ {sym('eh', FAST)}
+  /\\ {sym('e3', '1b-105')}
   -> Y - 1 in [-{FAST_LN_1P}, {FAST_LN_1P}] }}
 
-Y - 1 -> (kw * eh + rr + (kd + rr) * eq) * (1 + e3) + e3;
+Y - 1 -> (kw * eh + ed) * (1 + e3) + e3;
 '''
+
 
 
 def accurate_ln_1p_dz():

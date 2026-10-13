@@ -40,7 +40,7 @@ import sys
 
 import mpmath
 
-from exp_constants import decode
+from exp_constants import coq_value, decode
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'crates/morphiq-numerics/src/ln/tables.rs'
@@ -246,7 +246,8 @@ def generate():
         *[f'    {f(c)},' for c in poly],
         '];',
     ]
-    return {OUTPUT: '\n'.join(lines) + '\n', COQ_OUTPUT: coq_tables(r, d)}
+    return {OUTPUT: '\n'.join(lines) + '\n', COQ_OUTPUT: coq_tables(r, d),
+            ROOT / 'formal/ln/LnFastTables.v': coq_fast_tables(d)}
 
 
 def coq_q128(d):
@@ -353,6 +354,55 @@ def coq_tables(r, d):
     lines += ['Qed.']
     lines += coq_q128(d)
     return '\n'.join(lines) + '\n'
+
+
+def coq_fast_tables(d):
+    """Binary64 coefficients and table encodings for the executable fast proof."""
+    lines = [
+        '(** Written by generators/ln_constants.py; do not edit. *)',
+        'From Coq Require Import Reals ZArith List Lia Lra.',
+        'From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.',
+        'From Binary64 Require Import IEEE64 Grid Encodings Binary64Add.',
+        'From Interval Require Import Tactic.',
+        'Require Import LnTables.',
+        'Import ListNotations.',
+        'Open Scope R_scope.',
+    ]
+    constants = [
+        ('lf_lh', d['ln2_hi']), ('lf_ll', d['ln2_lo']),
+        ('lf_eps', float.fromhex('0x1.0000000000004p-63')), ('lf_mhalf', -0.5),
+        *[(f'lf_c{i}', c) for i, c in enumerate(d['poly'], 3)],
+    ]
+    for name, value in constants:
+        lines += coq_value(name, value)
+    for i, c in enumerate(d['poly'], 3):
+        v = Fraction(c)
+        lines += [
+            f'Definition lf_a{i} : R := ({v.numerator}/{v.denominator}).',
+            f'Lemma lf_c{i}_real : B lf_c{i} = lf_a{i}.',
+            f'Proof. rewrite lf_c{i}_val. unfold lf_a{i}. field. Qed.',
+        ]
+
+    def horner(cs):
+        acc = cs[-1]
+        for c in reversed(cs[:-1]):
+            acc = f'({c}+x*{acc})'
+        return acc
+
+    lines += [f'Definition lf_w x : R := {horner([f"lf_a{i}" for i in range(3, 10)])}.']
+    errors = [
+        Fraction((-1)**(i-1), i) - (Fraction(d['poly'][i-3]) if i <= 9 else 0)
+        for i in range(3, 19)
+    ]
+    lines += [
+        f'Definition lf_difference x : R := {horner([f"({v.numerator}/{v.denominator})" for v in errors])}.',
+        'Definition lf_table : list (f64*f64) := [',
+        *[f' (b64_of_bits {to_bits(h)}, b64_of_bits {to_bits(l)})' + (';' if i < 127 else '')
+          for i, (h, l) in enumerate(d['neg_ln_dw'])],
+        '].', 'Definition lf_neg_ln_r i := nth i lf_table (b64_of_bits 0, b64_of_bits 0).',
+    ]
+    return '\n'.join(lines) + '\n'
+
 
 
 def main():

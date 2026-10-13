@@ -125,3 +125,27 @@ Print Assumptions Expm1.expm1_entry_finite.
 Print Assumptions Expm1.expm1_entry_nan.
 Print Assumptions Expm1.expm1_entry_infinities.
 Print Assumptions Expm1.expm1_entry_signed_zeros.
+
+Require LnFastAdd LnFastApprox LnFastTableCheck LnFastKernel LnFastZero LnFastY LnFastValue.
+Require Ln1pFastGeneral Ln1pFast LnFastDecision LnEntryLemmas LnEntry.
+Print Assumptions LnFastAdd.lf_add_normalized.
+Print Assumptions LnFastApprox.lf_polynomial_bound.
+Print Assumptions LnFastTableCheck.lf_table_all.
+Print Assumptions LnFastTableCheck.lf_ln2_error.
+Print Assumptions LnFastKernel.lf_polynomial_ok.
+Print Assumptions LnFastZero.lf_polynomial_zero.
+Print Assumptions LnFastY.lf_ln_y_ok.
+Print Assumptions LnFastValue.lf_ln_fast_value_ok.
+Print Assumptions Ln1pFastGeneral.lf_ln1p_general_ok.
+Print Assumptions Ln1pFast.lf_ln1p_fast_value_ok.
+Print Assumptions LnFastDecision.lf_ln_fast_ok.
+Print Assumptions LnFastDecision.lf_ln1p_fast_ok.
+Print Assumptions LnEntryLemmas.lf_tiny_round.
+Print Assumptions LnEntry.ln_entry_regular.
+Print Assumptions LnEntry.ln1p_entry_regular.
+Print Assumptions LnEntry.ln_entry_specials.
+Print Assumptions LnEntry.ln1p_entry_specials.
+Print Assumptions LnEntry.ln_entry_nan.
+Print Assumptions LnEntry.ln1p_entry_nan.
+Print Assumptions LnEntry.ln_entry_negative.
+Print Assumptions LnEntry.ln1p_entry_below_domain.

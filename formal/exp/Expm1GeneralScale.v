@@ -23,23 +23,6 @@ Proof.
      rewrite (bits_val 2251799813685248 false 2251799813685248 1074 eq_refl). cbn [SpecFloat.cond_Zopp]. apply Rle_antisym; interval with (i_prec 64).
 Qed.
 
-Lemma scaled_fmt_grid a q k : fmtF a -> on_grid q a -> (-1074 <= q+k)%Z ->
- fmtF (a*bpow radix2 k).
-Proof.
- intros Fa G Q.
- destruct (Rle_or_lt (bpow radix2 (-1022)) (Rabs (a*bpow radix2 k))) as [Normal | Small].
- - apply generic_format_FLT_FLX; [exact Normal | ].
-   destruct (FLX_format_generic radix2 53 a (generic_format_FLX_FLT radix2 (-1074) 53 a Fa)) as [[m e] Val M].
-   apply generic_format_FLX. apply (FLX_spec radix2 53 _ (Float radix2 m (e+k))).
-   + rewrite Val. unfold F2R; cbn [Fnum Fexp]. rewrite bpow_plus. ring.
-   + exact M.
- - apply generic_format_FLT_FIX; [exact _ | | ].
-   + apply Rle_trans with (bpow radix2 (-1022)); [lra | apply bpow_le; unfold emin,prec; lia].
-   + assert (Gk : on_grid k (bpow radix2 k)) by (exists 1%Z; ring).
-     destruct (grid_le (q+k) (-1074) _ Q (grid_mult q k _ _ G Gk)) as [m V].
-     apply generic_format_FIX. apply (FIX_spec radix2 (-1074) _ (Float radix2 m (-1074))); [exact V | reflexivity].
-Qed.
-
 Theorem em_scale_exact a q k : finite a -> on_grid q (B a) ->
  (-1024 <= q)%Z -> (-1074 <= q+k)%Z -> (-54 <= k <= 1024)%Z ->
  Rabs (B a*bpow radix2 k) < bpow radix2 1024 ->

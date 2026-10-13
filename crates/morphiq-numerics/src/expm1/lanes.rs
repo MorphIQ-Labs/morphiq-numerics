@@ -5,7 +5,9 @@ use morphiq_numerics_arch::Simd;
 use super::stages::{E_A, E_B, SUBTRACTION_ERROR};
 use super::{EPS, SMALL, TINY, expm1};
 use crate::exp::lanes::{reduce, stage_a, stage_b};
-use crate::lanes::{Dw, Kernel, decide, fast_two_sum, lanes_mask, mask_from, two_prod, two_sum};
+use crate::lanes::{
+    Dw, Kernel, add_dw, add_f64, decide, decide_relative, lanes_mask, mask_from, two_prod, two_sum,
+};
 
 pub(crate) struct Expm1;
 
@@ -104,29 +106,12 @@ fn small_fast<K: Simd>(k: K, x: K::F) -> Dw<K> {
     let t = k.mul(k.mul(x, sh), w);
     let half = two_sum(k, k.mul(k.splat(0.5), sh), k.mul(k.splat(0.5), sl));
     // DoubleWord::from_f64(x).add(half).add_f64(t), in exactly that order.
-    let (sh, sl) = two_sum(k, x, half.0);
-    let (th, tl) = two_sum(k, k.splat(0.0), half.1);
-    let c = k.add(sl, th);
-    let (vh, vl) = fast_two_sum(k, sh, c);
-    let w = k.add(tl, vl);
-    let (hi, lo) = fast_two_sum(k, vh, w);
-    let (sh, sl) = two_sum(k, hi, t);
-    fast_two_sum(k, sh, k.add(lo, sl))
+    add_f64(k, add_dw(k, (x, k.splat(0.0)), half), t)
 }
 
-/// `ln::decide_with` on normal small results; the ulp is itself normal.
 #[inline(always)]
 fn small_decide<K: Simd>(k: K, y: Dw<K>) -> u64 {
-    let magnitude = k.abs(y.0);
-    let bits = k.to_bits(magnitude);
-    let exponent = k.and_u(bits, k.splat_bits(0x7ff0_0000_0000_0000));
-    let ulp = k.to_float(k.sub_u(exponent, k.splat_bits(52 << 52)));
-    let power = k.eq_u(k.and_u(bits, k.splat_bits((1 << 52) - 1)), k.splat_bits(0));
-    let g = k.select(power, k.mul(ulp, k.splat(0.5)), ulp);
-    k.mask_bits(k.lt(
-        k.add(k.abs(y.1), k.mul(k.splat(EPS), magnitude)),
-        k.mul(g, k.splat(0.5)),
-    ))
+    decide_relative(k, y, EPS)
 }
 
 #[cfg(test)]

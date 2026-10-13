@@ -18,6 +18,7 @@ From Binary64 Require Import IEEE64 RoundingTest.
 Require ExpReduction ExpFast ExpAccurate ExpSmall LnReduction LnAccurate Ln1pScreen ExpStageReduction ExpStageA ExpStageB Ln1pStageH Ln1pStageB.
 Require Exp2Stages Expm1Stages Exp2FallbackReduction Exp2FallbackAccurate Exp2FallbackFast Exp2.
 Require Expm1GeneralReduction Expm1GeneralFast Expm1GeneralAccurate Expm1SmallFast Expm1SmallAccurate Expm1.
+Require LnFastValue Ln1pFast LnFastDecision LnEntry.
 Import ListNotations.
 
 Definition limbs (k : nat) (x : Z) : list Z := map (fun i => dig x (Z.of_nat i)) (seq 0 k).
@@ -132,5 +133,16 @@ Definition x_expm1_small x :=
 
 Definition x_expm1_entry x := bits_of_b64 (Expm1.expm1_entry (b64_of_bits x)).
 
-Extraction "internalcrosscheck.ml" x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
+Definition x_ln_fast x :=
+ let xb := b64_of_bits x in
+ let '(h,l) := LnFastValue.lf_ln_fast_value xb in
+ (map bits_of_b64 [h;l], opt_bits (LnFastDecision.lf_ln_fast xb)).
+Definition x_ln1p_fast x :=
+ let xb := b64_of_bits x in
+ let '(h,l) := Ln1pFast.lf_ln1p_fast_value xb in
+ (map bits_of_b64 [h;l], opt_bits (LnFastDecision.lf_ln1p_fast xb)).
+Definition x_ln_entry x := bits_of_b64 (LnEntry.ln_entry (b64_of_bits x)).
+Definition x_ln1p_entry x := bits_of_b64 (LnEntry.ln1p_entry (b64_of_bits x)).
+
+Extraction "internalcrosscheck.ml" x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
   x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs.

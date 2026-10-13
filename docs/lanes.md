@@ -198,8 +198,8 @@ the cross-target digest, not a separate Coq model of SIMD instructions.
    `hl = h − hh` and `z = (hh·rs − 1) + hl·rs`, exactly as `stages::reduce`.
 4. **The reconstruction** computes `E·L1`, `E·L0`, the degree-six polynomial,
    `(s, lo)` and `eps`, operation for operation as `ln::stage::parts`.
-5. **The interval test** in lanes (§3), with scalar fallback on every
-   undecided lane. The word-for-word test checks all three values
+5. **The interval test** in lanes (§3), followed by the shared double-word
+   fallback below. The word-for-word test checks all three values
    `(s, lo, eps)`, including each reciprocal-table boundary and its neighbours.
 
 **`ln_1p`:** stage H ([ln.md](ln.md) §7), as `ln::stages::stage_h_parts`
@@ -218,6 +218,27 @@ writes it.
    each operation as the scalar stage writes it.
 5. **The test** in lanes (§3); lanes it doesn't decide go to `ln_1p` past
    stage H.
+
+### Shared logarithm fallback
+
+When at least two eligible lanes remain, `ln/lanes/fallback.rs` evaluates
+the shared degree-nine polynomial and reconstruction in lanes. It uses
+`lanes::add_dw`, `add_f64` and `decide_relative`, also used by the small
+`expm1` path. Every addition and multiplication follows the scalar order;
+only the error term of `two_prod` uses hardware FMA on eligible backends (§2).
+
+`ln` screens special lanes before evaluating the fallback. `ln_1p` tries
+scalar stage B, then groups the remaining finite inputs. Its small branch
+uses `(x, 0)` directly; its general branch splits `1 + x`, evaluates `ln h`,
+and adds `l/h`, including subnormal quotients. Inactive lanes use finite
+placeholders. A single pending lane uses scalar completion; rejected
+fallback decisions use the scalar Q128 accurate path.
+
+The word tests compare both fallback words and each rounding decision,
+including accepted and rejected cases. Separate tests repeat actual
+undecided arguments across lanes and mix them with decided and special
+arguments. The scalar fallback and public-entry proofs are in `docs/ln.md`;
+intermediate-word tests and the cross-target digest check lane equivalence.
 
 ## 6. Checked by
 
@@ -352,3 +373,34 @@ Wide domains gain less because screened inputs still use scalar fallbacks.
 The scalar accurate-path rates remain those measured in [exp2.md](exp2.md)
 and [expm1.md](expm1.md); SIMD makes the same decisions per argument.
 No native x86 timing is claimed.
+
+The shared logarithm fallback was measured on the same M1 Pro and toolchain
+(2026-10-12), with other builds paused during timing. The benchmark includes
+arguments close enough to one to reject `ln`'s first stage, and arguments
+above `ln_1p`'s stage-B screen. Two runs of each version gave:
+
+| Function | Arguments | Previous batch, `490a7cf` (ns) | Shared fallback batch (ns) |
+|---|---|---|---|
+| `ln` | `[0.5, 2)` | 5.02–5.06 | 5.03 |
+| `ln` | positive encodings | 5.02–5.05 | 5.02–5.04 |
+| `ln` | `1 ± 2^−47` | 51.98–52.27 | 43.41–43.77 |
+| `ln_1p` | `[2^1020, MAX]` | 38.16–38.32 | 29.58–29.65 |
+| `ln_1p` | `e^d`, `d ∈ [−30, 0]` | 3.40–3.42 | 3.39–3.40 |
+| `ln_1p` | `z²/4`, `z ∈ [−6, 6]` | 3.31–3.33 | 3.30 |
+| `ln_1p` | `[−1, 2^60]`, log-uniform | 4.43–4.45 | 4.29–4.30 |
+
+The two fallback-heavy batches improve about 1.19× and 1.29×. Their new
+scalar-loop timings are 49.29–49.42 ns and 33.72–33.74 ns, respectively.
+Ordinary `ln` scalar timing also improves, from 6.52–6.58 ns to
+6.01–6.08 ns, after extracting its fallback completion. The dispatch keeps
+the decided mask through the common branch and computes the pending mask
+only when needed; adding mask work to every batch measurably slowed the
+common `ln_1p` workloads. These are local NEON measurements, not native x86
+results.
+
+The seeded scalar pass-rate tests send 81 of 1,048,576 `ln` inputs past the
+reciprocal stage (0.0077%). Exercising the double-word fallbacks directly,
+`ln` rejects 1,502 of 1,048,576 decisions (0.1432%) and `ln_1p` rejects
+761 of 550,857 (0.1381%). These latter rates describe the fallback itself,
+not the fraction of public calls reaching Q128 after the earlier stages.
+Lane decisions are identical to those scalar decisions.
