@@ -1,11 +1,11 @@
-"""Turn generators/erfcx/tables.out (Sollya) into src/consts.rs for the erfcx prototype.
+"""Turn generators/erfcx/tables.out (Sollya) into the erfcx fast tables.
 
 Also reports, per interval, the quantities the fast path's error analysis
 assumes: the approximation bound, |a1|·hm/|a0|, the size of the terms the
 evaluation keeps in binary64 (sum over k >= 3 of |a_k|·hm^k, relative to
 the least value of the polynomial), and that every a_l (k >= 3) is zero.
 
-usage: python to_rust.py tables.out > ../src/consts.rs 2> tables.report
+Invoked by generators/erfcx_constants.py, which writes tables.rs.
 """
 import sys
 from fractions import Fraction as F
@@ -43,6 +43,10 @@ for line in open(sys.argv[1]):
     elif t[0] == "PA":
         pa[int(t[1])] = h2f(t[2])
     elif t[0] in ("PA_ERR", "PREM", "CS_ERR"):
+        # These budgets feed the arithmetic component certificates. Compare
+        # exact decimal rationals, not an additional binary64 rounding.
+        budget = {"PA_ERR": 59, "PREM": 125, "CS_ERR": 110}[t[0]]
+        assert 0 <= F(t[1]) < F(1, 2**budget), (t[0], t[1])
         misc[t[0]] = float(t[1])
     elif t[0] in ("CS", "CSL"):
         misc[t[0]] = h2f(t[1])

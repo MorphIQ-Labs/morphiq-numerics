@@ -305,7 +305,7 @@ pub(super) fn exp_dw(s: f64, se: f64) -> (f64, f64, i32) {
 pub(super) fn n_eval(x: f64) -> (f64, f64, i32) {
     let (s, se) = two_prod(x, x);
     let (yh, yl, k) = exp_dw(s, se);
-    // 2·E − g = 2^(k+1)·(Y − g·2^−(k+1)); g/(2E) < 2^−110 once k > 104.
+    // 2·E − g = 2^(k+1)·(Y − g·2^−(k+1)); g/(2E) < 2^−105 once k > 104.
     if k > 104 {
         return (yh, yl, k + 1);
     }

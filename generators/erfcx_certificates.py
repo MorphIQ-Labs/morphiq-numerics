@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay the per-interval erfcx table-evaluation certificates.
+"""Replay the generated erfcx table and tail evaluation certificates.
 
 These certificates establish evaluation error conditional on their stated
 EFT and exact-product hypotheses; they do not prove the full erfcx entry.
@@ -13,8 +13,9 @@ OUT = ROOT/'formal/erfcx'
 with tempfile.TemporaryDirectory() as tmp:
     subprocess.run([sys.executable,str(ROOT/'generators/erfcx/table_certificates.py'),
                     str(ROOT/'generators/erfcx/tables.out'),tmp],check=True)
+    subprocess.run([sys.executable,str(ROOT/'generators/erfcx/tail_certificates.py'),tmp],check=True)
     generated = sorted(pathlib.Path(tmp).glob('*.g'))
-    assert len(generated) == 177
+    assert len(generated) == 181
     for src in generated:
         dst = OUT/src.name
         if '--check' in sys.argv:

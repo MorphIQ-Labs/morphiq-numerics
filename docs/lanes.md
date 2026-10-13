@@ -6,6 +6,12 @@ lane kernels are `crates/morphiq-numerics/src/lanes/`, `exp/lanes.rs`, `exp2/lan
 `ln/lanes.rs`; the SIMD backends are the `morphiq-numerics-arch` crate
 ([arch.md](arch.md)).
 
+`morphiq_numerics::normal::erfcx_slice` uses the same backends and cascade.
+Its table, reciprocal and reflection kernels are in `erfcx/lanes.rs`;
+[erfcx.md](erfcx.md) states their operation sequences and current assurance
+limits. As with the elementary slices, its numerical contract is inherited
+from its scalar function.
+
 ## 1. Contract
 
 `f_slice(x, out)` sets `out[i]` to `f(x[i])`, bit for bit, for every `i`, on

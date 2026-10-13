@@ -1,10 +1,11 @@
 """Q256 constants for the erfcx accurate-path prototype (issue #34).
 
-Writes src/q256_consts.rs: erfcx at every table centre, 1/sqrt(pi),
+Emits erfcx at every table centre, 1/sqrt(pi),
 2/sqrt(pi), 1/k (k = 1..100), 2^(j/128) (j = 0..127) and ln 2 / 128, each the
 exact value rounded to nearest to a normalized 256-bit significand
 (relative error below 2^-256). mpmath at 600 bits.
-usage: python q256_consts.py > ../src/q256_consts.rs
+Invoked by generators/erfcx_constants.py, which writes accurate_tables.rs
+and checks agreement between 600-bit and 1000-bit generation.
 """
 import mpmath as mp
 

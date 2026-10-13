@@ -1,4 +1,4 @@
-"""Writes one Gappa certificate per region-T interval (research sketch, #34).
+"""Write one conditional Gappa certificate per region-T interval.
 
 Each bounds |Y - P(h)|, the evaluation error of `t_eval` against the
 interval's polynomial P (exact coefficients), for every binary64 h in
@@ -6,10 +6,11 @@ interval's polynomial P (exact coefficients), for every binary64 h in
   - H = h rounded to the 2^(e-23) grid (the shifter), L = h - H exactly;
   - A1·H, H·H and A2·(H·H) are exact (bit counts: 35 + 18, 18 + 18, 17 + 36);
   - a1h - A1 and a2h - A2 are exact (A is a1h, a2h truncated);
-  - fast_two_sum is exact (|a0h| >= |p1|, |s| >= |p2|: checked in to_rust.py).
+  - fast_two_sum is exact (its operand-magnitude conditions remain entry
+    proof obligations; generator reports alone do not discharge them).
 The relative bound composes |Y - P| / min|P| with Sollya's approximation bound.
 
-usage: python gappa_t.py tables.out outdir   (then run gappa on outdir/*.g)
+Invoked by generators/erfcx_certificates.py with tables.out and an output directory.
 """
 import os
 import struct

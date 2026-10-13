@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# Component certificates for the erfcx table evaluator. The remaining regions
-# and the end-to-end proof must be supplied before this draft can ship.
+# Component certificates for the erfcx table, tail and reflection evaluators.
+# Binary64 entry hypotheses and the accurate path still need end-to-end proofs.
 set -eu
 cd "$(dirname "$0")/.."
 sha256sum --check --quiet formal/erfcx/binding.sha256
