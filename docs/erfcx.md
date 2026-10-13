@@ -97,7 +97,7 @@ lemmas; an unchecked algebraic identity is not accepted as a proof.
 
 | Component | Certified bound | Assumptions still needed at the entry |
 |---|---|---|
-| `T*.g` | Relative table evaluation error `2^-67` against the polynomial | Exact reduction, split products, coefficient differences and Fast2Sum calls |
+| `T*.g` | Relative table evaluation error `2^-67` against the polynomial | Residual split and its square discharged by `ErfcxTableSplit`; reduction, coefficient products/differences and Fast2Sum calls remain |
 | `reciprocal.g` | Relative error `2^-98` for corrected `1/x`, `16 <= x <= 512` | Discharged by `ErfcxReciprocal.reciprocal_ieee` |
 | `middle_square*.g` | Absolute error `2^-102` against `1/x²` | Discharged by `ErfcxSquare.reciprocal_square_ieee` |
 | `middle_polynomial.g`, `middle_mvt.g` | Evaluation error `0x1.5p-68`; sensitivity error `2^-101` | Discharged by `ErfcxMiddlePolynomial.reciprocal_correction_ieee` |
@@ -158,6 +158,16 @@ proof covers arguments below 704. Its entry proof therefore cannot simply
 be reused unchanged. When the positive reflection term is omitted, the
 simple uniform bound on that term relative to the exponential is `2^-105`;
 the former `2^-110` comment was too strong near exponent 105.
+
+The table residual-split theorem covers each of the four encoded shifters.
+For a finite residual `h` with `abs(h) <= 2^(e-6)`, `0 <= e <= 3`, it proves
+that the high word is nearest-even rounding to the `2^(e-23)` grid, the low
+word is exact, and their sum is exactly `h`. The low word has magnitude at
+most `2^(e-24)`. A separate theorem proves the high-word square exact from
+its grid and magnitude. The extracted split and square are checked against
+Rust at positive and negative rounding ties, their neighbours, interval
+endpoints, and subnormal residuals. These lemmas assume the reduction has
+already supplied the stated residual bound.
 
 The reciprocal and square entry theorems start from a finite binary64
 input in `[16, 512]`. They prove that every intermediate is finite, that

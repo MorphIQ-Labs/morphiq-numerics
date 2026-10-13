@@ -147,6 +147,14 @@ pub(super) fn t_reduce(x: f64) -> (usize, f64, f64, i32) {
     }
 }
 
+/// Split the reduced argument on the table kernel's exponent-dependent grid.
+#[inline]
+pub(crate) fn table_split(h: f64, e: i32) -> (f64, f64) {
+    let sh = f((((1023 + 29 + e) as u64) << 52) | (1u64 << 51));
+    let hi = (h + sh) - sh;
+    (hi, h - hi)
+}
+
 /// The double-word polynomial value for region T.
 #[inline]
 pub(super) fn t_eval(x: f64) -> (f64, f64) {
@@ -154,9 +162,7 @@ pub(super) fn t_eval(x: f64) -> (f64, f64) {
     let a = &T[idx];
     // H: h on the 2^(e−23) grid, so |H| ≤ 2^17 grid steps (≤ 18 bits) and
     // H·H is exact (≤ 36 bits); L = h − H exactly, |L| ≤ 2^(e−24).
-    let sh = f((((1023 + 29 + e) as u64) << 52) | (1u64 << 51));
-    let hh_ = (h + sh) - sh;
-    let l = h - hh_;
+    let (hh_, l) = table_split(h, e);
     // A1: a1's high word cut to 35 bits, so A1·H is exact (≤ 53 bits).
     let a1h = f(a[2]);
     let a1 = f(a[2] & !((1u64 << 18) - 1));

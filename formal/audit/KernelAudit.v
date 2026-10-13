@@ -180,3 +180,7 @@ Print Assumptions ErfcxTailCorrection.tail_correction_ieee.
 Print Assumptions ErfcxTailValue.tail_reconstruct_ieee.
 Print Assumptions ErfcxTailValue.tail_ieee.
 Print Assumptions ErfcxTailValue.scaled_tail_ieee.
+
+Require ErfcxTableSplit.
+Print Assumptions ErfcxTableSplit.table_split_ieee.
+Print Assumptions ErfcxTableSplit.table_square_ieee.
