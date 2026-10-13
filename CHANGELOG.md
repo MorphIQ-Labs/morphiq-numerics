@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.4](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.3...v0.0.4) - 2026-10-13
+
+### Added
+
+- *(ln)* prove fallback kernels and vectorize their evaluation ([#140](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/140))
+
 ## [0.0.3](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.2...v0.0.3) - 2026-10-13
 
 ### Added
