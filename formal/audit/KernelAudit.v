@@ -252,3 +252,9 @@ Print Assumptions ErfcxSubnormalCandidate.subnormal_candidate_ieee.
 Print Assumptions ErfcxSubnormalCandidate.subnormal_fast_ieee.
 Print Assumptions ErfcxSubnormalValue.subnormal_value_words_ieee.
 Print Assumptions ErfcxSubnormalFast.tail_subnormal_fast_ieee.
+
+Require ErfcxScaledWords ErfcxSubnormalBoundary ErfcxScaledFast.
+Print Assumptions ErfcxScaledWords.scaled_quotient_words_ieee.
+Print Assumptions ErfcxSubnormalBoundary.erfcx_normal_tail_lower.
+Print Assumptions ErfcxScaledFast.tail_scaled_normal_fast_ieee.
+Print Assumptions ErfcxScaledFast.tail_scaled_fast_ieee.

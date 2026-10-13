@@ -67,9 +67,10 @@ The current fast-path tests use a provisional relative guard of `2^-66`.
 A rejection evaluates the Q256 path. The arithmetic certificates fit within
 this guard. The table evaluation error is proved at its binary64 entry;
 the negative fast-path rounding decision and final scaling are proved under
-an explicit analytic table contract. Function approximation/remainder bounds,
-scaled positive-tail normal-output rounding, and the accurate path still require
-proofs. The guard is not an end-to-end error proof.
+an explicit analytic table contract. The scaled positive-tail final rounding
+is proved on both sides of the subnormal boundary under its omitted-correction
+contract. Function approximation/remainder bounds and the accurate path still
+require proofs. The guard is not an end-to-end error proof.
 
 For a subnormal output, the leading candidate is scaled first. It is then
 mapped back exactly to the unscaled domain, where the binary64 subnormal
@@ -159,8 +160,15 @@ the high/low word ranges and normalization needed by the test;
 encoding preserve its candidate bounds. `ErfcxSubnormal.v` accounts for
 rounding in the residual, margin product, and final comparison. Acceptance
 places the exact target strictly within `2^-1075` of the final candidate,
-so ties cannot be accepted incorrectly. The scaled normal-output decision
-has a separate exponent-scaling obligation.
+so ties cannot be accepted incorrectly.
+
+`ErfcxScaledFast.tail_scaled_fast_ieee` combines both scaled-output branches.
+For finite inputs below `X_SUB`, `ErfcxSubnormalBoundary.v` uses the preceding
+binary64 input and a CoqInterval bound on `1/sqrt(pi)` to prove that the
+analytic target remains at least `2^-1022`. `ErfcxScaledWords.v` supplies the
+normalized quotient range; final multiplication by `2^-600` is exact and
+commutes with rounding on this domain. The threshold comparison and both
+final-rounding branches are included in the extracted Rust cross-check.
 
 The direct quotient certificates cover `[2^9, 2^897]` in 28 adjacent
 exponent windows. Every operation uses binary64 rounding, including gradual
