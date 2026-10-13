@@ -73,13 +73,18 @@ case "$mutation" in
     ;;
   crosscheck|internal-crosscheck)
     file="$work/$mutation.txt"
-    # Change an expected result by one bit, keeping the corpus well formed.
-    # The first expected result is finite; don't mutate a NaN payload that
-    # the cross-check intentionally treats as equivalent.
-    awk 'NR == 1 && match($0, /: [0-9a-f]/) {
+    # Change one expected digit while keeping the corpus well formed. Integer
+    # helper results may precede floating-point cases; skip negative decimals
+    # and nonfinite encodings (some comparisons treat NaN payloads as equal).
+    awk '!changed && match($0, /: [0-9a-f]/) {
       pos = RSTART + 2
-      digit = index("0123456789abcdef", substr($0, pos, 1))
-      $0 = substr($0, 1, pos - 1) substr("1032547698badcfe", digit, 1) substr($0, pos + 1)
+      token = substr($0, pos)
+      sub(/ .*/, "", token)
+      if (!(length(token) == 16 && token ~ /^(7ff|fff)/)) {
+        digit = index("0123456789abcdef", substr($0, pos, 1))
+        $0 = substr($0, 1, pos - 1) substr("1032547698badcfe", digit, 1) substr($0, pos + 1)
+        changed = 1
+      }
     } { print }' "$file" > "$file.changed"
     if cmp -s "$file" "$file.changed"; then
       echo "$mutation: mutation did not change the corpus" >&2
