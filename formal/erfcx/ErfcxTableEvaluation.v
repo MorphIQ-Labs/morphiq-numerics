@@ -149,13 +149,14 @@ Definition table_sum_value a0 p1 p2 rest :=
  let s2 := rndF (s+p2) in let e2 := s+p2-s2 in
  s2+rndF (rndF (e1+e2)+rest).
 
-Theorem table_sum_ieee a0 p1 p2 rest :
+Theorem table_sum_normalized_ieee a0 p1 p2 rest :
  finite a0 -> 9/256<=B a0<=2 ->
  finite p1 -> Rabs (B p1)<=B a0/4 ->
  finite p2 -> Rabs (B p2)<=B a0/16 ->
  bounded64 rest (21/1024) ->
  let '(h,l) := table_sum64 a0 p1 p2 rest in
- finite h /\ finite l /\ B h+B l=table_sum_value (B a0) (B p1) (B p2) (B rest).
+ finite h /\ finite l /\ B h+B l=table_sum_value (B a0) (B p1) (B p2) (B rest) /\
+ B h=rndF(B h+B l) /\ bpow radix2 (-9)<=B h<=8.
 Proof.
  intros Fa A Fp1 P1 Fp2 P2 [Fr Rest].
  assert (R1 : rn (B a0)=B a0) by (apply round_generic;[exact _|apply B_fmt]).
@@ -208,6 +209,27 @@ Proof.
   ltac:(apply Rle_trans with 1;[lra|change 1 with (bpow radix2 0);apply bpow_le;lia])
   ltac:(right;left;exact Last)) as FTS3.
  destruct (fast_two_sum64 s2 (fadd (fadd e1 e2) rest)) as [h l].
- destruct FTS3 as [Fh [Flast [Bh Exact]]]. repeat split;try assumption.
- rewrite Exact,Vl,Ve,Be1,Be2,Bs2,Bs. reflexivity.
+ destruct FTS3 as [Fh [Flast [Bh Exact]]].
+ split; [exact Fh | split; [exact Flast | split; [ | split]]].
+ - rewrite Exact,Vl,Ve,Be1,Be2,Bs2,Bs. reflexivity.
+ - rewrite Exact. exact Bh.
+ - rewrite Bh. split.
+   + apply round_ge_generic; [exact _ | exact _ | | change (bpow radix2 (-9)) with (/512); lra].
+     change (/512) with (bpow radix2 (-9)).
+     apply generic_format_bpow. unfold FLT_exp,emin,prec. lia.
+   + apply round_le_generic; [exact _ | exact _ | | lra].
+     change 8 with (bpow radix2 3). apply generic_format_bpow. unfold FLT_exp,emin,prec. lia.
+Qed.
+
+Theorem table_sum_ieee a0 p1 p2 rest :
+ finite a0 -> 9/256<=B a0<=2 ->
+ finite p1 -> Rabs (B p1)<=B a0/4 ->
+ finite p2 -> Rabs (B p2)<=B a0/16 ->
+ bounded64 rest (21/1024) ->
+ let '(h,l) := table_sum64 a0 p1 p2 rest in
+ finite h /\ finite l /\ B h+B l=table_sum_value (B a0) (B p1) (B p2) (B rest).
+Proof.
+ intros Fa A Fp1 P1 Fp2 P2 Rest.
+ pose proof (table_sum_normalized_ieee a0 p1 p2 rest Fa A Fp1 P1 Fp2 P2 Rest) as S.
+ destruct (table_sum64 a0 p1 p2 rest) as [h l]. tauto.
 Qed.

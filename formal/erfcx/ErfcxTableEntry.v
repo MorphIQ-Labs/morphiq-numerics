@@ -44,10 +44,11 @@ Proof.
  split;[exact F0|]. split;[lra|]. split;[exact F1|apply Rabs_le;lra].
 Qed.
 
-Theorem table_polynomial_ieee i h e : (i<177)%nat -> finite h -> (0<=e<=3)%Z ->
+Theorem table_polynomial_normalized_ieee i h e : (i<177)%nat -> finite h -> (0<=e<=3)%Z ->
  Rabs (B h)<=bpow radix2 (e-6) ->
  let '(yh,yl) := table_polynomial64 i h e in
- finite yh /\ finite yl /\ B yh+B yl=table_polynomial_value i (B h) e.
+ finite yh /\ finite yl /\ B yh+B yl=table_polynomial_value i (B h) e /\
+ B yh=rndF(B yh+B yl) /\ bpow radix2 (-9)<=B yh<=8.
 Proof.
  intros I Fh E H.
  assert (Hm : bpow radix2 (e-6)<=/8).
@@ -96,14 +97,25 @@ Proof.
  pose proof (table_rest_ieee (coef i 1) a1 b1 a2h b2 h hh l sq (horner64 h (tail_coefs i))
    CLow (conj FA1 A1) (conj FB1 B1) (conj FA2 A2) (conj FB2 B2)
    (conj Fh Hsmall) (conj FH HH) (conj Fl L) (conj FSq Sq) (conj Fq Q)) as [R Vr].
- pose proof (table_sum_ieee (coef i 0) p1 p2
+ pose proof (table_sum_normalized_ieee (coef i 0) p1 p2
    (table_rest64 (coef i 1) a1 b1 a2h b2 h hh l sq (horner64 h (tail_coefs i))) F0 C0 FP1 P1 FP2 P2 R) as Sum.
  destruct (table_sum64 (coef i 0) p1 p2
    (table_rest64 (coef i 1) a1 b1 a2h b2 h hh l sq (horner64 h (tail_coefs i)))) as [yh yl].
- destruct Sum as [Fyh [Fyl Value]]. split;[exact Fyh|]. split;[exact Fyl|].
+ destruct Sum as (Fyh & Fyl & Value & Norm & Range).
+ split;[exact Fyh|]. split;[exact Fyl|]. split; [ | split; assumption].
  rewrite Value,Vr,VP1,VP2,VSq,VB1,VB2,Vq,A1id,A2id.
  assert (Bl : B l=B h-B hh) by lra. rewrite Bl,BH.
  reflexivity.
+Qed.
+
+
+Theorem table_polynomial_ieee i h e : (i<177)%nat -> finite h -> (0<=e<=3)%Z ->
+ Rabs (B h)<=bpow radix2 (e-6) ->
+ let '(yh,yl) := table_polynomial64 i h e in
+ finite yh /\ finite yl /\ B yh+B yl=table_polynomial_value i (B h) e.
+Proof.
+ intros I Fh E H. pose proof (table_polynomial_normalized_ieee i h e I Fh E H) as V.
+ destruct (table_polynomial64 i h e) as [yh yl]. tauto.
 Qed.
 
 
@@ -119,4 +131,15 @@ Proof.
  unfold table_eval64,table_value. destruct (table_reduce64 x) as [[[i c] h] e].
  destruct Reduce as [I [E [Fc [Fh [Exact H]]]]].
  apply table_polynomial_ieee;try assumption;lia.
+Qed.
+
+Theorem table_eval_normalized_ieee x : finite x -> -/2<=B x<16 ->
+ let '(h,l) := table_eval64 x in
+ finite h /\ finite l /\ B h+B l=table_value x /\
+ B h=rndF(B h+B l) /\ bpow radix2 (-9)<=B h<=8.
+Proof.
+ intros Fx X. pose proof (table_reduce_ieee x Fx X) as Reduce.
+ unfold table_eval64,table_value. destruct (table_reduce64 x) as [[[i c] h] e].
+ destruct Reduce as [I [E [Fc [Fh [Exact H]]]]].
+ apply table_polynomial_normalized_ieee;try assumption;lia.
 Qed.

@@ -573,6 +573,13 @@ fn internal_crosscheck_corpus() {
             yl.to_bits()
         )
         .unwrap();
+        writeln!(
+            out,
+            "erfcx_table_fast {:016x} : {}",
+            x.to_bits(),
+            opt(crate::erfcx::fast_t(x))
+        )
+        .unwrap();
     }
     for idx in 0_usize..177 {
         let e = if idx < 49 {

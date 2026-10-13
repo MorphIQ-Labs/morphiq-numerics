@@ -258,3 +258,10 @@ Print Assumptions ErfcxScaledWords.scaled_quotient_words_ieee.
 Print Assumptions ErfcxSubnormalBoundary.erfcx_normal_tail_lower.
 Print Assumptions ErfcxScaledFast.tail_scaled_normal_fast_ieee.
 Print Assumptions ErfcxScaledFast.tail_scaled_fast_ieee.
+
+Require ErfcxTableFast.
+Print Assumptions ErfcxTableEvaluation.table_sum_normalized_ieee.
+Print Assumptions ErfcxTableEntry.table_polynomial_normalized_ieee.
+Print Assumptions ErfcxTableEntry.table_eval_normalized_ieee.
+Print Assumptions ErfcxTableFast.table_composed_error.
+Print Assumptions ErfcxTableFast.table_fast_ieee.

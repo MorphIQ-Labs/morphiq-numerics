@@ -80,6 +80,17 @@ the initial candidate's half-gap, its adjacent neighbor is checked first;
 the interval test still decides acceptance. A test on the normal result
 followed by subnormal scaling would be insufficient.
 
+The table fast-path proof `ErfcxTableFast.table_fast_ieee` composes the
+`2^-67` relative arithmetic error against the stored polynomial with a
+`2^-69` relative approximation contract. Their combined error is at most
+`3*2^-68` relative to the target, which fits the existing `2^-66` guard.
+`generators/erfcx/table_certificates.py` checks every replayed Sollya upper
+bound against `2^-69` using exact rational arithmetic. The Coq theorem keeps
+the analytic target explicit; its assumption must describe the same
+function and selected interval as the Sollya certificate. The table entry
+also proves final normalization and a positive high-word range, so the
+rounding test's arithmetic preconditions are discharged.
+
 ## Accurate arithmetic and error units
 
 Q256 evaluation uses the ODE coefficient recurrence at table centers, the

@@ -46,7 +46,11 @@ for line in open(sys.argv[1]):
         elif t[2] in ("A", "L"):
             d[t[2]][int(t[3])] = h2f(t[4])
         elif t[2] == "ERR":
-            d["ERR"] = float(t[3])
+            # Sollya prints an upper bound; preserve it exactly when checking the
+            # approximation budget composed by ErfcxTableFast.table_fast_ieee.
+            error = Fraction(t[3])
+            assert 0 <= error <= Fraction(1, 2**69), (t[:2], error)
+            d["ERR"] = float(error)
 outdir = sys.argv[2]
 os.makedirs(outdir, exist_ok=True)
 for (tag, idx), d in sorted(tab.items()):
