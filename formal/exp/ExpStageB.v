@@ -104,7 +104,7 @@ Qed.
 
 (** formal/exp/stage_b.g's theorem. *)
 Theorem stage_b_bound (Th d rh Tl rt q_ Dt dr eq m a : R) :
-  Rabs rh <= 0.000678 -> Rabs rt <= bpow radix2 (-40) -> Rabs dr <= bpow radix2 (-93) ->
+  Rabs rh <= 0.000678 -> Rabs rt <= bpow radix2 (-40) -> Rabs dr <= bpow radix2 (-92) ->
   0 <= rn q_ <= bpow radix2 (-22) -> Rabs eq <= bpow radix2 (-73) ->
   Rabs a <= IZR 5174524961095286666344419 * bpow radix2 (-158) -> Rabs m <= bpow radix2 (-74) ->
   1 <= Th <= 2 -> Rabs Tl <= bpow radix2 (-53) -> Rabs Dt <= bpow radix2 (-104) ->
@@ -161,11 +161,11 @@ Proof. intros Hu Hv. rewrite Rabs_mult. apply Rmult_le_compat; try apply Rabs_po
 Lemma add1 u v U V : Rabs u <= U -> Rabs v <= V -> Rabs (u + v) <= U + V.
 Proof. intros Hu Hv. apply Rle_trans with (1 := Rabs_triang u v). lra. Qed.
 
-Theorem stage_b_at_ok rh rt j R : finite rh -> finite rt -> on_grid (-40) (B rh) ->
+Theorem stage_b_at_extended_ok rh rt j R : finite rh -> finite rt -> on_grid (-40) (B rh) ->
   Rabs (B rh) <= 0.000678 -> Rabs (B rt) <= bpow radix2 (-40) ->
-  Rabs (B rh + B rt - R) <= bpow radix2 (-93) -> Rabs R <= 0.000677 -> (j < 512)%nat ->
+  Rabs (B rh + B rt - R) <= bpow radix2 (-92) -> Rabs R <= 0.000677 -> (j < 512)%nat ->
   let '(y,l) := stage_b_at rh rt j in
-  finite y /\ finite l /\ Rabs (B y) <= 4 /\ Rabs (B l) <= bpow radix2 (-20) /\
+  finite y /\ finite l /\ 0.5 <= B y <= 4 /\ Rabs (B l) <= bpow radix2 (-20) /\
   Rabs (exp (INR j * ln 2 / 512) * exp R - (B y + B l)) <= IZR 209 * bpow radix2 (-78).
 Proof.
   intros Frh Frt Grh Hrh Hrt Hdr HR Hj.
@@ -295,7 +295,7 @@ Proof.
   assert (Hm : Rabs m <= bpow radix2 (-74)).
   { unfold m. replace R with (B rhi + (R - B rhi)) at 1 by ring. apply stage_mvt_bound; [exact Hrhi | ].
     change (bpow radix2 (-64)) with (/ 18446744073709551616) in Ehi.
-    change (bpow radix2 (-93)) with (/ 9903520314283042199192993792) in Hdr.
+    change (bpow radix2 (-92)) with (/ 4951760157141521099596496896) in Hdr.
     change (bpow radix2 (-72)) with (/ 4722366482869645213696).
     apply Rabs_le_inv in Ehi. apply Rabs_le_inv in Hdr. apply Rabs_le. unfold dr in *. lra. }
   set (av := exp R - 1 - R - Qs R).
@@ -349,13 +349,29 @@ Proof.
   destruct (fadd16 e _ Fe Frest) as [Fl Bl].
   { rewrite Brest. apply Rle_trans with (1 + 1); [apply add1; lra | lra]. }
   rewrite Brest, rndF_rn in Bl.
-  split; [exact Fy | split; [exact Fl | split; [rewrite Rabs_pos_eq; lra | split]]].
+  split; [exact Fy | split; [exact Fl | split; [split; lra | split]]].
   - rewrite Bl. exact Gl.
   - rewrite Bl.
     assert (ER : one_g + (B rh + B rt - dr) + (B q - eqv + m) + av = exp R)
       by (rewrite one_g_eq; unfold dr, eqv, m, av; ring).
     rewrite ER in GY. replace (B th + B tl - Dt) with T in GY by (unfold Dt; ring).
     rewrite Rabs_minus_sym. exact GY.
+Qed.
+
+Theorem stage_b_at_ok rh rt j R : finite rh -> finite rt -> on_grid (-40) (B rh) ->
+  Rabs (B rh) <= 0.000678 -> Rabs (B rt) <= bpow radix2 (-40) ->
+  Rabs (B rh + B rt - R) <= bpow radix2 (-93) -> Rabs R <= 0.000677 -> (j < 512)%nat ->
+  let '(y,l) := stage_b_at rh rt j in
+  finite y /\ finite l /\ Rabs (B y) <= 4 /\ Rabs (B l) <= bpow radix2 (-20) /\
+  Rabs (exp (INR j * ln 2 / 512) * exp R - (B y + B l)) <= IZR 209 * bpow radix2 (-78).
+Proof.
+  intros Frh Frt Grh Hrh Hrt Hdr HR Hj.
+  assert (E : Rabs (B rh + B rt - R) <= bpow radix2 (-92))
+    by (apply Rle_trans with (1 := Hdr); apply bpow_le; lia).
+  pose proof (stage_b_at_extended_ok rh rt j R Frh Frt Grh Hrh Hrt E HR Hj) as H.
+  destruct (stage_b_at rh rt j) as [y l].
+  destruct H as [Fy [Fl [Y [L Err]]]].
+  split; [exact Fy | split; [exact Fl | split; [rewrite Rabs_pos_eq; lra | split; assumption]]].
 Qed.
 
 Theorem stage_b_value_ok x n r1 (ni : Z) (j : nat) :

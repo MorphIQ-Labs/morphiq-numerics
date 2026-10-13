@@ -124,6 +124,13 @@ measured there (§11).
    `ni·L1` (a multiple of `2^−40`), and `|r1| ≤ |R| + |ni|·|L − L1| < 2^−10`
    needs at most 53 bits at that quantum.
 
+The reusable `stage_of_extended_ok` proof also covers `|x| < 710`,
+with `|ni| <= 524450`, `|k| <= 1025` and `|R| <= 0.000676902`,
+for erfcx's double-word square. The original `stage_of_ok` theorem follows
+as a corollary with the bounds above; the exp screen and runtime operations
+are unchanged. `stage_b_r_model` exposes the exact IEEE reduction operations
+for `|ni| <= 525000`, independently of a caller's low-word error budget.
+
 Then `e^x = 2^k·T_j·e^R`. Stage A (§5) and stage B (§6) finish the reduction
 in their own ways.
 
@@ -241,6 +248,9 @@ go through rounded binary64 operations.
 reduction (step 1), the polynomial's evaluation (step 2), the approximation
 error (§5), `m` at `r_hi` (`|R − r_hi| ≤ 2^−64 + 2^−93`, `stage_mvt.g`), the
 table (§4), and the exactness facts of step 3.
+The same certificate accepts reduction error through `2^−92`, with the
+same evaluation bound. `stage_b_at_extended_ok` exposes that wider budget
+for erfcx's low input word; `stage_b_at_ok` preserves exp's `2^−93` interface.
 
 **`E_B = 2^−70`:** the certified error plus the test's rounding,
 `0x1.a2p−71 + 2^−73 = 1.88·2^−71`, rounded up.

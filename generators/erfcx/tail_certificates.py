@@ -112,10 +112,5 @@ for index, lower in enumerate(range(9, 897, 32)):
     certificate = s.replace("LOWER", f"1b{lower}").replace("UPPER", f"1b{upper}")
     (out / f"tail_quotient_{index:02}.g").write_text(certificate)
 
-# The operation sequence is exactly the existing shared exponential stage B.
-# Adapt only the reduction-error hypothesis; erfcx appends the square's low word.
-stage = (root / "formal/exp/stage_b.g").read_text()
-assert stage.count("dr in [-1b-93, 1b-93]") == 1
-stage = stage.replace("2^-93", "2^-92").replace("1b-93", "1b-92")
-stage = stage.replace("formal/exp/stage_b_reduction.g", "formal/erfcx/reflection_reduction.g")
-(out / "reflection_stage.g").write_text(header + stage)
+# Negative reflection uses the shared stage-B certificate directly:
+# formal/exp/stage_b.g includes its 2^-92 reduction-error budget.

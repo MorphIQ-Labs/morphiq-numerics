@@ -86,6 +86,16 @@ let compute op args =
        | [hi; lo; eps; k] ->
            show_opt (x_decide_scaled (z_of_u64 (hex hi)) (z_of_u64 (hex lo)) (z_of_u64 (hex eps)) (z_of_int (int_of_string k)))
        | _ -> failwith "decide_scaled takes three words and an exponent")
+  | "erfcx_reflection_square" ->
+      (match args with
+       | [x] -> String.concat " " (List.map show_bits (x_erfcx_reflection_square (z_of_u64 (hex x))))
+       | _ -> failwith "erfcx_reflection_square takes a word")
+  | "erfcx_reflection_exp" ->
+      (match args with
+       | [s;se] ->
+           let (k,words) = x_erfcx_reflection_exp (z_of_u64 (hex s)) (z_of_u64 (hex se)) in
+           String.concat " " (string_of_int (int_of_z k) :: List.map show_bits words)
+       | _ -> failwith "erfcx_reflection_exp takes two words")
   | "erfcx_table_value" ->
       (match args with
        | [x] -> String.concat " " (List.map show_bits (x_erfcx_table_value (z_of_u64 (hex x))))

@@ -207,3 +207,14 @@ Print Assumptions ErfcxTableEntry.table_eval_ieee.
 
 Require ErfcxTableBound.
 Print Assumptions ErfcxTableBound.table_evaluation_error.
+
+Print Assumptions ExpStageReduction.stage_of_extended_ok.
+Print Assumptions ExpStageReduction.stage_b_r_model.
+Print Assumptions ExpStageB.stage_b_at_extended_ok.
+Require ErfcxReflectionSquare ErfcxReflectionReduction ErfcxReflectionExp.
+Print Assumptions ErfcxReflectionSquare.reflection_square_ieee.
+Print Assumptions ErfcxReflectionReduction.reflection_reduced_ieee.
+Print Assumptions ErfcxReflectionReduction.reflection_reduce_ieee.
+Print Assumptions ErfcxReflectionExp.reflection_exp_ieee.
+Print Assumptions ErfcxReflectionExp.reflection_square_exp_ieee.
+Print Assumptions ErfcxReflectionExp.reflection_dispatch_range.

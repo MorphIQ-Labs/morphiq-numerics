@@ -1,8 +1,8 @@
 # erfcx exp_dw reduction for s = RN(x*x), se = x*x-s.
 # CONDITIONAL: n is the shifter integer, |n| <= 525000, R=s-n*ln(2)/512;
 # r1=s-n*L1 and both differences forming u are exact; rh=r0+dh is
-# the shifter result with |dh| <= 2^-41. These integer/grid hypotheses still
-# require the erfcx binary64 entry proof (exp's |s|<704 proof is insufficient).
+# the shifter result with |dh| <= 2^-41. The integer/grid hypotheses are discharged by
+# ErfcxReflectionReduction.v using the shared |s|<710 reduction theorem.
 # |se| <= 2^-44 follows for |x| below the overflow boundary, s < 710.
 # L2/L3 and |dL| <= 2^-129 are the shared generated exp constants.
 # The extra final rounding of rt0+se makes the bound 2^-92, not 2^-93.

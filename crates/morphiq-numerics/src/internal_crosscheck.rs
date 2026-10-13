@@ -247,6 +247,55 @@ fn internal_crosscheck_corpus() {
     // Cover the corrected reciprocal's full exponent range, including each
     // power-of-two boundary and its adjacent binary64 values.
     let mut erfcx_rng = SplitMix64::new(0x6572_6663_785f_0001);
+    // The exact square and normalized exponential used by negative reflection.
+    // Include the overflow-adjacent input, the -1/2 boundary, and direct
+    // reductions beyond exp's usual 704 screen through the 710 proof limit.
+    for i in 0..24_000 {
+        let low = 0xbfe0_0000_0000_0001_u64;
+        let high = crate::erfcx::X_OVF.to_bits() - 1;
+        let bits = match i % 8 {
+            0 => low + (i / 8) % 32,
+            1 => high - (i / 8) % 32,
+            _ => low + erfcx_rng.next_u64() % (high - low + 1),
+        };
+        let x = f64::from_bits(bits);
+        let (square, error) = crate::eft::two_prod(x, x);
+        writeln!(
+            out,
+            "erfcx_reflection_square {bits:016x} : {:016x} {:016x}",
+            square.to_bits(),
+            error.to_bits()
+        )
+        .unwrap();
+        let (s, se) = if i % 2 == 0 {
+            (square, error)
+        } else {
+            let lower = 704.0_f64.to_bits();
+            let upper = 710.0_f64.to_bits() - 1;
+            let sb = match i % 6 {
+                1 => lower + (i / 6) % 32,
+                3 => upper - (i / 6) % 32,
+                _ => lower + erfcx_rng.next_u64() % (upper - lower + 1),
+            };
+            let eb = match (i / 2) % 6 {
+                0 => 0,
+                1 => 1,
+                2 => (1023 - 44) << 52,
+                _ => erfcx_rng.next_u64() % (((1023 - 44) << 52) + 1),
+            } | ((erfcx_rng.next_u64() & 1) << 63);
+            (f64::from_bits(sb), f64::from_bits(eb))
+        };
+        let (h, l, k) = crate::erfcx::exp_dw(s, se);
+        writeln!(
+            out,
+            "erfcx_reflection_exp {:016x} {:016x} : {k} {:016x} {:016x}",
+            s.to_bits(),
+            se.to_bits(),
+            h.to_bits(),
+            l.to_bits()
+        )
+        .unwrap();
+    }
     for bits in (4_u64..=9)
         .flat_map(|e| {
             let b = (1023 + e) << 52;
