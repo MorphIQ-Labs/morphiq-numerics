@@ -173,3 +173,10 @@ Print Assumptions ErfcxQuotient.quotient_ieee.
 Print Assumptions ErfcxQuotient.normalized_quotient_ieee.
 Print Assumptions ErfcxQuotientScale.scale_input_ieee.
 Print Assumptions ErfcxQuotientScale.scaled_quotient_ieee.
+
+Require ErfcxRounding ErfcxTailCorrection ErfcxTailValue.
+Print Assumptions ErfcxRounding.rounding_decomposition.
+Print Assumptions ErfcxTailCorrection.tail_correction_ieee.
+Print Assumptions ErfcxTailValue.tail_reconstruct_ieee.
+Print Assumptions ErfcxTailValue.tail_ieee.
+Print Assumptions ErfcxTailValue.scaled_tail_ieee.

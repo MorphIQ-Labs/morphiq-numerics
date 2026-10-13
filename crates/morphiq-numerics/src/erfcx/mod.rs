@@ -256,6 +256,14 @@ pub(crate) fn quotient(x: f64) -> (f64, f64) {
     (q, ql)
 }
 
+/// Cubic correction in the large positive tail, including gradual underflow.
+#[inline]
+pub(crate) fn tail_correction(x: f64) -> f64 {
+    let y = 1.0 / x;
+    let t = y * y;
+    t * (-0.5 + t * (0.75 - 1.875 * t))
+}
+
 /// Double-word erfcx for finite `x ≥ 512`, as `(hi, lo, k)` with value
 /// `(hi + lo)·2^k`.
 #[inline]
@@ -272,11 +280,7 @@ pub(crate) fn yb_eval(x: f64) -> (f64, f64, i32) {
         let (fh, fl) = fast_two_sum(q, ql);
         return (fh, fl, k);
     }
-    // u = −t/2 + 3t²/4 − 15t³/8 with t = 1/x² (t underflowing to zero makes
-    // no difference: |u| < 2^−54 there).
-    let y = 1.0 / x;
-    let t = y * y;
-    let u = t * (-0.5 + t * (0.75 - 1.875 * t));
+    let u = tail_correction(x);
     let (fh, fl) = fast_two_sum(q, ql + q * u);
     (fh, fl, k)
 }
