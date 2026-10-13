@@ -54,7 +54,7 @@ pub(super) fn taylor(x: f64) -> Q256 {
     sum
 }
 
-pub(super) fn asym(x: f64) -> Q256 {
+pub(crate) fn asym(x: f64) -> Q256 {
     let xq = Q256::from_f64(x);
     let y = xq.recip();
     let t = y.mul(y);

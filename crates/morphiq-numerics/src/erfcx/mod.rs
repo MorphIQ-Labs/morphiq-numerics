@@ -1,5 +1,7 @@
 //! Scaled complementary error function: table, reciprocal and reflection kernels.
 mod accurate;
+#[cfg(test)]
+pub(crate) use accurate::asym as accurate_asym;
 mod accurate_tables;
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;

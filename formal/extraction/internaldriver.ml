@@ -96,6 +96,10 @@ let compute op args =
        | [hi; lo; eps; k] ->
            show_opt (x_decide_scaled (z_of_u64 (hex hi)) (z_of_u64 (hex lo)) (z_of_u64 (hex eps)) (z_of_int (int_of_string k)))
        | _ -> failwith "decide_scaled takes three words and an exponent")
+  | "erfcx_accurate_tail" ->
+      (match args with
+       | [x] -> let ((n, e), l) = x_erfcx_accurate_tail (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "erfcx_accurate_tail takes a word")
   | "erfcx_table_fast" ->
       (match args with
        | [x] -> show_opt (x_erfcx_table_fast (z_of_u64 (hex x)))

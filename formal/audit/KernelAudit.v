@@ -329,3 +329,8 @@ Print Assumptions ErfcxAccurateNewton.q_newton_error.
 Print Assumptions ErfcxAccurateNewton.q_refine3_error.
 Print Assumptions ErfcxAccurateSetup.q_recip_float_error.
 Print Assumptions ErfcxAccurateSetup.q_tail_series_integral.
+
+Require ErfcxAccurateProduct ErfcxAccurateRounded.
+Print Assumptions ErfcxAccurateProduct.q_cs_error.
+Print Assumptions ErfcxAccurateProduct.q_asym_error.
+Print Assumptions ErfcxAccurateRounded.q_asym_rounded.

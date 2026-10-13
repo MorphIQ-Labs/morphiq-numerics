@@ -174,7 +174,16 @@ values, rounding of finite Q256 outputs, and the exact odd integer factors.
 `ErfcxAccurateSetup.q_tail_series_integral` composes these results:
 for every finite binary64 input `x >= 16`, the computed series differs
 from `J(1/x²)` by at most `2^-226`, without assumptions on intermediate
-errors. The final scaled product and output rounding remain separate. `Q256Real.top_small` and
+errors. `ErfcxAccurateProduct.q_asym_error` includes the generated Q256
+`1/sqrt(pi)` constant and both final multiplications, with relative error
+at most `2^-224` against the normalized integral representation.
+`ErfcxAccurateRounded.q_asym_rounded` proves the final binary64 result
+is finite and has the form `erfcx(x)*(1+d)+a`, with
+`|d| <= 2^-53 + 2^-223` and `|a| <= 2^-1075`. This includes gradual
+underflow and is an error bound, not a correct-rounding guarantee.
+The extracted accurate-tail model is compared against the Rust Q256
+fields over inputs covering every positive-tail binade, subnormal
+reciprocal seeds, and the longer loops near 16. `Q256Real.top_small` and
 `mul_pow2_any` prove the integer-exponent
 helpers; their extracted transcriptions are checked against the Rust fields
 and results, including zero, the stopping boundary and large exponents.

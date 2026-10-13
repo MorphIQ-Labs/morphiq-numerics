@@ -245,6 +245,7 @@ fn internal_crosscheck_corpus() {
     let mut rng = SplitMix64::new(0x7163_726f_7373_0001);
     let mut out = String::new();
     q256_exponent_corpus(&mut out);
+    erfcx_accurate_tail_corpus(&mut out);
     // Cover the corrected reciprocal's full exponent range, including each
     // power-of-two boundary and its adjacent binary64 values.
     let mut erfcx_rng = SplitMix64::new(0x6572_6663_785f_0001);
@@ -1157,8 +1158,26 @@ fn internal_crosscheck_corpus() {
     std::fs::write(path, out).unwrap();
 }
 
-/// An argument of `ln_1p`'s stages: small of either sign, near −1, below and
-/// above `2^53`, any encoding, or at a table interval's edge.
+/// Accurate erfcx tails: loop-heavy inputs, every input binade, and subnormal seeds.
+fn erfcx_accurate_tail_corpus(out: &mut String) {
+    let mut rng = SplitMix64::new(0x6572_6663_7851_3235);
+    for i in 0_u64..4096 {
+        let bits = match i {
+            0 => 16.0_f64.to_bits(),
+            1 => 16.0_f64.to_bits() + 1,
+            2 => f64::MAX.to_bits(),
+            3 => f64::MAX.to_bits() - 1,
+            4 => 2045_u64 << 52,
+            5 => (2045_u64 << 52) + 1,
+            6 => (2045_u64 << 52) - 1,
+            7..=1023 => 16.0_f64.to_bits() + rng.next_u64() % (2_u64 << 52),
+            _ => ((1027 + (i - 1024) % 1020) << 52) | (rng.next_u64() >> 12),
+        };
+        let value = crate::erfcx::accurate_asym(f64::from_bits(bits));
+        writeln!(out, "erfcx_accurate_tail {bits:016x} : {}", q256(value)).unwrap();
+    }
+}
+
 fn q256_exponent_corpus(out: &mut String) {
     let mut rng = SplitMix64::new(0x7132_3536_6578_7001);
     for i in 0..12_000 {
@@ -1191,6 +1210,8 @@ fn q256_exponent_corpus(out: &mut String) {
     }
 }
 
+/// An argument of `ln_1p`'s stages: small of either sign, near −1, below and
+/// above `2^53`, any encoding, or at a table interval's edge.
 fn ln_1p_stage_argument(rng: &mut SplitMix64) -> f64 {
     let binade = |rng: &mut SplitMix64, low: u64, width: u64| {
         f64::from_bits(((low + rng.next_u64() % width) << 52) | (rng.next_u64() >> 12))
