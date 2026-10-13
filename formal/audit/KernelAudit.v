@@ -184,3 +184,7 @@ Print Assumptions ErfcxTailValue.scaled_tail_ieee.
 Require ErfcxTableSplit.
 Print Assumptions ErfcxTableSplit.table_split_ieee.
 Print Assumptions ErfcxTableSplit.table_square_ieee.
+
+Require ErfcxTableCoefficient ErfcxTableProducts.
+Print Assumptions ErfcxTableCoefficient.coefficient_check_ok.
+Print Assumptions ErfcxTableProducts.table_leading_value_ieee.

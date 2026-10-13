@@ -86,6 +86,11 @@ let compute op args =
        | [hi; lo; eps; k] ->
            show_opt (x_decide_scaled (z_of_u64 (hex hi)) (z_of_u64 (hex lo)) (z_of_u64 (hex eps)) (z_of_int (int_of_string k)))
        | _ -> failwith "decide_scaled takes three words and an exponent")
+  | "erfcx_table_leading" ->
+      (match args with
+       | [i; x] -> String.concat " " (List.map show_bits
+           (x_erfcx_table_leading (z_of_int (int_of_string i)) (z_of_u64 (hex x))))
+       | _ -> failwith "erfcx_table_leading takes an index and a word")
   | "erfcx_table_split" ->
       (match args with
        | [x; e] -> String.concat " " (List.map show_bits

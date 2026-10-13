@@ -97,7 +97,7 @@ lemmas; an unchecked algebraic identity is not accepted as a proof.
 
 | Component | Certified bound | Assumptions still needed at the entry |
 |---|---|---|
-| `T*.g` | Relative table evaluation error `2^-67` against the polynomial | Residual split and its square discharged by `ErfcxTableSplit`; reduction, coefficient products/differences and Fast2Sum calls remain |
+| `T*.g` | Relative table evaluation error `2^-67` against the polynomial | Residual split, square, coefficient products and differences discharged by `ErfcxTableSplit` and `ErfcxTableProducts`; reduction and Fast2Sum calls remain |
 | `reciprocal.g` | Relative error `2^-98` for corrected `1/x`, `16 <= x <= 512` | Discharged by `ErfcxReciprocal.reciprocal_ieee` |
 | `middle_square*.g` | Absolute error `2^-102` against `1/x²` | Discharged by `ErfcxSquare.reciprocal_square_ieee` |
 | `middle_polynomial.g`, `middle_mvt.g` | Evaluation error `0x1.5p-68`; sensitivity error `2^-101` | Discharged by `ErfcxMiddlePolynomial.reciprocal_correction_ieee` |
@@ -169,6 +169,16 @@ Rust at positive and negative rounding ties, their neighbours, interval
 endpoints, and subnormal residuals. These lemmas assume the reduction has
 already supplied the stated residual bound.
 
+The leading-coefficient checker decodes the actual binary64 words and the
+same bit masks used by Rust. Coq evaluates this check for both leading
+coefficients in every table row. Its soundness theorem establishes finite
+operands, the coefficient grids, and exact high-word differences. Combined
+with the residual grid, `ErfcxTableProducts.table_leading_ieee` proves
+`A1*H`, `H*H` and `A2*(H*H)` exact for all 177 rows. The integer check does
+not approximate coefficients or assume a generator's precision claim. The
+leading-value theorem also proves both low-coefficient additions finite and
+identifies their binary64 rounded values.
+
 The reciprocal and square entry theorems start from a finite binary64
 input in `[16, 512]`. They prove that every intermediate is finite, that
 TwoProd and the Sterbenz subtraction are exact, and that scaling the high
@@ -221,6 +231,8 @@ scaled reciprocals keep large inputs away from Dekker splitter overflow.
 * `generators/erfcx/tables.sollya`: Sollya 8.0 `fpminimax` and `supnorm`,
   400-bit working precision. All coefficients originate here.
 * `generators/erfcx_constants.py`: fast and Q256 table replay.
+* `generators/erfcx_table_data.py`: exact table-word transcription for the
+  Coq coefficient checks.
 * `generators/erfcx_reference.py`: independent mpmath witnesses, including
   binade edges, interval boundaries, thresholds, and both tails.
 * `formal/erfcx/T*.g`: 177 Gappa table-evaluation certificates. They prove
@@ -265,6 +277,13 @@ With the current guard, separately instrumented uniform samples rejected
 196/1,048,576 table inputs, 199/1,048,576 middle-tail inputs,
 182/1,048,576 large-tail inputs in `[512,4608)`, and 177/1,048,576 negative
 inputs. These rates exclude screened inputs and are workload-specific.
+
+The leading-product helper introduced for extraction preserves the baseline
+AArch64 instruction sequence, including operands, across the optimized
+library. Only a panic source-location record changes in the assembly.
+`crates/reference/measurements/erfcx-m1pro/table-products-codegen.json`
+records the toolchain, command, source revision and assembly hashes for this
+comparison; it is code-generation evidence, not a new timing measurement.
 
 ## Mathematical sources and provenance
 

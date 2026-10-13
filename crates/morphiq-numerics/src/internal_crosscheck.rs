@@ -389,6 +389,26 @@ fn internal_crosscheck_corpus() {
         )
         .unwrap();
     }
+    for idx in 0_usize..177 {
+        let e = if idx < 49 {
+            0
+        } else {
+            ((idx - 49) / 32) as i32
+        };
+        let hm = f64::from_bits(((1017 + e) as u64) << 52);
+        for sample in 0..32 {
+            let h = match sample {
+                0 => 0.0,
+                1 => hm,
+                2 => -hm,
+                _ => hm * (2.0 * unit(&mut erfcx_rng) - 1.0),
+            };
+            let (h, _) = crate::erfcx::table_split(h, e);
+            let (a1, b1, a2h, b2, p1, sq, p2) = crate::erfcx::table_leading(idx, h);
+            writeln!(out, "erfcx_table_leading {idx} {:016x} : {:016x} {:016x} {:016x} {:016x} {:016x} {:016x} {:016x}",
+                h.to_bits(), a1.to_bits(), b1.to_bits(), a2h.to_bits(), b2.to_bits(), p1.to_bits(), sq.to_bits(), p2.to_bits()).unwrap();
+        }
+    }
     // Tail correction and reconstruction through square/product underflow.
     // Include both neighbours of exponent boundaries and the dispatch endpoint.
     for i in 0..12000 {

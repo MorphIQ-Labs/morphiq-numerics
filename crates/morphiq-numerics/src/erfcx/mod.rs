@@ -155,6 +155,24 @@ pub(crate) fn table_split(h: f64, e: i32) -> (f64, f64) {
     (hi, h - hi)
 }
 
+/// Exact leading products of the table polynomial after splitting its residual.
+#[inline]
+pub(crate) fn table_leading(idx: usize, h: f64) -> (f64, f64, f64, f64, f64, f64, f64) {
+    let a = &T[idx];
+    // A1 has 35 significand bits; H has at most 18, so A1·H is exact.
+    let a1h = f(a[2]);
+    let a1 = f(a[2] & !((1u64 << 18) - 1));
+    let b1 = (a1h - a1) + f(a[3]);
+    // A2 has 17 significand bits; H² has at most 36, so A2·H² is exact.
+    let a2h = f(a[4]);
+    let a2 = f(a[4] & !((1u64 << 36) - 1));
+    let b2 = (a2h - a2) + f(a[5]);
+    let p1 = a1 * h;
+    let sq = h * h;
+    let p2 = a2 * sq;
+    (a1, b1, a2h, b2, p1, sq, p2)
+}
+
 /// The double-word polynomial value for region T.
 #[inline]
 pub(super) fn t_eval(x: f64) -> (f64, f64) {
@@ -163,17 +181,7 @@ pub(super) fn t_eval(x: f64) -> (f64, f64) {
     // H: h on the 2^(e−23) grid, so |H| ≤ 2^17 grid steps (≤ 18 bits) and
     // H·H is exact (≤ 36 bits); L = h − H exactly, |L| ≤ 2^(e−24).
     let (hh_, l) = table_split(h, e);
-    // A1: a1's high word cut to 35 bits, so A1·H is exact (≤ 53 bits).
-    let a1h = f(a[2]);
-    let a1 = f(a[2] & !((1u64 << 18) - 1));
-    let b1 = (a1h - a1) + f(a[3]);
-    // A2: a2's high word cut to 17 bits, so A2·(H·H) is exact.
-    let a2h = f(a[4]);
-    let a2 = f(a[4] & !((1u64 << 36) - 1));
-    let b2 = (a2h - a2) + f(a[5]);
-    let p1 = a1 * hh_;
-    let sq = hh_ * hh_;
-    let p2 = a2 * sq;
+    let (a1, b1, a2h, b2, p1, sq, p2) = table_leading(idx, hh_);
     // Tail: q = a3 + h·(a4 + …), Horner in binary64.
     let mut q = f(a[6 + DEG - 3]);
     for j in (6..6 + DEG - 3).rev() {
