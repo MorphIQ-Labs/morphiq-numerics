@@ -24,6 +24,13 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir "$work/repo"
 cp -r .cargo crates formal scripts "$work/repo/"
+# Bindings may also cover generators or other inputs outside these trees.
+# Copy from the manifest so extending a binding cannot silently omit an input.
+while read -r bound_hash bound_source; do
+  case "$bound_hash" in ''|\#*) continue ;; esac
+  mkdir -p "$work/repo/$(dirname "$bound_source")"
+  cp "$bound_source" "$work/repo/$bound_source"
+done < formal/binding.sha256
 cp -a "$build" "$work/build"
 cp "$corpus" "$work/crosscheck.txt"
 cp "$icorpus" "$work/internal-crosscheck.txt"
