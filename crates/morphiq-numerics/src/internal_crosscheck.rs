@@ -249,6 +249,7 @@ fn internal_crosscheck_corpus() {
     erfcx_accurate_exponential_corpus(&mut out);
     erfcx_accurate_taylor_corpus(&mut out);
     erfcx_accurate_negative_corpus(&mut out);
+    erfcx_public_entry_corpus(&mut out);
     // Cover the corrected reciprocal's full exponent range, including each
     // power-of-two boundary and its adjacent binary64 values.
     let mut erfcx_rng = SplitMix64::new(0x6572_6663_785f_0001);
@@ -1159,6 +1160,29 @@ fn internal_crosscheck_corpus() {
     assert_eq!((least_k, greatest_k), (-54, 1024), "expm1 scaling extremes");
     logarithm_fallback_corpus(&mut out);
     std::fs::write(path, out).unwrap();
+}
+
+/// Public dispatch: independent witness inputs and arbitrary binary64 encodings.
+fn erfcx_public_entry_corpus(out: &mut String) {
+    let mut write = |x: f64| {
+        writeln!(
+            out,
+            "erfcx_entry {:016x} : {:016x}",
+            x.to_bits(),
+            crate::normal::erfcx(x).to_bits()
+        )
+        .unwrap();
+    };
+    for case in crate::test_exact::entries(
+        include_str!("../../reference/fixtures/erfcx.json"),
+        &["cases"],
+    ) {
+        write(crate::test_exact::word(case, "x"));
+    }
+    let mut rng = SplitMix64::new(0x6572_6663_7870_7562);
+    for _ in 0..4096 {
+        write(f64::from_bits(rng.next_u64()));
+    }
 }
 
 /// The complete negative fallback, including both correction branches.

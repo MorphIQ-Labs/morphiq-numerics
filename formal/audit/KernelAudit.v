@@ -395,3 +395,8 @@ Print Assumptions ErfcxAccurateReflectionFar.q_reflection_asym_error.
 Print Assumptions ErfcxAccurateReflectionEntry.q_negative_error.
 Print Assumptions ErfcxAccurateReflectionRange.accurate_reflection_target_range.
 Print Assumptions ErfcxAccurateReflectionRounded.q_negative_rounded.
+
+(** Complete erfcx dispatch, bounds, special values and positive finite outputs. *)
+Require ErfcxPublicEntry ErfcxPublicPositive.
+Print Assumptions ErfcxPublicEntry.erfcx_public_contract.
+Print Assumptions ErfcxPublicPositive.erfcx_entry_positive.

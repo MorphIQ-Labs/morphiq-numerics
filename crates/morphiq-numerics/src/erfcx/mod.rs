@@ -32,7 +32,7 @@ pub(super) const ONE_NEG: f64 = f64::from_bits(0xbc9c_5bf8_91b4_ef69);
 pub(super) const X_SUB: f64 = f64::from_bits(0x7fc2_0dd7_5042_9b6e);
 
 /// Rounding-test bounds per region (relative error of the double-word result).
-/// Provisional guards; docs/erfcx.md states the current assurance limits.
+/// Composed IEEE/analytic proofs establish these guards; see docs/erfcx.md.
 pub(super) const EPS_T: f64 = f64::from_bits(0x3bd0_0000_0000_0000);
 pub(super) const EPS_Y: f64 = f64::from_bits(0x3bd0_0000_0000_0000);
 pub(super) const EPS_N: f64 = f64::from_bits(0x3bd0_0000_0000_0000);
@@ -71,8 +71,9 @@ fn f(b: u64) -> f64 {
 /// negative infinity returns positive infinity. Finite positive arguments
 /// retain a positive result even in the subnormal tail.
 ///
-/// This implementation is under development; see docs/erfcx.md for the
-/// current assurance status before making an accuracy claim.
+/// Accepted fast paths are correctly rounded. Accurate fallbacks have proved
+/// per-domain error bounds; whole-domain correct rounding is not claimed.
+/// See docs/erfcx.md for the bounds and their derivation.
 #[must_use]
 pub fn erfcx(x: f64) -> f64 {
     if let Some(y) = special(x) {
