@@ -1,0 +1,63 @@
+// Research prototype constants for erfcx fast paths (issue #34).
+// Prints "KEY ..." lines; to_rust.py turns them into Rust.
+//
+// Table regions (fast path), each interval [c - hm, c + hm] with a
+// polynomial in h = x - c approximating erfcx(c + h) relatively:
+//   T0: c = k/32, hm = 1/64, k = -16..32     (x in [-1/2, 1))
+//   T1: c = 2^e (1 + (2i+1)/64), hm = 2^e/64, e = 0..3, i = 0..31  (x in [1, 16))
+// Coefficients a0, a1, a2 are double-double (DD), a3..ad binary64.
+// Large x (asymptotic form, t = 1/x^2):
+//   erfcx(x) = (1/(x sqrt(pi))) (1 - t/2 + t^2 P(t)),
+//   P approximating (S_K(t) - 1 + t/2)/t^2, S_K the asymptotic series
+//   truncated after K terms; its remainder is bounded by the first omitted
+//   term (DLMF 7.12(i)), printed as PREM.
+prec = 400;
+D0 = 9;
+D1 = 9;
+DA = 7;
+
+procedure emit(tag, idx, c, hm, d) {
+  var f, I, p, e, k, a, hi, lo;
+  f = erfc(c + x) * exp((c + x)^2);
+  I = [-hm; hm];
+  p = fpminimax(f, d, [|DD, DD, DD, D...|], I, relative);
+  e = supnorm(p, f, I, relative, 2^-12);
+  write(tag, " ", idx, " C "); printdouble(c);
+  write(tag, " ", idx, " HM "); printdouble(hm);
+  for k from 0 to d do {
+    a = coeff(p, k);
+    hi = round(a, D, RN);
+    lo = round(a - hi, D, RN);
+    write(tag, " ", idx, " A ", k, " "); printdouble(hi);
+    write(tag, " ", idx, " L ", k, " "); printdouble(lo);
+  };
+  write(tag, " ", idx, " ERR "); print(sup(e));
+};
+
+for k from -16 to 32 do emit("T0", k + 16, k / 32, 1/64, D0);
+for e from 0 to 3 do
+  for i from 0 to 31 do
+    emit("T1", 32 * e + i, 2^e * (1 + (2 * i + 1) / 64), 2^e / 64, D1);
+
+// Asymptotic form.
+K = 32;
+hpoly = 0; cc = 1;
+for k from 1 to K - 1 do {
+  cc = cc * (2 * k - 1) / 2;
+  if k >= 2 then hpoly = hpoly + (-1)^k * cc * x^(k - 2);
+};
+rem = cc * (2 * K - 1) / 2;
+IA = [2^-18; 2^-8];
+pa = fpminimax(hpoly, DA, [|D...|], IA, relative);
+ea = supnorm(pa, hpoly, IA, relative, 2^-10);
+for k from 0 to DA do { write("PA ", k, " "); printdouble(coeff(pa, k)); };
+write("PA_ERR "); print(sup(ea));
+write("PREM "); print(rem * (2^-8)^(K - 2));
+
+// 1/sqrt(pi) as a double-double.
+cs = 1 / sqrt(pi);
+csh = round(cs, D, RN); csl = round(cs - csh, D, RN);
+write("CS "); printdouble(csh);
+write("CSL "); printdouble(csl);
+write("CS_ERR "); print(sup(evaluate(abs((csh + csl) / cs - 1), [0; 0])));
+quit;

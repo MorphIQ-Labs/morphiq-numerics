@@ -38,4 +38,5 @@ done
 
 
 [ "$failed" -eq 0 ]
+./scripts/check_erfcx_certificates.sh
 echo "certificates: OK"

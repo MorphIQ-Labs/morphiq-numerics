@@ -13,7 +13,7 @@ fi
 out=$1
 cd "$(dirname "$0")/.."
 
-for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig; do
+for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig formal/erfcx; do
   f=${dir#formal/}
   mkdir -p "$out/$f"
   for certificate in "$dir"/*.g; do

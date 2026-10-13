@@ -1,0 +1,23 @@
+{
+  "base_revision": "12be77d",
+  "cpu": "Apple M1 Pro",
+  "os": "macOS 27.0.1 (26A434)",
+  "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14), LLVM 22.1.6",
+  "backend": "NEON",
+  "command": "cargo run --release --locked -p morphiq-numerics-reference --features simd,std --bin bench-erfcx",
+  "build_flags": "workspace release profile; codegen-units=1; no RUSTFLAGS override",
+  "conditions": "Shared host; no other task-owned builds, proofs or profiling during these two runs. Other host activity was not controlled; these are preliminary measurements under contention, not idle-host claims. Power and frequency settings were not controlled.",
+  "load_snapshots": [
+    " 7:29  up 19:43, 4 users, load averages: 3.83 11.26 16.90",
+    " 7:29  up 19:43, 4 users, load averages: 5.13 11.40 16.92"
+  ],
+  "source_sha256": {
+    "crates/morphiq-numerics/src/erfcx/accurate.rs": "5e7d61d0d9643cbf6b37e6de61f2ba4107d0b4ae8261d64f9d6c1c8809d6c21e",
+    "crates/morphiq-numerics/src/erfcx/accurate_tables.rs": "8531684a353f9d0d7e8cc97507dd9fbaf0ba1478421add436ec1bc95f174272e",
+    "crates/morphiq-numerics/src/erfcx/lanes.rs": "1de12e5d94040479612f4cb8280a617b14415a68e2d981e3a68648a2b4b9ce05",
+    "crates/morphiq-numerics/src/erfcx/mod.rs": "38ab40bd02cd846929a9dd3a2ad9a66e78ca1f4eba579021844708b077aaf63d",
+    "crates/morphiq-numerics/src/erfcx/tables.rs": "0abf00749730452278139157fbf8e43670e4abf0fecece5fa92d09b694c1b79f",
+    "crates/morphiq-numerics/src/erfcx/tests.rs": "f7170f71d55bce3fd29ae50e1e4c72ac110300557747806e08059b182fd9b4b0",
+    "crates/reference/src/bin/bench-erfcx.rs": "2a18e1a04c062ab363d1bd12cbe26a6b6d5bc1d6639d1279e00d0b930aa811d8"
+  }
+}

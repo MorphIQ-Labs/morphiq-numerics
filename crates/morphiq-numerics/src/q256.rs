@@ -306,6 +306,23 @@ impl Q256 {
         y
     }
 
+    /// The exponent of the leading bit, or the zero sentinel.
+    pub(crate) fn top(self) -> i32 {
+        if is_zero(&self.m) {
+            i32::MIN / 2
+        } else {
+            self.e + 255
+        }
+    }
+
+    /// Exact power-of-two scaling in the integer-significand representation.
+    pub(crate) fn mul_pow2(self, power: i32) -> Self {
+        Self {
+            e: self.e + power,
+            ..self
+        }
+    }
+
     /// `self` rounded to binary64, to nearest with ties to even, subnormals
     /// included; `±∞` beyond the largest finite magnitude.
     pub(crate) fn to_f64(self) -> f64 {
