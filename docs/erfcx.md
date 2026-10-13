@@ -189,6 +189,19 @@ not approximate coefficients or assume a generator's precision claim. The
 leading-value theorem also proves both low-coefficient additions finite and
 identifies their binary64 rounded values.
 
+The same exact decoder checks every coefficient's magnitude and each leading
+product's size relative to the constant term. `ErfcxTableEvaluation` uses
+these bounds to prove finite Horner intermediates and the compensated
+remainder's operation sequence. A generic Gappa certificate supplies the
+three reconstruction sums' magnitude bounds; Coq discharges every
+Fast2Sum precondition, including the final normalization.
+`ErfcxTableEntry.table_eval_ieee` composes the reduction, split, leading
+products, Horner loop and reconstruction for every finite input in
+`[-1/2,16)`. It identifies the returned words' exact sum with the real
+rounding model used by the table certificates. This arithmetic model still
+needs its per-row approximation bounds and final rounding decision connected
+to the mathematical function.
+
 The reciprocal and square entry theorems start from a finite binary64
 input in `[16, 512]`. They prove that every intermediate is finite, that
 TwoProd and the Sterbenz subtraction are exact, and that scaling the high

@@ -196,3 +196,11 @@ Require ErfcxTableReduction.
 Print Assumptions ErfcxTableReduction.table_uniform_ieee.
 Print Assumptions ErfcxTableReduction.table_binade_ieee.
 Print Assumptions ErfcxTableReduction.table_reduce_ieee.
+
+Require ErfcxTableEvaluation ErfcxTableEntry.
+Print Assumptions ErfcxTableCoefficient.word_range_check_ok.
+Print Assumptions ErfcxTableCoefficient.coefficient_size_check_ok.
+Print Assumptions ErfcxTableEvaluation.horner_ieee.
+Print Assumptions ErfcxTableEvaluation.table_rest_ieee.
+Print Assumptions ErfcxTableEvaluation.table_sum_ieee.
+Print Assumptions ErfcxTableEntry.table_eval_ieee.

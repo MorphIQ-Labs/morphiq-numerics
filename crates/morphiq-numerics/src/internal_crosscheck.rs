@@ -448,6 +448,15 @@ fn internal_crosscheck_corpus() {
             h.to_bits()
         )
         .unwrap();
+        let (yh, yl) = crate::erfcx::t_eval(x);
+        writeln!(
+            out,
+            "erfcx_table_value {:016x} : {:016x} {:016x}",
+            x.to_bits(),
+            yh.to_bits(),
+            yl.to_bits()
+        )
+        .unwrap();
     }
     for idx in 0_usize..177 {
         let e = if idx < 49 {

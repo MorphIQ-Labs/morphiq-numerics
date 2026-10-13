@@ -212,3 +212,43 @@ Proof.
  - apply andb_true_iff in A. exact A.
  - apply nth_In. rewrite table_words_length. exact I.
 Qed.
+
+Lemma table_word_checks : forallb (fun row =>
+ (length row =? 13)%nat && forallb (fun b => word_range_check b ((-4)%Z,0%Z) (4%Z,0%Z)) row) table_words=true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma table_word_check i k : (i<177)%nat -> (k<13)%nat ->
+ word_range_check (table_word i k) ((-4)%Z,0%Z) (4%Z,0%Z)=true.
+Proof.
+ intros I K. pose proof table_word_checks as C.
+ apply forallb_forall with (x:=nth i table_words []) in C.
+ - apply andb_true_iff in C as [Length Words]. apply Nat.eqb_eq in Length.
+   apply forallb_forall with (x:=table_word i k) in Words;[exact Words|].
+   apply nth_In. rewrite Length;exact K.
+ - apply nth_In. rewrite table_words_length;exact I.
+Qed.
+Lemma table_constant_checks : forallb (fun row =>
+ word_range_check (nth 0 row 0) (9%Z,(-8)%Z) (2%Z,0%Z) &&
+ word_range_check (nth 1 row 0) ((-1)%Z,(-52)%Z) (1%Z,(-52)%Z)) table_words=true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma table_constant_check i : (i<177)%nat ->
+ word_range_check (table_word i 0) (9%Z,(-8)%Z) (2%Z,0%Z)=true /\
+ word_range_check (table_word i 1) ((-1)%Z,(-52)%Z) (1%Z,(-52)%Z)=true.
+Proof.
+ intros I. pose proof table_constant_checks as C.
+ apply forallb_forall with (x:=nth i table_words []) in C.
+ - apply andb_true_iff in C;exact C.
+ - apply nth_In. rewrite table_words_length;exact I.
+Qed.
+Lemma table_leading_size_checks : forallb (fun row =>
+ coefficient_size_check (nth 0 row 0) (nth 2 row 0) (nth 3 row 0) 18 1 (-32) &&
+ coefficient_size_check (nth 0 row 0) (nth 4 row 0) (nth 5 row 0) 36 2 (-14)) table_words=true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma table_leading_size_check i : (i<177)%nat ->
+ coefficient_size_check (table_word i 0) (table_word i 2) (table_word i 3) 18 1 (-32)=true /\
+ coefficient_size_check (table_word i 0) (table_word i 4) (table_word i 5) 36 2 (-14)=true.
+Proof.
+ intros I. pose proof table_leading_size_checks as C.
+ apply forallb_forall with (x:=nth i table_words []) in C.
+ - apply andb_true_iff in C;exact C.
+ - apply nth_In. rewrite table_words_length;exact I.
+Qed.

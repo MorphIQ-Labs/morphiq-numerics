@@ -84,3 +84,48 @@ Proof.
  apply dle_ok in C. rewrite dval_abs in C. change (dval (1%Z,0%Z)) with (1*1) in C.
  rewrite V; lra.
 Qed.
+
+
+(** Exact range checks used to discharge table evaluation and Fast2Sum
+    preconditions. All comparisons are on decoded dyadic values. *)
+Definition word_range_check b lo hi : bool :=
+ match dec b with
+ | Some v => dle lo v && dle v hi
+ | None => false
+ end.
+Lemma word_range_check_ok b lo hi : word_range_check b lo hi=true ->
+ finite (b64_of_bits b) /\ dval lo<=B (b64_of_bits b)<=dval hi.
+Proof.
+ unfold word_range_check. destruct (dec b) as [v|] eqn:D;[|discriminate].
+ intros C. apply andb_true_iff in C as [L U].
+ destruct (dec_ok b v D) as [F V]. rewrite V. split;[exact F|].
+ split;apply dle_ok;assumption.
+Qed.
+
+Definition coefficient_size_check head full low shift ratio err : bool :=
+ match dec head,dec full,dec low,dec (truncated_bits full shift) with
+ | Some a0,Some a,Some l,Some cut =>
+   dle (dabs cut) (dmul (1%Z,ratio) a0) &&
+   dle (dabs (dadd (dsub a cut) l)) (1%Z,err)
+ | _,_,_,_ => false
+ end.
+Lemma coefficient_size_check_ok head full low shift ratio err :
+ coefficient_size_check head full low shift ratio err=true ->
+ Rabs (B (b64_of_bits (truncated_bits full shift)))<=bpow radix2 ratio*B (b64_of_bits head) /\
+ Rabs (B (b64_of_bits full)-B (b64_of_bits (truncated_bits full shift))+B (b64_of_bits low))<=bpow radix2 err.
+Proof.
+ unfold coefficient_size_check.
+ destruct (dec head) as [a0|] eqn:D0;[|discriminate].
+ destruct (dec full) as [a|] eqn:Da;[|discriminate].
+ destruct (dec low) as [l|] eqn:Dl;[|discriminate].
+ destruct (dec (truncated_bits full shift)) as [cut|] eqn:Dc;[|discriminate].
+ intros C. apply andb_true_iff in C as [Size Err].
+ apply dle_ok in Size,Err.
+ rewrite dval_abs,dval_mul in Size.
+ rewrite dval_abs,dval_add,dval_sub in Err.
+ destruct (dec_ok _ _ D0) as [_ V0]. destruct (dec_ok _ _ Da) as [_ Va].
+ destruct (dec_ok _ _ Dl) as [_ Vl]. destruct (dec_ok _ _ Dc) as [_ Vc].
+ rewrite V0,Va,Vl,Vc. unfold dval at 2 in Size. cbn [fst snd] in Size.
+ change (dval (1%Z,err)) with (1*bpow radix2 err) in Err.
+ rewrite Rmult_1_l in Size,Err. split;assumption.
+Qed.
