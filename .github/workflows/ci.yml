@@ -305,9 +305,10 @@ jobs:
     needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-24.04
-    # About three times a run with neither cache (21 minutes when added); with
-    # both, a run takes about 10.
-    timeout-minutes: 60
+    # The erfcx analytic tables and Q256 composition bring a native cold
+    # proof build plus audits to roughly 45 minutes. Leave headroom for
+    # the smaller hosted runner; every proof and audit still runs.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2

@@ -510,7 +510,9 @@ signed integral remainder and the stored-polynomial CoqInterval check.
 `ErfcxPublicModel.v` transcribes the complete public scalar entry, including
 NaN encoding preservation, infinities, signed zeros, the interval returning
 one, the negative overflow threshold and each fast/fallback selection.
-The extracted entry is compared bit for bit with Rust on all 2,626 independent
+The extracted accurate fallback is a thunk, matching Rust's lazy rejection
+path rather than evaluating Q256 for accepted inputs. The extracted entry
+is compared bit for bit with Rust on all 2,626 independent
 fixture inputs and 4,096 arbitrary binary64 encodings. Component extraction
 checks additionally cover the internal operations and accurate-path fields.
 `ErfcxPublicEntry.v` proves the per-domain public bounds and special values;

@@ -20,14 +20,15 @@ Definition erfcx_special64 x :=
   if erfcx_le x reflection_limit then Some erfcx_infinity else
   if erfcx_eq x erfcx_infinity then Some erfcx_zero else
   if erfcx_le erfcx_one_neg x && erfcx_le x erfcx_one_pos then Some one else None.
-Definition erfcx_fallback fast accurate :=
-  match fast with Some y=>y | None=>Q256.to_f64 accurate end.
+(** Preserve Rust's lazy accurate fallback in the call-by-value extraction. *)
+Definition erfcx_fallback fast (accurate : unit -> Q256.q256) :=
+  match fast with Some y=>y | None=>Q256.to_f64 (accurate tt) end.
 Definition erfcx_regular64 x :=
-  if erfcx_lt x erfcx_negative_half then erfcx_fallback (reflection_fast64 x)(q_negative x) else
-  if erfcx_lt x reflection_sixteen then erfcx_fallback (table_fast64 x)(q_taylor x) else
-  if erfcx_lt x erfcx_five_twelve then erfcx_fallback (middle_fast64 x)(q_asym x) else
-  if erfcx_lt erfcx_scaled_limit x then erfcx_fallback (tail_scaled_fast64 x)(q_asym x) else
-    erfcx_fallback (tail_unscaled_fast64 x)(q_asym x).
+  if erfcx_lt x erfcx_negative_half then erfcx_fallback (reflection_fast64 x)(fun _=>q_negative x) else
+  if erfcx_lt x reflection_sixteen then erfcx_fallback (table_fast64 x)(fun _=>q_taylor x) else
+  if erfcx_lt x erfcx_five_twelve then erfcx_fallback (middle_fast64 x)(fun _=>q_asym x) else
+  if erfcx_lt erfcx_scaled_limit x then erfcx_fallback (tail_scaled_fast64 x)(fun _=>q_asym x) else
+    erfcx_fallback (tail_unscaled_fast64 x)(fun _=>q_asym x).
 Definition erfcx_entry64 x := match erfcx_special64 x with Some y=>y | None=>erfcx_regular64 x end.
 Lemma erfcx_negative_half_ok : finite erfcx_negative_half /\ B erfcx_negative_half= -/2.
 Proof.
