@@ -26,14 +26,14 @@ Proof.
  erfcx_goal (erfcx_dw_product.l1 a b c d).
 Qed.
 
-Theorem product_ieee ah al bh bl : finite ah -> finite al -> finite bh -> finite bl ->
+Theorem product_normalized_ieee ah al bh bl : finite ah -> finite al -> finite bh -> finite bl ->
  /1024 <= B ah <= 2 -> /1024 <= B bh <= 2 ->
  - /2^51 <= B al/B ah <= /2^51 -> - /2^51 <= B bl/B bh <= /2^51 ->
  let '(h,l) := product64 ah al bh bl in
  finite h /\ finite l /\
  - /2^77 <= ((B h+B l)-(B ah+B al)*(B bh+B bl))/((B ah+B al)*(B bh+B bl)) <= /2^77 /\
  /2^21 <= B h <= 8 /\ - /2^51 <= B l/B h <= /2^51 /\
- 999/1000 <= B h/(B ah*B bh) <= 1001/1000.
+ 999/1000 <= B h/(B ah*B bh) <= 1001/1000 /\ B h=rndF(B h+B l).
 Proof.
  intros Fah Fal Fbh Fbl Ah Bh Al Bl.
  assert (Ra : rn (B ah) = B ah) by (apply round_generic; [exact _ | apply B_fmt]).
@@ -101,5 +101,21 @@ Proof.
  change (B h = rn (B p+B t)) in Bhh.
  rewrite <- Bhh in Merr,Mh,Ml,Mr.
  assert (El : B l = B p+B t-B h) by lra.
- rewrite <- El in Merr,Ml. repeat split; tauto.
+ rewrite <- El in Merr,Ml.
+ assert (Norm : B h=rndF(B h+B l)) by (rewrite Ell; exact Bhh).
+ repeat split; tauto.
+Qed.
+
+Theorem product_ieee ah al bh bl : finite ah -> finite al -> finite bh -> finite bl ->
+ /1024 <= B ah <= 2 -> /1024 <= B bh <= 2 ->
+ - /2^51 <= B al/B ah <= /2^51 -> - /2^51 <= B bl/B bh <= /2^51 ->
+ let '(h,l) := product64 ah al bh bl in
+ finite h /\ finite l /\
+ - /2^77 <= ((B h+B l)-(B ah+B al)*(B bh+B bl))/((B ah+B al)*(B bh+B bl)) <= /2^77 /\
+ /2^21 <= B h <= 8 /\ - /2^51 <= B l/B h <= /2^51 /\
+ 999/1000 <= B h/(B ah*B bh) <= 1001/1000.
+Proof.
+ intros Fah Fal Fbh Fbl Ah Bh Al Bl.
+ pose proof (product_normalized_ieee ah al bh bl Fah Fal Fbh Fbl Ah Bh Al Bl) as P.
+ destruct (product64 ah al bh bl) as [h l]. tauto.
 Qed.

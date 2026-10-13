@@ -36,13 +36,13 @@ Proof.
  erfcx_goal (erfcx_middle_composition.l1 ec ey s ep ev ea em1 em2).
 Qed.
 
-Theorem middle_ieee x c s : finite x -> 16 <= B x <= 512 -> 0<c ->
+Theorem middle_normalized_ieee x c s : finite x -> 16 <= B x <= 512 -> 0<c ->
  - /2^110 <= ((B cs+B csl)-c)/c <= /2^110 ->
  998/1000 <= s <= 1 ->
  - /2^74 <= correction_exact ((1/B x)*(1/B x))-s <= /2^74 ->
  let '(h,l) := middle64 x in
  finite h /\ finite l /\
- - /2^67 <= ((B h+B l)-(c/B x)*s)/((c/B x)*s) <= /2^67.
+ - /2^67 <= ((B h+B l)-(c/B x)*s)/((c/B x)*s) <= /2^67 /\ B h=rndF(B h+B l) /\ /2^21<=B h<=8.
 Proof.
  intros Fx X Cpos Cerror Srange Approx.
  pose proof (reciprocal_ieee x Fx X) as R.
@@ -71,9 +71,9 @@ Proof.
  assert (Zid : B zh = (B zh/(B cs*B yh))*(B cs*B yh)) by (field; split; lra).
  assert (Zh' : /1024 <= B zh <= 2).
  { set (p := B cs*B yh) in *. set (r := B zh/p) in *. clear - CZ Zscale Zid. nra. }
- pose proof (product_ieee zh zl w wl Fzh Fzl Fw Fwl Zh' ltac:(lra) Zq Wq) as Out.
+ pose proof (product_normalized_ieee zh zl w wl Fzh Fzl Fw Fwl Zh' ltac:(lra) Zq Wq) as Out.
  destruct (product64 zh zl w wl) as [h l].
- destruct Out as [Fh [Fl [Oe _]]].
+ destruct Out as (Fh & Fl & Oe & Oh & Ol & Oscale & Norm).
  pose proof (middle_composition_model s
   (((B cs+B csl)-c)/c)
   (((B yh+B yl)-1/B x)/(1/B x))
@@ -98,6 +98,19 @@ Proof.
  { field. repeat split; lra. }
  rewrite Eq in Bound. repeat split; tauto.
 Qed.
+Theorem middle_ieee x c s : finite x -> 16 <= B x <= 512 -> 0<c ->
+ - /2^110 <= ((B cs+B csl)-c)/c <= /2^110 ->
+ 998/1000 <= s <= 1 ->
+ - /2^74 <= correction_exact ((1/B x)*(1/B x))-s <= /2^74 ->
+ let '(h,l) := middle64 x in
+ finite h /\ finite l /\
+ - /2^67 <= ((B h+B l)-(c/B x)*s)/((c/B x)*s) <= /2^67.
+Proof.
+ intros Fx X Cpos Cerror Srange Approx.
+ pose proof (middle_normalized_ieee x c s Fx X Cpos Cerror Srange Approx) as M.
+ destruct (middle64 x) as [h l]. tauto.
+Qed.
+
 
 
 Require Import ErfcxConstants.

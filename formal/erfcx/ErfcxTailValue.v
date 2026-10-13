@@ -23,7 +23,7 @@ Qed.
 
 Definition tail_reconstruct64 q ql u := fast_two_sum64 q (fadd ql (fmul q u)).
 
-Theorem tail_reconstruct_ieee q ql u z T rem :
+Theorem tail_reconstruct_normalized_ieee q ql u z T rem :
  finite q -> finite ql -> finite u -> 0<z ->
  bpow radix2 (-899) <= B q <= bpow radix2 (-9) ->
  - /2^51 <= B ql/B q <= /2^51 ->
@@ -33,7 +33,7 @@ Theorem tail_reconstruct_ieee q ql u z T rem :
  0 <= rem <= 7/2^72 ->
  let '(h,l) := tail_reconstruct64 q ql u in
  finite h /\ finite l /\
- - /2^67 <= ((B h+B l)-z*(1+tail_polynomial T+rem))/(z*(1+tail_polynomial T+rem)) <= /2^67.
+ - /2^67 <= ((B h+B l)-z*(1+tail_polynomial T+rem))/(z*(1+tail_polynomial T+rem)) <= /2^67 /\ B h=rndF(B h+B l) /\ bpow radix2 (-900)<=B h<=bpow radix2 (-8).
 Proof.
  intros Fq Fql Fu Z Q L U Eq Tr Eu Rem.
  assert (Qpos : 0<B q) by (pose proof (bpow_gt_0 radix2 (-899)); lra).
@@ -70,7 +70,7 @@ Proof.
         change 1 with (bpow radix2 0); apply bpow_le; lia])
   ltac:(right; left; exact Dom)) as FS.
  unfold tail_reconstruct64. fold r.
- destruct (fast_two_sum64 q r) as [h lo]. destruct FS as [Fh [Fl [_ Sum]]].
+ destruct (fast_two_sum64 q r) as [h lo]. destruct FS as [Fh [Fl [High Sum]]].
  assert (OneEq : 1+((B q+B ql)-z)/z <> 0) by (clear - Eq; nra).
  assert (Qsum : 0<B q+B ql) by (clear - Qpos L Lid; nra).
  assert (Fval : ((1+B ql/B q)/(1+((B q+B ql)-z)/z)) = z/B q).
@@ -79,8 +79,38 @@ Proof.
  assert (E : ((1+B r/B q)-(z/B q)*(1+tail_polynomial T+rem))/((z/B q)*(1+tail_polynomial T+rem))
   = ((B h+B lo)-z*(1+tail_polynomial T+rem))/(z*(1+tail_polynomial T+rem))).
  { rewrite Sum. field. repeat split; lra. }
- rewrite E in Err. repeat split; tauto.
+ rewrite E in Err.
+ assert (Norm : B h=rndF(B h+B lo)) by (rewrite Sum; exact High).
+ assert (Half : bpow radix2 (-899)=2*bpow radix2 (-900))
+   by (change 2 with (bpow radix2 1); rewrite <- bpow_plus; reflexivity).
+ assert (Sb : bpow radix2 (-900)<=B q+B r<=bpow radix2 (-8)).
+ { change (bpow radix2 (-8)) with (/256). destruct Q as [Qlo Qhi].
+   rewrite Half in Qlo. split; clear - R Rid Qpos Qsmall Qlo; nra. }
+ assert (Hb : bpow radix2 (-900)<=B h<=bpow radix2 (-8)).
+ { rewrite High. split.
+   - apply round_ge_generic; [exact _ | exact _ | | exact (proj1 Sb)].
+     apply generic_format_bpow; unfold FLT_exp, emin, prec; lia.
+   - apply round_le_generic; [exact _ | exact _ | | exact (proj2 Sb)].
+     apply generic_format_bpow; unfold FLT_exp, emin, prec; lia. }
+ repeat split; tauto.
 Qed.
+Theorem tail_reconstruct_ieee q ql u z T rem :
+ finite q -> finite ql -> finite u -> 0<z ->
+ bpow radix2 (-899) <= B q <= bpow radix2 (-9) ->
+ - /2^51 <= B ql/B q <= /2^51 ->
+ - /2^18 <= B u <= 0 ->
+ - /2^69 <= ((B q+B ql)-z)/z <= /2^69 ->
+ 0 <= T <= /2^18 -> - /2^69 <= B u-tail_polynomial T <= /2^69 ->
+ 0 <= rem <= 7/2^72 ->
+ let '(h,l) := tail_reconstruct64 q ql u in
+ finite h /\ finite l /\
+ - /2^67 <= ((B h+B l)-z*(1+tail_polynomial T+rem))/(z*(1+tail_polynomial T+rem)) <= /2^67.
+Proof.
+ intros Fq Fql Fu Z Q L U Eq Tr Eu Rem.
+ pose proof (tail_reconstruct_normalized_ieee q ql u z T rem Fq Fql Fu Z Q L U Eq Tr Eu Rem) as V.
+ destruct (tail_reconstruct64 q ql u) as [h l]. tauto.
+Qed.
+
 
 Lemma quotient_constant_error h l c0 c x : 0<c -> 0<x ->
  - /2^110 <= (c0-c)/c <= /2^110 ->
@@ -100,12 +130,12 @@ Qed.
 Definition tail64 x :=
  let '(q,ql) := quotient64 x in tail_reconstruct64 q ql (tail_correction64 x).
 
-Theorem tail_ieee x c rem : finite x -> 512 <= B x <= bpow radix2 897 -> 0<c ->
+Theorem tail_normalized_ieee x c rem : finite x -> 512 <= B x <= bpow radix2 897 -> 0<c ->
  - /2^110 <= ((B cs+B csl)-c)/c <= /2^110 -> 0 <= rem <= 7/2^72 ->
  let '(h,l) := tail64 x in
  finite h /\ finite l /\
  - /2^67 <= ((B h+B l)-(c/B x)*(1+tail_polynomial ((1/B x)*(1/B x))+rem))/
-  ((c/B x)*(1+tail_polynomial ((1/B x)*(1/B x))+rem)) <= /2^67.
+  ((c/B x)*(1+tail_polynomial ((1/B x)*(1/B x))+rem)) <= /2^67 /\ B h=rndF(B h+B l) /\ bpow radix2 (-900)<=B h<=bpow radix2 (-8).
 Proof.
  intros Fx X C Ec Rem.
  pose proof (quotient_ieee x Fx X) as Q.
@@ -118,9 +148,21 @@ Proof.
  assert (Z : 0<c/B x) by (apply Rdiv_lt_0_compat; lra).
  assert (Y : 0 <= 1/B x <= /512).
  { unfold Rdiv. rewrite Rmult_1_l. split; [apply Rlt_le, Rinv_0_lt_compat; lra | apply Rinv_le_contravar; lra]. }
- exact (tail_reconstruct_ieee q ql (tail_correction64 x) (c/B x) ((1/B x)*(1/B x)) rem
+ exact (tail_reconstruct_normalized_ieee q ql (tail_correction64 x) (c/B x) ((1/B x)*(1/B x)) rem
   Fq Fql Fu Z H ltac:(replace (/2^51) with (bpow radix2 (-51)) by (bpow_num; simpl; field); exact L) U E ltac:(clear - Y; nra) Eu Rem).
 Qed.
+Theorem tail_ieee x c rem : finite x -> 512 <= B x <= bpow radix2 897 -> 0<c ->
+ - /2^110 <= ((B cs+B csl)-c)/c <= /2^110 -> 0 <= rem <= 7/2^72 ->
+ let '(h,l) := tail64 x in
+ finite h /\ finite l /\
+ - /2^67 <= ((B h+B l)-(c/B x)*(1+tail_polynomial ((1/B x)*(1/B x))+rem))/
+  ((c/B x)*(1+tail_polynomial ((1/B x)*(1/B x))+rem)) <= /2^67.
+Proof.
+ intros Fx X C Ec Rem.
+ pose proof (tail_normalized_ieee x c rem Fx X C Ec Rem) as T.
+ destruct (tail64 x) as [h l]. tauto.
+Qed.
+
 
 Require Import ErfcxQuotientScale.
 Require erfcx_tail_scaled.

@@ -86,6 +86,11 @@ let compute op args =
        | [hi; lo; eps; k] ->
            show_opt (x_decide_scaled (z_of_u64 (hex hi)) (z_of_u64 (hex lo)) (z_of_u64 (hex eps)) (z_of_int (int_of_string k)))
        | _ -> failwith "decide_scaled takes three words and an exponent")
+  | "erfcx_middle_fast" | "erfcx_tail_unscaled_fast" ->
+      (match args with
+       | [x] -> show_opt ((if op = "erfcx_middle_fast" then x_erfcx_middle_fast
+                          else x_erfcx_tail_unscaled_fast) (z_of_u64 (hex x)))
+       | _ -> failwith (op ^ " takes a word"))
   | "erfcx_reflection_fast" ->
       (match args with
        | [x] -> show_opt (x_erfcx_reflection_fast (z_of_u64 (hex x)))

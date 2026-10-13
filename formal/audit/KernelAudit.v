@@ -233,3 +233,11 @@ Print Assumptions ErfcxDecision.erfcx_decide_scaled_normal_ieee.
 Print Assumptions ErfcxReflectionOverflow.reflection_finite_magnitude.
 Print Assumptions ErfcxReflectionOverflow.reflection_overflow_magnitude.
 Print Assumptions ErfcxReflectionFast.reflection_fast_ieee.
+
+Require ErfcxMiddleFast ErfcxTailFast.
+Print Assumptions ErfcxProduct.product_normalized_ieee.
+Print Assumptions ErfcxMiddleValue.middle_normalized_ieee.
+Print Assumptions ErfcxTailValue.tail_reconstruct_normalized_ieee.
+Print Assumptions ErfcxTailValue.tail_normalized_ieee.
+Print Assumptions ErfcxMiddleFast.middle_fast_ieee.
+Print Assumptions ErfcxTailFast.tail_unscaled_fast_ieee.

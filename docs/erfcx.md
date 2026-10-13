@@ -68,7 +68,7 @@ A rejection evaluates the Q256 path. The arithmetic certificates fit within
 this guard. The table evaluation error is proved at its binary64 entry;
 the negative fast-path rounding decision and final scaling are proved under
 an explicit analytic table contract. Function approximation/remainder bounds,
-the positive-tail final rounding, and the accurate path still require proofs. The guard is not an end-to-end error proof.
+scaled positive-tail final rounding, and the accurate path still require proofs. The guard is not an end-to-end error proof.
 
 For a subnormal output, the leading candidate is scaled first. It is then
 mapped back exactly to the unscaled domain, where the binary64 subnormal
@@ -143,6 +143,14 @@ The constant's error is discharged independently. Identifying that expression
 with erfcx requires the stated asymptotic remainder bound.
 The extracted correction and reconstruction are checked against Rust across
 the exponent range, including adjacent square-underflow boundaries.
+
+The double-word product and both unscaled positive evaluators expose their
+proved normalization and high-word ranges. `ErfcxMiddleFast.v` and
+`ErfcxTailFast.v` compose these facts with the encoded `2^-66` rounding
+guard. An accepted result is the nearest binary64 value of the corresponding
+analytic expression, under its stated approximation or remainder contract.
+The scaled large-tail decision, including its final subnormal grid, is a
+separate path.
 
 The direct quotient certificates cover `[2^9, 2^897]` in 28 adjacent
 exponent windows. Every operation uses binary64 rounding, including gradual

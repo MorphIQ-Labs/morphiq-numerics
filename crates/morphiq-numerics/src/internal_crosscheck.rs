@@ -310,6 +310,26 @@ fn internal_crosscheck_corpus() {
         )
         .unwrap();
     }
+    for i in 0..24_000 {
+        let middle = i % 2 == 0;
+        let (low, high) = if middle {
+            (16.0_f64.to_bits(), 512.0_f64.to_bits() - 1)
+        } else {
+            (512.0_f64.to_bits(), 1e270_f64.to_bits())
+        };
+        let bits = match (i / 2) % 4 {
+            0 => low + (i / 8) % 32,
+            1 => high - (i / 8) % 32,
+            _ => low + erfcx_rng.next_u64() % (high - low + 1),
+        };
+        let x = f64::from_bits(bits);
+        let (name, result) = if middle {
+            ("erfcx_middle_fast", crate::erfcx::fast_ya(x))
+        } else {
+            ("erfcx_tail_unscaled_fast", crate::erfcx::fast_yb(x))
+        };
+        writeln!(out, "{name} {bits:016x} : {}", opt(result)).unwrap();
+    }
     for bits in (4_u64..=9)
         .flat_map(|e| {
             let b = (1023 + e) << 52;
