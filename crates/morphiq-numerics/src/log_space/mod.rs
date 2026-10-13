@@ -37,6 +37,9 @@ const CHUNK: usize = 32;
 /// which returns the same bits (decision 7).
 #[must_use]
 pub fn log_sum_exp(x: &[f64]) -> f64 {
+    if let [a, b] = *x {
+        return pair_sum(a, b);
+    }
     let (m, j) = match shift(x) {
         Ok(shift) => shift,
         Err(y) => return y,
@@ -47,6 +50,31 @@ pub fn log_sum_exp(x: &[f64]) -> f64 {
         return m;
     }
     m + ln_1p(t)
+}
+
+/// Steps 1–5 for two entries: classify in input order and reduce the only
+/// other term, without the general slice scans (decision 9). The compensated
+/// arithmetic and its order are exactly `scalar_terms`'s.
+fn pair_sum(a: f64, b: f64) -> f64 {
+    if a.is_nan() {
+        return a;
+    }
+    if b.is_nan() {
+        return b;
+    }
+    if a == f64::INFINITY || b == f64::INFINITY {
+        return f64::INFINITY;
+    }
+    // A strict comparison keeps the first maximum, including tied zeros.
+    let (m, v) = if b > a { (b, a) } else { (a, b) };
+    if v == f64::NEG_INFINITY {
+        return m;
+    }
+    let (dh, dl) = two_sum(v, -m);
+    let mut sum = Sum2Stream::default();
+    sum.add(exp(dh), dl);
+    let t = sum.total();
+    if t == 0.0 { m } else { m + ln_1p(t) }
 }
 
 /// `log_sum_exp` of each of `N` pairs: element `i` of the result is
@@ -207,8 +235,9 @@ fn terms(x: &[f64], m: f64, j: usize) -> f64 {
 /// Steps 2–4 as `scalar_terms`, with the exponentials of each chunk of
 /// `CHUNK` terms evaluated together by `exp_slice`, which returns `exp`'s
 /// bits. Every summand then enters Sum2 in the same order (decision 7). A
-/// slice of two holds at most one other term, which gains nothing from
-/// lanes, so it takes `scalar_terms` and its same bits.
+/// slice of at most two holds at most one other term, which gains nothing
+/// from lanes. Pairs enter `pair_sum` before reaching this function; the
+/// remaining short inputs keep `scalar_terms` and its same bits.
 #[cfg(feature = "simd")]
 fn terms(x: &[f64], m: f64, j: usize) -> f64 {
     if x.len() <= 2 {

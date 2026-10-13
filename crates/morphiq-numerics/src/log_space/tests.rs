@@ -84,6 +84,35 @@ fn log_sum_exp_special_values_are_exact() {
 }
 
 #[test]
+fn two_term_classification_preserves_nan_precedence_and_zero_sign() {
+    // Expected results follow §1's special-value table, independently of
+    // the reduction. Distinct quiet/signalling payloads in both positions
+    // distinguish returning the first NaN from canonicalizing it or letting
+    // an earlier infinity win.
+    for nan in [
+        f64::from_bits(0x7ff8_0000_0000_0123),
+        f64::from_bits(0xfff0_0000_0000_0456),
+    ] {
+        let second_nan = f64::from_bits(0x7ff8_0000_0000_0789);
+        for (x, expected) in [
+            ([nan, second_nan], nan),
+            ([second_nan, nan], second_nan),
+            ([f64::INFINITY, nan], nan),
+            ([nan, f64::INFINITY], nan),
+            ([f64::NEG_INFINITY, nan], nan),
+            ([nan, -0.0], nan),
+        ] {
+            assert_eq!(log_sum_exp(&x).to_bits(), expected.to_bits());
+        }
+    }
+    for zero in [0.0_f64, -0.0] {
+        for x in [[zero, f64::NEG_INFINITY], [f64::NEG_INFINITY, zero]] {
+            assert_eq!(log_sum_exp(&x).to_bits(), zero.to_bits());
+        }
+    }
+}
+
+#[test]
 fn log_diff_exp_special_values_are_exact() {
     let cases = entries(FIXTURE, &["log_diff_exp", "exact"]);
     assert_eq!(cases.len(), 21);
@@ -247,12 +276,14 @@ fn check_normalize<const N: usize>(pairs: &[[f64; 2]]) {
     }
 }
 
-/// The pairs both batched tests run on: every pairing of twelve special
+/// The pairs both batched tests run on: every pairing of fourteen special
 /// values, the fixture's pairs, and 40,000 random pairs.
 fn pair_corpus() -> Vec<[f64; 2]> {
     let specials = [
         f64::NAN,
         -f64::NAN,
+        f64::from_bits(0x7ff8_0000_0000_0123),
+        f64::from_bits(0xfff0_0000_0000_0456),
         f64::INFINITY,
         f64::NEG_INFINITY,
         0.0,
