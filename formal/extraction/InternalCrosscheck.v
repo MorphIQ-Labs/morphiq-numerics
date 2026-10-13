@@ -20,7 +20,7 @@ Require Exp2Stages Expm1Stages Exp2FallbackReduction Exp2FallbackAccurate Exp2Fa
 Require Expm1GeneralReduction Expm1GeneralFast Expm1GeneralAccurate Expm1SmallFast Expm1SmallAccurate Expm1.
 Require LnFastValue Ln1pFast LnFastDecision LnEntry.
 Require ErfcxReciprocal ErfcxSquare ErfcxMiddlePolynomial ErfcxProduct ErfcxMiddleValue ErfcxQuotient ErfcxQuotientScale ErfcxTailCorrection ErfcxTailValue ErfcxTableSplit ErfcxTableProducts ErfcxTableData ErfcxTableReduction ErfcxTableEntry.
-Require ErfcxReflectionExp ErfcxReflectionSubtract.
+Require ErfcxReflectionExp ErfcxReflectionSubtract ErfcxReflectionFast.
 Import ListNotations.
 
 Definition limbs (k : nat) (x : Z) : list Z := map (fun i => dig x (Z.of_nat i)) (seq 0 k).
@@ -203,5 +203,10 @@ Definition x_erfcx_reflection_value x :=
  let '(h,l,k) := ErfcxReflectionSubtract.reflection_value64 (b64_of_bits x) in
  (k,map bits_of_b64 [h;l]).
 
-Extraction "internalcrosscheck.ml" x_erfcx_reflection_value x_erfcx_reflection_square x_erfcx_reflection_exp x_erfcx_table_value x_erfcx_table_reduce x_erfcx_table_leading x_erfcx_table_split x_erfcx_tail x_erfcx_tail_correction x_erfcx_quotient x_erfcx_scaled_quotient x_erfcx_middle x_erfcx_product x_erfcx_reciprocal_correction x_erfcx_reciprocal_square x_erfcx_reciprocal x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
+Definition x_erfcx_reflection_fast x :=
+ match ErfcxReflectionFast.reflection_fast64 (b64_of_bits x) with
+ | Some y => Some (bits_of_b64 y) | None => None
+ end.
+
+Extraction "internalcrosscheck.ml" x_erfcx_reflection_fast x_erfcx_reflection_value x_erfcx_reflection_square x_erfcx_reflection_exp x_erfcx_table_value x_erfcx_table_reduce x_erfcx_table_leading x_erfcx_table_split x_erfcx_tail x_erfcx_tail_correction x_erfcx_quotient x_erfcx_scaled_quotient x_erfcx_middle x_erfcx_product x_erfcx_reciprocal_correction x_erfcx_reciprocal_square x_erfcx_reciprocal x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
   x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs.

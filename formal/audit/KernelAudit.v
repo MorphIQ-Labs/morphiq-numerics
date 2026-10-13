@@ -222,3 +222,14 @@ Print Assumptions ErfcxReflectionExp.reflection_dispatch_range.
 Require ErfcxReflectionScale ErfcxReflectionSubtract.
 Print Assumptions ErfcxReflectionScale.reflection_scaled_word_ieee.
 Print Assumptions ErfcxReflectionSubtract.reflection_subtract_ieee.
+
+Require ErfcxReflectionValue.
+Print Assumptions ErfcxReflectionExp.reflection_exp_ideal_range.
+Print Assumptions ErfcxReflectionValue.reflection_value_ieee.
+
+Require ErfcxDecision ErfcxReflectionOverflow ErfcxReflectionFast.
+Print Assumptions ErfcxDecision.erfcx_decide_ieee.
+Print Assumptions ErfcxDecision.erfcx_decide_scaled_normal_ieee.
+Print Assumptions ErfcxReflectionOverflow.reflection_finite_magnitude.
+Print Assumptions ErfcxReflectionOverflow.reflection_overflow_magnitude.
+Print Assumptions ErfcxReflectionFast.reflection_fast_ieee.

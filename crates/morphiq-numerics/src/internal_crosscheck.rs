@@ -275,6 +275,12 @@ fn internal_crosscheck_corpus() {
             nl.to_bits()
         )
         .unwrap();
+        writeln!(
+            out,
+            "erfcx_reflection_fast {bits:016x} : {}",
+            opt(crate::erfcx::fast_n(x))
+        )
+        .unwrap();
         let (s, se) = if i % 2 == 0 {
             (square, error)
         } else {

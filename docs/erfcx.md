@@ -66,8 +66,9 @@ would permit double rounding at underflow.
 The current fast-path tests use a provisional relative guard of `2^-66`.
 A rejection evaluates the Q256 path. The arithmetic certificates fit within
 this guard. The table evaluation error is proved at its binary64 entry;
-connecting its approximation to the function, the reflection entry and final
-rounding still requires further proofs. The guard is not an end-to-end error proof.
+the negative fast-path rounding decision and final scaling are proved under
+an explicit analytic table contract. Function approximation/remainder bounds,
+the positive-tail final rounding, and the accurate path still require proofs. The guard is not an end-to-end error proof.
 
 For a subnormal output, the leading candidate is scaled first. It is then
 mapped back exactly to the unscaled domain, where the binary64 subnormal
@@ -181,8 +182,26 @@ at most `2^-800`. The composition certificate includes this error.
 Fast2Sum dominance and normalization, and relative error at most `2^-67`
 against the reflected expression, under the stated table and exponential
 word ranges and approximation bounds. The complete negative kernel is
-also transcribed for extraction; this cross-check is not an analytic
-function-error proof.
+transcribed for extraction. `ErfcxReflectionValue.v` composes both branches
+and proves finite, normalized words with exponent in `[1, 1024]` and
+relative error at most `2^-67` against `(2 exp(x²) - G) / 2^m`.
+Its remaining analytic contract is explicit: `0 <= G <= 1` and, when
+`1/2 < -x < 9`, the table words must satisfy the stated ranges and approximate
+`G` with absolute error at most `2^-67`. Identifying `G` with erfcx and
+establishing that table contract are not implied by the extraction checks.
+
+`ErfcxDecision.v` binds the encoded `2^-66` guard to the shared rounding
+test and proves normal scaling in the implementation's operation order,
+including its two multiplies at exponent 1024. `ErfcxReflectionOverflow.v`
+uses CoqInterval at 128-bit precision to bracket the encoded negative
+overflow boundary. The binary64 input grid proves that every input above
+it is at least one input ulp away; its exponential upper bound is below
+`f64::MAX`. At or below the boundary, even subtracting one leaves the
+expression at or above the binary64 overflow midpoint.
+`ErfcxReflectionFast.v` composes these results: whenever the negative fast
+path accepts, it returns the nearest binary64 value of `2 exp(x²) - G`,
+under the explicit positive-value and table contract above. It makes no
+assumption about normalization, final scaling or overflow.
 
 When the positive reflection term is omitted, the
 simple uniform bound on that term relative to the exponential is `2^-105`;

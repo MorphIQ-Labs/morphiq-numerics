@@ -13,6 +13,23 @@ Definition reflection_exp64 x se : f64 * f64 * Z :=
   let '(yh,yl) := fast_two_sum64 y l in
   (yh,yl,k).
 
+Lemma reduced_exponential_range j R : (0 <= j < 512)%Z -> Rabs R <= 0.000677 ->
+  0.9993 <= exp (INR (Z.to_nat j) * ln 2 / 512) * exp R <= 2.
+Proof.
+  intros J HR.
+  assert (Jr : 0 <= INR (Z.to_nat j) <= 511).
+  { split; [apply pos_INR | ].
+    replace 511 with (INR 511) by (rewrite INR_IZR_INZ; reflexivity).
+    apply le_INR. lia. }
+  rewrite <- exp_plus. pose proof L_range as Lr. unfold L in Lr.
+  pose proof (Rabs_le_inv _ _ HR) as Rr.
+  assert (Zr : -0.000677 <= INR (Z.to_nat j) * ln 2 / 512 + R <= ln 2) by nra.
+  split.
+  - pose proof (exp_ineq1_le (INR (Z.to_nat j) * ln 2 / 512 + R)). lra.
+  - apply Rle_trans with (exp (ln 2));
+      [apply exp_le; exact (proj2 Zr) | rewrite exp_ln; lra].
+Qed.
+
 Theorem reflection_exp_ieee x se :
   finite x -> Rabs (B x) < 710 -> finite se -> Rabs (B se) <= bpow radix2 (-44) ->
   let '(yh,yl,k) := reflection_exp64 x se in
@@ -40,21 +57,7 @@ Proof.
   pose proof (fast_two_sum_ieee y l Fy Fl Yabs Labs (or_intror (or_introl Dom))) as FS.
   revert FS. generalize (fast_two_sum64 y l). intros [yh yl] FS.
   destruct FS as [Fyh [Fyl [High Exact]]].
-  assert (Jr : 0 <= INR (Z.to_nat j) <= 511).
-  { split; [apply pos_INR | ].
-    replace 511 with (INR 511) by (rewrite INR_IZR_INZ; reflexivity).
-    apply le_INR. lia. }
-  assert (Ideal : 0.9993 <=
-    exp (INR (Z.to_nat j) * ln 2 / 512) * exp (B x - IZR ni * L + B se) <= 2).
-  { rewrite <- exp_plus. pose proof L_range as Lr. unfold L in Lr.
-    pose proof (Rabs_le_inv _ _ HR) as Rr.
-    assert (Zr : -0.000677 <= INR (Z.to_nat j) * ln 2 / 512 +
-      (B x - IZR ni * L + B se) <= ln 2) by nra.
-    split.
-    - pose proof (exp_ineq1_le (INR (Z.to_nat j) * ln 2 / 512 +
-        (B x - IZR ni * L + B se))). lra.
-    - apply Rle_trans with (exp (ln 2));
-        [apply exp_le; exact (proj2 Zr) | rewrite exp_ln; lra]. }
+  pose proof (reduced_exponential_range j (B x - IZR ni * L + B se) J HR) as Ideal.
   assert (Sum : 0.9992 <= B y + B l <= 2.0001).
   { pose proof (Rabs_le_inv _ _ E) as Er.
     change (IZR 209) with 209 in Er.
@@ -99,13 +102,16 @@ Qed.
     positive argument lies wholly within the table kernel's domain. *)
 Theorem reflection_dispatch_range x : finite x -> B reflection_limit < B x < - /2 ->
   let '(s,se) := two_prod64 x x in
-  let '(j,k,rh,rt) := reflection_reduce64 s se in
+  let '(yh,yl,k) := reflection_exp64 s se in
   (0 <= k <= 1023)%Z /\ ((k <= 104)%Z -> /2 < - B x < 9).
 Proof.
   intros Fx Hx. pose proof (reflection_square_ieee x Fx Hx) as Sq.
   destruct (two_prod64 x x) as [s se]. destruct Sq as [Fs [Fse [Exact [S Low]]]].
   pose proof (reflection_reduce_ieee s se Fs ltac:(rewrite Rabs_pos_eq; lra) Fse Low) as Red.
+  unfold reflection_exp64.
   destruct (reflection_reduce64 s se) as [[[j k] rh] rt].
+  destruct (stage_b_at rh rt (Z.to_nat j)) as [eh el].
+  destruct (fast_two_sum64 eh el) as [yh yl].
   destruct Red as (ni & Nk & J & K & Frh & Frt & Grh & Rh & Rt & HR & Err).
   assert (Rem : Rabs (B x * B x - IZR ni * L) <= 0.000677).
   { replace (B x * B x - IZR ni * L) with (B s - IZR ni * L + B se) by lra. exact HR. }
@@ -122,4 +128,24 @@ Proof.
   assert (IZR ni <= 53759) by (apply IZR_le; lia).
   assert (0 <= IZR ni) by (apply IZR_le; lia).
   split; nra.
+Qed.
+
+Theorem reflection_exp_ideal_range x se :
+  finite x -> Rabs (B x) < 710 -> finite se -> Rabs (B se) <= bpow radix2 (-44) ->
+  let '(yh,yl,k) := reflection_exp64 x se in
+  0.9993 <= exp (B x + B se) / bpow radix2 k <= 2.
+Proof.
+  intros Fx Hx Fse Hse. unfold reflection_exp64.
+  pose proof (reflection_reduce_ieee x se Fx Hx Fse Hse) as Red.
+  destruct (reflection_reduce64 x se) as [[[j k] rh] rt].
+  destruct (stage_b_at rh rt (Z.to_nat j)) as [eh el].
+  destruct (fast_two_sum64 eh el) as [yh yl].
+  destruct Red as (ni & Nk & J & K & Frh & Frt & Grh & Rh & Rt & HR & Err).
+  assert (Scale : exp (B x + B se) =
+    (exp (INR (Z.to_nat j) * ln 2 / 512) * exp (B x - IZR ni * L + B se)) * bpow radix2 k).
+  { rewrite <- exp_split. f_equal. rewrite Z2Nat.id by lia. rewrite Nk. ring. }
+  replace (exp (B x + B se) / bpow radix2 k) with
+    (exp (INR (Z.to_nat j) * ln 2 / 512) * exp (B x - IZR ni * L + B se)).
+  - apply reduced_exponential_range; assumption.
+  - rewrite Scale. field. apply Rgt_not_eq, bpow_gt_0.
 Qed.

@@ -39,7 +39,7 @@ Theorem reflection_subtract_ieee eh el gh gl k de dg :
   Rabs de <= IZR 209 * bpow radix2 (-78) -> Rabs dg <= bpow radix2 (-67) ->
   let '(h,l) := reflection_subtract64 eh el gh gl k in
   let F := (B eh + B el - de) - (B gh + B gl - dg)*bpow radix2 (-k-1) in
-  finite h /\ finite l /\ B h = rndF (B h+B l) /\
+  finite h /\ finite l /\ /2 <= B h <= 4 /\ B h = rndF (B h+B l) /\
   Rabs ((B h+B l-F)/F) <= bpow radix2 (-67).
 Proof.
   intros Feh Fel Fgh Fgl E L G U K De Dg. unfold reflection_subtract64.
@@ -115,7 +115,17 @@ Proof.
   pose proof (fast_two_sum_ieee dh rest Fdh Fr Dhbig Rbig (or_intror (or_introl Dom))) as FS.
   revert FS. generalize (fast_two_sum64 dh rest). intros [h l] FS.
   destruct FS as [Fh [Fl [High Total]]]. cbv zeta.
-  split; [exact Fh | split; [exact Fl | split]].
+  assert (HighRange : /2 <= B h <= 4).
+  { rewrite High. pose proof (Rabs_le_inv _ _ Rest) as Rr.
+    change (bpow radix2 (-50)) with (/1125899906842624) in Rr.
+    split.
+    - change (/2) with (bpow radix2 (-1)). apply round_ge_generic;
+        [exact _ | exact _ | | change (bpow radix2 (-1)) with (/2); lra].
+      apply generic_format_bpow; unfold FLT_exp, emin, prec; lia.
+    - change 4 with (bpow radix2 2). apply round_le_generic;
+        [exact _ | exact _ | | change (bpow radix2 2) with 4; lra].
+      apply generic_format_bpow; unfold FLT_exp, emin, prec; lia. }
+  split; [exact Fh | split; [exact Fl | split; [exact HighRange | split]]].
   - rewrite Total. exact High.
   - rewrite Total. exact Err.
 Qed.
