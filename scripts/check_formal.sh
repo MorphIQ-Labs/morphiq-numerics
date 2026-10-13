@@ -179,6 +179,15 @@ echo "$toolchain" > "$build/.toolchain"
 (cd "$build" && coq_makefile -f _CoqProject -o Makefile && make -j"$(nproc)" TIMED=1)
 touch "$build/.built"
 
+# The pinned OCaml Flambda compiler recursively walks the extracted module's
+# top-level expressions. The combined kernels exceed its default 8 MiB stack
+# on Linux; reserve 32 MiB for compilation. This applies to both extractions
+# and is scoped to the compiler, not the proof auditors or corpus executables.
+compile_extraction() (
+  ulimit -s 32768 || exit 1
+  exec ocamlfind ocamlopt "$@"
+)
+
 # The audits and the cross-checks are independent, so they run at once; each is
 # then judged in turn, and the first to fail fails the lane.
 (cd "$build/audit" && coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" -R ../binary64 Binary64 -R ../q Q Audit.v) \
@@ -192,12 +201,12 @@ certificate_audit=$!
 kernel_audit=$!
 (cd "$build/extraction" \
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
-  && ocamlfind ocamlopt -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
+  && compile_extraction -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
   && ./crosscheck "$corpus") > "$work/crosscheck.log" 2> "$work/crosscheck.err" &
 crosscheck=$!
 (cd "$build/extraction" \
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R ../gappa "" InternalCrosscheck.v \
-  && ocamlfind ocamlopt -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
+  && compile_extraction -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
   && ./internalcrosscheck "$icorpus") > "$work/internal_crosscheck.log" 2> "$work/internal_crosscheck.err" &
 internal_crosscheck=$!
 # finish NAME PID: waits for the step, shows its errors, and fails if it did.

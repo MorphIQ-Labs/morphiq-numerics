@@ -58,10 +58,7 @@ pub fn ln(x: f64) -> f64 {
     if let Some(y) = stage::parts(reduced.e, reduced.y).3 {
         return y;
     }
-    if let Some(y) = decide(reduced.fast_value()) {
-        return y;
-    }
-    reduced.accurate_value(reduced.z_exact()).to_f64()
+    reduced.finish()
 }
 
 /// `ln(1 + x)`, without rounding `1 + x`: correctly rounded whenever a
@@ -154,6 +151,14 @@ pub(crate) struct Reduced {
 }
 
 impl Reduced {
+    /// Past the reciprocal stage: the double-word decision, then Q128.
+    fn finish(&self) -> f64 {
+        if let Some(y) = decide(self.fast_value()) {
+            return y;
+        }
+        self.accurate_value(self.z_exact()).to_f64()
+    }
+
     /// `(i, y, R[i])`, for the internal cross-check.
     #[cfg(test)]
     pub(crate) fn parts(&self) -> (usize, f64, f64) {
@@ -336,6 +341,17 @@ pub(crate) fn decide_with(y: DoubleWord, eps: f64) -> Option<f64> {
         ulp(magnitude)
     };
     (y_lo.abs() + eps * magnitude < g * 0.5).then_some(y_hi)
+}
+
+#[cfg(test)]
+pub(crate) fn crosscheck_ln1p_fast(x: f64) -> (DoubleWord, Option<f64>) {
+    let y = if x.abs() < TWO_M7 {
+        ln_1p_double_word(DoubleWord::from_f64(x))
+    } else {
+        let (h, l) = split(x);
+        Reduced::of(h).fast_value().add_f64(l / h)
+    };
+    (y, decide(y))
 }
 
 #[cfg(test)]

@@ -103,12 +103,20 @@ fn main() {
         .collect();
     let small: Vec<f64> = (0..N).map(|_| (unit(&mut words) - 0.5) / 16.0).collect();
     let expm1_domain: Vec<f64> = (0..N).map(|_| -37.4 + 746.4 * unit(&mut words)).collect();
+    let ln_close: Vec<f64> = (0..N)
+        .map(|_| 1.0 + (unit(&mut words) - 0.5) * f64::from_bits(0x3d10_0000_0000_0000))
+        .collect();
+    let ln1p_large: Vec<f64> = (0..N)
+        .map(|_| f64::from_bits(0x7fb0_0000_0000_0000 + words.next_word() % (1 << 54)))
+        .collect();
     println!("| Function | Arguments | Scalar loop (ns) | Batched (ns) | Speed-up |");
     println!("|---|---|---|---|---|");
     row("exp", "`[−30, 0]`", &d, exp, exp_slice);
     row("exp", "`[−745, 709]`", &domain, exp, exp_slice);
     row("ln", "`[0.5, 2)`", &near_one, ln, ln_slice);
     row("ln", "positive encodings", &positive, ln, ln_slice);
+    row("ln", "`1 ± 2^−47`", &ln_close, ln, ln_slice);
+    row("ln_1p", "`[2^1020, MAX]`", &ln1p_large, ln_1p, ln_1p_slice);
     row("ln_1p", "`e^d`, `d ∈ [−30, 0]`", &t, ln_1p, ln_1p_slice);
     row("ln_1p", "`z²/4`, `z ∈ [−6, 6]`", &z, ln_1p, ln_1p_slice);
     row(

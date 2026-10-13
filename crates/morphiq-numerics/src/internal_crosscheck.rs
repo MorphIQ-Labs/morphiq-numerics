@@ -764,6 +764,7 @@ fn internal_crosscheck_corpus() {
         "both expm1 fallback decisions"
     );
     assert_eq!((least_k, greatest_k), (-54, 1024), "expm1 scaling extremes");
+    logarithm_fallback_corpus(&mut out);
     std::fs::write(path, out).unwrap();
 }
 
@@ -845,4 +846,123 @@ fn expm1_entry_line(out: &mut String, x: f64) {
         crate::expm1::expm1(x).to_bits()
     )
     .unwrap();
+}
+
+fn logarithm_line(out: &mut String, x: f64) {
+    for (op, y) in [
+        ("ln_entry", crate::ln::ln(x)),
+        ("ln1p_entry", crate::ln::ln_1p(x)),
+    ] {
+        writeln!(out, "{op} {:016x} : {:016x}", x.to_bits(), y.to_bits()).unwrap();
+    }
+    if x > 0.0 && x < f64::INFINITY {
+        let y = crate::ln::Reduced::of(x).fast_value();
+        writeln!(
+            out,
+            "ln_fast {:016x} : {:016x} {:016x} {}",
+            x.to_bits(),
+            y.hi().to_bits(),
+            y.lo().to_bits(),
+            opt(crate::ln::decide(y))
+        )
+        .unwrap();
+    }
+    if x > -1.0 && x < f64::INFINITY && x.abs() >= f64::from_bits(0x3c90_0000_0000_0000) {
+        let (y, d) = crate::ln::crosscheck_ln1p_fast(x);
+        writeln!(
+            out,
+            "ln1p_fast {:016x} : {:016x} {:016x} {}",
+            x.to_bits(),
+            y.hi().to_bits(),
+            y.lo().to_bits(),
+            opt(d)
+        )
+        .unwrap();
+    }
+}
+
+fn logarithm_fallback_corpus(out: &mut String) {
+    let mut rng = SplitMix64::new(0x6c6e_6661_6c6c_626b);
+    // Every table interval, subnormal normalization, and both sides of all
+    // public screens. Large ln_1p inputs include subnormal l/h quotients.
+    for i in 0..=128_u64 {
+        for exponent in [1, 511, 1022, 1023, 1024, 2044, 2045] {
+            let edge = (exponent << 52) + (i << 45);
+            for bits in [edge - 1, edge, edge + 1] {
+                let x = f64::from_bits(bits);
+                logarithm_line(out, x);
+                if exponent == 1 {
+                    logarithm_line(out, x * f64::from_bits(0x3c90_0000_0000_0000));
+                }
+            }
+        }
+    }
+    for edge in [
+        0x3c90_0000_0000_0000_u64,
+        0x3f80_0000_0000_0000,
+        0x3ff0_0000_0000_0000,
+        0x4340_0000_0000_0000,
+        0x7fd0_0000_0000_0000,
+        0x7fe0_0000_0000_0000,
+        0x7fef_ffff_ffff_ffff,
+    ] {
+        for offset in 0..=8 {
+            for bits in [edge - offset, edge + offset] {
+                logarithm_line(out, f64::from_bits(bits));
+                logarithm_line(out, -f64::from_bits(bits));
+            }
+        }
+    }
+    for bits in [
+        0,
+        1,
+        0x8000_0000_0000_0000,
+        0x8000_0000_0000_0001,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0x7ff0_0000_0000_0001,
+        0xfff0_0000_0000_0001,
+        0x7ff8_0000_0000_0042,
+        0xfff8_0000_0000_0042,
+    ] {
+        logarithm_line(out, f64::from_bits(bits));
+    }
+    for case in include_str!("../../reference/fixtures/ln.json")
+        .lines()
+        .filter(|l| l.trim_start().starts_with("\"x\":"))
+    {
+        logarithm_line(out, crate::test_exact::word(case, "x"));
+    }
+    for _ in 0..4000 {
+        logarithm_line(out, ln_argument(&mut rng));
+        logarithm_line(out, ln_1p_argument(&mut rng));
+        logarithm_line(out, f64::from_bits(rng.next_u64()));
+    }
+    // Explicitly include rounding-test rejections, including the small
+    // ln_1p branch, without inflating extraction with the search stream.
+    for kind in 0..3 {
+        let mut rejected = 0;
+        for _ in 0..(1 << 22) {
+            let x = if kind == 0 {
+                ln_argument(&mut rng)
+            } else if kind == 1 {
+                ln_1p_argument(&mut rng)
+            } else {
+                (unit(&mut rng) - 0.5) / 64.0
+            };
+            let decision = if kind == 0 {
+                crate::ln::decide(crate::ln::Reduced::of(x).fast_value())
+            } else {
+                crate::ln::crosscheck_ln1p_fast(x).1
+            };
+            if decision.is_none() {
+                logarithm_line(out, x);
+                rejected += 1;
+                if rejected == 8 {
+                    break;
+                }
+            }
+        }
+        assert_eq!(rejected, 8, "logarithm fallback rejection coverage {kind}");
+    }
 }

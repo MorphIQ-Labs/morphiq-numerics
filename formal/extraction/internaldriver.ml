@@ -110,6 +110,19 @@ let compute op args =
              (List.map show_bits nr @ [string_of_int (int_of_z j); string_of_int (int_of_z k)]
               @ List.map show_bits a @ [show_opt ra] @ List.map show_bits b @ [show_opt rb])
        | _ -> failwith "stage takes one word")
+  | "ln_fast" | "ln1p_fast" ->
+      (match args with
+       | [x] ->
+           let f = if op = "ln_fast" then x_ln_fast else x_ln1p_fast in
+           let (words, result) = f (z_of_u64 (hex x)) in
+           String.concat " " (List.map show_bits words @ [show_opt result])
+       | _ -> failwith "logarithm fast value takes one word")
+  | "ln_entry" | "ln1p_entry" ->
+      (match args with
+       | [x] ->
+           let f = if op = "ln_entry" then x_ln_entry else x_ln1p_entry in
+           show_bits (f (z_of_u64 (hex x)))
+       | _ -> failwith "logarithm entry takes one word")
   | "expm1_small" ->
       (match args with
        | [x] ->

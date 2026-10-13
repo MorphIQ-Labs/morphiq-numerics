@@ -179,6 +179,39 @@ pub(crate) fn two_sum<K: Simd>(k: K, a: K::F, b: K::F) -> Dw<K> {
     (s, k.add(k.sub(a, a1), k.sub(b, b1)))
 }
 
+/// `DoubleWord::add`, preserving every scalar rounding.
+#[inline(always)]
+pub(crate) fn add_dw<K: Simd>(k: K, x: Dw<K>, y: Dw<K>) -> Dw<K> {
+    let (sh, sl) = two_sum(k, x.0, y.0);
+    let (th, tl) = two_sum(k, x.1, y.1);
+    let (vh, vl) = fast_two_sum(k, sh, k.add(sl, th));
+    fast_two_sum(k, vh, k.add(tl, vl))
+}
+
+/// `DoubleWord::add_f64`, preserving every scalar rounding.
+#[inline(always)]
+pub(crate) fn add_f64<K: Simd>(k: K, x: Dw<K>, y: K::F) -> Dw<K> {
+    let (sh, sl) = two_sum(k, x.0, y);
+    fast_two_sum(k, sh, k.add(x.1, sl))
+}
+
+/// `ln::decide_with` where `2^-969 <= |hi| < infinity`, so the ulp and
+/// its half are normal. The logarithm and small-expm1 kernels prove this
+/// range for every active lane; inactive lanes are masked by their caller.
+#[inline(always)]
+pub(crate) fn decide_relative<K: Simd>(k: K, y: Dw<K>, eps: f64) -> u64 {
+    let magnitude = k.abs(y.0);
+    let bits = k.to_bits(magnitude);
+    let exponent = k.and_u(bits, k.splat_bits(0x7ff0_0000_0000_0000));
+    let ulp = k.to_float(k.sub_u(exponent, k.splat_bits(52 << 52)));
+    let power = k.eq_u(k.and_u(bits, k.splat_bits((1 << 52) - 1)), k.splat_bits(0));
+    let g = k.select(power, k.mul(ulp, k.splat(0.5)), ulp);
+    k.mask_bits(k.lt(
+        k.add(k.abs(y.1), k.mul(k.splat(eps), magnitude)),
+        k.mul(g, k.splat(0.5)),
+    ))
+}
+
 /// Bits `0..LANES` set.
 #[inline(always)]
 pub(crate) fn lanes_mask<K: Simd>() -> u64 {
