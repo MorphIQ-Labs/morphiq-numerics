@@ -6,8 +6,9 @@ preserves scalar result bits through NEON, SSE2, AVX2+FMA and AVX-512F.
 
 Accepted fast paths are correctly rounded. Accurate fallbacks have proved
 per-domain bounds; no published worst-case result has been established here
-that would justify whole-domain correct rounding. For every finite output,
-the public result is finite, strictly positive, and has the form
+that would justify whole-domain correct rounding. For every finite input
+above the overflow threshold, the public result is finite, strictly positive,
+and has the form
 `F(x)*(1+d)+a` with these bounds:
 
 | Input domain | Bound on `abs(d)` | Bound on `abs(a)` |
