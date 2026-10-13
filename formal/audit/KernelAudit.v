@@ -273,3 +273,17 @@ Print Assumptions ErfcxTailIntegral.tail_integral_limit.
 Print Assumptions ErfcxTailIntegral.tail_integral_correction.
 Print Assumptions ErfcxScaledAnalytic.scaled_tail_analytic_correction.
 Print Assumptions ErfcxScaledAnalytic.tail_scaled_fast_analytic_ieee.
+
+Require ErfcxAsymptotic ErfcxCubicAnalytic.
+Print Assumptions ErfcxAsymptotic.moment_series_integral_limit.
+Print Assumptions ErfcxAsymptotic.tail_integrand_signed_remainder.
+Print Assumptions ErfcxAsymptotic.tail_integral_asymptotic.
+Print Assumptions ErfcxCubicAnalytic.tail_cubic_remainder.
+Print Assumptions ErfcxCubicAnalytic.tail_unscaled_fast_analytic_ieee.
+
+Require ErfcxFactorial ErfcxMiddleApprox ErfcxMiddleRemainder ErfcxMiddleAnalytic.
+Print Assumptions ErfcxFactorial.factorial_real_integer.
+Print Assumptions ErfcxMiddleApprox.middle_polynomial_approx.
+Print Assumptions ErfcxMiddleRemainder.middle_asymptotic_remainder.
+Print Assumptions ErfcxMiddleAnalytic.middle_integral_contract.
+Print Assumptions ErfcxMiddleAnalytic.middle_fast_analytic_ieee.

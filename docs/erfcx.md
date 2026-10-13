@@ -56,8 +56,24 @@ The encoded `1e270` cutoff exceeds `3*2^895`; consequently the omitted
 correction is at most `2^-1794` throughout the scaled branch.
 `ErfcxScaledAnalytic.tail_scaled_fast_analytic_ieee` therefore proves that
 accepted scaled-tail results round to this integral-defined target without
-an assumed analytic error bound. This does not cover rejected inputs, which
-use the Q256 accurate path.
+an assumed analytic error bound.
+
+`ErfcxAsymptotic.tail_integral_asymptotic` integrates Taylor's signed
+remainder for `exp(-s)` to bound every finite truncation by its first omitted
+term, with the same sign as that term. Its cubic specialization proves
+`0 <= J(t) - (1-t/2+3t²/4-15t³/8) <= (105/16)*t⁴`. For `x >= 512`, this is
+at most `7*2^-72`, discharging the unscaled large-tail composition contract
+in `ErfcxCubicAnalytic.tail_unscaled_fast_analytic_ieee`.
+
+For the middle range, the degree-31 asymptotic polynomial has an integral
+remainder at most `2^-140` on `2^-18 <= t <= 2^-8`.
+`ErfcxMiddleApprox.middle_polynomial_approx` checks the stored correction
+polynomial against that exact polynomial with CoqInterval, bounding their
+absolute difference by `3*2^-76`. The sum fits the arithmetic composition's
+`2^-74` budget. `ErfcxMiddleAnalytic.middle_fast_analytic_ieee` discharges
+that contract and the target range `[0.998, 1]`, proving accepted results
+for `16 <= x <= 512` against the same integral-defined function.
+These accepted-path results do not cover rejected inputs, which use Q256.
 
 ## Scalar kernels
 
@@ -88,8 +104,10 @@ the negative fast-path rounding decision and final scaling are proved under
 an explicit analytic table contract. The scaled positive-tail final rounding
 is proved on both sides of the subnormal boundary under its omitted-correction
 contract; that correction is derived from the normalized defining integral
-for the actual scaled domain. The other approximation/remainder bounds and
-the accurate path still require proofs. The guard is not an end-to-end error proof.
+for the actual scaled domain. The cubic and middle-tail analytic contracts
+are also derived from that integral. The table approximation contract and
+the accurate path still require composition proofs. The guard alone is not
+an end-to-end error proof.
 
 For a subnormal output, the leading candidate is scaled first. It is then
 mapped back exactly to the unscaled domain, where the binary64 subnormal
@@ -329,10 +347,9 @@ The middle-tail value theorem composes these IEEE operations, proving a
 `2^-67` relative error against `S/(sqrt(pi)*x)` when `S` is in `[0.998, 1]`
 and the exact correction polynomial approximates `S` within `2^-74`
 absolute error. The constant is tied to the real `1/sqrt(pi)` by the
-independent interval proof. The approximation hypothesis remains explicit;
-the theorem does not itself identify `S` with `x*sqrt(pi)*erfcx(x)`. The
-generated approximation evidence below supplies the intended budget, while
-its mathematical composition remains a separate obligation.
+independent interval proof. `ErfcxMiddleAnalytic.middle_fast_analytic_ieee`
+instantiates `S = J(1/x²)` and discharges both analytic hypotheses using the
+signed integral remainder and the stored-polynomial CoqInterval check.
 
 The remaining components do not yet prove their binary64 entry hypotheses, the
 Q256 remainder and arithmetic error, the special-value thresholds or the
