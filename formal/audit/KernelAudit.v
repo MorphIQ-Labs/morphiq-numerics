@@ -291,3 +291,16 @@ Print Assumptions ErfcxMiddleAnalytic.middle_fast_analytic_ieee.
 Require ErfcxAccurateReciprocal.
 Print Assumptions ErfcxAccurateReciprocal.binary64_round_large_reciprocal.
 Print Assumptions ErfcxAccurateReciprocal.accurate_reciprocal_seed_ieee.
+
+From Q Require Q256Real.
+Require ErfcxAccurateSeries.
+Print Assumptions Q256Real.new_valid.
+Print Assumptions Q256Real.from_f64_valid.
+Print Assumptions Q256Real.neg_any.
+Print Assumptions Q256Real.add_any.
+Print Assumptions Q256Real.mul_any.
+Print Assumptions Q256Real.mul_relative.
+Print Assumptions ErfcxAccurateSeries.asym_term_step.
+Print Assumptions ErfcxAccurateSeries.accurate_series_remainder.
+Print Assumptions ErfcxAccurateSeries.accurate_series_cap_remainder.
+Print Assumptions ErfcxAccurateSeries.accurate_series_stopped_remainder.

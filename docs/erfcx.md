@@ -143,6 +143,18 @@ certificates include this larger seed budget and still bound the third
 iteration by `650*2^-262 < 2^-252`. The seed theorem and Newton certificates
 are components; the complete Q256 tail composition remains separate.
 
+`ErfcxAccurateSeries.v` proves the exact term recurrence
+`a[k+1] = -(t/2)*(2*k+1)*a[k]` and bounds the integral remainder by the
+first omitted term for every truncation index. At the fixed loop limit,
+the remainder after term 399 is at most `2^-319` for `0 <= t <= 2^-8`.
+For an early exit, the remainder is at most `2^-261` if the computed
+omitted term is at most `2^-262` and differs from its exact value by at most
+half that value's magnitude. Establishing the latter condition and the
+accumulated Q256 evaluation error requires the loop's arithmetic proof.
+`formal/q/Q256Real.v` extends the existing limb-level contracts to include
+zero operands and preserves normalization through construction, conversion,
+negation, addition and multiplication.
+
 A relative approximation bound is not an ulp bound. For a positive normal
 value z, `z / ulp(z)` is between `2^52` and `2^53`; therefore relative error
 epsilon corresponds to as much as `2^53 epsilon` ulp before final rounding.
