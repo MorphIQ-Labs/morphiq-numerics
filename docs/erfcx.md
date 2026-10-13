@@ -135,6 +135,14 @@ alternating asymptotic series in the positive tail, and a Q256 exponential
 and reflection for negative inputs. Constants are generated independently
 at 600 and 1000 bits and must agree after rounding to 256 bits.
 
+The Q256 reciprocal starts with binary64 division. At the largest inputs,
+that seed is subnormal and its relative rounding error can exceed `2^-53`.
+`ErfcxAccurateReciprocal.accurate_reciprocal_seed_ieee` proves its error is
+at most `2^-51` for every finite input at least 16. The shared Newton
+certificates include this larger seed budget and still bound the third
+iteration by `650*2^-262 < 2^-252`. The seed theorem and Newton certificates
+are components; the complete Q256 tail composition remains separate.
+
 A relative approximation bound is not an ulp bound. For a positive normal
 value z, `z / ulp(z)` is between `2^52` and `2^53`; therefore relative error
 epsilon corresponds to as much as `2^53 epsilon` ulp before final rounding.

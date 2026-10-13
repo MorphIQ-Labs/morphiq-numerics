@@ -287,3 +287,7 @@ Print Assumptions ErfcxMiddleApprox.middle_polynomial_approx.
 Print Assumptions ErfcxMiddleRemainder.middle_asymptotic_remainder.
 Print Assumptions ErfcxMiddleAnalytic.middle_integral_contract.
 Print Assumptions ErfcxMiddleAnalytic.middle_fast_analytic_ieee.
+
+Require ErfcxAccurateReciprocal.
+Print Assumptions ErfcxAccurateReciprocal.binary64_round_large_reciprocal.
+Print Assumptions ErfcxAccurateReciprocal.accurate_reciprocal_seed_ieee.

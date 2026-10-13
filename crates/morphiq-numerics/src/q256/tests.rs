@@ -212,3 +212,37 @@ fn recip_is_within_its_bound() {
         assert_ne!(error.cmp(&Exact::pow2(-252)), Ordering::Greater, "1/{c:?}");
     }
 }
+
+#[test]
+fn recip_is_within_its_bound_when_the_seed_is_subnormal() {
+    let check = |c: Q256| {
+        let error = Exact::of_q256(c)
+            .mul(&Exact::of_q256(c.recip()))
+            .sub(&Exact::pow2(0))
+            .abs();
+        assert_ne!(error.cmp(&Exact::pow2(-252)), Ordering::Greater, "1/{c:?}");
+    };
+    // The normal/subnormal seed boundary, its neighbors, the next binade,
+    // and the largest finite input, with both signs.
+    for bits in [
+        0x7fcf_ffff_ffff_ffff,
+        0x7fd0_0000_0000_0000,
+        0x7fd0_0000_0000_0001,
+        0x7fdf_ffff_ffff_ffff,
+        0x7fe0_0000_0000_0000,
+        0x7fe0_0000_0000_0001,
+        0x7fef_ffff_ffff_fffe,
+        0x7fef_ffff_ffff_ffff,
+    ] {
+        let c = Q256::from_f64(f64::from_bits(bits));
+        check(c);
+        check(c.neg());
+    }
+    // Full 256-bit significands also exercise the first rounding of c.
+    let mut rng = SplitMix64::new(0x5132_3536_7375_626e);
+    for _ in 0..10_000 {
+        let c = Q256::new(rng.next_u64() & 1 != 0, limbs(&mut rng), 767);
+        check(c);
+        check(c.mul_pow2(1));
+    }
+}
