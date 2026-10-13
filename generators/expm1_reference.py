@@ -64,8 +64,8 @@ def thresholds():
     found = {
         'largest x with a finite result': pos(overflow - 1),
         'least x overflowing': pos(overflow),
-        'largest x above -1': neg(minus_one - 1),
-        'least x rounding to -1': neg(minus_one),
+        'least x above -1': neg(minus_one - 1),
+        'largest x rounding to -1': neg(minus_one),
         'largest positive x returning x': pos(pos_x - 1),
         'least positive x not returning x': pos(pos_x),
         'least negative x returning x': neg(neg_x - 1),

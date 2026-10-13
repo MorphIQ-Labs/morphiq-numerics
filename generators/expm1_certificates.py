@@ -184,9 +184,9 @@ X = 1 + (x / {m}) * Xn;
 H - X -> (x / {m}) * (En + Hn * ((1 + kk) * (1 + ma) * (1 + mb) - 1)) + s;
 '''
         prev, e_prev = bound, value(bound)
-    # G = (e^x - 1)/x = X_2 + truncation, the first omitted term below
-    # A^(d+1)/(d+2)!.
-    e2 = up(e_prev + A ** (d + 1) / math.factorial(d + 2))
+    # Taylor-Lagrange: G = (e^x - 1)/x = X_2 + truncation, bounded by
+    # exp(A) A^(d+1)/(d+2)!, with exp(A) < TAIL_FACTOR (Expm1Series.v).
+    e2 = up(e_prev + expm1_constants.TAIL_FACTOR * A ** (d + 1) / math.factorial(d + 2))
     spread = A / 2 / (1 - A)
     files['accurate_small.g'] = f'''# expm1's small-argument accurate result (docs/expm1.md, section 4):
 # x H_2 in Q128 against e^x - 1 = x G, G = (e^x - 1)/x, relative.
@@ -242,6 +242,52 @@ def generate():
     return files
 
 
+def coq_levels():
+    """Bridges to the generated Gappa theorems, using the same hypotheses."""
+    files = small_accurate()
+    import re
+    def bound(s):
+        return '0' if s == '0' else f'{s.split("b-")[0]} / 2^{s.split("b-")[1]}'
+    lines = [
+        '(** Written by generators/expm1_certificates.py; do not edit. *)',
+        'From Coq Require Import Reals ZArith Lia Lra.',
+        'From Flocq Require Import Core.',
+        'From Gappa Require Gappa_definitions Gappa_pred_bnd.',
+        'Require Import ExpAccurateLevels.',
+        'Require ' + ' '.join(f'expm1_accurate_level_{i:02}' for i in range(2, expm1_constants.DEGREE + 2)) + ' expm1_accurate_small.',
+        'Open Scope R_scope.',
+    ]
+    for i in range(expm1_constants.DEGREE + 1, 1, -1):
+        text = files[f'accurate_level_{i:02}.g']
+        lo, hi = re.search(r'Xn in \[([^,]+), ([^]]+)\]', text).groups()
+        prev = re.search(r'En in \[-([^,]+),', text).group(1)
+        cur = re.search(r'H - X in \[-([^,]+),', text).group(1)
+        lines += [
+            f'Theorem em_level_{i:02} x kk ma Xn En mb s :',
+            f' Rabs x <= 0.0312501 -> {lo} <= Xn <= {hi} -> Rabs En <= {bound(prev)} ->',
+            ' Rabs kk <= /2^127 -> -/2^127 <= ma <= 0 -> -/2^127 <= mb <= 0 -> Rabs s <= /2^126 ->',
+            f' Rabs (1 + (x * (1/{i}*(1+kk))) * (1+ma) * (Xn+En) * (1+mb) + s - (1+x/{i}*Xn)) <= {bound(cur)}.',
+            'Proof.',
+            ' intros Hx HX HE Hk Hma Hmb Hs.',
+            ' apply Rabs_le_inv in Hx. apply Rabs_le_inv in HE. apply Rabs_le_inv in Hk. apply Rabs_le_inv in Hs.',
+            f' bridge (expm1_accurate_level_{i:02}.l1 x kk ma Xn En mb s) ({bound(cur)}).',
+            'Qed.',
+        ]
+    text = files['accurate_small.g']
+    lo, hi = re.search(r'G in \[([^,]+), ([^]]+)\]', text).groups()
+    err = re.search(r'E2 in \[-([^,]+),', text).group(1)
+    lines += [
+        'Theorem em_accurate_small_certificate G E2 m :',
+        f' {lo} <= G <= {hi} -> Rabs E2 <= {bound(err)} -> -/2^127 <= m <= 0 ->',
+        ' Rabs ((G+E2)*(1+m)/G-1) <= /2^123.',
+        'Proof.',
+        ' intros HG HE Hm. apply Rabs_le_inv in HE.',
+        ' bridge (expm1_accurate_small.l1 G E2 m) (/2^123).',
+        'Qed.',
+    ]
+    return '\n'.join(lines) + '\n'
+
+
 def main():
     files = generate()
     check = '--check' in sys.argv[1:]
@@ -249,6 +295,7 @@ def main():
         present = {p.name for p in DIR.glob('*.g')}
         if present != set(files):
             sys.exit(f'formal/expm1 holds {sorted(present ^ set(files))} unexpectedly')
+    files['../exp/Expm1AccurateLevels.v'] = coq_levels()
     for name, text in files.items():
         path = DIR / name
         if check:

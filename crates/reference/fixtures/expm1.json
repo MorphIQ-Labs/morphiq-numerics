@@ -9,8 +9,8 @@
  "thresholds": {
   "largest x with a finite result": "40862e42fefa39ef",
   "least x overflowing": "40862e42fefa39f0",
-  "largest x above -1": "c042b708872320e1",
-  "least x rounding to -1": "c042b708872320e2",
+  "least x above -1": "c042b708872320e1",
+  "largest x rounding to -1": "c042b708872320e2",
   "largest positive x returning x": "3ca6a09e667f3bcc",
   "least positive x not returning x": "3ca6a09e667f3bcd",
   "least negative x returning x": "bca6a09e667f3bcc",
@@ -7315,12 +7315,12 @@
    "expm1": "7ff0000000000000"
   },
   {
-   "kind": "threshold: largest x above -1",
+   "kind": "threshold: least x above -1",
    "x": "c042b708872320e1",
    "expm1": "bfefffffffffffff"
   },
   {
-   "kind": "threshold: least x rounding to -1",
+   "kind": "threshold: largest x rounding to -1",
    "x": "c042b708872320e2",
    "expm1": "bff0000000000000"
   },

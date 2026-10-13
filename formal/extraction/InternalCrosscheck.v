@@ -17,7 +17,7 @@ From Q Require Import Limbs Digits64 Q128 Q256.
 From Binary64 Require Import IEEE64 RoundingTest.
 Require ExpReduction ExpFast ExpAccurate ExpSmall LnReduction LnAccurate Ln1pScreen ExpStageReduction ExpStageA ExpStageB Ln1pStageH Ln1pStageB.
 Require Exp2Stages Expm1Stages Exp2FallbackReduction Exp2FallbackAccurate Exp2FallbackFast Exp2.
-Require Expm1GeneralReduction Expm1GeneralFast Expm1GeneralAccurate.
+Require Expm1GeneralReduction Expm1GeneralFast Expm1GeneralAccurate Expm1SmallFast Expm1SmallAccurate Expm1.
 Import ListNotations.
 
 Definition limbs (k : nat) (x : Z) : list Z := map (fun i => dig x (Z.of_nat i)) (seq 0 k).
@@ -123,5 +123,14 @@ Definition x_expm1_general x :=
  (j, k, map bits_of_b64 [h;l], opt_bits (Expm1GeneralFast.em_general_fast xb),
   q128_out q, bits_of_b64 (Q128.to_f64 q)).
 
-Extraction "internalcrosscheck.ml" x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
+Definition x_expm1_small x :=
+ let xb := b64_of_bits x in
+ let '(h,l) := Expm1SmallFast.em_small_fast_value xb in
+ let q := Expm1SmallAccurate.em_small_accurate xb in
+ (map bits_of_b64 [h;l], opt_bits (Expm1SmallFast.em_small_fast xb),
+  q128_out q, bits_of_b64 (Q128.to_f64 q)).
+
+Definition x_expm1_entry x := bits_of_b64 (Expm1.expm1_entry (b64_of_bits x)).
+
+Extraction "internalcrosscheck.ml" x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
   x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs.

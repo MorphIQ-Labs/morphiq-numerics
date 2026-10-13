@@ -294,10 +294,11 @@ def accurate(d, coq=None):
     prev = up(e_prev)
     e_prev = value(prev)
     for k in range(DEGREE - 1, 0, -1):
-        # X_(k+1) = sum_j (-z)^j / (k + 1 + j), alternating and decreasing:
-        # within [1/(k+1) - |z|/(k+2), 1/(k+1) + |z|/(k+2)].
-        x_lo = Fraction(1, k + 1) - Z / (k + 2)
-        x_hi = Fraction(1, k + 1) + Z / (k + 2)
+        # X_(k+1) = sum_j (-z)^j / (k + 1 + j). For negative z the
+        # terms have one sign; a geometric majorant covers either sign.
+        spread = Z / (k + 2) / (1 - Z)
+        x_lo = Fraction(1, k + 1) - spread
+        x_hi = Fraction(1, k + 1) + spread
         g_max = x_hi + e_prev
         # |kk|/k + |z| (E_(k+1) + |G_(k+1)| 2^-127) + 2^-126 (operands below 1).
         bound = up(Fraction(1, k) * U + Z * (e_prev + g_max * U) + 2 * U)
@@ -307,9 +308,9 @@ def accurate(d, coq=None):
             coq['levels'].append((k, prev, x_range, bound))
         prev, e_prev = bound, value(bound)
     # G_1 approximates ln(1 + z)/z: the levels' error plus the truncation after
-    # z^(DEGREE-1), at most the first omitted term, |z|^DEGREE / (DEGREE + 1)
-    # (alternating, decreasing).
-    e1 = up(e_prev + Z ** DEGREE / (DEGREE + 1))
+    # z^(DEGREE-1), bounded by |z|^DEGREE / ((DEGREE + 1) (1 - |z|)).
+    # The factor covers the non-alternating negative-z tail (LnAccurate.v).
+    e1 = up(e_prev + Z ** DEGREE / (DEGREE + 1) / (1 - Z))
     with mpmath.workprec(200):
         zm = mpmath.mpf(Z.numerator) / Z.denominator
         x1_lo, x1_hi = mpmath.log(1 + zm) / zm, mpmath.log(1 - zm) / -zm

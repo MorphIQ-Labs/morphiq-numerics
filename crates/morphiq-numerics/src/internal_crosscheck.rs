@@ -604,6 +604,96 @@ fn internal_crosscheck_corpus() {
         }
     }
     assert_eq!(rejected, 8, "fallback rejection coverage");
+    // Every small-path operation, including both outcomes of its Ziv test.
+    let mut rng = SplitMix64::new(0x7163_726f_7373_0006);
+    let (mut accepted, mut rejected) = (0, 0);
+    let mut small_case = |x: f64| {
+        let (y, decision, q) = crate::expm1::crosscheck_small(x);
+        if decision.is_some() {
+            accepted += 1;
+        } else {
+            rejected += 1;
+        }
+        writeln!(
+            out,
+            "expm1_small {:016x} : {:016x} {:016x} {} {} {:016x}",
+            x.to_bits(),
+            y.hi().to_bits(),
+            y.lo().to_bits(),
+            opt(decision),
+            q128(q),
+            q.to_f64().to_bits(),
+        )
+        .unwrap();
+    };
+    for exponent in 969..=1018 {
+        let edge = exponent << 52;
+        for offset in 0..=8 {
+            for bits in [edge - offset, edge + offset] {
+                let x = f64::from_bits(bits);
+                small_case(x);
+                small_case(-x);
+            }
+        }
+    }
+    for _ in 0..8000 {
+        small_case((unit(&mut rng) - 0.5) / 16.0);
+    }
+    for x in [-0.0, 0.0] {
+        small_case(x);
+    }
+    for case in include_str!("../../reference/fixtures/expm1.json")
+        .lines()
+        .filter(|line| line.trim_start().starts_with("\"x\":"))
+    {
+        let x = crate::test_exact::word(case, "x");
+        if x.abs() >= f64::from_bits(0x3c80_0000_0000_0000) && x.abs() <= 0.0312501 {
+            small_case(x);
+        }
+    }
+    assert!(
+        accepted > 0 && rejected >= 8,
+        "both expm1 small-path decisions"
+    );
+    // Whole public entry: special values, every screen boundary, fixtures,
+    // and arbitrary encodings across the normal and subnormal ranges.
+    for case in include_str!("../../reference/fixtures/expm1.json")
+        .lines()
+        .filter(|line| line.trim_start().starts_with("\"x\":"))
+    {
+        expm1_entry_line(&mut out, crate::test_exact::word(case, "x"));
+    }
+    for edge in [
+        0x3c90_0000_0000_0000,
+        0x3fa0_0000_0000_0000,
+        0xc042_b708_8723_20e2,
+        0x4086_2e42_fefa_39f0,
+    ] {
+        for offset in 0..=32 {
+            for bits in [edge - offset, edge + offset] {
+                expm1_entry_line(&mut out, f64::from_bits(bits));
+                expm1_entry_line(&mut out, -f64::from_bits(bits));
+            }
+        }
+    }
+    for bits in [
+        0,
+        1,
+        0x8000_0000_0000_0000,
+        0x8000_0000_0000_0001,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0x7ff0_0000_0000_0001,
+        0xfff0_0000_0000_0001,
+        0x7ff8_0000_0000_0042,
+        0xfff8_0000_0000_0042,
+    ] {
+        expm1_entry_line(&mut out, f64::from_bits(bits));
+    }
+    for _ in 0..4000 {
+        expm1_entry_line(&mut out, f64::from_bits(rng.next_u64()));
+        expm1_entry_line(&mut out, (unit(&mut rng) - 0.5) / 16.0);
+    }
     // expm1's general fallback: compute the reduction metadata, both scaled
     // words, decision, Q128 subtraction and final conversion from x alone.
     let mut rng = SplitMix64::new(0x7163_726f_7373_0005);
@@ -743,6 +833,16 @@ fn exp2_fast_line(out: &mut String, x: f64) {
         y.hi().to_bits(),
         y.lo().to_bits(),
         opt(decided)
+    )
+    .unwrap();
+}
+
+fn expm1_entry_line(out: &mut String, x: f64) {
+    writeln!(
+        out,
+        "expm1_entry {:016x} : {:016x}",
+        x.to_bits(),
+        crate::expm1::expm1(x).to_bits()
     )
     .unwrap();
 }

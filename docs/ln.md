@@ -286,8 +286,8 @@ conversion from and rounding to binary64).
    G_18 = 1/18;   G_k = 1/k − z·G_(k+1),  k = 17, …, 1;   Lz = z·G_1
    ```
    - `1/k` are `Q128` constants (*generated*: `RECIPROCALS`).
-   - **The degree** is the least `d` whose truncation, `|z|^d / (d + 1)` (the
-     first omitted term of an alternating, decreasing series), is at most
+   - **The degree** is the least `d` whose truncation, `|z|^d / ((d + 1)·(1 − |z|))`
+     (a geometric majorant valid for both signs of `z`), is at most
      `2^−125`. That is negligible next to `Q128`'s rounding (*generated*:
      `DEGREE = 18`).
    - Each Horner level's absolute error is bounded from the previous one
