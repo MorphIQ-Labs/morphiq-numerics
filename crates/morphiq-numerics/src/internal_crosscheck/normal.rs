@@ -3,6 +3,7 @@
 //! reduction or operation-order discrepancy.
 use super::{SplitMix64, q256};
 use crate::normal_distribution::{self, accurate};
+use crate::q256::Q256;
 use std::fmt::Write as _;
 use std::string::String;
 use std::vec::Vec;
@@ -90,6 +91,58 @@ pub(super) fn write(out: &mut String) {
             x.to_bits(),
             y.hi().to_bits(),
             y.lo().to_bits()
+        )
+        .unwrap();
+    }
+    for i in 0..256 {
+        let high = match i {
+            0 => 16.0,
+            1 => 16.0_f64.next_up(),
+            2 => 32.0,
+            3 => f64::MAX * 0.5,
+            _ => f64::from_bits(
+                16.0_f64.to_bits() + rng.next_u64() % (0x7fe0_0000_0000_0000 - 16.0_f64.to_bits()),
+            ),
+        };
+        let high = Q256::from_f64(high);
+        let low = high.mul_pow2(-100);
+        let x = high.add(if i % 2 == 0 { low } else { low.neg() });
+        writeln!(
+            out,
+            "normal_erfcx_asym {} : {}",
+            q256(x),
+            q256(crate::erfcx::accurate::asym_value(x))
+        )
+        .unwrap();
+    }
+    for i in 0..256 {
+        let x = match i {
+            0 => f64::from_bits(1),
+            1 => f64::MIN_POSITIVE,
+            2 => f64::MAX,
+            3 => 23.0,
+            _ => f64::from_bits(1 + rng.next_u64() % f64::MAX.to_bits()),
+        };
+        writeln!(
+            out,
+            "normal_scaled_argument {:016x} : {}",
+            x.to_bits(),
+            q256(accurate::scaled_argument(x))
+        )
+        .unwrap();
+        let x = match i {
+            0 => 23.0,
+            1 => 38.6,
+            2 => 38.5,
+            _ => f64::from_bits(
+                23.0_f64.to_bits() + rng.next_u64() % (38.6_f64.to_bits() - 23.0_f64.to_bits()),
+            ),
+        };
+        writeln!(
+            out,
+            "normal_accurate_tail_asym {:016x} : {}",
+            x.to_bits(),
+            q256(accurate::tail(x))
         )
         .unwrap();
     }

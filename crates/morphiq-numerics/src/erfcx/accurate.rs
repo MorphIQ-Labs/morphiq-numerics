@@ -81,7 +81,7 @@ pub(crate) fn asym(x: f64) -> Q256 {
     asym_value(Q256::from_f64(x))
 }
 
-fn asym_value(xq: Q256) -> Q256 {
+pub(crate) fn asym_value(xq: Q256) -> Q256 {
     let y = xq.recip();
     let t = y.mul(y);
     let half = Q256::from_f64(0.5);

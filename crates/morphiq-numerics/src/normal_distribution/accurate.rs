@@ -41,9 +41,12 @@ pub(crate) fn central_cdf(x: f64) -> Q256 {
     q(0.5).add(center(x))
 }
 
-fn tail(x: f64) -> Q256 {
-    let z = q(x).mul(tables::q_inv_sqrt2());
-    let scaled = crate::erfcx::accurate::positive(z);
+pub(crate) fn scaled_argument(x: f64) -> Q256 {
+    q(x).mul(tables::q_inv_sqrt2())
+}
+
+pub(crate) fn tail(x: f64) -> Q256 {
+    let scaled = crate::erfcx::accurate::positive(scaled_argument(x));
     gaussian(x).mul(scaled).mul_pow2(-1)
 }
 
@@ -102,8 +105,7 @@ pub(super) fn evaluate(op: Operation, x: f64) -> f64 {
         Operation::LogCdf => {
             // This path never constructs the exponentially small probability.
             // Q256's integer exponent also avoids an overflowing binary64 square.
-            let z = q(a).mul(tables::q_inv_sqrt2());
-            let scaled = crate::erfcx::accurate::positive(z).mul_pow2(-1);
+            let scaled = crate::erfcx::accurate::positive(scaled_argument(a)).mul_pow2(-1);
             q(a).mul(q(a)).mul_pow2(-1).neg().add(logarithm(scaled))
         }
     };
