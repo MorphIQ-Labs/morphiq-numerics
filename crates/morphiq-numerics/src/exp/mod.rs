@@ -6,7 +6,7 @@
 
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;
-mod tables;
+pub(crate) mod tables;
 
 use crate::double_word::DoubleWord;
 use crate::eft::{fast_two_sum, two_prod, two_sum};

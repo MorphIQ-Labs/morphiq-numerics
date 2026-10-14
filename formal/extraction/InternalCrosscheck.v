@@ -13,12 +13,15 @@
 
 From Coq Require Import ZArith List Extraction ExtrOcamlBasic.
 From Flocq Require Import IEEE754.Binary IEEE754.Bits.
-From Q Require Import Limbs Digits64 Q128 Q256.
+From Q Require Import Limbs Digits64 Q128 Q256 Q256Real.
 From Binary64 Require Import IEEE64 RoundingTest.
 Require ExpReduction ExpFast ExpAccurate ExpSmall LnReduction LnAccurate Ln1pScreen ExpStageReduction ExpStageA ExpStageB Ln1pStageH Ln1pStageB.
 Require Exp2Stages Expm1Stages Exp2FallbackReduction Exp2FallbackAccurate Exp2FallbackFast Exp2.
 Require Expm1GeneralReduction Expm1GeneralFast Expm1GeneralAccurate Expm1SmallFast Expm1SmallAccurate Expm1.
 Require LnFastValue Ln1pFast LnFastDecision LnEntry.
+Require ErfcxReciprocal ErfcxSquare ErfcxMiddlePolynomial ErfcxProduct ErfcxMiddleValue ErfcxQuotient ErfcxQuotientScale ErfcxTailCorrection ErfcxTailValue ErfcxTableSplit ErfcxTableProducts ErfcxTableData ErfcxTableReduction ErfcxTableEntry.
+Require ErfcxReflectionExp ErfcxReflectionSubtract ErfcxReflectionFast.
+Require ErfcxMiddleFast ErfcxTailFast ErfcxAccurateProduct ErfcxAccurateExponential.
 Import ListNotations.
 
 Definition limbs (k : nat) (x : Z) : list Z := map (fun i => dig x (Z.of_nat i)) (seq 0 k).
@@ -37,6 +40,8 @@ Definition x_q256_add n1 e1 l1 n2 e2 l2 := q256_out (Q256.add (q256_in n1 e1 l1)
 Definition x_q256_to_f64 n e l := bits_of_b64 (Q256.to_f64 (q256_in n e l)).
 Definition x_q256_from_f64 bits := q256_out (Q256.from_f64 bits).
 Definition x_q256_from_limbs n e l := q256_out (Q256.from_limbs n l e).
+Definition x_q256_top n e l := Q256Real.top (q256_in n e l).
+Definition x_q256_mul_pow2 n e l power := q256_out (Q256Real.mul_pow2 (q256_in n e l) power).
 
 (** The rounding tests (RoundingTest.v), on binary64 encodings. *)
 Definition opt_bits (o : option f64) : option Z := match o with Some v => Some (bits_of_b64 v) | None => None end.
@@ -144,5 +149,99 @@ Definition x_ln1p_fast x :=
 Definition x_ln_entry x := bits_of_b64 (LnEntry.ln_entry (b64_of_bits x)).
 Definition x_ln1p_entry x := bits_of_b64 (LnEntry.ln1p_entry (b64_of_bits x)).
 
-Extraction "internalcrosscheck.ml" x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
-  x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs.
+Definition x_erfcx_reciprocal x :=
+ let '(h,l) := ErfcxReciprocal.reciprocal64 (b64_of_bits x) in
+ map bits_of_b64 [h;l].
+
+Definition x_erfcx_reciprocal_square x :=
+ let '(h,l) := ErfcxSquare.reciprocal_square64 (b64_of_bits x) in
+ map bits_of_b64 [h;l].
+
+Definition x_erfcx_reciprocal_correction x :=
+ let '(h,l) := ErfcxMiddlePolynomial.reciprocal_correction64 (b64_of_bits x) in
+ map bits_of_b64 [h;l].
+
+Definition x_erfcx_product ah al bh bl :=
+ let '(h,l) := ErfcxProduct.product64 (b64_of_bits ah) (b64_of_bits al) (b64_of_bits bh) (b64_of_bits bl) in
+ map bits_of_b64 [h;l].
+
+Definition x_erfcx_middle x :=
+ let '(h,l) := ErfcxMiddleValue.middle64 (b64_of_bits x) in
+ map bits_of_b64 [h;l].
+
+Definition x_erfcx_quotient x :=
+ let '(h,l) := ErfcxQuotient.quotient64 (b64_of_bits x) in map bits_of_b64 [h;l].
+Definition x_erfcx_scaled_quotient x :=
+ let '(h,l) := ErfcxQuotientScale.scaled_quotient64 (b64_of_bits x) in map bits_of_b64 [h;l].
+
+Definition x_erfcx_tail_correction x :=
+ [bits_of_b64 (ErfcxTailCorrection.tail_correction64 (b64_of_bits x))].
+Definition x_erfcx_tail x :=
+ let '(h,l) := ErfcxTailValue.tail64 (b64_of_bits x) in map bits_of_b64 [h;l].
+
+Definition x_erfcx_table_split x e :=
+ let '(h,l) := ErfcxTableSplit.table_split64 (b64_of_bits x) e in
+ map bits_of_b64 [h;l;IEEE64.fmul h h].
+
+Definition x_erfcx_table_value x :=
+ let '(h,l) := ErfcxTableEntry.table_eval64 (b64_of_bits x) in map bits_of_b64 [h;l].
+
+Definition x_erfcx_table_reduce x :=
+ let '(i,c,h,e) := ErfcxTableReduction.table_reduce64 (b64_of_bits x) in
+ (i,e,map bits_of_b64 [c;h]).
+
+Definition x_erfcx_table_leading i x :=
+ let '(a1,b1,a2h,b2,p1,sq,p2) := ErfcxTableProducts.table_leading64 (Z.to_nat i) (b64_of_bits x) in
+ map bits_of_b64 [a1;b1;a2h;b2;p1;sq;p2].
+
+Definition x_erfcx_reflection_square x :=
+ let '(s,se) := IEEE64Mul.two_prod64 (b64_of_bits x) (b64_of_bits x) in
+ map bits_of_b64 [s;se].
+
+Definition x_erfcx_reflection_exp s se :=
+ let '(h,l,k) := ErfcxReflectionExp.reflection_exp64 (b64_of_bits s) (b64_of_bits se) in
+ (k,map bits_of_b64 [h;l]).
+
+Definition x_erfcx_reflection_value x :=
+ let '(h,l,k) := ErfcxReflectionSubtract.reflection_value64 (b64_of_bits x) in
+ (k,map bits_of_b64 [h;l]).
+
+Definition x_erfcx_reflection_fast x :=
+ match ErfcxReflectionFast.reflection_fast64 (b64_of_bits x) with
+ | Some y => Some (bits_of_b64 y) | None => None
+ end.
+
+Require ErfcxTableFast ErfcxAccurateTaylorEntry ErfcxAccurateReflectionEntry ErfcxPublicModel.
+Definition x_erfcx_entry x := bits_of_b64 (ErfcxPublicModel.erfcx_entry64 (b64_of_bits x)).
+Definition x_erfcx_accurate_negative x := q256_out (ErfcxAccurateReflectionEntry.q_negative (b64_of_bits x)).
+Definition x_erfcx_accurate_taylor x := q256_out (ErfcxAccurateTaylorEntry.q_taylor (b64_of_bits x)).
+
+Definition x_erfcx_accurate_exp s se := q256_out (ErfcxAccurateExponential.q_reflection_exponential (b64_of_bits s) (b64_of_bits se)).
+
+Definition x_erfcx_accurate_tail x := q256_out (ErfcxAccurateProduct.q_asym (b64_of_bits x)).
+
+Definition x_erfcx_table_fast x :=
+ match ErfcxTableFast.table_fast64 (b64_of_bits x) with
+ | Some y => Some (bits_of_b64 y) | None => None
+ end.
+Require ErfcxScaledFast.
+Definition x_erfcx_tail_scaled_fast x :=
+ match ErfcxScaledFast.tail_scaled_fast64 (b64_of_bits x) with
+ | Some y => Some (bits_of_b64 y) | None => None
+ end.
+Require ErfcxSubnormalFast.
+Definition x_erfcx_tail_subnormal_fast x :=
+ match ErfcxSubnormalFast.tail_subnormal_fast64 (b64_of_bits x) with
+ | Some y => Some (bits_of_b64 y) | None => None
+ end.
+Definition x_erfcx_middle_fast x :=
+ match ErfcxMiddleFast.middle_fast64 (b64_of_bits x) with
+ | Some y => Some (bits_of_b64 y) | None => None
+ end.
+Definition x_erfcx_tail_unscaled_fast x :=
+ match ErfcxTailFast.tail_unscaled_fast64 (b64_of_bits x) with
+ | Some y => Some (bits_of_b64 y) | None => None
+ end.
+
+Extraction "internalcrosscheck.ml" x_erfcx_entry x_erfcx_accurate_negative x_erfcx_accurate_taylor x_erfcx_accurate_exp x_erfcx_accurate_tail x_erfcx_table_fast x_erfcx_tail_scaled_fast x_erfcx_tail_subnormal_fast x_erfcx_middle_fast x_erfcx_tail_unscaled_fast x_erfcx_reflection_fast x_erfcx_reflection_value x_erfcx_reflection_square x_erfcx_reflection_exp x_erfcx_table_value x_erfcx_table_reduce x_erfcx_table_leading x_erfcx_table_split x_erfcx_tail x_erfcx_tail_correction x_erfcx_quotient x_erfcx_scaled_quotient x_erfcx_middle x_erfcx_product x_erfcx_reciprocal_correction x_erfcx_reciprocal_square x_erfcx_reciprocal x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
+  x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs x_q256_top x_q256_mul_pow2.

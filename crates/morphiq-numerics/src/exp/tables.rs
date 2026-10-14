@@ -3,9 +3,9 @@
 //! `docs/exp.md` gives the derivation.
 
 /// `RN(128 / ln 2)` (184.6649652337873).
-pub(super) const INV_L: f64 = f64::from_bits(0x40671547652b82fe);
+pub(crate) const INV_L: f64 = f64::from_bits(0x40671547652b82fe);
 /// `1.5 * 2^52`: adding and subtracting it rounds to the nearest integer.
-pub(super) const SHIFTER: f64 = f64::from_bits(0x4338000000000000);
+pub(crate) const SHIFTER: f64 = f64::from_bits(0x4338000000000000);
 /// `L = ln 2 / 128 = L1 + L2 + L3 + L4` to within 2^-206.0;
 /// `L1` has 35 significant bits, so `n * L1` is exact for `|n| < 2^18`.
 pub(super) const L1: f64 = f64::from_bits(0x3f762e42fefc0000);
@@ -300,13 +300,13 @@ pub(super) const RECIPROCALS: [(u128, i32); 12] = [
 ];
 
 /// Stages A and B (`docs/exp.md` §3–§6): `RN(512 / ln 2)`.
-pub(super) const INV_N: f64 = f64::from_bits(0x40871547652b82fe);
+pub(crate) const INV_N: f64 = f64::from_bits(0x40871547652b82fe);
 /// `L = ln 2 / 512 = S_L1 + S_L2 + S_L3` to within 2^-129.5; `S_L1` and
 /// `S_L2` have 31 significant bits, so `n * S_L1` and `n * S_L2` are exact for
 /// `|n| < 2^22`.
-pub(super) const S_L1: f64 = f64::from_bits(0x3f562e42ff000000);
-pub(super) const S_L2: f64 = f64::from_bits(0xbd3718432a000000);
-pub(super) const S_L3: f64 = f64::from_bits(0xbb3b0e2633fe0685);
+pub(crate) const S_L1: f64 = f64::from_bits(0x3f562e42ff000000);
+pub(crate) const S_L2: f64 = f64::from_bits(0xbd3718432a000000);
+pub(crate) const S_L3: f64 = f64::from_bits(0xbb3b0e2633fe0685);
 /// Stage A's second word: `L = S_L1 + S_L2D` to within 2^-98.3.
 pub(super) const S_L2D: f64 = f64::from_bits(0xbd3718432a1b0e26);
 /// The stages' polynomial (`generators/exp_poly.sollya`):

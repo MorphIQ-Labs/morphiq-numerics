@@ -1,0 +1,11 @@
+{
+  "baseline_commit": "78a8250",
+  "candidate_erfcx_source_sha256": "5a3fa13e6a5fa52bd00a10bcab4dbb0e81e7225bfcd48fa75c88a382bc1ed17e",
+  "command": "cargo rustc --release --locked -p morphiq-numerics --features simd,std --lib -- --emit=asm",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: aarch64-apple-darwin\nrelease: 1.97.1\nLLVM version: 22.1.6\n",
+  "target": "aarch64-apple-darwin",
+  "instruction_sha256": "c6f24292e3a2ec2ae7ee905f0d713ea69d535f555791c08a60a3a7f1bbac4549",
+  "comparison": "All emitted instruction lines and operands are identical. The only complete-assembly difference is one panic source-location record.",
+  "baseline_assembly_sha256": "94d7cb4df76d910bb410be0dc2a9541fd323e7703a7ea661b10bb830afc58969",
+  "candidate_assembly_sha256": "bbf2c290bd8eb96bec84fdc4bc74a8ed011b9ce30cf167852e359f91da391e26"
+}

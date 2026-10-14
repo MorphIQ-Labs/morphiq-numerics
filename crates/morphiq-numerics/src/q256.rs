@@ -292,10 +292,11 @@ impl Q256 {
         }
     }
 
-    /// `1/self` for a nonzero `self` whose magnitude is a normal binary64's,
-    /// within `2^−252` relatively: three Newton steps
+    /// `1/self`, within `2^−252` relatively, when its magnitude is at least
+    /// `f64::MIN_POSITIVE` and `self.to_f64()` is finite: three Newton steps
     /// `y ← y + y·(1 − self·y)` from `y_0 = RN(1/RN(self))`, each step squaring
-    /// the error, under this type's own rounding (certified:
+    /// the error, including a subnormal initial reciprocal, under this type's
+    /// own rounding (certified:
     /// `formal/trig/recip_0.g` to `recip_3.g`).
     pub(crate) fn recip(self) -> Self {
         let mut y = Self::from_f64(1.0 / self.to_f64());
@@ -304,6 +305,23 @@ impl Q256 {
             y = y.add(y.mul(error));
         }
         y
+    }
+
+    /// The exponent of the leading bit, or the zero sentinel.
+    pub(crate) fn top(self) -> i32 {
+        if is_zero(&self.m) {
+            i32::MIN / 2
+        } else {
+            self.e + 255
+        }
+    }
+
+    /// Exact power-of-two scaling in the integer-significand representation.
+    pub(crate) fn mul_pow2(self, power: i32) -> Self {
+        Self {
+            e: self.e + power,
+            ..self
+        }
     }
 
     /// `self` rounded to binary64, to nearest with ties to even, subnormals

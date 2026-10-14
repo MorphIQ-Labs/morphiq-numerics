@@ -234,7 +234,11 @@ operands outside its theorem's domain, and those arguments go to the accurate
 path; none of the 1,200 precise arguments does.
 
 **Decision 4: `Q256::recip`, by Newton's iteration.**
-- `y_0 = RN(1/RN(c))` is within `2^−51.98` (*certified*: `recip_0.g`).
+- For `|c| >= 2^-1022` with finite `RN(c)`, `y_0 = RN(1/RN(c))`
+  is within `647*2^-60` relatively (*certified*: `recip_0.g`). The
+  reciprocal can be subnormal: its exact magnitude exceeds `2^-1024`,
+  so the absolute half-ulp `2^-1075` fits a `2^-51` relative bound.
+  The initial rounding of c has relative error at most `2^-53`.
 - Each step computes `y ← y + y·(1 − c·y)` in `Q256`, which squares the error
   and adds `Q256`'s roundings.
 - Three steps reach `2^−252.66` (*certified*: `recip_1.g` to `recip_3.g`, each

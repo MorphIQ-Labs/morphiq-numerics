@@ -18,7 +18,7 @@ use morphiq_numerics::elementary::{
 use morphiq_numerics::log_space::{
     log_diff_exp, log_sum_exp, log_sum_exp_and_normalize, log_sum_exp_pairs,
 };
-use morphiq_numerics::normal::log_norm_pdf;
+use morphiq_numerics::normal::{erfcx, erfcx_slice, log_norm_pdf};
 use morphiq_numerics::random::{
     SplitMix64, Xoshiro256PlusPlus, normal_pair, unit_closed_open, unit_open,
 };
@@ -847,6 +847,47 @@ pub fn corpus_digest() -> [u8; 32] {
         expm1_slice,
         &expm1_edges,
         (-0.03125, 0.03125),
+    );
+
+    r.label("erfcx");
+    let erfcx_edges = [
+        0,
+        1 << 63,
+        1,
+        0x7ff8_0000_0000_1234,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0xc03a_a0f4_d2e0_63cf,
+        0xc03a_a0f4_d2e0_63ce,
+        0x3c8c_5bf8_91b4_ef6b,
+        0x3c8c_5bf8_91b4_ef6c,
+        0xbc9c_5bf8_91b4_ef69,
+        0xbc9c_5bf8_91b4_ef6a,
+        (-0.5_f64).to_bits(),
+        1.0_f64.to_bits(),
+        16.0_f64.to_bits(),
+        512.0_f64.to_bits(),
+        1e270_f64.to_bits(),
+        0x7fc2_0dd7_5042_9b6d,
+        0x7fc2_0dd7_5042_9b6e,
+        f64::MAX.to_bits(),
+    ];
+    for i in 0..20_000 {
+        r.f64(erfcx(batched_input(
+            &mut words,
+            &erfcx_edges,
+            i,
+            -27.0,
+            520.0,
+        )));
+    }
+    r.label("erfcx_slice");
+    batched_section(
+        &mut r,
+        &mut words,
+        erfcx_slice,
+        &erfcx_edges,
+        (-27.0, 520.0),
     );
 
     r.0.finalize().into()

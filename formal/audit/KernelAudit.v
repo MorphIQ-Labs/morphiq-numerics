@@ -149,3 +149,254 @@ Print Assumptions LnEntry.ln_entry_nan.
 Print Assumptions LnEntry.ln1p_entry_nan.
 Print Assumptions LnEntry.ln_entry_negative.
 Print Assumptions LnEntry.ln1p_entry_below_domain.
+
+Require ErfcxReciprocal.
+Print Assumptions ErfcxReciprocal.reciprocal_ieee.
+
+Require ErfcxSquare.
+Print Assumptions ErfcxSquare.square_ieee.
+Print Assumptions ErfcxSquare.reciprocal_square_ieee.
+
+Require ErfcxMiddlePolynomial.
+Print Assumptions ErfcxMiddlePolynomial.poly_ieee.
+Print Assumptions ErfcxMiddlePolynomial.correction_ieee.
+Print Assumptions ErfcxMiddlePolynomial.reciprocal_correction_ieee.
+
+Require ErfcxProduct.
+Print Assumptions ErfcxProduct.product_ieee.
+
+Require ErfcxMiddleValue.
+Print Assumptions ErfcxMiddleValue.middle_with_pi_ieee.
+
+Require ErfcxQuotient ErfcxQuotientScale.
+Print Assumptions ErfcxQuotient.quotient_ieee.
+Print Assumptions ErfcxQuotient.normalized_quotient_ieee.
+Print Assumptions ErfcxQuotientScale.scale_input_ieee.
+Print Assumptions ErfcxQuotientScale.scaled_quotient_ieee.
+
+Require ErfcxRounding ErfcxTailCorrection ErfcxTailValue.
+Print Assumptions ErfcxRounding.rounding_decomposition.
+Print Assumptions ErfcxTailCorrection.tail_correction_ieee.
+Print Assumptions ErfcxTailValue.tail_reconstruct_ieee.
+Print Assumptions ErfcxTailValue.tail_with_pi_ieee.
+Print Assumptions ErfcxTailValue.scaled_tail_with_pi_ieee.
+
+Require ErfcxTableSplit.
+Print Assumptions ErfcxTableSplit.table_split_ieee.
+Print Assumptions ErfcxTableSplit.table_square_ieee.
+
+Require ErfcxTableCoefficient ErfcxTableProducts.
+Print Assumptions ErfcxTableCoefficient.coefficient_check_ok.
+Print Assumptions ErfcxTableProducts.table_leading_value_ieee.
+
+Require ErfcxConstants.
+Print Assumptions ErfcxConstants.cs_split_bound.
+
+Require ErfcxTableReduction.
+Print Assumptions ErfcxTableReduction.table_uniform_ieee.
+Print Assumptions ErfcxTableReduction.table_binade_ieee.
+Print Assumptions ErfcxTableReduction.table_reduce_ieee.
+
+Require ErfcxTableEvaluation ErfcxTableEntry.
+Print Assumptions ErfcxTableCoefficient.word_range_check_ok.
+Print Assumptions ErfcxTableCoefficient.coefficient_size_check_ok.
+Print Assumptions ErfcxTableEvaluation.horner_ieee.
+Print Assumptions ErfcxTableEvaluation.table_rest_ieee.
+Print Assumptions ErfcxTableEvaluation.table_sum_ieee.
+Print Assumptions ErfcxTableEntry.table_eval_ieee.
+
+Require ErfcxTableBound.
+Print Assumptions ErfcxTableBound.table_evaluation_error.
+
+Print Assumptions ExpStageReduction.stage_of_extended_ok.
+Print Assumptions ExpStageReduction.stage_b_r_model.
+Print Assumptions ExpStageB.stage_b_at_extended_ok.
+Require ErfcxReflectionSquare ErfcxReflectionReduction ErfcxReflectionExp.
+Print Assumptions ErfcxReflectionSquare.reflection_square_ieee.
+Print Assumptions ErfcxReflectionReduction.reflection_reduced_ieee.
+Print Assumptions ErfcxReflectionReduction.reflection_reduce_ieee.
+Print Assumptions ErfcxReflectionExp.reflection_exp_ieee.
+Print Assumptions ErfcxReflectionExp.reflection_square_exp_ieee.
+Print Assumptions ErfcxReflectionExp.reflection_dispatch_range.
+
+Require ErfcxReflectionScale ErfcxReflectionSubtract.
+Print Assumptions ErfcxReflectionScale.reflection_scaled_word_ieee.
+Print Assumptions ErfcxReflectionSubtract.reflection_subtract_ieee.
+
+Require ErfcxReflectionValue.
+Print Assumptions ErfcxReflectionExp.reflection_exp_ideal_range.
+Print Assumptions ErfcxReflectionValue.reflection_value_ieee.
+
+Require ErfcxDecision ErfcxReflectionOverflow ErfcxReflectionFast.
+Print Assumptions ErfcxDecision.erfcx_decide_ieee.
+Print Assumptions ErfcxDecision.erfcx_decide_scaled_normal_ieee.
+Print Assumptions ErfcxReflectionOverflow.reflection_finite_magnitude.
+Print Assumptions ErfcxReflectionOverflow.reflection_overflow_magnitude.
+Print Assumptions ErfcxReflectionFast.reflection_fast_ieee.
+
+Require ErfcxMiddleFast ErfcxTailFast.
+Print Assumptions ErfcxProduct.product_normalized_ieee.
+Print Assumptions ErfcxMiddleValue.middle_normalized_ieee.
+Print Assumptions ErfcxTailValue.tail_reconstruct_normalized_ieee.
+Print Assumptions ErfcxTailValue.tail_normalized_ieee.
+Print Assumptions ErfcxMiddleFast.middle_fast_ieee.
+Print Assumptions ErfcxTailFast.tail_unscaled_fast_ieee.
+
+Require ErfcxSubnormal ErfcxSubnormalBits ErfcxSubnormalCandidate ErfcxSubnormalValue ErfcxSubnormalFast.
+Print Assumptions ErfcxQuotient.normalized_quotient_words_ieee.
+Print Assumptions ErfcxSubnormal.binary64_round_absolute.
+Print Assumptions ErfcxSubnormal.subnormal_accept_ieee.
+Print Assumptions ErfcxSubnormalBits.small_bits_value.
+Print Assumptions ErfcxSubnormalBits.small_positive_encoding.
+Print Assumptions ErfcxSubnormalCandidate.subnormal_candidate_ieee.
+Print Assumptions ErfcxSubnormalCandidate.subnormal_fast_ieee.
+Print Assumptions ErfcxSubnormalValue.subnormal_value_words_ieee.
+Print Assumptions ErfcxSubnormalFast.tail_subnormal_fast_ieee.
+
+Require ErfcxScaledWords ErfcxSubnormalBoundary ErfcxScaledFast.
+Print Assumptions ErfcxScaledWords.scaled_quotient_words_ieee.
+Print Assumptions ErfcxSubnormalBoundary.erfcx_normal_tail_lower.
+Print Assumptions ErfcxScaledFast.tail_scaled_normal_fast_ieee.
+Print Assumptions ErfcxScaledFast.tail_scaled_fast_ieee.
+
+Require ErfcxTableFast.
+Print Assumptions ErfcxTableEvaluation.table_sum_normalized_ieee.
+Print Assumptions ErfcxTableEntry.table_polynomial_normalized_ieee.
+Print Assumptions ErfcxTableEntry.table_eval_normalized_ieee.
+Print Assumptions ErfcxTableFast.table_composed_error.
+Print Assumptions ErfcxTableFast.table_fast_ieee.
+
+Require ErfcxExpRemainder ErfcxMoments ErfcxTailIntegral ErfcxScaledAnalytic.
+Print Assumptions ErfcxExpRemainder.exp_negative_taylor_remainder.
+Print Assumptions ErfcxMoments.exponential_moment_integral_limit.
+Print Assumptions ErfcxTailIntegral.tail_integral_limit.
+Print Assumptions ErfcxTailIntegral.tail_integral_correction.
+Print Assumptions ErfcxScaledAnalytic.scaled_tail_analytic_correction.
+Print Assumptions ErfcxScaledAnalytic.tail_scaled_fast_analytic_ieee.
+
+Require ErfcxAsymptotic ErfcxCubicAnalytic.
+Print Assumptions ErfcxAsymptotic.moment_series_integral_limit.
+Print Assumptions ErfcxAsymptotic.tail_integrand_signed_remainder.
+Print Assumptions ErfcxAsymptotic.tail_integral_asymptotic.
+Print Assumptions ErfcxCubicAnalytic.tail_cubic_remainder.
+Print Assumptions ErfcxCubicAnalytic.tail_unscaled_fast_analytic_ieee.
+
+Require ErfcxFactorial ErfcxMiddleApprox ErfcxMiddleRemainder ErfcxMiddleAnalytic.
+Print Assumptions ErfcxFactorial.factorial_real_integer.
+Print Assumptions ErfcxMiddleApprox.middle_polynomial_approx.
+Print Assumptions ErfcxMiddleRemainder.middle_asymptotic_remainder.
+Print Assumptions ErfcxMiddleAnalytic.middle_integral_contract.
+Print Assumptions ErfcxMiddleAnalytic.middle_fast_analytic_ieee.
+
+Require ErfcxAccurateReciprocal.
+Print Assumptions ErfcxAccurateReciprocal.binary64_round_large_reciprocal.
+Print Assumptions ErfcxAccurateReciprocal.accurate_reciprocal_seed_ieee.
+
+From Q Require Q256Real.
+Require ErfcxAccurateSeries.
+Print Assumptions Q256Real.new_valid.
+Print Assumptions Q256Real.from_f64_valid.
+Print Assumptions Q256Real.neg_any.
+Print Assumptions Q256Real.add_any.
+Print Assumptions Q256Real.mul_any.
+Print Assumptions Q256Real.mul_relative.
+Print Assumptions ErfcxAccurateSeries.asym_term_step.
+Print Assumptions ErfcxAccurateSeries.accurate_series_remainder.
+Print Assumptions ErfcxAccurateSeries.accurate_series_cap_remainder.
+Print Assumptions ErfcxAccurateSeries.accurate_series_stopped_remainder.
+
+Require ErfcxAccurateTerms.
+Print Assumptions Q256Real.top_small.
+Print Assumptions Q256Real.mul_pow2_any.
+Print Assumptions ErfcxAccurateTerms.q_asym_term_error.
+Print Assumptions ErfcxAccurateTerms.q_asym_stop_remainder.
+
+Require ErfcxAccurateTermBounds ErfcxAccurateSum ErfcxAccurateLoop ErfcxAccurateSquare ErfcxAccurateInputs.
+Print Assumptions ErfcxAccurateTermBounds.asym_terms_bounded.
+Print Assumptions ErfcxAccurateSum.q_asym_sum_error.
+Print Assumptions ErfcxAccurateSum.q_asym_sum_integral.
+Print Assumptions ErfcxAccurateLoop.q_asym_loop_prefix.
+Print Assumptions ErfcxAccurateLoop.q_asym_series_integral.
+Print Assumptions ErfcxAccurateSquare.q_half_square_error.
+Print Assumptions ErfcxAccurateInputs.q_float_ok.
+Print Assumptions ErfcxAccurateInputs.q_to_float_round.
+Print Assumptions ErfcxAccurateInputs.q_float_roundtrip.
+Print Assumptions ErfcxAccurateInputs.q_odd_ok.
+
+
+Require ErfcxAccurateNewton ErfcxAccurateSetup.
+Print Assumptions ErfcxAccurateNewton.q_newton_error.
+Print Assumptions ErfcxAccurateNewton.q_refine3_error.
+Print Assumptions ErfcxAccurateSetup.q_recip_float_error.
+Print Assumptions ErfcxAccurateSetup.q_tail_series_integral.
+
+Require ErfcxAccurateProduct ErfcxAccurateRounded.
+Print Assumptions ErfcxAccurateProduct.q_cs_error.
+Print Assumptions ErfcxAccurateProduct.q_asym_error.
+Print Assumptions ErfcxAccurateRounded.q_asym_rounded.
+
+Require ErfcxAccurateConstants ErfcxAccurateTranscendentals ErfcxAccurateHorner
+  ErfcxAccurateExpSeries ErfcxAccurateReduction ErfcxAccurateIndex ErfcxAccurateExponential.
+Print Assumptions ErfcxAccurateConstants.q_reciprocal_ok.
+Print Assumptions ErfcxAccurateTranscendentals.q_logstep_ok.
+Print Assumptions ErfcxAccurateTranscendentals.q_exp_table_ok.
+Print Assumptions ErfcxAccurateHorner.q_exp_horner_error.
+Print Assumptions ErfcxAccurateExpSeries.exp_horner_truncation.
+Print Assumptions ErfcxAccurateExpSeries.q_exp_horner_exp.
+Print Assumptions ErfcxAccurateReduction.accurate_n_ieee.
+Print Assumptions ErfcxAccurateReduction.accurate_residual_error.
+Print Assumptions ErfcxAccurateIndex.accurate_index_ok.
+Print Assumptions ErfcxAccurateExponential.q_exp_scaled_error.
+Print Assumptions ErfcxAccurateExponential.q_reflection_exponential_error.
+Print Assumptions ErfcxAccurateExponential.q_reflection_big_error.
+
+Require ErfcxGaussianSeries ErfcxGaussianTarget ErfcxGaussianBox ErfcxGaussianRemainder
+  ErfcxAccurateCenters ErfcxAccurateCenterBounds ErfcxTaylorDerivatives
+  ErfcxTaylorLocal ErfcxTaylorBounds ErfcxTaylorRemainder.
+Print Assumptions ErfcxGaussianSeries.gaussian_integral_remainder.
+Print Assumptions ErfcxGaussianTarget.gaussian_approx_error.
+Print Assumptions ErfcxGaussianTarget.gaussian_erfcx_derivative.
+Print Assumptions ErfcxGaussianBox.gaussian_boxes_correct.
+Print Assumptions ErfcxGaussianRemainder.gaussian_approx_uniform.
+Print Assumptions ErfcxAccurateCenters.q_center_ok.
+Print Assumptions ErfcxAccurateCenterBounds.accurate_center_bounds.
+Print Assumptions ErfcxTaylorDerivatives.taylor_derivatives_correct.
+Print Assumptions ErfcxTaylorDerivatives.taylor_derivative_n.
+Print Assumptions ErfcxTaylorLocal.gaussian_local_variation.
+Print Assumptions ErfcxTaylorLocal.gaussian_local_bound.
+Print Assumptions ErfcxTaylorBounds.taylor_derivative_bound.
+Print Assumptions ErfcxTaylorRemainder.taylor_local_remainder.
+Print Assumptions ErfcxTaylorRemainder.table_taylor_cap_remainder.
+
+Require ErfcxTaylorCoefficients ErfcxTaylorErrorBudget ErfcxTaylorStopped ErfcxAccurateTaylorInitial ErfcxAccurateTaylorStep ErfcxAccurateTaylorCoefficients ErfcxAccurateTaylorPower ErfcxAccurateTaylorTerms ErfcxAccurateTaylorSum ErfcxAccurateTaylorLoop ErfcxAccurateTaylor ErfcxAccurateTaylorReduction ErfcxAccurateTaylorEntry ErfcxAccurateTaylorRounded.
+Print Assumptions ErfcxTaylorCoefficients.taylor_coefficient_step.
+Print Assumptions ErfcxTaylorCoefficients.taylor_coefficient_bound.
+Print Assumptions ErfcxTaylorErrorBudget.taylor_error_budget_range.
+Print Assumptions ErfcxTaylorStopped.taylor_stopped_remainder.
+Print Assumptions ErfcxAccurateTaylorInitial.q_c2_ok.
+Print Assumptions ErfcxAccurateTaylorInitial.q_taylor_first_error.
+Print Assumptions ErfcxAccurateTaylorStep.q_taylor_step_error.
+Print Assumptions ErfcxAccurateTaylorCoefficients.q_taylor_coefficient_errors.
+Print Assumptions ErfcxAccurateTaylorPower.q_taylor_power_error.
+Print Assumptions ErfcxAccurateTaylorTerms.q_taylor_term_error.
+Print Assumptions ErfcxAccurateTaylorSum.q_taylor_prefix_error.
+Print Assumptions ErfcxAccurateTaylorLoop.q_taylor_series_prefix.
+Print Assumptions ErfcxAccurateTaylor.q_taylor_series_error.
+Print Assumptions ErfcxAccurateTaylorReduction.accurate_table_reduce_ieee.
+Print Assumptions ErfcxAccurateTaylorEntry.q_taylor_error.
+Print Assumptions ErfcxAccurateTaylorRounded.q_taylor_rounded.
+
+Require ErfcxGaussianReflection ErfcxGaussianFar ErfcxAccurateReflection ErfcxAccurateReflectionFar ErfcxAccurateReflectionEntry ErfcxAccurateReflectionRange ErfcxAccurateReflectionRounded.
+Print Assumptions ErfcxGaussianReflection.gaussian_erfcx_reflection.
+Print Assumptions ErfcxGaussianReflection.gaussian_negative_lower.
+Print Assumptions ErfcxGaussianFar.gaussian_far_bound.
+Print Assumptions ErfcxAccurateReflection.q_reflection_taylor_error.
+Print Assumptions ErfcxAccurateReflectionFar.q_reflection_asym_error.
+Print Assumptions ErfcxAccurateReflectionEntry.q_negative_error.
+Print Assumptions ErfcxAccurateReflectionRange.accurate_reflection_target_range.
+Print Assumptions ErfcxAccurateReflectionRounded.q_negative_rounded.
+
+(** Complete erfcx dispatch, bounds, special values and positive finite outputs. *)
+Require ErfcxPublicEntry ErfcxPublicPositive.
+Print Assumptions ErfcxPublicEntry.erfcx_public_contract.
+Print Assumptions ErfcxPublicPositive.erfcx_entry_positive.

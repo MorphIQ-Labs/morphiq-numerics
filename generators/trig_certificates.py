@@ -300,14 +300,19 @@ def recip():
     """Q256::recip (section 8): y_0 = RN(1/RN(c)), then three Newton steps
     y <- y + y (1 - c y) under Q256's rounding, each bound from the last."""
     u = Fraction(1, 2**53)
-    first = up((1 + u) / (1 - u) - 1)
+    # RN(c) is finite and normal. Its reciprocal is >= 2^-1024, so
+    # subnormal rounding's absolute half-ulp 2^-1075 is <= 2^-51 relatively.
+    reciprocal_u = Fraction(1, 2**51)
+    first = up((1 + reciprocal_u) / (1 - u) - 1)
     files = {'recip_0.g': f'''# Q256::recip's first guess (docs/sin_cos.md, section 8): y_0 = RN(1/RN(c))
-# for c of a normal binary64's magnitude; c y_0 = (1 + d2)/(1 + d1), with d1, d2
-# the two roundings to nearest. Written by generators/trig_certificates.py.
+# with |c| >= 2^-1022 and RN(c) finite; c y_0 = (1 + d2)/(1 + d1).
+# The reciprocal can be subnormal: its magnitude is >= 2^-1024 and the
+# absolute rounding error <= 2^-1075, hence |d2| <= 2^-51. For a normal
+# reciprocal the tighter 2^-53 also fits. Written by generators/trig_certificates.py.
 
 E = (1 + d2) / (1 + d1) - 1;
 
-{{ {sym('d1', '1b-53')} /\\ {sym('d2', '1b-53')} -> E in [-{first}, {first}] }}
+{{ {sym('d1', '1b-53')} /\\ {sym('d2', '1b-51')} -> E in [-{first}, {first}] }}
 '''}
     prev = first
     for n in range(1, 4):

@@ -1,0 +1,624 @@
+# Scaled complementary error function
+
+`normal::erfcx(x)` evaluates `F(x) = exp(x²) erfc(x)`;
+`normal::erfcx_slice` evaluates the same function on a slice. The latter
+preserves scalar result bits through NEON, SSE2, AVX2+FMA and AVX-512F.
+
+Accepted fast paths are correctly rounded. Accurate fallbacks have proved
+per-domain bounds; no published worst-case result has been established here
+that would justify whole-domain correct rounding. For every finite input
+above the overflow threshold, the public result is finite, strictly positive,
+and has the form
+`F(x)*(1+d)+a` with these bounds:
+
+| Input domain | Bound on `abs(d)` | Bound on `abs(a)` |
+|---|---|---|
+| Negative reflection, above the overflow boundary | `2^-53 + 2^-122` | `2^-1075` |
+| `-1/2 <= x < 16` | `2^-53` | `2^-123 + 2^-1075` |
+| `x >= 16` | `2^-53 + 2^-223` | `2^-1075` |
+
+`ErfcxPublicEntry.erfcx_public_contract` composes the actual scalar dispatch,
+fast acceptance, Q256 fallback, thresholds and special values.
+`ErfcxPublicPositive.erfcx_entry_positive` excludes zero even at the largest
+finite positive input. The proof targets are the finite Gaussian definition
+in the table and negative domains and the normalized defining integral in
+the positive tails, as detailed below.
+
+## Definition and special values
+
+For real x, substituting `t = x + u` in the defining erfc integral gives
+
+```
+F(x) = (2 / sqrt(pi)) integral_0^infinity exp(-u² - 2xu) du.
+F'(x) = 2x F(x) - 2 / sqrt(pi).
+F(-x) = 2 exp(x²) - F(x).
+```
+
+The integral is positive and strictly decreasing. Finite positive inputs
+have positive results, including when the rounded result is subnormal.
+NaNs retain their encodings, `F(+infinity) = +0`, `F(-infinity) = +infinity`,
+and both signed zeros give one.
+
+The boundary encodings used by the implementation are:
+
+| Boundary | Encoding |
+|---|---|
+| Greatest input overflowing to positive infinity | `c03aa0f4d2e063cf` |
+| Least negative input in the interval rounding to one | `bc9c5bf891b4ef69` |
+| Greatest positive input rounding to one | `3c8c5bf891b4ef6b` |
+| Least positive input with a subnormal result | `7fc20dd750429b6e` |
+
+The adjacent finite input above the overflow boundary rounds to
+`1.7976931348622484e308`; it does **not** round to `f64::MAX`.
+The fixture generator checks each boundary and three neighbors on each side
+at 600 and 1000 bits. High-precision dyadics are rounded once, in integer
+arithmetic, on the binary64 grid; converting first to a 53-bit normal number
+would permit double rounding at underflow.
+
+For `x > 0`, substituting `u = 2*x*v` in the defining integral gives
+
+```
+F(x) = (1/(x*sqrt(pi))) J(1/x²),
+J(t) = integral_0^infinity exp(-u) exp(-t*u²/4) du.
+```
+
+`ErfcxTailIntegral.v` constructs `J` as the finite limit of integrals on
+`[0, n]`, proves `0 <= J(t) <= 1` for `t >= 0`, and proves
+`0 <= 1-J(t) <= t/2`. The proof integrates `1-s <= exp(-s) <= 1` using
+`ErfcxMoments.v`, whose exponential moments have exact limits `n!`.
+The encoded `1e270` cutoff exceeds `3*2^895`; consequently the omitted
+correction is at most `2^-1794` throughout the scaled branch.
+`ErfcxScaledAnalytic.tail_scaled_fast_analytic_ieee` therefore proves that
+accepted scaled-tail results round to this integral-defined target without
+an assumed analytic error bound.
+
+`ErfcxAsymptotic.tail_integral_asymptotic` integrates Taylor's signed
+remainder for `exp(-s)` to bound every finite truncation by its first omitted
+term, with the same sign as that term. Its cubic specialization proves
+`0 <= J(t) - (1-t/2+3t²/4-15t³/8) <= (105/16)*t⁴`. For `x >= 512`, this is
+at most `7*2^-72`, discharging the unscaled large-tail composition contract
+in `ErfcxCubicAnalytic.tail_unscaled_fast_analytic_ieee`.
+
+For the middle range, the degree-31 asymptotic polynomial has an integral
+remainder at most `2^-140` on `2^-18 <= t <= 2^-8`.
+`ErfcxMiddleApprox.middle_polynomial_approx` checks the stored correction
+polynomial against that exact polynomial with CoqInterval, bounding their
+absolute difference by `3*2^-76`. The sum fits the arithmetic composition's
+`2^-74` budget. `ErfcxMiddleAnalytic.middle_fast_analytic_ieee` discharges
+that contract and the target range `[0.998, 1]`, proving accepted results
+for `16 <= x <= 512` against the same integral-defined function.
+These accepted-path results do not cover rejected inputs, which use Q256.
+
+## Scalar kernels
+
+* **Table (`-1/2 <= x < 16`).** There are 177 intervals: centers at `k/32`
+  below one, then 32 intervals per binade up to 16. Reduction gives an exact
+  residual `h = x-c`. Degree-nine polynomials have three double-word
+  coefficients followed by seven binary64 coefficients. An 18-bit split of
+  h and truncated 35-bit and 17-bit leading coefficients make the principal
+  products exact without FMA. Compensated additions assemble the result.
+  The table occupies 18,408 bytes.
+* **Middle positive tail (`16 <= x < 512`).** A corrected reciprocal and its
+  double-word square feed `C y (1-t/2+t²P(t))`, where `C = 1/sqrt(pi)`,
+  `y = 1/x`, and `t = y²`. Both words of t enter the t² correction.
+* **Large positive tail (`x >= 512`).** A double-word quotient `C/x` is
+  corrected by `-t/2 + 3t²/4 - 15t³/8`. Above `1e270`, x is scaled by
+  `2^-600` before forming the quotient. The correction's squared reciprocal
+  rounds to zero throughout this scaled domain; computing it is unnecessary.
+* **Negative reflection (`x < -1/2`).** The square is exact as `two_prod(x,x)`.
+  Its low word joins the reduction of the shared 512-entry exponential
+  stage B. The stage's result is normalized before the erfcx rounding test.
+  The reflected positive value is subtracted before exponent scaling. Above
+  exponent 104 that subtraction is omitted, subject to the reflection bound.
+
+The fast-path tests use a relative guard of `2^-66`; rejection evaluates
+Q256. Each fast branch now has a composed rounding theorem at its binary64
+entry. The table and negative branches use the finite Gaussian definition;
+the positive tails use the normalized defining integral. The Q256 branches
+have the final error bounds stated below. The public-entry theorem composes
+these branch theorems with the implemented dispatch and special-value screens.
+
+For a subnormal output, the leading candidate is scaled first. It is then
+mapped back exactly to the unscaled domain, where the binary64 subnormal
+spacing is `2^-474`, since the scale is `2^-600`. The residual plus its guard
+must lie strictly within half that spacing. If the residual points beyond
+the initial candidate's half-gap, its adjacent neighbor is checked first;
+the interval test still decides acceptance. A test on the normal result
+followed by subnormal scaling would be insufficient.
+
+The table fast-path proof `ErfcxTableFast.table_fast_ieee` composes the
+`2^-67` relative arithmetic error against the stored polynomial with a
+`2^-69` relative approximation contract. Their combined error is at most
+`3*2^-68` relative to the target, which fits the existing `2^-66` guard.
+`generators/erfcx/table_certificates.py` checks every replayed Sollya upper
+bound against `2^-69` using exact rational arithmetic. `ErfcxTableAnalyticEntry.table_fast_analytic_ieee` discharges the analytic
+contract against the finite Gaussian definition. The table entry also
+proves normalization and a positive high-word range.
+
+`generators/erfcx_table_analytic.py` builds an exact rational degree-48 ODE
+polynomial at each of the 177 stored centers. Coq checks every initial
+constant, recurrence step and coefficientwise difference against the stored
+fast polynomial. The propagated center/constant error and Taylor remainder
+bound the rational polynomial's absolute error by `2^-84`. CoqInterval
+bounds the difference polynomial by `3*2^-71` times the stored center value
+and bounds the rational polynomial below by 0.9 times that value. These
+bounds imply the required `2^-69` relative approximation error. This proof
+includes both residual signs and every table interval; it does not assume
+that Sollya and Coq use the same analytic target.
+
+## Accurate arithmetic and error units
+
+Q256 evaluation uses the ODE coefficient recurrence at table centers, the
+alternating asymptotic series in the positive tail, and a Q256 exponential
+and reflection for negative inputs. Constants are generated independently
+at 600 and 1000 bits and must agree after rounding to 256 bits.
+
+The stored Taylor centers are independently certified against
+`exp(c²) * (1 - (2/sqrt(pi)) * integral_0^c exp(-u²) du)`.
+`ErfcxGaussianSeries.gaussian_integral_remainder` scales the integral to
+`[0,1]`, integrates its exponential polynomial, and bounds the remainder
+for either sign of c. `ErfcxGaussianBox.gaussian_boxes_correct` proves a
+fixed-point interval replay with outward-rounded integer divisions.
+`generators/erfcx_center_certificates.py` emits the checks for all 177 stored
+Q256 values, using 400–1200 bits and polynomial degrees 100–1100; Coq
+replays every integer step and CoqInterval checks the final transcendental
+expression. The truncation bound is `2^-350`.
+`ErfcxAccurateCenters.q_center_ok` includes both errors and proves
+`|stored_F(c) - F(c)| <= 2^-251` for every center.
+
+`ErfcxTaylorDerivatives.taylor_derivative_n` connects the ODE recurrence to
+all actual derivatives. The local integral identity bounds `|F(c+h)|` by
+512 for `|c| <= 16`, `|h| <= 1/8`, and the certified center range.
+The derivative majorant `512 * 40^n` through order 100 gives a
+`2^-280` absolute truncation bound for the degree-99 Taylor polynomial in
+`ErfcxTaylorRemainder.table_taylor_cap_remainder`. The Q256 composition below includes evaluation and early stopping.
+
+`ErfcxAccurateTaylorCoefficients.q_taylor_coefficient_errors` bounds every
+computed coefficient through degree 99 by `2^-136` absolutely. Its integer
+error majorant includes the stored center and reciprocal errors, and all
+Q256 multiplications and additions. The repeated residual powers and term
+products give term error at most `2^-135`; accumulated prefixes differ from
+their exact polynomials by at most `2^-126`. Two consecutive terms passing
+the implemented top-bit test bound the uncomputed polynomial tail by
+`2^-125`. `ErfcxAccurateTaylorLoop.q_taylor_series_prefix` proves that the
+actual bounded loop returns one of these prefixes, with the two tested
+terms when it exits early.
+
+`ErfcxAccurateTaylorEntry.q_taylor_error` includes binary64 reduction,
+center indexing, exact Q256 conversion and the zero-residual shortcut.
+For every finite `-1/2 <= x < 16`, its Q256 result has absolute error at most
+`2^-124` against the defining Gaussian integral. Final conversion is finite
+and has the form `F(x)*(1+d)+a`, where `|d| <= 2^-53` and
+`|a| <= 2^-123 + 2^-1075`, proved in
+`ErfcxAccurateTaylorRounded.q_taylor_rounded`. This conservative bound does
+not establish correct rounding. Extracted Q256 fields are cross-checked
+against Rust over every table center, interval edges, adjacent values,
+signed zero and tiny residuals. The cross-check entry is test-only and
+changes no release-build arithmetic.
+
+The Q256 reciprocal starts with binary64 division. At the largest inputs,
+that seed is subnormal and its relative rounding error can exceed `2^-53`.
+`ErfcxAccurateReciprocal.accurate_reciprocal_seed_ieee` proves its error is
+at most `2^-51` for every finite input at least 16. The shared Newton
+certificates include this larger seed budget and still bound the third
+iteration by `650*2^-262 < 2^-252`. `ErfcxAccurateNewton.q_refine3_error` separately composes the actual
+Q256 operation sequence, including zero residuals, with a final bound
+of `2^-252`. `ErfcxAccurateSetup.q_recip_float_error` connects it to
+the input conversion and hardware division without a seed-error assumption.
+
+`ErfcxAccurateSeries.v` proves the exact term recurrence
+`a[k+1] = -(t/2)*(2*k+1)*a[k]` and bounds the integral remainder by the
+first omitted term for every truncation index. At the fixed loop limit,
+the remainder after term 399 is at most `2^-319` for `0 <= t <= 2^-8`.
+For an early exit, the remainder is at most `2^-261` if the computed
+omitted term is at most `2^-262` and differs from its exact value by at most
+half that value's magnitude. The term and sum proofs below supply these
+conditions under the stated reciprocal contract.
+`formal/q/Q256Real.v` extends the existing limb-level contracts to include
+zero operands and preserves normalization through construction, conversion,
+negation, addition and multiplication.
+
+`ErfcxAccurateTerms.q_asym_term_error` proves the Q256 term recurrence has
+relative error at most `n*2^-246` through step 400, given a reciprocal-square
+relative error of at most `2^-249` and exact odd integer factors. This
+discharges the early-exit magnitude condition above, with the implemented
+`top() < -262` test, in `q_asym_stop_remainder`.
+`ErfcxAccurateSum.q_asym_sum_error` bounds accumulated term and addition
+error by `n*2^-235` through term 399. The early-exit loop transcription in
+`ErfcxAccurateLoop.q_asym_series_integral` therefore differs from `J(t)` by
+at most `2^-226`, including either termination condition.
+
+`ErfcxAccurateSquare.q_half_square_error` establishes the reciprocal-square
+contract from a reciprocal with relative error at most `2^-252`.
+`ErfcxAccurateInputs.v` proves binary64/Q256 conversion and round-trip
+values, rounding of finite Q256 outputs, and the exact odd integer factors.
+`ErfcxAccurateSetup.q_tail_series_integral` composes these results:
+for every finite binary64 input `x >= 16`, the computed series differs
+from `J(1/x²)` by at most `2^-226`, without assumptions on intermediate
+errors. `ErfcxAccurateProduct.q_asym_error` includes the generated Q256
+`1/sqrt(pi)` constant and both final multiplications, with relative error
+at most `2^-224` against the normalized integral representation.
+`ErfcxAccurateRounded.q_asym_rounded` proves the final binary64 result
+is finite and has the form `erfcx(x)*(1+d)+a`, with
+`|d| <= 2^-53 + 2^-223` and `|a| <= 2^-1075`. This includes gradual
+underflow and is an error bound, not a correct-rounding guarantee.
+The extracted accurate-tail model is compared against the Rust Q256
+fields over inputs covering every positive-tail binade, subnormal
+reciprocal seeds, and the longer loops near 16. `Q256Real.top_small` and
+`mul_pow2_any` prove the integer-exponent
+helpers; their extracted transcriptions are checked against the Rust fields
+and results, including zero, the stopping boundary and large exponents.
+
+The accurate reflected exponential is bounded separately from the final
+subtraction. `ErfcxAccurateConstants.q_reciprocal_ok` checks all 100 stored
+reciprocals with exact integer inequalities. CoqInterval independently
+bounds `ln(2)/128` and all 128 Q256 exponential-table constants in
+`ErfcxAccurateTranscendentals.v`; `generators/erfcx_accurate_data.py`
+transcribes their exact limbs from the generated Rust tables.
+
+`ErfcxAccurateHorner.q_exp_horner_error` bounds the 24-level Q256 Horner
+sequence by `2^-252` absolutely for a residual of magnitude at most `1/256`.
+Its degree-24 truncation error is at most `2^-282` on that interval.
+`ErfcxAccurateReduction.accurate_residual_error` includes the exact square's
+low word and bounds reduction error by `2^-241`. The integer decoder is
+proved to recover the same bounded integer as the shifter result's `i32`
+conversion. `ErfcxAccurateExponential.q_reflection_big_error` composes the
+actual square, reduction, polynomial, table product and scaling, proving
+relative error at most `2^-238` against `2*exp(x²)` on the implemented finite
+negative-reflection domain.
+
+`ErfcxAccurateReflectionEntry.q_negative_error` composes both positive
+correction branches and the actual Q256 subtraction. Its relative error
+against the finite Gaussian definition is at most `2^-123`. The Taylor
+branch uses the reflection identity and its absolute error bound. The
+far-negative branch has the tighter `2^-236` relative bound: an integral
+estimate bounds the finite Gaussian correction relative to `exp(x²)` by
+`2^-350`, while the computed asymptotic correction has magnitude at most
+one. This argument does not assume an unproved identity between finite and
+improper Gaussian integrals.
+
+`ErfcxAccurateReflectionRange.accurate_reflection_target_range` uses the
+binary64 input spacing above the overflow boundary to prove sufficient
+headroom for Q256 error and final rounding. The complete converted result
+is finite and has the form `erfcx(x)*(1+d)+a`, where
+`|d| <= 2^-53 + 2^-122` and `|a| <= 2^-1075`, as established by
+`ErfcxAccurateReflectionRounded.q_negative_rounded`. This is a proved error
+bound, not a whole-domain correct-rounding guarantee.
+
+A relative approximation bound is not an ulp bound. For a positive normal
+value z, `z / ulp(z)` is between `2^52` and `2^53`; therefore relative error
+epsilon corresponds to as much as `2^53 epsilon` ulp before final rounding.
+The final rounding and binade/subnormal boundaries must also be accounted
+for. No accuracy claim in this document is inferred from sampled errors.
+
+## Arithmetic certificates and their hypotheses
+
+The certificates in `formal/erfcx/` establish the following conditional
+statements. Their Coq translations check the algebraic rewriting hints as
+lemmas; an unchecked algebraic identity is not accepted as a proof.
+
+| Component | Certified bound | Assumptions still needed at the entry |
+|---|---|---|
+| `T*.g` | Relative table evaluation error `2^-67` against the polynomial | Arithmetic and analytic hypotheses discharged by `ErfcxTableAnalyticEntry.table_fast_analytic_ieee` |
+| `reciprocal.g` | Relative error `2^-98` for corrected `1/x`, `16 <= x <= 512` | Discharged by `ErfcxReciprocal.reciprocal_ieee` |
+| `middle_square*.g` | Absolute error `2^-102` against `1/x²` | Discharged by `ErfcxSquare.reciprocal_square_ieee` |
+| `middle_polynomial.g`, `middle_mvt.g` | Evaluation error `0x1.5p-68`; sensitivity error `2^-101` | Discharged by `ErfcxMiddlePolynomial.reciprocal_correction_ieee` |
+| `dw_product.g` | Relative multiplication error `2^-77` | Discharged on the stated middle-tail range by `ErfcxProduct.product_ieee`, including gradual underflow |
+| `middle_composition.g` | Relative error `2^-67` | Discharged by `ErfcxMiddleAnalytic.middle_fast_analytic_ieee` |
+| `tail_quotient_*.g` | Relative error `2^-70` against the stored constant divided by x | Discharged on `[2^9, 2^897]` by `ErfcxQuotient.quotient_ieee`; exact scaling by `ErfcxQuotientScale.scaled_quotient_ieee` |
+| `tail_correction.g` | Absolute correction error `2^-69` against the cubic at exact `1/x²` | Discharged by `ErfcxTailCorrection.tail_correction_ieee`, including underflow |
+| `tail_composition.g` | Relative reconstructed tail error `2^-67` | Discharged by `ErfcxCubicAnalytic.tail_unscaled_fast_analytic_ieee` |
+| `tail_scaled.g` | Relative error `2^-68` when omitting the correction above `1e270` | IEEE composition discharged by `ErfcxTailValue.scaled_tail_with_pi_ieee`; omitted-correction bound is discharged on `x > 1e270` by `ErfcxScaledAnalytic.tail_scaled_fast_analytic_ieee` |
+| `reflection_reduction.g` | Absolute reduction error `2^-92` | Integer index, exact differences and shifter, `s < 710`, `abs(se) <= 2^-44` |
+| `../exp/stage_b.g` | Absolute exponential-stage error `0x1.a2p-71` before scaling | Adapted reduction plus the shared polynomial and table hypotheses |
+| `reflection_composition.g` | Relative reflected error `2^-67` | Table/exponential bounds and stated word ranges; IEEE EFT/scaling conditions discharged |
+| `reflection_omitted.g` | Relative error `2^-69` after omitting the positive term | Exponential bound, `0 <= erfcx(-x) <= 1`, exponent greater than 104 |
+
+For the middle tail, the generated polynomial approximates the finite
+asymptotic correction with relative error below `2^-59`. Its magnitude is
+at most `3/4`: the finite alternating series has decreasing terms because
+each successive magnitude ratio is at most `63/512 < 1`. Multiplication by
+`t² <= 2^-16`, together with the first-omitted-term bound `PREM < 2^-125`
+for the correction polynomial, gives absolute error below `2^-74` for
+`1-t/2+t²P(t)`. The generated double-word `1/sqrt(pi)` has relative error
+below `2^-110`. Generator replay checks these three budgets using exact
+decimal rationals. `ErfcxConstants.cs_split_bound` independently verifies
+the stored constant against the real `1/sqrt(pi)` with CoqInterval at
+200-bit working precision, proving relative error at most `2^-110`.
+
+For the large tail, the first omitted term after the cubic is
+`105 t^4 / 16`, bounded by `7 * 2^-72` when `t <= 2^-18`. The direct
+correction certificate combines reciprocal rounding, square rounding and
+cubic evaluation, with absolute error at most `2^-69` against the cubic at
+exact `1/x²`. Its IEEE entry theorem proves all intermediates finite,
+including subnormal and zero products.
+
+The reconstruction theorem uses a Flocq-proved decomposition of rounding
+error into relative error at most `2^-53` and absolute error at most
+`2^-1075`. Dividing the absolute term by a leading quotient at least
+`2^-899` gives a bound below `2^-170`. It proves the final Fast2Sum
+precondition and a `2^-67` relative error against
+`(1/(sqrt(pi)*x))*(1+P(1/x²)+rem)` when `0 <= rem <= 7*2^-72`.
+The constant's error is discharged independently. Identifying that expression
+with erfcx requires the stated asymptotic remainder bound.
+The extracted correction and reconstruction are checked against Rust across
+the exponent range, including adjacent square-underflow boundaries.
+
+The double-word product and both unscaled positive evaluators expose their
+proved normalization and high-word ranges. `ErfcxMiddleFast.v` and
+`ErfcxTailFast.v` compose these facts with the encoded `2^-66` rounding
+guard. An accepted result is the nearest binary64 value of the corresponding
+analytic expression, under its stated approximation or remainder contract.
+`ErfcxSubnormalFast.tail_subnormal_fast_ieee` composes the scaled quotient
+with final-grid rounding for inputs at least `2^1021`, under the explicit
+omitted-correction bound `0 <= correction <= 2^-1794`. The actual subnormal
+branch starts at `X_SUB`, within this domain. `ErfcxSubnormalValue.v` proves
+the high/low word ranges and normalization needed by the test;
+`ErfcxSubnormalCandidate.v` proves the initial scaling and either adjacent
+encoding preserve its candidate bounds. `ErfcxSubnormal.v` accounts for
+rounding in the residual, margin product, and final comparison. Acceptance
+places the exact target strictly within `2^-1075` of the final candidate,
+so ties cannot be accepted incorrectly.
+
+`ErfcxScaledFast.tail_scaled_fast_ieee` combines both scaled-output branches.
+For finite inputs below `X_SUB`, `ErfcxSubnormalBoundary.v` uses the preceding
+binary64 input and a CoqInterval bound on `1/sqrt(pi)` to prove that the
+analytic target remains at least `2^-1022`. `ErfcxScaledWords.v` supplies the
+normalized quotient range; final multiplication by `2^-600` is exact and
+commutes with rounding on this domain. The threshold comparison and both
+final-rounding branches are included in the extracted Rust cross-check.
+
+The direct quotient certificates cover `[2^9, 2^897]` in 28 adjacent
+exponent windows. Every operation uses binary64 rounding, including gradual
+underflow. The quotient entry discharges TwoProd, Sterbenz subtraction,
+finiteness and final Fast2Sum; the scaled entry proves multiplication by
+`2^-600` exact for finite inputs at least `2^896`. Its theorem measures
+error after real scaling against the original input's quotient. The stored
+constant's `2^-110` relative error fits within a combined `2^-69` quotient
+budget, preserving the tail composition's `2^-67` budget and giving
+`2^-68` for the scaled quotient with its omitted asymptotic correction.
+
+The reflection reduction appends `se` after computing the shared stage's
+residual. Its additional rounding changes the certified reduction budget
+from `2^-93` to `2^-92`; the shared evaluation's `0x1.a2p-71` budget still
+holds. `ErfcxReflectionSquare.v` proves the square exact and the low word
+at most `2^-44` throughout the implemented negative branch. The shared
+`stage_of_extended_ok` theorem covers finite arguments below 710 in
+magnitude, with `|ni| <= 524450` and `|k| <= 1025`; the original exp theorem
+retains its smaller bounds. `stage_b_r_model` proves the exact differences
+and shifter facts for indices through 525000. `ErfcxReflectionReduction.v`
+connects those facts to the extra low-word rounding certificate.
+
+The shared stage-B certificate directly accepts reduction error `2^-92`;
+there is no separate copy for erfcx. `ErfcxReflectionExp.v` composes the
+reduction, shared evaluation and exact Fast2Sum normalization, proving
+absolute error at most `209 * 2^-78` before power-of-two scaling against
+`exp(x²) / 2^k`. The normalized high word is the nearest binary64 value to
+the two-word sum, lies in `[0.999, 2.001]`, and its low word is at most
+`2^-52` in magnitude. The dispatch theorem proves `0 <= k <= 1023` on
+the implemented negative branch and `1/2 < -x < 9` when `k <= 104`.
+
+`ErfcxReflectionScale.v` proves the high table word scales exactly.
+For the low word it permits gradual underflow: words at least `2^-746`
+in magnitude scale exactly, and smaller words have absolute scaling error
+at most `2^-800`. The composition certificate includes this error.
+`ErfcxReflectionSubtract.v` proves finite intermediates, exact TwoSum,
+Fast2Sum dominance and normalization, and relative error at most `2^-67`
+against the reflected expression, under the stated table and exponential
+word ranges and approximation bounds. The complete negative kernel is
+transcribed for extraction. `ErfcxReflectionValue.v` composes both branches
+and proves finite, normalized words with exponent in `[1, 1024]` and
+relative error at most `2^-67` against `(2 exp(x²) - G) / 2^m`.
+`ErfcxTableReflectionEntry` discharges the table word ranges and absolute
+error against the finite Gaussian definition. The omitted branch uses
+`ErfcxGaussianForward.gaussian_omitted_relative`: for `8 <= p <= 27`, the
+Gaussian correction has magnitude at most `exp(p²)*2^-80`. The actual
+exponential dispatch proves this input range whenever `k > 104`.
+`ErfcxReflectionAnalytic.reflection_value_analytic_ieee` composes both
+branches against `F(x)/2^m` without an assumed positive-correction contract.
+
+`ErfcxDecision.v` binds the encoded `2^-66` guard to the shared rounding
+test and proves normal scaling in the implementation's operation order,
+including its two multiplies at exponent 1024. `ErfcxReflectionOverflow.v`
+uses CoqInterval at 128-bit precision to bracket the encoded negative
+overflow boundary. The binary64 input grid proves that every input above
+it is at least one input ulp away; its exponential upper bound is below
+`f64::MAX`. At or below the boundary, even subtracting one leaves the
+expression at or above the binary64 overflow midpoint.
+`ErfcxReflectionAnalyticFast.reflection_fast_analytic_ieee` proves that every
+accepted negative fast result is the nearest binary64 value of the finite
+Gaussian definition. `ErfcxGaussianOverflow.gaussian_overflow_magnitude`
+proves the overflowing side of the encoded threshold for that definition,
+using a finite-integral bound and monotonicity. `ErfcxOneThreshold.erfcx_one_round`
+proves rounding to one throughout the implemented asymmetric interval at
+zero, including both signed-zero inputs.
+
+When the positive reflection term is omitted, the
+simple uniform bound on that term relative to the exponential is `2^-105`;
+the former `2^-110` comment was too strong near exponent 105.
+
+The table residual-split theorem covers each of the four encoded shifters.
+For a finite residual `h` with `abs(h) <= 2^(e-6)`, `0 <= e <= 3`, it proves
+that the high word is nearest-even rounding to the `2^(e-23)` grid, the low
+word is exact, and their sum is exactly `h`. The low word has magnitude at
+most `2^(e-24)`. A separate theorem proves the high-word square exact from
+its grid and magnitude. The extracted split and square are checked against
+Rust at positive and negative rounding ties, their neighbours, interval
+endpoints, and subnormal residuals. `ErfcxTableReduction.table_reduce_ieee`
+proves that the actual reduction supplies this residual bound for every
+finite input in `[-1/2,16)`. The uniform branch rounds `32*x` to nearest-even,
+proves that its integer is within the Rust cast's range, and subtracts the
+selected centre exactly, including for subnormal inputs. The binade branch
+proves the exponent and midpoint masks select the stated row and centre;
+its subtraction is exact on the input's grid. Both branches return a valid
+index, a finite centre and residual, and exponent `0 <= e <= 3`. Extracted
+reduction checks include all uniform ties and all binade cell edges and
+centres, their neighbours, and both signed zeros.
+
+The leading-coefficient checker decodes the actual binary64 words and the
+same bit masks used by Rust. Coq evaluates this check for both leading
+coefficients in every table row. Its soundness theorem establishes finite
+operands, the coefficient grids, and exact high-word differences. Combined
+with the residual grid, `ErfcxTableProducts.table_leading_ieee` proves
+`A1*H`, `H*H` and `A2*(H*H)` exact for all 177 rows. The integer check does
+not approximate coefficients or assume a generator's precision claim. The
+leading-value theorem also proves both low-coefficient additions finite and
+identifies their binary64 rounded values.
+
+The same exact decoder checks every coefficient's magnitude and each leading
+product's size relative to the constant term. `ErfcxTableEvaluation` uses
+these bounds to prove finite Horner intermediates and the compensated
+remainder's operation sequence. A generic Gappa certificate supplies the
+three reconstruction sums' magnitude bounds; Coq discharges every
+Fast2Sum precondition, including the final normalization.
+`ErfcxTableEntry.table_eval_ieee` composes the reduction, split, leading
+products, Horner loop and reconstruction for every finite input in
+`[-1/2,16)`. It identifies the returned words' exact sum with the real
+rounding model used by the table certificates. The generated bridge decodes
+and checks every coefficient and masked coefficient against the exact Gappa
+constant. `ErfcxTableBound.table_evaluation_error` selects the certificate
+corresponding to the actual reduction index and proves relative evaluation
+error at most `2^-67` against the stored polynomial for all finite inputs in
+`[-1/2,16)`. The analytic table certificate and final rounding theorem connect this
+evaluation result to the finite Gaussian definition.
+
+The reciprocal and square entry theorems start from a finite binary64
+input in `[16, 512]`. They prove that every intermediate is finite, that
+TwoProd and the Sterbenz subtraction are exact, and that scaling the high
+reciprocal by two is exact. The composed theorem bounds the actual two-word
+square against `1/x²` by `2^-102`, including the low word. Both transcriptions
+are extracted and cross-checked against the Rust operations on exponent
+boundaries, adjacent values and reproducible random inputs.
+
+The correction-polynomial entry proves every Horner operation finite, both
+Fast2Sum calls exact, and high-word halving exact. Low-word halving uses the
+binary64 rounding model, including subnormal results. The multiplication
+entry uses a conservative `2^-77` relative bound on leading words in
+`[2^-10, 2]`; it includes underflow in all low-word operations and proves the
+final Fast2Sum condition. Substituting this bound for both products still
+proves the middle composition's `2^-67` budget. The tighter relative-only
+multiplication model is unnecessary for this region.
+
+The middle-tail value theorem composes these IEEE operations, proving a
+`2^-67` relative error against `S/(sqrt(pi)*x)` when `S` is in `[0.998, 1]`
+and the exact correction polynomial approximates `S` within `2^-74`
+absolute error. The constant is tied to the real `1/sqrt(pi)` by the
+independent interval proof. `ErfcxMiddleAnalytic.middle_fast_analytic_ieee`
+instantiates `S = J(1/x²)` and discharges both analytic hypotheses using the
+signed integral remainder and the stored-polynomial CoqInterval check.
+
+`ErfcxPublicModel.v` transcribes the complete public scalar entry, including
+NaN encoding preservation, infinities, signed zeros, the interval returning
+one, the negative overflow threshold and each fast/fallback selection.
+The extracted accurate fallback is a thunk, matching Rust's lazy rejection
+path rather than evaluating Q256 for accepted inputs. The extracted entry
+is compared bit for bit with Rust on all 2,626 independent
+fixture inputs and 4,096 arbitrary binary64 encodings. Component extraction
+checks additionally cover the internal operations and accurate-path fields.
+`ErfcxPublicEntry.v` proves the per-domain public bounds and special values;
+`ErfcxPublicPositive.v` proves positivity throughout the finite-output domain.
+
+The finite and improper integral representations are stated explicitly in
+the branch theorems. Their classical Gaussian-integral equivalence is not a
+separate theorem in this development; each branch is proved against its
+stated mathematical representation. Source binding identifies the
+implementation analyzed, and extraction checks the executable transcription.
+
+## SIMD operation order
+
+Each region has a lane transcription of its scalar floating-point sequence.
+Homogeneous chunks return directly from their region kernel. Mixed chunks
+mask inactive lanes to benign inputs before table indexing or division;
+regions with one active lane use the scalar function. Two-lane mixed chunks
+use scalar evaluation, avoiding two partially occupied vector evaluations.
+Rejected lanes use Q256. A final partial chunk follows the existing backend
+cascade down to the scalar function.
+
+Only error terms in `two_prod` use hardware FMA. In the table region all
+products follow the scalar multiply/add sequence. In the tail and reflection
+regions, the operands of `two_prod` satisfy the shared exact-product domain;
+scaled reciprocals keep large inputs away from Dekker splitter overflow.
+
+## Reproducible artifacts
+
+* `generators/erfcx/tables.sollya`: Sollya 8.0 `fpminimax` and `supnorm`,
+  400-bit working precision. All coefficients originate here.
+* `generators/erfcx_constants.py`: fast and Q256 table replay.
+* `generators/erfcx_table_data.py`: exact table-word transcription, coefficient
+  range checks and per-row Gappa bindings.
+* `generators/erfcx_reference.py`: independent mpmath witnesses, including
+  binade edges, interval boundaries, thresholds, and both tails.
+* `formal/erfcx/T*.g`: 177 Gappa table-evaluation certificates. They prove
+  relative evaluation error at most `2^-67` against each polynomial, given
+  the stated shifter, exact-product and error-free-addition hypotheses.
+* `formal/erfcx/[a-z]*.g`: 41 arithmetic component certificates for the
+  reciprocal, tail and reflection paths. Thirty are generated by
+  `generators/erfcx/tail_certificates.py` from the current erfcx constants;
+  the others contain exact mathematical
+  constants and stated error budgets.
+* `scripts/check_erfcx_certificates.sh`: Sollya replay and component checks.
+* `bench-erfcx`: scalar throughput, SIMD throughput and scalar dependency
+  latency, 31 alternating rounds, all samples emitted as CSV. No allocation
+  occurs inside an evaluated kernel or timed repetition.
+
+## Local performance evidence
+
+Apple M1 Pro, macOS 27.0.1, Rust 1.97.1, release profile with
+`codegen-units=1`, `simd,std`. Two runs of 31 alternating rounds gave these
+median ranges, in nanoseconds per argument:
+
+| Inputs | Scalar throughput | NEON throughput | Scalar dependency latency |
+|---|---:|---:|---:|
+| Table region | 9.69–9.77 | 5.61–5.62 | 28.42–28.63 |
+| `[0,6)` | 10.96–11.03 | 6.38–6.39 | 30.69–30.77 |
+| `[16,512)` | 15.09–15.57 | 5.67–5.87 | 39.73–40.54 |
+| `[512,4608)` | 8.52–8.65 | 3.57–3.68 | 28.50–29.06 |
+| `[-26.6,-0.5)` | 15.95–16.45 | 14.34–14.69 | 39.78–40.78 |
+| Subnormal outputs | 13.96–14.31 | 5.61–5.81 | 32.49–33.22 |
+| Interleaved regions | 12.42–12.84 | 12.67–13.12 | 34.57–35.16 |
+
+The shared host was not idle: one-minute load averages were 3.83 and 5.13
+at the run boundaries. This task's proof and certificate processes were
+paused during timing; unrelated host activity, frequency and power settings
+were not controlled. These are preliminary same-host observations and
+establish no native x86 performance claim. Mixed-region two-lane dispatch
+adds about 2% here; homogeneous regions benefit from vector evaluation.
+[Raw rounds, process timing and source hashes](../crates/reference/measurements/erfcx-m1pro/)
+retain every sample and the environment record.
+
+With the current guard, separately instrumented uniform samples rejected
+196/1,048,576 table inputs, 199/1,048,576 middle-tail inputs,
+182/1,048,576 large-tail inputs in `[512,4608)`, and 177/1,048,576 negative
+inputs. These rates exclude screened inputs and are workload-specific.
+
+The leading-product helper introduced for extraction preserves the baseline
+AArch64 instruction sequence, including operands, across the optimized
+library. Only a panic source-location record changes in the assembly.
+`crates/reference/measurements/erfcx-m1pro/table-products-codegen.json`
+records the toolchain, command, source revision and assembly hashes for this
+comparison; it is code-generation evidence, not a new timing measurement.
+
+The accurate reflected-exponential helper refactor changed AArch64 register
+allocation and reduced its affected stack frame from 432 to 400 bytes.
+A separate forced-accurate negative-path comparison gave median costs of
+3743.90 ns before and 3747.28 ns after (+0.09%), over 31 alternating process
+pairs. Proof processes were paused; unrelated host activity and power were
+uncontrolled. [Inputs, benchmark, raw rounds and source binding](../crates/reference/measurements/erfcx-m1pro/accurate-exponential-refactor/)
+record this comparison. It is separate from the normal-dispatch throughput
+measurements above.
+
+## Mathematical sources and provenance
+
+[DLMF §7.7](https://dlmf.nist.gov/7.7), particularly equation 7.7.6,
+provides Gaussian integral representations. The integral and ODE above
+follow by substitution and differentiation.
+[DLMF §7.12(i)](https://dlmf.nist.gov/7.12.i) supplies the erfc asymptotic
+series and the first-omitted-term remainder bound for positive real inputs.
+Only mathematical identities are used.
+
+The algorithms and generators originate in this repository's
+`research/erfcx` work at `be3a40d`. Its provenance record identifies the
+MIT-licensed CORE-MATH erfc source consulted for ideas; no implementation or
+coefficients from it were copied. The current adaptation consults that
+research and this repository's kernels, plus the DLMF mathematical pages.
+MPFR is used externally as a test oracle and is not a library dependency.

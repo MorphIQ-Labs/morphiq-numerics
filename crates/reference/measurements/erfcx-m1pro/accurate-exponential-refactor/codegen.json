@@ -1,0 +1,11 @@
+{
+  "baseline": {
+    "assembly_sha256": "024ea0a7359b884e838f406577c8ea6c2956c1f26e43e5b1454ecb559a3b29f1",
+    "instruction_sha256": "9d63aacaa66ab140b5b26769b9e737db88b330267d474a16eceace723fc52454"
+  },
+  "candidate": {
+    "assembly_sha256": "279fcbf64d8aa40ba83fafd8b98c5cc287b233f0e781afc06f206dd75b150635",
+    "instruction_sha256": "68fb16444ab4749a3bf62b57e1a52315ed0676a87bd1bad8f56b4961399ff43e"
+  },
+  "command": "cargo rustc --release --locked -p morphiq-numerics --features simd,std --lib -- --emit=asm"
+}

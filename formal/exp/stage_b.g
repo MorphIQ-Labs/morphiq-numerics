@@ -3,8 +3,8 @@
 # T_j = 2^(j/512).
 #
 # Hypotheses, each from its own certificate or proof:
-#   r_h + r_t = R + dr, |dr| <= 2^-93, |r_h| <= 0.000678, |r_t| <= 2^-40
-#                                           (formal/exp/stage_b_reduction.g)
+#   r_h + r_t = R + dr, |dr| <= 2^-92, |r_h| <= 0.000678, |r_t| <= 2^-40
+#                                           (formal/exp/stage_b_reduction.g, or erfcx’s low-word extension)
 #   q = RN(q_), q - Q(r_hi) = eq, |eq| <= 2^-73, 0 <= q <= 2^-22
 #                                           (formal/exp/stage_b_poly.g)
 #   e^R = 1 + R + Q(r_hi) + m + a,
@@ -44,7 +44,7 @@ T = Th + Tl - Dt;
 Y = y + l;
 Ideal = Tl + Tl * rhi + d * rh + Th * (rt + q);
 
-{ rh in [-0.000678, 0.000678] /\ rt in [-1b-40, 1b-40] /\ dr in [-1b-93, 1b-93]
+{ rh in [-0.000678, 0.000678] /\ rt in [-1b-40, 1b-40] /\ dr in [-1b-92, 1b-92]
   /\ q in [0, 1b-22] /\ eq in [-1b-73, 1b-73]
   /\ a in [-0x1.11efe3daa4fb92df2df8cp-76, 0x1.11efe3daa4fb92df2df8cp-76] /\ m in [-1b-74, 1b-74]
   /\ Th in [1, 2] /\ Tl in [-1b-53, 1b-53] /\ Dt in [-1b-104, 1b-104]

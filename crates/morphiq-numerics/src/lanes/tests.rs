@@ -614,3 +614,9 @@ fn exp2_lanes_return_scalar_bits_on_every_backend() {
 fn expm1_lanes_return_scalar_bits_on_every_backend() {
     check_all::<Expm1>("expm1", &expm1_corpus());
 }
+
+#[test]
+fn erfcx_lanes_all_backends_and_cascades() {
+    let xs = crate::erfcx::tests::corpus();
+    check_cascades::<crate::erfcx::lanes::Erfcx>("erfcx", &xs);
+}

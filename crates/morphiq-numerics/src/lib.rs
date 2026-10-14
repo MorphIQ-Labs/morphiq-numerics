@@ -18,7 +18,9 @@
 //!   and `log_sum_exp_and_normalize`, a pair's log-sum with the pair divided
 //!   by its own sum, sharing one exponential;
 //! - [`normal`]: `log_norm_pdf`, the logarithm of the standard normal
-//!   density, correctly rounded wherever its rounding test decides;
+//!   density, correctly rounded wherever its rounding test decides; and
+//!   `erfcx`, the scaled complementary error function, with `erfcx_slice`
+//!   for scalar-equivalent SIMD evaluation (see its assurance limits);
 //! - [`random`]: seeded SplitMix64 and xoshiro256++ streams, with exact
 //!   unit uniforms and Box–Muller normal pairs;
 //! - [`reduce`]: sums, dot products and sums of squares in a specified order,
@@ -39,6 +41,7 @@ extern crate std;
 pub mod double_word;
 pub mod eft;
 pub mod elementary;
+mod erfcx;
 mod exp;
 mod exp2;
 mod expm1;

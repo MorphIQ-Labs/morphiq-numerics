@@ -64,6 +64,16 @@ let show_opt = function None -> "none" | Some z -> show_bits z
 
 let compute op args =
   match op with
+  | "q256_top" ->
+      let ((n, e, l), _) = value args in
+      string_of_int (int_of_z (x_q256_top n e l))
+  | "q256_mul_pow2" ->
+      let ((n, e, l), rest) = value args in
+      (match rest with
+       | [power] ->
+           let ((n, e), l) = x_q256_mul_pow2 n e l (z_of_int (int_of_string power)) in
+           show (n, e, l)
+       | _ -> failwith "q256_mul_pow2 takes a value and exponent")
   | "q128_mul" | "q128_add" | "q256_mul" | "q256_add" ->
       let ((n1, e1, l1), rest) = value args in
       let ((n2, e2, l2), _) = value rest in
@@ -86,6 +96,102 @@ let compute op args =
        | [hi; lo; eps; k] ->
            show_opt (x_decide_scaled (z_of_u64 (hex hi)) (z_of_u64 (hex lo)) (z_of_u64 (hex eps)) (z_of_int (int_of_string k)))
        | _ -> failwith "decide_scaled takes three words and an exponent")
+  | "erfcx_entry" ->
+      (match args with
+       | [x] -> show_bits (x_erfcx_entry (z_of_u64 (hex x)))
+       | _ -> failwith "erfcx_entry takes a word")
+  | "erfcx_accurate_exp" ->
+      (match args with
+       | [s; se] -> let ((n, e), l) = x_erfcx_accurate_exp (z_of_u64 (hex s)) (z_of_u64 (hex se)) in show (n, e, l)
+       | _ -> failwith "erfcx_accurate_exp takes two words")
+  | "erfcx_accurate_negative" ->
+      (match args with
+       | [x] -> let ((n, e), l) = x_erfcx_accurate_negative (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "erfcx_accurate_negative takes a word")
+  | "erfcx_accurate_taylor" ->
+      (match args with
+       | [x] -> let ((n, e), l) = x_erfcx_accurate_taylor (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "erfcx_accurate_taylor takes a word")
+  | "erfcx_accurate_tail" ->
+      (match args with
+       | [x] -> let ((n, e), l) = x_erfcx_accurate_tail (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "erfcx_accurate_tail takes a word")
+  | "erfcx_table_fast" ->
+      (match args with
+       | [x] -> show_opt (x_erfcx_table_fast (z_of_u64 (hex x)))
+       | _ -> failwith "erfcx_table_fast takes a word")
+  | "erfcx_tail_scaled_fast" ->
+      (match args with
+       | [x] -> show_opt (x_erfcx_tail_scaled_fast (z_of_u64 (hex x)))
+       | _ -> failwith "erfcx_tail_scaled_fast takes a word")
+  | "erfcx_tail_subnormal_fast" ->
+      (match args with
+       | [x] -> show_opt (x_erfcx_tail_subnormal_fast (z_of_u64 (hex x)))
+       | _ -> failwith "erfcx_tail_subnormal_fast takes a word")
+  | "erfcx_middle_fast" | "erfcx_tail_unscaled_fast" ->
+      (match args with
+       | [x] -> show_opt ((if op = "erfcx_middle_fast" then x_erfcx_middle_fast
+                          else x_erfcx_tail_unscaled_fast) (z_of_u64 (hex x)))
+       | _ -> failwith (op ^ " takes a word"))
+  | "erfcx_reflection_fast" ->
+      (match args with
+       | [x] -> show_opt (x_erfcx_reflection_fast (z_of_u64 (hex x)))
+       | _ -> failwith "erfcx_reflection_fast takes a word")
+  | "erfcx_reflection_value" ->
+      (match args with
+       | [x] ->
+           let (k,words) = x_erfcx_reflection_value (z_of_u64 (hex x)) in
+           String.concat " " (string_of_int (int_of_z k) :: List.map show_bits words)
+       | _ -> failwith "erfcx_reflection_value takes a word")
+  | "erfcx_reflection_square" ->
+      (match args with
+       | [x] -> String.concat " " (List.map show_bits (x_erfcx_reflection_square (z_of_u64 (hex x))))
+       | _ -> failwith "erfcx_reflection_square takes a word")
+  | "erfcx_reflection_exp" ->
+      (match args with
+       | [s;se] ->
+           let (k,words) = x_erfcx_reflection_exp (z_of_u64 (hex s)) (z_of_u64 (hex se)) in
+           String.concat " " (string_of_int (int_of_z k) :: List.map show_bits words)
+       | _ -> failwith "erfcx_reflection_exp takes two words")
+  | "erfcx_table_value" ->
+      (match args with
+       | [x] -> String.concat " " (List.map show_bits (x_erfcx_table_value (z_of_u64 (hex x))))
+       | _ -> failwith "erfcx_table_value takes a word")
+  | "erfcx_table_reduce" ->
+      (match args with
+       | [x] ->
+           let ((i,e),words) = x_erfcx_table_reduce (z_of_u64 (hex x)) in
+           String.concat " " (string_of_int (int_of_z i) :: string_of_int (int_of_z e) :: List.map show_bits words)
+       | _ -> failwith "erfcx_table_reduce takes a word")
+  | "erfcx_table_leading" ->
+      (match args with
+       | [i; x] -> String.concat " " (List.map show_bits
+           (x_erfcx_table_leading (z_of_int (int_of_string i)) (z_of_u64 (hex x))))
+       | _ -> failwith "erfcx_table_leading takes an index and a word")
+  | "erfcx_table_split" ->
+      (match args with
+       | [x; e] -> String.concat " " (List.map show_bits
+           (x_erfcx_table_split (z_of_u64 (hex x)) (z_of_int (int_of_string e))))
+       | _ -> failwith "erfcx_table_split takes a word and an exponent")
+  | "erfcx_product" ->
+      (match args with
+       | [ah; al; bh; bl] -> String.concat " " (List.map show_bits
+           (x_erfcx_product (z_of_u64 (hex ah)) (z_of_u64 (hex al)) (z_of_u64 (hex bh)) (z_of_u64 (hex bl))))
+       | _ -> failwith "erfcx_product takes four words")
+  | "erfcx_reciprocal" | "erfcx_reciprocal_square" | "erfcx_reciprocal_correction" | "erfcx_middle" | "erfcx_quotient" | "erfcx_scaled_quotient" | "erfcx_tail_correction" | "erfcx_tail" ->
+      (match args with
+       | [x] ->
+           let f = match op with
+             | "erfcx_reciprocal" -> x_erfcx_reciprocal
+             | "erfcx_reciprocal_square" -> x_erfcx_reciprocal_square
+             | "erfcx_reciprocal_correction" -> x_erfcx_reciprocal_correction
+             | "erfcx_middle" -> x_erfcx_middle
+             | "erfcx_tail_correction" -> x_erfcx_tail_correction
+             | "erfcx_tail" -> x_erfcx_tail
+             | "erfcx_quotient" -> x_erfcx_quotient
+             | _ -> x_erfcx_scaled_quotient in
+           String.concat " " (List.map show_bits (f (z_of_u64 (hex x))))
+       | _ -> failwith "erfcx reciprocal operations take one word")
   | "reduce" ->
       (match args with
        | [x] -> String.concat " " (List.map show_bits (x_reduce (z_of_u64 (hex x))))

@@ -244,6 +244,400 @@ fn internal_crosscheck_corpus() {
     let path = std::env::var("MORPHIQ_INTERNAL_CORPUS").expect("MORPHIQ_INTERNAL_CORPUS");
     let mut rng = SplitMix64::new(0x7163_726f_7373_0001);
     let mut out = String::new();
+    q256_exponent_corpus(&mut out);
+    erfcx_accurate_tail_corpus(&mut out);
+    erfcx_accurate_exponential_corpus(&mut out);
+    erfcx_accurate_taylor_corpus(&mut out);
+    erfcx_accurate_negative_corpus(&mut out);
+    erfcx_public_entry_corpus(&mut out);
+    // Cover the corrected reciprocal's full exponent range, including each
+    // power-of-two boundary and its adjacent binary64 values.
+    let mut erfcx_rng = SplitMix64::new(0x6572_6663_785f_0001);
+    // The exact square and normalized exponential used by negative reflection.
+    // Include the overflow-adjacent input, the -1/2 boundary, and direct
+    // reductions beyond exp's usual 704 screen through the 710 proof limit.
+    for i in 0..24_000 {
+        let low = 0xbfe0_0000_0000_0001_u64;
+        let high = crate::erfcx::X_OVF.to_bits() - 1;
+        let bits = match i % 8 {
+            0 => low + (i / 8) % 32,
+            1 => high - (i / 8) % 32,
+            _ => low + erfcx_rng.next_u64() % (high - low + 1),
+        };
+        let x = f64::from_bits(bits);
+        let (square, error) = crate::eft::two_prod(x, x);
+        writeln!(
+            out,
+            "erfcx_reflection_square {bits:016x} : {:016x} {:016x}",
+            square.to_bits(),
+            error.to_bits()
+        )
+        .unwrap();
+        let (nh, nl, nk) = crate::erfcx::n_eval(x);
+        writeln!(
+            out,
+            "erfcx_reflection_value {bits:016x} : {nk} {:016x} {:016x}",
+            nh.to_bits(),
+            nl.to_bits()
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "erfcx_reflection_fast {bits:016x} : {}",
+            opt(crate::erfcx::fast_n(x))
+        )
+        .unwrap();
+        let (s, se) = if i % 2 == 0 {
+            (square, error)
+        } else {
+            let lower = 704.0_f64.to_bits();
+            let upper = 710.0_f64.to_bits() - 1;
+            let sb = match i % 6 {
+                1 => lower + (i / 6) % 32,
+                3 => upper - (i / 6) % 32,
+                _ => lower + erfcx_rng.next_u64() % (upper - lower + 1),
+            };
+            let eb = match (i / 2) % 6 {
+                0 => 0,
+                1 => 1,
+                2 => (1023 - 44) << 52,
+                _ => erfcx_rng.next_u64() % (((1023 - 44) << 52) + 1),
+            } | ((erfcx_rng.next_u64() & 1) << 63);
+            (f64::from_bits(sb), f64::from_bits(eb))
+        };
+        let (h, l, k) = crate::erfcx::exp_dw(s, se);
+        writeln!(
+            out,
+            "erfcx_reflection_exp {:016x} {:016x} : {k} {:016x} {:016x}",
+            s.to_bits(),
+            se.to_bits(),
+            h.to_bits(),
+            l.to_bits()
+        )
+        .unwrap();
+    }
+    for i in 0..24_000 {
+        let middle = i % 2 == 0;
+        let (low, high) = if middle {
+            (16.0_f64.to_bits(), 512.0_f64.to_bits() - 1)
+        } else {
+            (512.0_f64.to_bits(), 1e270_f64.to_bits())
+        };
+        let bits = match (i / 2) % 4 {
+            0 => low + (i / 8) % 32,
+            1 => high - (i / 8) % 32,
+            _ => low + erfcx_rng.next_u64() % (high - low + 1),
+        };
+        let x = f64::from_bits(bits);
+        let (name, result) = if middle {
+            ("erfcx_middle_fast", crate::erfcx::fast_ya(x))
+        } else {
+            ("erfcx_tail_unscaled_fast", crate::erfcx::fast_yb(x))
+        };
+        writeln!(out, "{name} {bits:016x} : {}", opt(result)).unwrap();
+    }
+    for i in 0..24_000_u64 {
+        let low = crate::erfcx::X_SUB.to_bits();
+        let high = f64::MAX.to_bits();
+        let bits = match i % 4 {
+            0 => low + (i / 4) % 64,
+            1 => high - (i / 4) % 64,
+            _ => low + erfcx_rng.next_u64() % (high - low + 1),
+        };
+        writeln!(
+            out,
+            "erfcx_tail_subnormal_fast {bits:016x} : {}",
+            opt(crate::erfcx::fast_yb(f64::from_bits(bits)))
+        )
+        .unwrap();
+    }
+    for i in 0..24_000_u64 {
+        let low = 1e270_f64.to_bits() + 1;
+        let boundary = crate::erfcx::X_SUB.to_bits();
+        let high = f64::MAX.to_bits();
+        let bits = match i % 6 {
+            0 => low + (i / 6) % 64,
+            1 => boundary - 1 - (i / 6) % 64,
+            2 => boundary + (i / 6) % 64,
+            3 => high - (i / 6) % 64,
+            _ => low + erfcx_rng.next_u64() % (high - low + 1),
+        };
+        writeln!(
+            out,
+            "erfcx_tail_scaled_fast {bits:016x} : {}",
+            opt(crate::erfcx::fast_yb(f64::from_bits(bits)))
+        )
+        .unwrap();
+    }
+    for bits in (4_u64..=9)
+        .flat_map(|e| {
+            let b = (1023 + e) << 52;
+            [b - 1, b, b + 1]
+        })
+        .chain((0..4000).map(|_| {
+            let e = 1027 + erfcx_rng.next_u64() % 5;
+            (e << 52) | (erfcx_rng.next_u64() & ((1_u64 << 52) - 1))
+        }))
+    {
+        let x = f64::from_bits(bits);
+        if (16.0..=512.0).contains(&x) {
+            let (_, _, th, tl) = crate::erfcx::reciprocal_square(x);
+            writeln!(
+                out,
+                "erfcx_reciprocal_square {bits:016x} : {:016x} {:016x}",
+                th.to_bits(),
+                tl.to_bits()
+            )
+            .unwrap();
+            let (w, wl) = crate::erfcx::middle_correction(th, tl);
+            writeln!(
+                out,
+                "erfcx_reciprocal_correction {bits:016x} : {:016x} {:016x}",
+                w.to_bits(),
+                wl.to_bits()
+            )
+            .unwrap();
+            let (zh, zl) = crate::erfcx::ya_eval(x);
+            writeln!(
+                out,
+                "erfcx_middle {bits:016x} : {:016x} {:016x}",
+                zh.to_bits(),
+                zl.to_bits()
+            )
+            .unwrap();
+            let (h, l) = crate::erfcx::reciprocal(x);
+            writeln!(
+                out,
+                "erfcx_reciprocal {bits:016x} : {:016x} {:016x}",
+                h.to_bits(),
+                l.to_bits()
+            )
+            .unwrap();
+        }
+    }
+    for i in 0..8000 {
+        let mut operand = |salt: u64| {
+            let e = 1013 + erfcx_rng.next_u64() % 11;
+            let h = f64::from_bits((e << 52) | (erfcx_rng.next_u64() & ((1_u64 << 52) - 1)));
+            let l = match (i + salt) % 8 {
+                0 => 0.0,
+                1 => f64::from_bits(1),
+                2 => f64::from_bits((1_u64 << 52) - 1),
+                3 => f64::from_bits(1_u64 << 52),
+                4 => f64::from_bits(23_u64 << 52),
+                5 => f64::from_bits(523_u64 << 52),
+                _ => h * f64::from_bits(969_u64 << 52) * unit(&mut erfcx_rng),
+            };
+            (h, if erfcx_rng.next_u64() & 1 == 0 { l } else { -l })
+        };
+        let (ah, al) = operand(0);
+        let (bh, bl) = operand(3);
+        let (h, l) = crate::erfcx::dw_mul(ah, al, bh, bl);
+        writeln!(
+            out,
+            "erfcx_product {:016x} {:016x} {:016x} {:016x} : {:016x} {:016x}",
+            ah.to_bits(),
+            al.to_bits(),
+            bh.to_bits(),
+            bl.to_bits(),
+            h.to_bits(),
+            l.to_bits()
+        )
+        .unwrap();
+    }
+    for i in 0..12000 {
+        let e = 1032 + erfcx_rng.next_u64() % 888;
+        let bits = (e << 52) | (erfcx_rng.next_u64() & ((1_u64 << 52) - 1));
+        let bits = match i {
+            0 => 1032_u64 << 52,
+            1 => 1920_u64 << 52,
+            _ => bits,
+        };
+        let (h, l) = crate::erfcx::quotient(f64::from_bits(bits));
+        writeln!(
+            out,
+            "erfcx_quotient {bits:016x} : {:016x} {:016x}",
+            h.to_bits(),
+            l.to_bits()
+        )
+        .unwrap();
+        let low = 1e270_f64.to_bits() + 1;
+        let high = f64::MAX.to_bits();
+        let bits = match i {
+            0 => low,
+            1 => high,
+            _ => low + erfcx_rng.next_u64() % (high - low + 1),
+        };
+        let (h, l, _) = crate::erfcx::yb_eval(f64::from_bits(bits));
+        writeln!(
+            out,
+            "erfcx_scaled_quotient {bits:016x} : {:016x} {:016x}",
+            h.to_bits(),
+            l.to_bits()
+        )
+        .unwrap();
+    }
+    for i in 0_usize..12000 {
+        let e = (i % 4) as i32;
+        let hm = f64::from_bits(((1017 + e) as u64) << 52);
+        let grid = f64::from_bits(((1000 + e) as u64) << 52);
+        let k = erfcx_rng.next_u64() % 131072;
+        let midpoint = (k as f64 + 0.5) * grid;
+        let h = match i / 4 {
+            0 => 0.0,
+            1 => -0.0,
+            2 => f64::from_bits(1),
+            3 => -f64::from_bits(1),
+            4 => hm,
+            5 => -hm,
+            _ => {
+                let bits = match i % 5 {
+                    0 => midpoint.to_bits() - 1,
+                    1 => midpoint.to_bits(),
+                    2 => midpoint.to_bits() + 1,
+                    _ => erfcx_rng.next_u64() % (hm.to_bits() + 1),
+                };
+                f64::from_bits(bits | ((erfcx_rng.next_u64() & 1) << 63))
+            }
+        };
+        let (hi, lo) = crate::erfcx::table_split(h, e);
+        writeln!(
+            out,
+            "erfcx_table_split {:016x} {e} : {:016x} {:016x} {:016x}",
+            h.to_bits(),
+            hi.to_bits(),
+            lo.to_bits(),
+            (hi * hi).to_bits()
+        )
+        .unwrap();
+    }
+    // Actual table reduction: all uniform ties and binade boundaries,
+    // adjacent encodings, signed zero and both signs of subnormal input.
+    for sample in 0_u64..24000 {
+        let x = if sample < 12000 {
+            match sample {
+                0 => -0.5,
+                1 => f64::from_bits(1.0_f64.to_bits() - 1),
+                2 => 0.0,
+                3 => -0.0,
+                4 => f64::from_bits(1),
+                5 => -f64::from_bits(1),
+                6..=149 => {
+                    let k = ((sample - 6) / 3) as i32 - 16;
+                    let tie = (k as f64 + 0.5) / 32.0;
+                    let bits = match (sample - 6) % 3 {
+                        0 => tie.to_bits() - 1,
+                        1 => tie.to_bits(),
+                        _ => tie.to_bits() + 1,
+                    };
+                    f64::from_bits(bits)
+                }
+                _ => {
+                    let negative = erfcx_rng.next_u64() & 1 != 0;
+                    let limit = if negative {
+                        0.5_f64.to_bits() + 1
+                    } else {
+                        1.0_f64.to_bits()
+                    };
+                    let bits = erfcx_rng.next_u64() % limit;
+                    f64::from_bits(bits | if negative { 1_u64 << 63 } else { 0 })
+                }
+            }
+        } else {
+            let j = sample - 12000;
+            let low = 1.0_f64.to_bits();
+            let high = 16.0_f64.to_bits() - 1;
+            let bits = match j {
+                0..=767 => {
+                    let boundary = low + ((j / 3) << 46);
+                    match j % 3 {
+                        0 => boundary.saturating_sub(1).max(low),
+                        1 => boundary,
+                        _ => boundary + 1,
+                    }
+                }
+                768 => high,
+                _ => low + erfcx_rng.next_u64() % (high - low + 1),
+            };
+            f64::from_bits(bits)
+        };
+        let (idx, c, h, e) = crate::erfcx::t_reduce(x);
+        writeln!(
+            out,
+            "erfcx_table_reduce {:016x} : {idx} {e} {:016x} {:016x}",
+            x.to_bits(),
+            c.to_bits(),
+            h.to_bits()
+        )
+        .unwrap();
+        let (yh, yl) = crate::erfcx::t_eval(x);
+        writeln!(
+            out,
+            "erfcx_table_value {:016x} : {:016x} {:016x}",
+            x.to_bits(),
+            yh.to_bits(),
+            yl.to_bits()
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "erfcx_table_fast {:016x} : {}",
+            x.to_bits(),
+            opt(crate::erfcx::fast_t(x))
+        )
+        .unwrap();
+    }
+    for idx in 0_usize..177 {
+        let e = if idx < 49 {
+            0
+        } else {
+            ((idx - 49) / 32) as i32
+        };
+        let hm = f64::from_bits(((1017 + e) as u64) << 52);
+        for sample in 0..32 {
+            let h = match sample {
+                0 => 0.0,
+                1 => hm,
+                2 => -hm,
+                _ => hm * (2.0 * unit(&mut erfcx_rng) - 1.0),
+            };
+            let (h, _) = crate::erfcx::table_split(h, e);
+            let (a1, b1, a2h, b2, p1, sq, p2) = crate::erfcx::table_leading(idx, h);
+            writeln!(out, "erfcx_table_leading {idx} {:016x} : {:016x} {:016x} {:016x} {:016x} {:016x} {:016x} {:016x}",
+                h.to_bits(), a1.to_bits(), b1.to_bits(), a2h.to_bits(), b2.to_bits(), p1.to_bits(), sq.to_bits(), p2.to_bits()).unwrap();
+        }
+    }
+    // Tail correction and reconstruction through square/product underflow.
+    // Include both neighbours of exponent boundaries and the dispatch endpoint.
+    for i in 0..12000 {
+        let low = 512_f64.to_bits();
+        let high = 1e270_f64.to_bits();
+        let bits = match i {
+            0 => low,
+            1 => high,
+            2..=13 => {
+                let exponent = [511_u64, 512, 537, 538][(i - 2) / 3];
+                ((1023 + exponent) << 52) - 1 + ((i - 2) % 3) as u64
+            }
+            _ => low + erfcx_rng.next_u64() % (high - low + 1),
+        };
+        let x = f64::from_bits(bits);
+        let u = crate::erfcx::tail_correction(x);
+        writeln!(
+            out,
+            "erfcx_tail_correction {bits:016x} : {:016x}",
+            u.to_bits()
+        )
+        .unwrap();
+        let (h, l, _) = crate::erfcx::yb_eval(x);
+        writeln!(
+            out,
+            "erfcx_tail {bits:016x} : {:016x} {:016x}",
+            h.to_bits(),
+            l.to_bits()
+        )
+        .unwrap();
+    }
     for i in 0..4000 {
         // decide_with: leading words across the proved range, both signs.
         let eps = f64::from_bits(EPS[usize::try_from(rng.next_u64() % 4).unwrap()]);
@@ -766,6 +1160,226 @@ fn internal_crosscheck_corpus() {
     assert_eq!((least_k, greatest_k), (-54, 1024), "expm1 scaling extremes");
     logarithm_fallback_corpus(&mut out);
     std::fs::write(path, out).unwrap();
+}
+
+/// Public dispatch: independent witness inputs and arbitrary binary64 encodings.
+fn erfcx_public_entry_corpus(out: &mut String) {
+    let mut write = |x: f64| {
+        writeln!(
+            out,
+            "erfcx_entry {:016x} : {:016x}",
+            x.to_bits(),
+            crate::normal::erfcx(x).to_bits()
+        )
+        .unwrap();
+    };
+    for case in crate::test_exact::entries(
+        include_str!("../../reference/fixtures/erfcx.json"),
+        &["cases"],
+    ) {
+        write(crate::test_exact::word(case, "x"));
+    }
+    let mut rng = SplitMix64::new(0x6572_6663_7870_7562);
+    for _ in 0..4096 {
+        write(f64::from_bits(rng.next_u64()));
+    }
+}
+
+/// The complete negative fallback, including both correction branches.
+fn erfcx_accurate_negative_corpus(out: &mut String) {
+    let mut rng = SplitMix64::new(0x6572_6663_786e_6567);
+    let lower = crate::erfcx::X_OVF.next_up();
+    let upper = (-0.5_f64).next_down();
+    let mut branches = [0; 2];
+    for sample in 0..2048 {
+        let x = if sample < 128 {
+            f64::from_bits(lower.to_bits() - sample)
+        } else if sample < 256 {
+            -f64::from_bits(16.0_f64.to_bits() - 64 + sample - 128)
+        } else if sample < 384 {
+            f64::from_bits(upper.to_bits() + sample - 256)
+        } else if sample % 2 == 0 {
+            lower + (upper - lower) * unit(&mut rng)
+        } else {
+            -f64::from_bits(
+                0.5_f64.to_bits() + 1 + rng.next_u64() % ((-lower).to_bits() - 0.5_f64.to_bits()),
+            )
+        }
+        .clamp(lower, upper);
+        branches[usize::from(-x >= 16.0)] += 1;
+        writeln!(
+            out,
+            "erfcx_accurate_negative {:016x} : {}",
+            x.to_bits(),
+            q256(crate::erfcx::accurate_negative(x))
+        )
+        .unwrap();
+    }
+    assert!(
+        branches.into_iter().all(|count| count >= 256),
+        "both accurate erfcx reflection corrections"
+    );
+}
+
+/// Accurate Taylor fields: every center, interval boundaries, tiny residuals.
+fn erfcx_accurate_taylor_corpus(out: &mut String) {
+    let mut rng = SplitMix64::new(0x6572_6663_7874_6179);
+    let mut seen = [false; 177];
+    for sample in 0..4096 {
+        let x = if sample < 177 * 9 {
+            let i = u32::try_from(sample / 9).unwrap();
+            let (center, radius) = if i < 49 {
+                ((f64::from(i) - 16.0) / 32.0, 1.0 / 64.0)
+            } else {
+                let scale = f64::from(1_u32 << ((i - 49) / 32));
+                (
+                    scale * (1.0 + f64::from(2 * ((i - 49) % 32) + 1) / 64.0),
+                    scale / 64.0,
+                )
+            };
+            match sample % 9 {
+                0 => center,
+                1 => center.next_down(),
+                2 => center.next_up(),
+                3 => center - radius,
+                4 => center + radius,
+                5 => (center - radius).next_down(),
+                6 => (center - radius).next_up(),
+                7 => (center + radius).next_down(),
+                _ => (center + radius).next_up(),
+            }
+        } else {
+            match sample - 177 * 9 {
+                0 => 0.0,
+                1 => -0.0,
+                2 => f64::from_bits(1),
+                3 => -f64::from_bits(1),
+                4 => f64::MIN_POSITIVE,
+                5 => -f64::MIN_POSITIVE,
+                6 => f64::from_bits(f64::MIN_POSITIVE.to_bits() - 1),
+                7 => -f64::from_bits(f64::MIN_POSITIVE.to_bits() - 1),
+                _ if sample % 2 == 0 => -0.5 + 16.5 * unit(&mut rng),
+                _ => {
+                    let negative = rng.next_u64() & 1 != 0;
+                    let upper = if negative {
+                        0.5_f64.to_bits()
+                    } else {
+                        16.0_f64.to_bits()
+                    };
+                    let bits = rng.next_u64() % upper;
+                    f64::from_bits(bits | if negative { 1_u64 << 63 } else { 0 })
+                }
+            }
+        }
+        .clamp(-0.5, 16.0_f64.next_down());
+        seen[crate::erfcx::t_reduce(x).0] = true;
+        writeln!(
+            out,
+            "erfcx_accurate_taylor {:016x} : {}",
+            x.to_bits(),
+            q256(crate::erfcx::accurate_taylor(x))
+        )
+        .unwrap();
+    }
+    assert!(
+        seen.into_iter().all(core::convert::identity),
+        "every accurate erfcx Taylor center"
+    );
+}
+
+/// Every accurate exponential table index, exact squares, and reduction edges.
+fn erfcx_accurate_exponential_corpus(out: &mut String) {
+    let mut rng = SplitMix64::new(0x6572_6663_7865_7870);
+    let mut seen = [false; 128];
+    for i in 0..2048 {
+        let (s, se) = if i < 384 {
+            let k = [1, 512, 1023][i / 128];
+            let n = f64::from(u32::try_from(k * 128 + i % 128).unwrap());
+            (n / crate::exp::tables::INV_L, 0.0)
+        } else {
+            let bits = match i {
+                384 => 0.5_f64.to_bits(),
+                385 => (-crate::erfcx::X_OVF).to_bits() - 1,
+                386 => 16.0_f64.to_bits(),
+                _ => {
+                    0.5_f64.to_bits()
+                        + rng.next_u64() % ((-crate::erfcx::X_OVF).to_bits() - 0.5_f64.to_bits())
+                }
+            };
+            let x = f64::from_bits(bits);
+            crate::eft::two_prod(x, x)
+        };
+        let n = (s * crate::exp::tables::INV_L + crate::exp::tables::SHIFTER)
+            - crate::exp::tables::SHIFTER;
+        #[allow(clippy::cast_possible_truncation)] // integer shifter result, 46..=131071
+        let index = (n as i32).rem_euclid(128);
+        seen[usize::try_from(index).unwrap()] = true;
+        let value = crate::erfcx::accurate_reflected_exp(s, se);
+        writeln!(
+            out,
+            "erfcx_accurate_exp {:016x} {:016x} : {}",
+            s.to_bits(),
+            se.to_bits(),
+            q256(value)
+        )
+        .unwrap();
+    }
+    assert!(
+        seen.into_iter().all(core::convert::identity),
+        "every accurate erfcx exponential table index"
+    );
+}
+
+/// Accurate erfcx tails: loop-heavy inputs, every input binade, and subnormal seeds.
+fn erfcx_accurate_tail_corpus(out: &mut String) {
+    let mut rng = SplitMix64::new(0x6572_6663_7851_3235);
+    for i in 0_u64..4096 {
+        let bits = match i {
+            0 => 16.0_f64.to_bits(),
+            1 => 16.0_f64.to_bits() + 1,
+            2 => f64::MAX.to_bits(),
+            3 => f64::MAX.to_bits() - 1,
+            4 => 2045_u64 << 52,
+            5 => (2045_u64 << 52) + 1,
+            6 => (2045_u64 << 52) - 1,
+            7..=1023 => 16.0_f64.to_bits() + rng.next_u64() % (2_u64 << 52),
+            _ => ((1027 + (i - 1024) % 1020) << 52) | (rng.next_u64() >> 12),
+        };
+        let value = crate::erfcx::accurate_asym(f64::from_bits(bits));
+        writeln!(out, "erfcx_accurate_tail {bits:016x} : {}", q256(value)).unwrap();
+    }
+}
+
+fn q256_exponent_corpus(out: &mut String) {
+    let mut rng = SplitMix64::new(0x7132_3536_6578_7001);
+    for i in 0..12_000 {
+        let exponent = match i {
+            0..=4 => [-518, -517, -516, -1277, 768][i],
+            _ => i32::try_from(rng.next_u64() % 1_638_401).unwrap() - 819_200,
+        };
+        let (_, significand, _) = r256(&mut rng).parts();
+        let q = if i.is_multiple_of(17) {
+            Q256::ZERO
+        } else {
+            Q256::new(rng.next_u64() & 1 != 0, significand, exponent)
+        };
+        let power = match i % 7 {
+            0 => 0,
+            1 => -600,
+            2 => 600,
+            3 => -1024,
+            4 => 1024,
+            _ => i32::try_from(rng.next_u64() % 4097).unwrap() - 2048,
+        };
+        writeln!(out, "q256_top {} : {}", q256(q), q.top()).unwrap();
+        writeln!(
+            out,
+            "q256_mul_pow2 {} {power} : {}",
+            q256(q),
+            q256(q.mul_pow2(power))
+        )
+        .unwrap();
+    }
 }
 
 /// An argument of `ln_1p`'s stages: small of either sign, near −1, below and
