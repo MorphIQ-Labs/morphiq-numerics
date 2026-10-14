@@ -117,7 +117,7 @@ let compute op args =
        | _ -> failwith "normal_gaussian takes a word")
   | "normal_density_fast" | "normal_center_small" | "normal_center_fast"
   | "normal_center_central" | "normal_cdf_central" | "normal_log_central" | "normal_tail_fast"
-  | "normal_outer_cdf" | "normal_outer_center_positive" | "normal_outer_center_negative" | "normal_log_negative" ->
+  | "normal_outer_cdf" | "normal_outer_center_positive" | "normal_outer_center_negative" | "normal_log_negative" | "normal_log_positive" ->
       (match args with
        | [x] -> let f = match op with
              | "normal_density_fast" -> x_normal_density_fast
@@ -130,7 +130,8 @@ let compute op args =
              | "normal_outer_cdf" -> x_normal_outer_cdf
              | "normal_outer_center_positive" -> x_normal_outer_center_positive
              | "normal_outer_center_negative" -> x_normal_outer_center_negative
-             | _ -> x_normal_log_negative in
+             | "normal_log_negative" -> x_normal_log_negative
+             | _ -> x_normal_log_positive in
            let (words, decision) = f (z_of_u64 (hex x)) in
            String.concat " " (List.map show_bits words @ [show_opt decision])
        | _ -> failwith (op ^ " takes a word"))
