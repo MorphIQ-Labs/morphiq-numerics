@@ -519,10 +519,27 @@ checks additionally cover the internal operations and accurate-path fields.
 `ErfcxPublicPositive.v` proves positivity throughout the finite-output domain.
 
 The finite and improper integral representations are stated explicitly in
-the branch theorems. Their classical Gaussian-integral equivalence is not a
-separate theorem in this development; each branch is proved against its
-stated mathematical representation. Source binding identifies the
-implementation analyzed, and extraction checks the executable transcription.
+the branch theorems. `formal/normal/NormalErfcxIdentity.v` proves their
+identity for every positive real argument. It substitutes `u = 2*x*(v-x)`
+in the finite tail integral, then passes to the limit using the Gaussian
+normalization proved in `NormalGaussianIntegral.v`. The proof introduces no
+Gaussian-integral assumption.
+
+For that normalization, let `I(x)` be the integral of `exp(-u²)` from zero
+to x, and let `J(x)` be the integral of `exp(-x²*(1+t²))/(1+t²)` from zero
+to one. Differentiation under the integral proves
+`I(x)² + J(x) = pi/4`. Since `0 <= J(x) <= exp(-x²)`, the proof obtains
+`I(x) -> sqrt(pi)/2`, with a quantitative remainder bound valid along every
+positive unbounded argument sequence. The representation identity therefore
+connects the existing positive-tail theorems to the finite Gaussian target.
+It does not strengthen the published accurate-path rounding bounds.
+
+The same directory's `NormalCentered.v` proves the integrated degree-12
+Gaussian series remainder for `|x| <= 1/2`; this is an analytic lemma, not an
+IEEE arithmetic or public normal-CDF correctness theorem. All these results
+participate in the formal source binding and axiom audit. Source binding
+identifies the implementation analyzed, and extraction checks the executable
+transcription.
 
 ## SIMD operation order
 
