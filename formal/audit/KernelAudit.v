@@ -400,3 +400,14 @@ Print Assumptions ErfcxAccurateReflectionRounded.q_negative_rounded.
 Require ErfcxPublicEntry ErfcxPublicPositive.
 Print Assumptions ErfcxPublicEntry.erfcx_public_contract.
 Print Assumptions ErfcxPublicPositive.erfcx_entry_positive.
+
+(** Shared analytic foundations for the standard normal compositions. *)
+Require NormalCentered NormalGaussianIntegral NormalErfcxIdentity.
+Print Assumptions NormalCentered.normal_shape_range.
+Print Assumptions NormalCentered.normal_center_polynomial_error.
+Print Assumptions NormalCentered.normal_center_degree12_error.
+Print Assumptions NormalGaussianIntegral.gaussian_square_identity.
+Print Assumptions NormalGaussianIntegral.gaussian_integral_remainder_bound.
+Print Assumptions NormalGaussianIntegral.gaussian_integral_limit.
+Print Assumptions NormalErfcxIdentity.normalized_tail_gaussian_identity.
+Print Assumptions NormalErfcxIdentity.positive_erfcx_gaussian.
