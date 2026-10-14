@@ -669,3 +669,10 @@ Print Assumptions NormalCenterCentral.normal_center_central_ieee.
 Print Assumptions NormalCenterCentral.normal_center_central_decided.
 Print Assumptions NormalCdfCentralFast.normal_cdf_central_fast_ieee.
 Print Assumptions NormalCdfCentralFast.normal_cdf_central_decided.
+
+Require Import NormalLogDw NormalLogCentralFast NormalLogDecision.
+Print Assumptions NormalLogDw.normal_log_dw_ieee.
+Print Assumptions NormalLogCentralFast.normal_log_absolute_perturbation.
+Print Assumptions NormalLogCentralFast.normal_log_central_fast_ieee.
+Print Assumptions NormalLogDecision.normal_log_decide_ok.
+Print Assumptions NormalLogDecision.normal_log_central_decided.

@@ -323,6 +323,7 @@ fn write_central_value(out: &mut String, x: f64) {
     for (name, op) in [
         ("normal_center_central", Operation::Centered),
         ("normal_cdf_central", Operation::Cdf),
+        ("normal_log_central", Operation::LogCdf),
     ] {
         let (value, eps) = normal_distribution::fast(op, x).unwrap();
         writeln!(
