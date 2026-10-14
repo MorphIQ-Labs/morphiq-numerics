@@ -180,11 +180,13 @@ echo "$toolchain" > "$build/.toolchain"
 touch "$build/.built"
 
 # The pinned OCaml Flambda compiler recursively walks the extracted module's
-# top-level expressions. The combined kernels exceed its default 8 MiB stack
-# on Linux; reserve 32 MiB for compilation. This applies to both extractions
+# top-level expressions. The complete erfcx entry exceeds even 32 MiB on
+# Linux; reserve 60 MiB, verified with the pinned compiler and below macOS's
+# 64 MiB hard limit. This applies to both extractions
 # and is scoped to the compiler, not the proof auditors or corpus executables.
 compile_extraction() (
-  ulimit -s 32768 || exit 1
+  echo "extraction: compiling $*"
+  ulimit -s 61440 || exit 1
   exec ocamlfind ocamlopt "$@"
 )
 
@@ -202,11 +204,13 @@ kernel_audit=$!
 (cd "$build/extraction" \
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
   && compile_extraction -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
+  && echo "extraction: running crosscheck" \
   && ./crosscheck "$corpus") > "$work/crosscheck.log" 2> "$work/crosscheck.err" &
 crosscheck=$!
 (cd "$build/extraction" \
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R ../gappa "" InternalCrosscheck.v \
   && compile_extraction -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
+  && echo "extraction: running internalcrosscheck" \
   && ./internalcrosscheck "$icorpus") > "$work/internal_crosscheck.log" 2> "$work/internal_crosscheck.err" &
 internal_crosscheck=$!
 # finish NAME PID: waits for the step, shows its errors, and fails if it did.
