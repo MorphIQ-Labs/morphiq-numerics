@@ -70,7 +70,7 @@ pub(crate) fn logarithm(x: Q256) -> Q256 {
 }
 
 /// ln(1-x) for 0 < x <= 1/2, without first rounding 1-x.
-fn log_complement(x: Q256) -> Q256 {
+pub(crate) fn log_complement(x: Q256) -> Q256 {
     let mut power = x;
     let mut sum = x;
     for n in 2..300 {

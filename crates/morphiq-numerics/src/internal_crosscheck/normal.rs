@@ -258,4 +258,25 @@ pub(super) fn write(out: &mut String) {
             }
         }
     }
+    let mut complements = Vec::new();
+    for exponent in [
+        -2, -3, -10, -53, -255, -500, -1022, -1074, -1075, -1100, -2048,
+    ] {
+        for mantissa in [1.0, 1.375, 2.0_f64.next_down()] {
+            let high = Q256::from_f64(mantissa).mul_pow2(exponent);
+            let low = high.mul_pow2(-100);
+            complements.extend([high.add(low.neg()), high, high.add(low)]);
+        }
+    }
+    let half = Q256::from_f64(0.5);
+    complements.extend([half, half.add(Q256::ONE.mul_pow2(-100).neg())]);
+    for x in complements {
+        writeln!(
+            out,
+            "normal_log_complement {} : {}",
+            q256(x),
+            q256(accurate::log_complement(x))
+        )
+        .unwrap();
+    }
 }
