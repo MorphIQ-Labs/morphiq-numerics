@@ -51,7 +51,7 @@ pub(crate) fn tail(x: f64) -> Q256 {
 }
 
 /// ln(x) from a normalized atanh series; x stays in extended precision.
-fn logarithm(x: Q256) -> Q256 {
+pub(crate) fn logarithm(x: Q256) -> Q256 {
     let e = x.top();
     let y = x.mul_pow2(-e);
     let t = y.add(Q256::ONE.neg()).mul(y.add(Q256::ONE).recip());

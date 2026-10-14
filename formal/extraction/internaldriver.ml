@@ -127,6 +127,9 @@ let compute op args =
   | "normal_erfcx_positive" ->
       let ((n, e, l), _) = value args in
       let ((n, e), l) = x_normal_erfcx_positive n e l in show (n, e, l)
+  | "normal_logarithm" ->
+      let ((n, e, l), _) = value args in
+      let ((n, e), l) = x_normal_logarithm n e l in show (n, e, l)
   | "normal_accurate_tail" ->
       (match args with
        | [x] -> let ((n, e), l) = x_normal_accurate_tail (z_of_u64 (hex x)) in show (n, e, l)

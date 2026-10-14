@@ -500,3 +500,20 @@ Require NormalLogReciprocal.
 Print Assumptions NormalLogReciprocal.normal_small_reciprocal_seed.
 Print Assumptions NormalLogReciprocal.normal_q_small_reciprocal_error.
 Print Assumptions NormalLogReciprocal.normal_q_log_reciprocal_error.
+Require NormalLogArgument NormalLogSeries NormalLogLoop NormalLogarithm.
+Print Assumptions NormalLogArgument.normal_q_same_grid_difference.
+Print Assumptions NormalLogArgument.normal_q_log_numerator_exact.
+Print Assumptions NormalLogArgument.normal_q_log_denominator_error.
+Print Assumptions NormalLogArgument.normal_q_log_argument_error.
+Print Assumptions NormalLogArgument.normal_q_log_argument_range.
+Print Assumptions NormalLogSeries.normal_q_log_odd_reciprocal.
+Print Assumptions NormalLogSeries.normal_q_log_square_error.
+Print Assumptions NormalLogSeries.normal_q_log_power_step.
+Print Assumptions NormalLogSeries.normal_q_log_term_error.
+Print Assumptions NormalLogSeries.normal_q_log_series_step.
+Print Assumptions NormalLogLoop.normal_q_log_early_term.
+Print Assumptions NormalLogLoop.normal_log_stopped_remainder.
+Print Assumptions NormalLogLoop.normal_q_log_loop_error.
+Print Assumptions NormalLogLoop.normal_q_log_series_error.
+Print Assumptions NormalLogarithm.normal_q_log_exponent_error.
+Print Assumptions NormalLogarithm.normal_q_logarithm_error.

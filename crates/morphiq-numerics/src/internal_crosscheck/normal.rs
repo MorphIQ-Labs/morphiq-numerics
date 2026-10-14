@@ -243,4 +243,19 @@ pub(super) fn write(out: &mut String) {
         )
         .unwrap();
     }
+    for exponent in [-2047, -1024, -1, 0, 1, 1024, 2047] {
+        for mantissa in [1.0, 1.0_f64.next_up(), 1.5, 2.0_f64.next_down()] {
+            let high = Q256::from_f64(mantissa).mul_pow2(exponent);
+            let low = high.mul_pow2(-100);
+            for x in [high.add(low.neg()), high, high.add(low)] {
+                writeln!(
+                    out,
+                    "normal_logarithm {} : {}",
+                    q256(x),
+                    q256(accurate::logarithm(x))
+                )
+                .unwrap();
+            }
+        }
+    }
 }
