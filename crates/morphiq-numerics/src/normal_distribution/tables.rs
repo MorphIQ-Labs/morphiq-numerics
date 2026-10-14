@@ -481,3 +481,4 @@ pub(super) const PDF_ZERO: f64 = f64::from_bits(0x40434a429ac2a6bc);
 pub(super) const TAIL_ZERO: f64 = f64::from_bits(0x40433e21dc3f3bd8);
 pub(super) const CDF_ONE: f64 = f64::from_bits(0x402095b059d67c4d);
 pub(super) const CENTERED_HALF: f64 = f64::from_bits(0x4020bfafe7a91e68);
+pub(super) const LOG_OVERFLOW: f64 = f64::from_bits(0x5ff6a09e667f3bcd);

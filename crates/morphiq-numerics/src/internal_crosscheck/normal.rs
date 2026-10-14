@@ -2,7 +2,7 @@
 //! with their extracted Coq transcriptions, before final rounding can hide a
 //! reduction or operation-order discrepancy.
 use super::{SplitMix64, q256};
-use crate::normal_distribution::{self, accurate};
+use crate::normal_distribution::{self, Operation, accurate};
 use crate::q256::Q256;
 use std::fmt::Write as _;
 use std::string::String;
@@ -276,6 +276,76 @@ pub(super) fn write(out: &mut String) {
             "normal_log_complement {} : {}",
             q256(x),
             q256(accurate::log_complement(x))
+        )
+        .unwrap();
+    }
+    write_compositions(out, &mut rng);
+}
+
+fn write_compositions(out: &mut String, rng: &mut SplitMix64) {
+    for i in 0..128 {
+        let x = match i {
+            0 => 0.5_f64.next_up(),
+            1 => 1.0,
+            2 => 8.0,
+            3 => 23.0,
+            4 => 38.6,
+            _ => f64::from_bits(
+                0.5_f64.to_bits() + 1 + rng.next_u64() % (38.6_f64.to_bits() - 0.5_f64.to_bits()),
+            ),
+        };
+        for (name, op) in [
+            ("normal_accurate_outer_cdf", Operation::Cdf),
+            ("normal_accurate_outer_center", Operation::Centered),
+            ("normal_accurate_log_positive", Operation::LogCdf),
+        ] {
+            writeln!(
+                out,
+                "{name} {:016x} : {}",
+                x.to_bits(),
+                q256(accurate::value(op, x))
+            )
+            .unwrap();
+        }
+    }
+    for i in 0..64 {
+        let x = match i {
+            0 => 0.0,
+            1 => f64::from_bits(1),
+            2 => f64::MIN_POSITIVE,
+            3 => 0.25,
+            4 => 0.5,
+            _ => f64::from_bits(rng.next_u64() % (0.5_f64.to_bits() + 1)),
+        };
+        for x in [x, -x] {
+            writeln!(
+                out,
+                "normal_accurate_log_central {:016x} : {}",
+                x.to_bits(),
+                q256(accurate::value(Operation::LogCdf, x))
+            )
+            .unwrap();
+        }
+    }
+    for i in 0..128 {
+        let x = match i {
+            0 => 0.5_f64.next_up(),
+            1 => 8.0,
+            2 => 23.0,
+            3 => 38.6,
+            4 => f64::from_bits(0x5fe0_0000_0000_0000),
+            5 => f64::from_bits(0x5ff0_0000_0000_0000),
+            6 => f64::from_bits(0x6000_0000_0000_0000),
+            7 => f64::MAX,
+            _ => f64::from_bits(
+                0.5_f64.to_bits() + 1 + rng.next_u64() % (f64::MAX.to_bits() - 0.5_f64.to_bits()),
+            ),
+        };
+        writeln!(
+            out,
+            "normal_accurate_log_negative {:016x} : {}",
+            x.to_bits(),
+            q256(accurate::value(Operation::LogCdf, -x))
         )
         .unwrap();
     }

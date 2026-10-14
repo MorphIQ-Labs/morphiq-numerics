@@ -239,6 +239,9 @@ impl<const OP: u8> Kernel for Normal<OP> {
             Operation::LogCdf if k.mask_bits(k.le(k.splat(tables::TAIL_ZERO), xv)) == all => {
                 return k.store(k.splat(-0.0));
             }
+            Operation::LogCdf if k.mask_bits(k.le(xv, k.splat(-tables::LOG_OVERFLOW))) == all => {
+                return k.store(k.splat(f64::NEG_INFINITY));
+            }
             _ => {}
         }
         let mut x = input;

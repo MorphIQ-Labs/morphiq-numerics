@@ -84,6 +84,17 @@ fn normal_lanes_preserve_scalar_intermediates_and_results() {
     }
     for backend in backends() {
         backend.vectorize(Compare(&xs));
+        // Exercise homogeneous saturation as well as the mixed fixture stream,
+        // including both finite neighbors of the log-CDF overflow boundary.
+        for case in entries(
+            include_str!("../../../../reference/fixtures/normal.json"),
+            &["cases"],
+        ) {
+            let x = word(case, "x");
+            if x < -1.0e154 {
+                backend.vectorize(Compare(&[x; 17]));
+            }
+        }
     }
 }
 

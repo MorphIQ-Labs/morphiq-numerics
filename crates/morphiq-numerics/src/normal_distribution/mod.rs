@@ -128,7 +128,7 @@ pub(crate) fn special(op: Operation, x: f64) -> Option<f64> {
         Operation::Cdf if x <= -tables::TAIL_ZERO => Some(0.0),
         Operation::Centered if x.abs() >= tables::CENTERED_HALF => Some(0.5_f64.copysign(x)),
         Operation::LogCdf if x >= tables::TAIL_ZERO => Some(-0.0),
-        Operation::LogCdf if x == f64::NEG_INFINITY => Some(x),
+        Operation::LogCdf if x <= -tables::LOG_OVERFLOW => Some(f64::NEG_INFINITY),
         _ => None,
     }
 }

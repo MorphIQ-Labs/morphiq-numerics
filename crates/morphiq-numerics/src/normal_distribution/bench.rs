@@ -32,6 +32,7 @@ fn workload(name: &str) -> Vec<f64> {
                 "negative_tail" => -8.0 - 28.0 * u,
                 "positive_tail" => 8.0 + 28.0 * u,
                 "underflow" => 37.0 + 2.0 * u,
+                "log_overflow" => -super::tables::LOG_OVERFLOW * (1.0 + u),
                 "mixed" => match i % 5 {
                     0 => u - 0.5,
                     1 => -3.0 * u,
@@ -96,6 +97,7 @@ fn normal_local_performance() {
         "negative_tail",
         "positive_tail",
         "underflow",
+        "log_overflow",
         "mixed",
     ] {
         let xs = workload(kind);

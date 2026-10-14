@@ -115,6 +115,18 @@ let compute op args =
        | [x] -> let (k, words) = x_normal_gaussian (z_of_u64 (hex x)) in
            String.concat " " (string_of_int (int_of_z k) :: List.map show_bits words)
        | _ -> failwith "normal_gaussian takes a word")
+  | "normal_accurate_outer_cdf" | "normal_accurate_outer_center" | "normal_accurate_log_positive"
+  | "normal_accurate_log_central" | "normal_accurate_log_negative" ->
+      (match args with
+       | [x] ->
+           let f = match op with
+             | "normal_accurate_outer_cdf" -> x_normal_accurate_outer_cdf
+             | "normal_accurate_outer_center" -> x_normal_accurate_outer_center
+             | "normal_accurate_log_positive" -> x_normal_accurate_log_positive
+             | "normal_accurate_log_central" -> x_normal_accurate_log_central
+             | _ -> x_normal_accurate_log_negative in
+           let ((n, e), l) = f (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "normal accurate composition takes a word")
   | "normal_erfcx_asym" ->
       let ((n, e, l), _) = value args in
       let ((n, e), l) = x_normal_erfcx_asym n e l in show (n, e, l)

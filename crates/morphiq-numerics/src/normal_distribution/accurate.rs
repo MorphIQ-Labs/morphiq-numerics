@@ -84,9 +84,9 @@ pub(crate) fn log_complement(x: Q256) -> Q256 {
     sum.neg()
 }
 
-pub(super) fn evaluate(op: Operation, x: f64) -> f64 {
+pub(crate) fn value(op: Operation, x: f64) -> Q256 {
     let a = x.abs();
-    let result = match op {
+    match op {
         Operation::Pdf => density(a),
         Operation::Centered if a <= 0.5 => center(x),
         Operation::Centered => {
@@ -108,8 +108,11 @@ pub(super) fn evaluate(op: Operation, x: f64) -> f64 {
             let scaled = crate::erfcx::accurate::positive(scaled_argument(a)).mul_pow2(-1);
             q(a).mul(q(a)).mul_pow2(-1).neg().add(logarithm(scaled))
         }
-    };
-    let y = result.to_f64();
+    }
+}
+
+pub(super) fn evaluate(op: Operation, x: f64) -> f64 {
+    let y = value(op, x).to_f64();
     if matches!(op, Operation::Centered) && y == 0.0 {
         0.0_f64.copysign(x)
     } else if matches!(op, Operation::LogCdf) && y == 0.0 {
