@@ -676,3 +676,11 @@ Print Assumptions NormalLogCentralFast.normal_log_absolute_perturbation.
 Print Assumptions NormalLogCentralFast.normal_log_central_fast_ieee.
 Print Assumptions NormalLogDecision.normal_log_decide_ok.
 Print Assumptions NormalLogDecision.normal_log_central_decided.
+
+(** This end-to-end factor theorem transitively audits the reduction,
+    both erfcx kernels, the derivative arithmetic and the low-word correction. *)
+Require Import NormalErfcxFastScaled.
+Print Assumptions NormalErfcxFastScaled.normal_erfcx_fast_scaled_ieee.
+
+Require Import NormalTailDecision.
+Print Assumptions NormalTailDecision.normal_tail_fast_decided.

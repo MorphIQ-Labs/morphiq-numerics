@@ -84,8 +84,13 @@ pub(crate) fn gaussian(x: f64) -> (Dw, i32) {
     (Dw::sum(yh, yl), k)
 }
 
-fn scaled_erfcx(x: f64) -> Dw {
-    let z = dw(tables::INV_SQRT2).mul_f64(x);
+#[inline]
+pub(crate) fn scaled_argument(x: f64) -> Dw {
+    dw(tables::INV_SQRT2).mul_f64(x)
+}
+
+pub(crate) fn scaled_erfcx(x: f64) -> Dw {
+    let z = scaled_argument(x);
     let (fh, fl) = if z.hi() < 16.0 {
         crate::erfcx::t_eval(z.hi())
     } else {

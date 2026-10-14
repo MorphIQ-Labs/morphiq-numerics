@@ -54,6 +54,9 @@ pub(super) fn write(out: &mut String) {
         &["cases"],
     ) {
         let x = crate::test_exact::word(case, "x").abs();
+        if x > 0.5 && x <= 37.0 {
+            write_tail_fast(out, x);
+        }
         if (f64::from_bits(0x3de0_0000_0000_0000)..=37.0).contains(&x) {
             write_density_fast(out, x);
         }
@@ -299,6 +302,44 @@ pub(super) fn write(out: &mut String) {
         )
         .unwrap();
     }
+    // The fast tail keeps both words of x/sqrt(2), especially at the
+    // erfcx table/middle boundary near x=16*sqrt(2).
+    let mut fast_scale_rng = SplitMix64::new(0x6e6f_726d_7363_616c);
+    let boundary = 0x4036_a09e_667f_3bcd;
+    for i in 0..2048 {
+        let bits = match i {
+            0 => 0.5_f64.to_bits(),
+            1 => 0.5_f64.to_bits() + 1,
+            2 => boundary - 1,
+            3 => boundary,
+            4 => boundary + 1,
+            5 => 37.0_f64.to_bits() - 1,
+            6 => 37.0_f64.to_bits(),
+            _ => {
+                0.5_f64.to_bits()
+                    + fast_scale_rng.next_u64() % (37.0_f64.to_bits() - 0.5_f64.to_bits())
+            }
+        };
+        if bits > 0.5_f64.to_bits() {
+            write_tail_fast(out, f64::from_bits(bits));
+        }
+        let value = normal_distribution::scaled_erfcx(f64::from_bits(bits));
+        writeln!(
+            out,
+            "normal_erfcx_fast_scaled {bits:016x} : {:016x} {:016x}",
+            value.hi().to_bits(),
+            value.lo().to_bits()
+        )
+        .unwrap();
+        let z = normal_distribution::scaled_argument(f64::from_bits(bits));
+        writeln!(
+            out,
+            "normal_fast_scaled_argument {bits:016x} : {:016x} {:016x}",
+            z.hi().to_bits(),
+            z.lo().to_bits()
+        )
+        .unwrap();
+    }
     write_compositions(out, &mut rng);
     write_center_central(out);
     write_center_small(out, &mut rng);
@@ -317,6 +358,20 @@ pub(super) fn write(out: &mut String) {
             write_center_fast(out, x);
         }
     }
+}
+
+fn write_tail_fast(out: &mut String, x: f64) {
+    let (value, eps) = normal_distribution::fast(Operation::Cdf, -x).unwrap();
+    writeln!(
+        out,
+        "normal_tail_fast {:016x} : {:016x} {:016x} {:016x} {}",
+        x.to_bits(),
+        value.hi().to_bits(),
+        value.lo().to_bits(),
+        eps.to_bits(),
+        super::opt(normal_distribution::fast_decide(Operation::Cdf, -x))
+    )
+    .unwrap();
 }
 
 fn write_central_value(out: &mut String, x: f64) {

@@ -116,7 +116,7 @@ let compute op args =
            String.concat " " (string_of_int (int_of_z k) :: List.map show_bits words)
        | _ -> failwith "normal_gaussian takes a word")
   | "normal_density_fast" | "normal_center_small" | "normal_center_fast"
-  | "normal_center_central" | "normal_cdf_central" | "normal_log_central" ->
+  | "normal_center_central" | "normal_cdf_central" | "normal_log_central" | "normal_tail_fast" ->
       (match args with
        | [x] -> let f = match op with
              | "normal_density_fast" -> x_normal_density_fast
@@ -124,7 +124,8 @@ let compute op args =
              | "normal_center_fast" -> x_normal_center_fast
              | "normal_center_central" -> x_normal_center_central
              | "normal_cdf_central" -> x_normal_cdf_central
-             | _ -> x_normal_log_central in
+             | "normal_log_central" -> x_normal_log_central
+             | _ -> x_normal_tail_fast in
            let (words, decision) = f (z_of_u64 (hex x)) in
            String.concat " " (List.map show_bits words @ [show_opt decision])
        | _ -> failwith (op ^ " takes a word"))
@@ -132,6 +133,11 @@ let compute op args =
       (match args with
        | [x] -> String.concat " " (List.map show_bits (x_normal_center_tail (z_of_u64 (hex x))))
        | _ -> failwith "normal_center_tail takes a word")
+  | "normal_fast_scaled_argument" | "normal_erfcx_fast_scaled" ->
+      (match args with
+       | [x] -> let f = if op = "normal_fast_scaled_argument" then x_normal_fast_scaled_argument else x_normal_erfcx_fast_scaled in
+           String.concat " " (List.map show_bits (f (z_of_u64 (hex x))))
+       | _ -> failwith (op ^ " takes a word"))
   | "normal_center_shape" ->
       (match args with
        | [x] -> String.concat " " (List.map show_bits (x_normal_center_shape (z_of_u64 (hex x))))

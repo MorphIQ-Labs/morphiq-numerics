@@ -33,6 +33,8 @@ Require NormalCenterFastPolynomial.
 Require NormalCenterFastValue NormalCenterFastDecision.
 Require NormalCenterCentral NormalCdfCentralFast.
 Require NormalLogDw NormalLogCentralFast NormalLogDecision.
+Require NormalFastScaledArgument NormalErfcxFastScaled.
+Require NormalTailFast NormalTailDecision.
 Import ListNotations.
 
 Definition limbs (k : nat) (x : Z) : list Z := map (fun i => dig x (Z.of_nat i)) (seq 0 k).
@@ -79,6 +81,16 @@ Definition x_normal_log_central x :=
   let '(h,l) := NormalLogCentralFast.normal_log_central_fast64 (b64_of_bits x) in
   let e:=NormalLogDecision.normal_log_guard64 h in
   (map bits_of_b64 [h;l;e],option_map bits_of_b64 (NormalLogDecision.normal_log_central_decide64 (b64_of_bits x))).
+Definition x_normal_fast_scaled_argument x :=
+  let '(h,l) := NormalFastScaledArgument.normal_fast_scaled_argument64 (b64_of_bits x) in
+  map bits_of_b64 [h;l].
+Definition x_normal_erfcx_fast_scaled x :=
+  let '(h,l) := NormalErfcxFastScaled.normal_erfcx_fast_scaled64 (b64_of_bits x) in
+  map bits_of_b64 [h;l].
+Definition x_normal_tail_fast x :=
+  let '(h,l,k) := NormalTailFast.normal_tail_fast64 (b64_of_bits x) in
+  let e:=NormalDensityDecision.normal_density_guard64 (b64_abs h) in
+  (map bits_of_b64 [h;l;e],option_map bits_of_b64 (NormalTailDecision.normal_tail_decide64 (b64_of_bits x))).
 Definition x_normal_erfcx_asym n e l := q256_out (NormalErfcxAsymptotic.normal_q_erfcx_asymptotic (q256_in n e l)).
 Definition x_normal_scaled_argument x := q256_out (NormalScaledArgument.normal_q_scaled_argument (b64_of_bits x)).
 Definition x_normal_accurate_tail_asym x := q256_out (NormalAccurateTail.normal_q_tail_asym (b64_of_bits x)).
@@ -306,5 +318,5 @@ Definition x_erfcx_tail_unscaled_fast x :=
  | Some y => Some (bits_of_b64 y) | None => None
  end.
 
-Extraction "internalcrosscheck.ml" x_normal_log_central x_normal_center_central x_normal_cdf_central x_normal_center_fast x_normal_center_shape x_normal_center_tail x_normal_center_small x_normal_density_fast x_normal_accurate_outer_cdf x_normal_accurate_outer_center x_normal_accurate_log_positive x_normal_accurate_log_central x_normal_accurate_log_negative x_normal_log_complement x_normal_logarithm x_normal_erfcx_positive x_normal_accurate_tail x_normal_erfcx_extended_table x_normal_erfcx_small_table x_normal_scaled_argument x_normal_accurate_tail_asym x_normal_erfcx_asym x_normal_accurate_gaussian x_normal_accurate_density x_normal_accurate_center x_normal_accurate_central_cdf x_normal_gaussian x_erfcx_entry x_erfcx_accurate_negative x_erfcx_accurate_taylor x_erfcx_accurate_exp x_erfcx_accurate_tail x_erfcx_table_fast x_erfcx_tail_scaled_fast x_erfcx_tail_subnormal_fast x_erfcx_middle_fast x_erfcx_tail_unscaled_fast x_erfcx_reflection_fast x_erfcx_reflection_value x_erfcx_reflection_square x_erfcx_reflection_exp x_erfcx_table_value x_erfcx_table_reduce x_erfcx_table_leading x_erfcx_table_split x_erfcx_tail x_erfcx_tail_correction x_erfcx_quotient x_erfcx_scaled_quotient x_erfcx_middle x_erfcx_product x_erfcx_reciprocal_correction x_erfcx_reciprocal_square x_erfcx_reciprocal x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
+Extraction "internalcrosscheck.ml" x_normal_tail_fast x_normal_fast_scaled_argument x_normal_erfcx_fast_scaled x_normal_log_central x_normal_center_central x_normal_cdf_central x_normal_center_fast x_normal_center_shape x_normal_center_tail x_normal_center_small x_normal_density_fast x_normal_accurate_outer_cdf x_normal_accurate_outer_center x_normal_accurate_log_positive x_normal_accurate_log_central x_normal_accurate_log_negative x_normal_log_complement x_normal_logarithm x_normal_erfcx_positive x_normal_accurate_tail x_normal_erfcx_extended_table x_normal_erfcx_small_table x_normal_scaled_argument x_normal_accurate_tail_asym x_normal_erfcx_asym x_normal_accurate_gaussian x_normal_accurate_density x_normal_accurate_center x_normal_accurate_central_cdf x_normal_gaussian x_erfcx_entry x_erfcx_accurate_negative x_erfcx_accurate_taylor x_erfcx_accurate_exp x_erfcx_accurate_tail x_erfcx_table_fast x_erfcx_tail_scaled_fast x_erfcx_tail_subnormal_fast x_erfcx_middle_fast x_erfcx_tail_unscaled_fast x_erfcx_reflection_fast x_erfcx_reflection_value x_erfcx_reflection_square x_erfcx_reflection_exp x_erfcx_table_value x_erfcx_table_reduce x_erfcx_table_leading x_erfcx_table_split x_erfcx_tail x_erfcx_tail_correction x_erfcx_quotient x_erfcx_scaled_quotient x_erfcx_middle x_erfcx_product x_erfcx_reciprocal_correction x_erfcx_reciprocal_square x_erfcx_reciprocal x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
   x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs x_q256_top x_q256_mul_pow2.
