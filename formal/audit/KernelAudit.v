@@ -662,3 +662,10 @@ Print Assumptions NormalRelativeDecision.normal_relative_decide_ok.
 Print Assumptions NormalCenterFastValue.normal_center_regular_ieee.
 Print Assumptions NormalCenterFastDecision.normal_center_regular_range.
 Print Assumptions NormalCenterFastDecision.normal_center_regular_decided.
+
+Require Import NormalCenterCentral NormalCdfCentralFast.
+Print Assumptions NormalCenterCentral.normal_center_small_input_spec.
+Print Assumptions NormalCenterCentral.normal_center_central_ieee.
+Print Assumptions NormalCenterCentral.normal_center_central_decided.
+Print Assumptions NormalCdfCentralFast.normal_cdf_central_fast_ieee.
+Print Assumptions NormalCdfCentralFast.normal_cdf_central_decided.

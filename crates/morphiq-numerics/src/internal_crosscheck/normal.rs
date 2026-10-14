@@ -57,6 +57,10 @@ pub(super) fn write(out: &mut String) {
         if (f64::from_bits(0x3de0_0000_0000_0000)..=37.0).contains(&x) {
             write_density_fast(out, x);
         }
+        if (f64::from_bits(0x23d0_0000_0000_0000)..=0.5).contains(&x) {
+            write_central_value(out, x);
+            write_central_value(out, -x);
+        }
         if (f64::from_bits(0x3de0_0000_0000_0000)..=0.5).contains(&x) {
             write_center_fast(out, x);
             write_center_fast(out, -x);
@@ -296,6 +300,7 @@ pub(super) fn write(out: &mut String) {
         .unwrap();
     }
     write_compositions(out, &mut rng);
+    write_center_central(out);
     write_center_small(out, &mut rng);
     write_center_tail(out, &mut rng);
     for i in 0..4096 {
@@ -310,6 +315,47 @@ pub(super) fn write(out: &mut String) {
         };
         for x in [f64::from_bits(bits), -f64::from_bits(bits)] {
             write_center_fast(out, x);
+        }
+    }
+}
+
+fn write_central_value(out: &mut String, x: f64) {
+    for (name, op) in [
+        ("normal_center_central", Operation::Centered),
+        ("normal_cdf_central", Operation::Cdf),
+    ] {
+        let (value, eps) = normal_distribution::fast(op, x).unwrap();
+        writeln!(
+            out,
+            "{name} {:016x} : {:016x} {:016x} {:016x} {}",
+            x.to_bits(),
+            value.hi().to_bits(),
+            value.lo().to_bits(),
+            eps.to_bits(),
+            super::opt(normal_distribution::fast_decide(op, x))
+        )
+        .unwrap();
+    }
+}
+
+fn write_center_central(out: &mut String) {
+    let mut rng = SplitMix64::new(0x6e6f_726d_6365_6e74);
+    let lower = 0x23d0_0000_0000_0000;
+    let split = 0x3de0_0000_0000_0000;
+    let upper = 0.5_f64.to_bits();
+    for i in 0..4096 {
+        let bits = match i {
+            0 => lower,
+            1 => lower + 1,
+            2 => split - 1,
+            3 => split,
+            4 => split + 1,
+            5 => upper - 1,
+            6 => upper,
+            _ => lower + rng.next_u64() % (upper - lower),
+        };
+        for x in [f64::from_bits(bits), -f64::from_bits(bits)] {
+            write_central_value(out, x);
         }
     }
 }
