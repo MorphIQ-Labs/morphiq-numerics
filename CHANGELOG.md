@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.6](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.5...v0.0.6) - 2026-10-14
+
+### Added
+
+- *(normal)* add erfcx scalar and SIMD kernels ([#145](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/145))
+
 ## [0.0.5](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.4...v0.0.5) - 2026-10-13
 
 ### Performance
