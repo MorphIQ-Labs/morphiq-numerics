@@ -53,7 +53,9 @@ pub(super) fn write(out: &mut String) {
         include_str!("../../../reference/fixtures/normal.json"),
         &["cases"],
     ) {
-        let x = crate::test_exact::word(case, "x").abs();
+        let input = crate::test_exact::word(case, "x");
+        write_public_entries(out, input);
+        let x = input.abs();
         if x > 0.5 && x <= 37.0 {
             write_outer_fast_components(out, x);
         }
@@ -583,4 +585,24 @@ fn write_density_fast(out: &mut String, x: f64) {
         super::opt(normal_distribution::fast_decide(Operation::Pdf, x))
     )
     .unwrap();
+}
+
+fn write_public_entries(out: &mut String, x: f64) {
+    use crate::normal::*;
+    type Function = fn(f64) -> f64;
+    for (name, function) in [
+        ("normal_entry_pdf", norm_pdf as Function),
+        ("normal_entry_cdf", norm_cdf),
+        ("normal_entry_ccdf", norm_ccdf),
+        ("normal_entry_center", norm_cdf_centered),
+        ("normal_entry_log", log_norm_cdf),
+    ] {
+        writeln!(
+            out,
+            "{name} {:016x} : {:016x}",
+            x.to_bits(),
+            function(x).to_bits()
+        )
+        .unwrap();
+    }
 }

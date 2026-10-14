@@ -1,0 +1,37 @@
+{
+  "cpu": "Apple M1 Pro",
+  "os": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: aarch64-apple-darwin\nrelease: 1.97.1\nLLVM version: 22.1.6",
+  "base_revision": "5d892080911f015360cf13422d18d20e1725d557",
+  "source_sha256": {
+    "crates/morphiq-numerics/src/normal_distribution/lanes.rs": "e36ff39bc68b51431bdcf62896f4d37262053ae7ae2c26456ec5db18f3bb37c1",
+    "crates/morphiq-numerics/src/normal_distribution/mod.rs": "ec8d30661b3139dfb630a6eef2269601fb153cb15d863fc79abe1ac4f05588d0",
+    "crates/morphiq-numerics/src/normal_distribution/accurate.rs": "3fa900b678d630ae3b68646e02073637c356767f0fbd6109a0f2ebd88a3cb359",
+    "crates/morphiq-numerics/src/normal_distribution/tests.rs": "ce4b174fd2fe8c6b9c932672edfbc401fab6f09e4dbee8f1a8623f9d4bfbfac5",
+    "crates/morphiq-numerics/src/normal_distribution/tables.rs": "74ad101724a5f67be7bf3ba839db7e42c2e70906d70e1296313941ce8703ac7f",
+    "crates/morphiq-numerics/src/normal_distribution/bench.rs": "21afac85ec743c808a7751a53b627d9b06f17db56f36adf799d02d16d315bd56",
+    "crates/morphiq-numerics/src/normal.rs": "8b6e98d1c93849c237a637fd38a3f44730202626ba863fca44bf433a20f50ffa"
+  },
+  "command": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "morphiq-numerics",
+    "--all-features",
+    "--lib",
+    "normal_local_performance",
+    "--",
+    "--ignored",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "flags": "default release profile; all-features; RUSTFLAGS unset",
+  "backend": "native aarch64 NEON",
+  "conditions": "single benchmark process, no local proof/build workload; ordinary desktop background activity; default OS frequency management; no CPU affinity",
+  "repetitions": 3,
+  "measurement_ms": 150,
+  "allocation": "workload/output vectors allocated before timing; library kernels allocate nothing",
+  "native_x86": "unavailable; tracked by #124; Rosetta/SDE correctness is not performance evidence"
+}

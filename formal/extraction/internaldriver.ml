@@ -100,6 +100,16 @@ let compute op args =
       (match args with
        | [x] -> show_bits (x_erfcx_entry (z_of_u64 (hex x)))
        | _ -> failwith "erfcx_entry takes a word")
+  | "normal_entry_pdf" | "normal_entry_cdf" | "normal_entry_ccdf" | "normal_entry_center" | "normal_entry_log" ->
+      (match args with
+       | [x] -> let f = match op with
+             | "normal_entry_pdf" -> x_normal_entry_pdf
+             | "normal_entry_cdf" -> x_normal_entry_cdf
+             | "normal_entry_ccdf" -> x_normal_entry_ccdf
+             | "normal_entry_center" -> x_normal_entry_center
+             | _ -> x_normal_entry_log in
+           show_bits (f (z_of_u64 (hex x)))
+       | _ -> failwith (op ^ " takes a word"))
   | "normal_accurate_gaussian" | "normal_accurate_density" | "normal_accurate_center" | "normal_accurate_central_cdf" ->
       (match args with
        | [x] ->

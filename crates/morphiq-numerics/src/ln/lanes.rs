@@ -12,7 +12,6 @@ use super::{FRACTION, TWO_54, ln, ln_1p};
 use crate::lanes::{Kernel, decide_relative, lanes_mask, mask_from};
 
 pub(crate) mod fallback;
-#[cfg(test)]
 pub(crate) mod stage_b;
 
 /// `ln` as a lane kernel.

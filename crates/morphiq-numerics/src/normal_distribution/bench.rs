@@ -22,6 +22,24 @@ fn measure(mut run: impl FnMut(), count: usize) -> f64 {
     }
 }
 
+// Serial data dependency through the preceding result. This includes array
+// lookup and index arithmetic; the identity chain reports that overhead.
+fn dependent_measure(xs: &[f64], f: impl Fn(f64) -> f64) -> f64 {
+    let mut index = 0;
+    measure(
+        || {
+            for _ in 0..1024 {
+                let value = f(black_box(xs[index]));
+                let bits = usize::try_from((value.to_bits() >> 32) & 1023).unwrap();
+                index = (index + 1 + bits) % xs.len();
+                black_box(value);
+            }
+            black_box(index);
+        },
+        1024,
+    )
+}
+
 fn workload(name: &str) -> Vec<f64> {
     (0..1024)
         .map(|i| {
@@ -65,6 +83,8 @@ fn bench<G: Kernel>(name: &str, op: Operation, complement: bool, kind: &str, xs:
         },
         xs.len(),
     );
+    let chain = dependent_measure(xs, G::scalar);
+    let overhead = dependent_measure(xs, |x| x);
     let mut fallback = 0;
     for &x in xs {
         let x = if complement { -x } else { x };
@@ -79,7 +99,7 @@ fn bench<G: Kernel>(name: &str, op: Operation, complement: bool, kind: &str, xs:
         }
     }
     std::println!(
-        "{name},{kind},{},{scalar:.3},{batch:.3},{:.3},{fallback}",
+        "{name},{kind},{},{scalar:.3},{batch:.3},{:.3},{fallback},{chain:.3},{overhead:.3}",
         xs.len(),
         scalar / batch
     );
@@ -91,8 +111,14 @@ fn bench<G: Kernel>(name: &str, op: Operation, complement: bool, kind: &str, xs:
 #[ignore = "same-host release-mode measurement; no timing assertions"]
 fn normal_local_performance() {
     use super::lanes::Normal;
-    std::println!("function,workload,count,scalar_ns,batch_ns,speedup,accurate_count");
+    std::println!(
+        "function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns"
+    );
     let selected = std::env::var("MORPHIQ_NORMAL_BENCH_WORKLOAD").ok();
+    let length = std::env::var("MORPHIQ_NORMAL_BENCH_LENGTH")
+        .map(|value| value.parse::<usize>().expect("integer benchmark length"))
+        .unwrap_or(1024);
+    assert!((1..=1024).contains(&length));
     for kind in [
         "tiny",
         "central",
@@ -106,7 +132,10 @@ fn normal_local_performance() {
         if selected.as_deref().is_some_and(|selected| selected != kind) {
             continue;
         }
-        let xs = workload(kind);
+        let full = workload(kind);
+        let xs: Vec<_> = (0..length)
+            .map(|i| full[i * 1023 / length.saturating_sub(1).max(1)])
+            .collect();
         bench::<Normal<0>>("pdf", Operation::Pdf, false, kind, &xs);
         bench::<Normal<1>>("cdf", Operation::Cdf, false, kind, &xs);
         bench::<Normal<2>>("ccdf", Operation::Cdf, true, kind, &xs);

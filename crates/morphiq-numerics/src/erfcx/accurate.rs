@@ -28,7 +28,6 @@ pub(super) fn taylor(x: f64) -> Q256 {
 }
 
 /// Positive erfcx at an extended argument, retaining the input's low bits.
-#[cfg(test)]
 pub(crate) fn positive(x: Q256) -> Q256 {
     if x.cmp_abs(Q256::from_f64(16.0)) != core::cmp::Ordering::Less {
         return asym_value(x);

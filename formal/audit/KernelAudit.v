@@ -693,3 +693,7 @@ Print Assumptions NormalLogNegativeFast.normal_log_negative_decided.
 
 Require Import NormalLogPositiveFast.
 Print Assumptions NormalLogPositiveFast.normal_log_positive_decided.
+
+Require Import NormalPublicEntry.
+Print Assumptions NormalPublicEntry.normal_public_contract.
+Print Assumptions NormalPublicEntry.normal_ccdf_public_contract.

@@ -19,8 +19,8 @@ pub(crate) enum Operation {
     LogCdf,
 }
 
-// A conservative candidate guard. Its complete analytic/IEEE certificate is
-// required before these experimental kernels become public APIs.
+// The complete composition and rounded-endpoint proofs certify these guards.
+// See formal/normal/NormalFastDispatch.v and docs/normal.md.
 const GUARD: f64 = f64::from_bits(0x3bf0_0000_0000_0000); // 2^-64
 // ln's double-word approximation has an absolute, not relative, bound.
 // The central log-CDF can have magnitude below one.

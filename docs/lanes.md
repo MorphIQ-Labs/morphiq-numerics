@@ -12,6 +12,12 @@ Its table, reciprocal and reflection kernels are in `erfcx/lanes.rs`;
 limits. As with the elementary slices, its numerical contract is inherited
 from its scalar function.
 
+The normal-family `norm_pdf_slice`, `norm_cdf_slice`, `norm_ccdf_slice`,
+`norm_cdf_centered_slice` and `log_norm_cdf_slice` also use every backend.
+Their shared compositions, saturation shortcuts and scalar fallback rules
+are described in [normal.md](normal.md). Both intermediate words and final
+results are compared lane by lane with the scalar kernels.
+
 ## 1. Contract
 
 `f_slice(x, out)` sets `out[i]` to `f(x[i])`, bit for bit, for every `i`, on

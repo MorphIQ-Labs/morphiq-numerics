@@ -77,7 +77,7 @@ fn normal_compositions_match_independently_rounded_witnesses() {
         &["cases"],
     ) {
         let x = word(case, "x");
-        let ccdf = evaluate(Operation::Cdf, if x.is_nan() { x } else { -x });
+        let ccdf = crate::normal::norm_ccdf(x);
         assert_eq!(
             ccdf.to_bits(),
             word(case, "ccdf").to_bits(),
@@ -91,7 +91,12 @@ fn normal_compositions_match_independently_rounded_witnesses() {
             (Operation::LogCdf, "log_cdf"),
         ] {
             let expected = word(case, name);
-            let actual = evaluate(op, x);
+            let actual = match op {
+                Operation::Pdf => crate::normal::norm_pdf(x),
+                Operation::Cdf => crate::normal::norm_cdf(x),
+                Operation::Centered => crate::normal::norm_cdf_centered(x),
+                Operation::LogCdf => crate::normal::log_norm_cdf(x),
+            };
             assert_eq!(
                 actual.to_bits(),
                 expected.to_bits(),
@@ -108,5 +113,64 @@ fn normal_compositions_match_independently_rounded_witnesses() {
                 );
             }
         }
+    }
+}
+
+#[test]
+fn public_normal_slices_match_independent_witnesses() {
+    use crate::normal::*;
+    use std::vec::Vec;
+    let cases = entries(
+        include_str!("../../../reference/fixtures/normal.json"),
+        &["cases"],
+    );
+    let inputs: Vec<_> = cases.iter().map(|case| word(case, "x")).collect();
+    type SliceFunction = fn(&[f64], &mut [f64]);
+    for (name, evaluate) in [
+        ("pdf", norm_pdf_slice as SliceFunction),
+        ("cdf", norm_cdf_slice),
+        ("ccdf", norm_ccdf_slice),
+        ("centered", norm_cdf_centered_slice),
+        ("log_cdf", log_norm_cdf_slice),
+    ] {
+        evaluate(&[], &mut []);
+        let mut output = std::vec![0.0; inputs.len()];
+        evaluate(&inputs, &mut output);
+        for (case, actual) in cases.iter().zip(output) {
+            assert_eq!(actual.to_bits(), word(case, name).to_bits(), "{name}");
+        }
+        for size in 1..=17 {
+            let mut input = [0.0; 17];
+            let mut out = [0.0; 17];
+            for (i, x) in input[..size].iter_mut().enumerate() {
+                *x = inputs[i * (inputs.len() - 1) / 16];
+            }
+            evaluate(&input[..size], &mut out[..size]);
+            for (i, &actual) in out[..size].iter().enumerate() {
+                let case = cases[i * (inputs.len() - 1) / 16];
+                assert_eq!(
+                    actual.to_bits(),
+                    word(case, name).to_bits(),
+                    "{name} length={size} input={:016x}",
+                    input[i].to_bits()
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn public_normal_slices_reject_mismatched_lengths() {
+    use crate::normal::*;
+    type SliceFunction = fn(&[f64], &mut [f64]);
+    for evaluate in [
+        norm_pdf_slice as SliceFunction,
+        norm_cdf_slice,
+        norm_ccdf_slice,
+        norm_cdf_centered_slice,
+        log_norm_cdf_slice,
+    ] {
+        assert!(std::panic::catch_unwind(|| evaluate(&[0.0], &mut [])).is_err());
+        assert!(std::panic::catch_unwind(|| evaluate(&[], &mut [0.0])).is_err());
     }
 }

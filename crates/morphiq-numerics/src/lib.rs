@@ -17,7 +17,9 @@
 //!   bits for several pairs at once, in SIMD lanes with the `simd` feature;
 //!   and `log_sum_exp_and_normalize`, a pair's log-sum with the pair divided
 //!   by its own sum, sharing one exponential;
-//! - [`normal`]: `log_norm_pdf`, the logarithm of the standard normal
+//! - [`normal`]: `norm_pdf`, `norm_cdf`, `norm_ccdf`, `norm_cdf_centered` and
+//!   `log_norm_cdf`, with matching SIMD slice functions and proved error bounds;
+//!   `log_norm_pdf`, the logarithm of the standard normal
 //!   density, correctly rounded wherever its rounding test decides; and
 //!   `erfcx`, the scaled complementary error function, with `erfcx_slice`
 //!   for scalar-equivalent SIMD evaluation (see its assurance limits);
@@ -57,7 +59,6 @@ mod log2;
 mod log_norm_pdf;
 pub mod log_space;
 pub mod normal;
-#[cfg(test)]
 mod normal_distribution;
 mod q128;
 mod q256;
