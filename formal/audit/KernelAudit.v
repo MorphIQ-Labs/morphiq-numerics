@@ -453,3 +453,11 @@ Print Assumptions NormalTailAnalytic.normal_tail_range.
 Print Assumptions NormalTailAnalytic.normal_tail_negative_cdf.
 Print Assumptions NormalAccurateTail.normal_q_scaled_erfcx_asym_error.
 Print Assumptions NormalAccurateTail.normal_q_tail_asym_rounded.
+Require NormalErfcxTaylor NormalLogAnalytic.
+Print Assumptions NormalErfcxTaylor.normal_erfcx_positive_lipschitz.
+Print Assumptions NormalErfcxTaylor.normal_q_erfcx_residual_error.
+Print Assumptions NormalErfcxTaylor.normal_q_erfcx_taylor_at_error.
+Print Assumptions NormalLogAnalytic.normal_log_tail_identity.
+Print Assumptions NormalLogAnalytic.normal_atanh_identity.
+Print Assumptions NormalLogAnalytic.normal_atanh_series100_error.
+Print Assumptions NormalLogAnalytic.normal_log_complement_series299_error.
