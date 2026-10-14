@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.7](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.6...v0.0.7) - 2026-10-14
+
+### Added
+
+- *(interval)* add finite outward-rounded arithmetic ([#159](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/159))
+
 ## [0.0.6](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.5...v0.0.6) - 2026-10-14
 
 ### Added
