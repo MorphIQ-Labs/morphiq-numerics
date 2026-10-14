@@ -25,6 +25,8 @@ Proof.
   apply generic_format_bpow;unfold FLT_exp,emin,prec;lia.
 Qed.
 
+
+
 Theorem normal_center_tail_ieee z count : finite z -> Rabs(B z)<=/4 -> (count<=8)%nat ->
   finite(normal_center_tail64 z count) /\
   Rabs(B(normal_center_tail64 z count))<=bpow radix2 (-10) /\
@@ -63,4 +65,27 @@ Proof.
     { apply Rmult_le_compat;[apply Rabs_pos|apply Rabs_pos|exact Z|exact Error]. }
     change(-12-54)%Z with(-66)%Z in ProductError;change(-10-54)%Z with(-64)%Z in SumError.
     bpow_num_all;lra.
+Qed.
+
+Theorem normal_center_tail_positive z : finite z -> Rabs(B z)<=/4 ->
+  bpow radix2 (-15)<=B(normal_center_tail64 z 8)<=bpow radix2 (-10).
+Proof.
+  intros Fz Z;destruct(normal_center_tail_ieee z 7 Fz Z ltac:(lia))as[Fh [H _]].
+  destruct normal_center_4_hi_ok as[Fc C].
+  set(h:=normal_center_tail64 z 7)in *.
+  assert(ProductRange : Rabs(B z*B h)<=bpow radix2 (-12)).
+  { rewrite Rabs_mult;pose proof(Rabs_pos(B z));pose proof(Rabs_pos(B h));bpow_num_all;nra. }
+  destruct(fmul16 z h Fz Fh ltac:(eapply Rle_trans;[exact ProductRange|interval with(i_prec 80)]))as[Fp Product].
+  assert(P : Rabs(B(fmul z h))<=bpow radix2 (-12)).
+  { rewrite Product;apply normal_center_round_bound;[exact ProductRange|lia]. }
+  assert(SumRange : bpow radix2 (-15)<=B normal_center_4_hi+B(fmul z h)<=bpow radix2 (-10)).
+  { apply Rabs_le_inv in P;rewrite C;bpow_num_all;split;interval with(i_prec 160). }
+  assert(Small : Rabs(B normal_center_4_hi+B(fmul z h))<=16).
+  { apply Rabs_le;bpow_num_all;lra. }
+  destruct(fadd16 normal_center_4_hi (fmul z h)Fc Fp Small)as[_ Sum].
+  change(bpow radix2 (-15)<=B(fadd normal_center_4_hi (fmul z h))<=bpow radix2 (-10));rewrite Sum;split.
+  - apply round_ge_generic;[exact _|exact _| |exact(proj1 SumRange)].
+    apply generic_format_bpow;unfold FLT_exp,emin,prec;lia.
+  - apply round_le_generic;[exact _|exact _| |exact(proj2 SumRange)].
+    apply generic_format_bpow;unfold FLT_exp,emin,prec;lia.
 Qed.

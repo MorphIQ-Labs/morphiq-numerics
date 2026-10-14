@@ -617,3 +617,29 @@ Print Assumptions NormalCenterFastAnalytic.normal_center_mixed_polynomial.
 Print Assumptions NormalCenterFastAnalytic.normal_center_mixed_tail_error.
 Print Assumptions NormalCenterFastAnalytic.normal_center_tail_argument_error.
 Print Assumptions NormalCenterFastSquare.normal_center_square_tail_ieee.
+
+From Binary64 Require Import Binary64Grid IEEE64Grid.
+Print Assumptions Binary64Grid.binary_grid_round.
+Print Assumptions Binary64Grid.binary_grid_normal.
+Print Assumptions Binary64Grid.binary_grid_two_prod_domain.
+Print Assumptions Binary64Grid.binary_grid_binary64.
+Print Assumptions Binary64Grid.binary_grid_add_f64.
+Print Assumptions Binary64Grid.binary_grid_add_dw.
+Print Assumptions Binary64Grid.binary_grid_mul_f64.
+Print Assumptions Binary64Grid.binary_grid_mul_dw.
+Print Assumptions IEEE64Grid.add_grid_ieee.
+Print Assumptions IEEE64Grid.mul_f64_grid_ieee.
+Print Assumptions IEEE64Grid.mul_grid_ieee.
+Print Assumptions IEEE64NormalizedMul.mul_normalized_ieee.
+Print Assumptions NormalCenterFastSquare.normal_center_square_grid.
+Require Import NormalCenterFastWords.
+Print Assumptions NormalCenterFastTail.normal_center_tail_positive.
+Print Assumptions NormalCenterFastWords.normal_center_tail_grid.
+Print Assumptions NormalCenterFastWords.normal_center_coefficient_ieee.
+Require Import NormalCenterFastHorner.
+Print Assumptions NormalCenterFastHorner.normal_center_fast_horner_range.
+Print Assumptions NormalCenterFastHorner.normal_center_fast_horner_dominance.
+Print Assumptions NormalCenterFastHorner.normal_center_fast_horner_cancellation.
+Require Import NormalCenterFastState.
+Print Assumptions NormalCenterFastState.normal_center_value_of_error.
+Print Assumptions NormalCenterFastState.normal_center_coefficient_state.

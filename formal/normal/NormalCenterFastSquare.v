@@ -3,7 +3,7 @@
 From Coq Require Import Reals ZArith Lia Lra Psatz.
 From Flocq Require Import Core.
 From Interval Require Import Tactic.
-From Binary64 Require Import Binary64Add Binary64Mul IEEE64 IEEE64Mul IEEE64Eft RoundingConstant.
+From Binary64 Require Import Binary64Add Binary64Mul Binary64Grid IEEE64 IEEE64Mul IEEE64Eft RoundingConstant.
 Require Import StageGappa NormalCenterFastTail NormalCenterFastAnalytic.
 Open Scope R_scope.
 
@@ -47,4 +47,21 @@ Proof.
     (proj2 X)Error)as[Ft Tail].
   repeat split;try tauto.
   rewrite Total;exact High.
+Qed.
+
+Theorem normal_center_square_grid x : finite x ->
+  bpow radix2 (-33)<=Rabs(B x)<=/2 ->
+  let '(h,l,t):=normal_center_square_tail64 x in
+  binary_grid (-118)(B h) /\ binary_grid (-170)(B l).
+Proof.
+  intros F X;pose proof(normal_center_square_tail_ieee x F X)as Square.
+  destruct(normal_center_square_tail64 x)as[[h l]t].
+  destruct Square as[_ [_ [_ [High [_ [Total _]]]]]].
+  assert(Gx : binary_grid (-85)(B x)).
+  { apply(binary_grid_binary64 x (-33));exact(proj1 X). }
+  assert(Gh : binary_grid (-118)(B h)).
+  { apply(binary_grid_binary64 h (-66));rewrite Rabs_pos_eq;[exact(proj1 High)|pose proof(bpow_gt_0 radix2 (-66));lra]. }
+  split;[exact Gh|];replace(B l)with(B x*B x-B h)by lra;apply binary_grid_sub.
+  - exact(binary_grid_mul (-85)(-85)(B x)(B x)Gx Gx).
+  - eapply binary_grid_finer;[|exact Gh];lia.
 Qed.

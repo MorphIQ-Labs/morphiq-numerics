@@ -1,4 +1,4 @@
-(** The DW-times-binary64 result retains the normalization invariant.
+(** Double-word multiplication retains the normalization invariant.
     IEEE64Mul already proves its error bound on these same hypotheses. *)
 From Coq Require Import Reals ZArith Lia Lra.
 From Flocq Require Import Core.
@@ -26,4 +26,23 @@ Proof.
   destruct Correct as[_ [_ Normalized]].
   split;[exact Fh|];split;[exact Fl|].
   rewrite(sum_round _ _ (B_fmt h)(B_fmt l));exact Normalized.
+Qed.
+
+Theorem mul_normalized_ieee xh xl yh yl :
+  finite xh -> finite xl -> B xh=rndF(B xh+B xl) ->
+  finite yh -> finite yl -> B yh=rndF(B yh+B yl) ->
+  Rabs(B xh)<=bpow radix2 508 -> Rabs(B xl)<=bpow radix2 508 ->
+  Rabs(B yh)<=bpow radix2 508 -> Rabs(B yl)<=bpow radix2 508 ->
+  in_two_prod_domain(B xh)(B yh) -> normal_or_zero(B xh*B yl) -> normal_or_zero(B xl*B yh) ->
+  let '(h,l):=mul64 xh xl yh yl in finite h /\ finite l /\ B h=rndF(B h+B l).
+Proof.
+  intros Fxh Fxl X Fyh Fyl Y Xh Xl Yh Yl Domain Cross1 Cross2.
+  assert(Bound : forall a,Rabs(B a)<=bpow radix2 508 -> bnd 1 508 (B a)).
+  { intros a A;unfold bnd;rewrite Rmult_1_l;exact A. }
+  destruct(mul64_ok 508 xh xl yh yl Fxh Fxl Fyh Fyl
+    (Bound _ Xh)(Bound _ Xl)(Bound _ Yh)(Bound _ Yl)ltac:(lia))as[Fh [Fl Value]].
+  pose proof(mul_dw (B xh)(B xl)(B yh)(B yl)(B_fmt xh)(B_fmt xl)X
+    (B_fmt yh)(B_fmt yl)Y Domain Cross1 Cross2)as Normalized.
+  rewrite <-Value in Normalized;destruct(mul64 xh xl yh yl)as[h l];cbn[fst snd]in *.
+  repeat split;assumption.
 Qed.
