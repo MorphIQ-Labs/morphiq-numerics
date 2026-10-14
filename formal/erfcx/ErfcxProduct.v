@@ -1,5 +1,6 @@
-(** Double-word multiplication on erfcx's middle-tail range. The binary64
-    rounding model includes subnormal low-word operations. *)
+(** Shared double-word multiplication for erfcx and normal compositions.
+    The broader factor bounds retain the original erfcx theorem below. The
+    binary64 model includes subnormal low-word operations. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz Classical.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Mul IEEE64Eft.
@@ -11,7 +12,8 @@ Definition product64 ah al bh bl : f64*f64 :=
  let '(p,e) := two_prod64 ah bh in
  fast_two_sum64 p (fadd e (fadd (fmul ah bl) (fmul al bh))).
 
-Lemma product_model a b c d : /1024 <= rn a <= 2 -> /1024 <= rn c <= 2 ->
+Lemma product_bounded_model a b c d : /1024 <= rn a <= 4 -> /1024 <= rn c <= 4 ->
+ rn a*rn c<=4 ->
  - /2^51 <= rn b/rn a <= /2^51 -> - /2^51 <= rn d/rn c <= /2^51 ->
  let ah := rn a in let al := rn b in let bh := rn c in let bl := rn d in
  let p := rn (ah*bh) in let pe := ah*bh-p in
@@ -22,12 +24,13 @@ Lemma product_model a b c d : /1024 <= rn a <= 2 -> /1024 <= rn c <= 2 ->
  /2^21 <= h <= 8 /\ - /2^51 <= l/h <= /2^51 /\
  - /2^27 <= t/p <= /2^27 /\ 999/1000 <= h/(ah*bh) <= 1001/1000.
 Proof.
- intros A C B D. cbv zeta. repeat split;
+ intros A C P B D. assert (Product : 0<=rn a*rn c<=4)by(split;[nra|exact P]).
+ cbv zeta. repeat split;
  erfcx_goal (erfcx_dw_product.l1 a b c d).
 Qed.
 
-Theorem product_normalized_ieee ah al bh bl : finite ah -> finite al -> finite bh -> finite bl ->
- /1024 <= B ah <= 2 -> /1024 <= B bh <= 2 ->
+Theorem product_bounded_ieee ah al bh bl : finite ah -> finite al -> finite bh -> finite bl ->
+ /1024 <= B ah <= 4 -> /1024 <= B bh <= 4 -> B ah*B bh<=4 ->
  - /2^51 <= B al/B ah <= /2^51 -> - /2^51 <= B bl/B bh <= /2^51 ->
  let '(h,l) := product64 ah al bh bl in
  finite h /\ finite l /\
@@ -35,23 +38,24 @@ Theorem product_normalized_ieee ah al bh bl : finite ah -> finite al -> finite b
  /2^21 <= B h <= 8 /\ - /2^51 <= B l/B h <= /2^51 /\
  999/1000 <= B h/(B ah*B bh) <= 1001/1000 /\ B h=rndF(B h+B l).
 Proof.
- intros Fah Fal Fbh Fbl Ah Bh Al Bl.
+ intros Fah Fal Fbh Fbl Ah Bh Product Al Bl.
  assert (Ra : rn (B ah) = B ah) by (apply round_generic; [exact _ | apply B_fmt]).
  assert (Rb : rn (B al) = B al) by (apply round_generic; [exact _ | apply B_fmt]).
  assert (Rc : rn (B bh) = B bh) by (apply round_generic; [exact _ | apply B_fmt]).
  assert (Rd : rn (B bl) = B bl) by (apply round_generic; [exact _ | apply B_fmt]).
- pose proof (product_model (B ah) (B al) (B bh) (B bl)
+ pose proof (product_bounded_model (B ah) (B al) (B bh) (B bl)
   ltac:(rewrite Ra; exact Ah) ltac:(rewrite Rc; exact Bh)
+  ltac:(rewrite Ra,Rc;exact Product)
   ltac:(rewrite Ra,Rb; exact Al) ltac:(rewrite Rc,Rd; exact Bl)) as M.
  cbv zeta in M. rewrite Ra,Rb,Rc,Rd in M.
  destruct M as [Merr [Mh [Ml [Mt Mr]]]].
  assert (Ai : B al = (B al/B ah)*B ah) by (field; lra).
  assert (Bi : B bl = (B bl/B bh)*B bh) by (field; lra).
- assert (LA : -1 <= B al <= 1) by nra.
- assert (LB : -1 <= B bl <= 1) by nra.
- pose proof (two_prod_ieee 1 1 ah bh Fah Fbh
-  ltac:(change (bpow radix2 1) with 2; apply Rabs_le; lra)
-  ltac:(change (bpow radix2 1) with 2; apply Rabs_le; lra)
+ assert (LA : -/2 <= B al <= /2) by nra.
+ assert (LB : -/2 <= B bl <= /2) by nra.
+ pose proof (two_prod_ieee 2 2 ah bh Fah Fbh
+  ltac:(change (bpow radix2 2) with 4; apply Rabs_le; lra)
+  ltac:(change (bpow radix2 2) with 4; apply Rabs_le; lra)
   ltac:(lia) ltac:(lia) ltac:(lia)
   ltac:(right; rewrite Rabs_pos_eq by nra;
         apply Rle_trans with (bpow radix2 (-20));
@@ -104,6 +108,19 @@ Proof.
  rewrite <- El in Merr,Ml.
  assert (Norm : B h=rndF(B h+B l)) by (rewrite Ell; exact Bhh).
  repeat split; tauto.
+Qed.
+
+Theorem product_normalized_ieee ah al bh bl : finite ah -> finite al -> finite bh -> finite bl ->
+ /1024 <= B ah <= 2 -> /1024 <= B bh <= 2 ->
+ - /2^51 <= B al/B ah <= /2^51 -> - /2^51 <= B bl/B bh <= /2^51 ->
+ let '(h,l) := product64 ah al bh bl in
+ finite h /\ finite l /\
+ - /2^77 <= ((B h+B l)-(B ah+B al)*(B bh+B bl))/((B ah+B al)*(B bh+B bl)) <= /2^77 /\
+ /2^21 <= B h <= 8 /\ - /2^51 <= B l/B h <= /2^51 /\
+ 999/1000 <= B h/(B ah*B bh) <= 1001/1000 /\ B h=rndF(B h+B l).
+Proof.
+ intros Fah Fal Fbh Fbl Ah Bh Al Bl.
+ apply product_bounded_ieee;try assumption;lra || nra.
 Qed.
 
 Theorem product_ieee ah al bh bl : finite ah -> finite al -> finite bh -> finite bl ->

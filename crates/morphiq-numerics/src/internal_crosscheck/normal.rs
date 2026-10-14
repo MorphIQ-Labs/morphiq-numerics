@@ -47,6 +47,17 @@ pub(super) fn write(out: &mut String) {
         )
         .unwrap();
     }
+    // Include the oracle fixture inputs as well as the random corpus, so
+    // rounding-sensitive cases exercise rejected interval decisions too.
+    for case in crate::test_exact::entries(
+        include_str!("../../../reference/fixtures/normal.json"),
+        &["cases"],
+    ) {
+        let x = crate::test_exact::word(case, "x").abs();
+        if (f64::from_bits(0x3de0_0000_0000_0000)..=37.0).contains(&x) {
+            write_density_fast(out, x);
+        }
+    }
     let lower = f64::from_bits(0x26f0_0000_0000_0000);
     for i in 0..512 {
         let x = match i {
@@ -93,6 +104,7 @@ pub(super) fn write(out: &mut String) {
             y.lo().to_bits()
         )
         .unwrap();
+        write_density_fast(out, x);
     }
     for i in 0..256 {
         let high = match i {
@@ -349,4 +361,18 @@ fn write_compositions(out: &mut String, rng: &mut SplitMix64) {
         )
         .unwrap();
     }
+}
+
+fn write_density_fast(out: &mut String, x: f64) {
+    let (density, eps) = normal_distribution::fast(Operation::Pdf, x).unwrap();
+    writeln!(
+        out,
+        "normal_density_fast {:016x} : {:016x} {:016x} {:016x} {}",
+        x.to_bits(),
+        density.hi().to_bits(),
+        density.lo().to_bits(),
+        eps.to_bits(),
+        super::opt(normal_distribution::fast_decide(Operation::Pdf, x))
+    )
+    .unwrap();
 }

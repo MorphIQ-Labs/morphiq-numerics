@@ -134,7 +134,7 @@ pub(crate) fn special(op: Operation, x: f64) -> Option<f64> {
 }
 
 /// A candidate value and its absolute guard, before the final rounding test.
-fn fast(op: Operation, x: f64) -> Option<(Dw, f64)> {
+pub(crate) fn fast(op: Operation, x: f64) -> Option<(Dw, f64)> {
     let a = x.abs();
     // The centered product's cross terms must stay within the double-word
     // multiplication proof's normal-or-zero domain, also when it feeds CDF
@@ -177,12 +177,18 @@ pub(crate) fn evaluate(op: Operation, x: f64) -> f64 {
     if let Some(value) = special(op, x) {
         return value;
     }
+    fast_decide(op, x).unwrap_or_else(|| accurate::evaluate(op, x))
+}
+
+/// The actual fast-path decision, also transcribed for the proof cross-check.
+#[inline]
+pub(crate) fn fast_decide(op: Operation, x: f64) -> Option<f64> {
     if let Some((y, eps)) = fast(op, x) {
         let low = y.hi() + (y.lo() - eps);
         let high = y.hi() + (y.lo() + eps);
         if low.to_bits() == high.to_bits() {
-            return low;
+            return Some(low);
         }
     }
-    accurate::evaluate(op, x)
+    None
 }
