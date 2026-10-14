@@ -35,6 +35,9 @@
 # run, against the build's .vo files, all at once.
 #
 # Options:
+#   --build-only  prepare a retained --build tree for caching, then exit before
+#                 the audits and cross-checks. This is not a passing formal
+#                 gate; CI follows it with the complete invocation below.
 #   --deps TAR   restore the Coq libraries from TAR (scripts/formal_deps.sh)
 #                and check their pinned versions, instead of installing them.
 #   --build DIR  build in DIR and keep it, so a later run reuses it (CI caches
@@ -53,8 +56,10 @@
 set -eu
 deps=
 build=
+build_only=0
 while [ $# -gt 0 ]; do
   case $1 in
+    --build-only) build_only=1; shift ;;
     --deps) deps=$(realpath "$2"); shift 2 ;;
     --build) mkdir -p "$2"; build=$(realpath "$2"); shift 2 ;;
     --) shift; break ;;
@@ -63,7 +68,11 @@ while [ $# -gt 0 ]; do
   esac
 done
 if [ $# -ne 3 ]; then
-  echo "usage: $0 [--deps <tar>] [--build <dir>] <cross-check corpus> <internal cross-check corpus> <Gappa proofs directory>" >&2
+  echo "usage: $0 [--deps <tar>] [--build <dir>] [--build-only] <cross-check corpus> <internal cross-check corpus> <Gappa proofs directory>" >&2
+  exit 2
+fi
+if [ "$build_only" -eq 1 ] && [ -z "$build" ]; then
+  echo "--build-only requires a retained --build directory" >&2
   exit 2
 fi
 corpus=$(realpath "$1")
@@ -178,6 +187,10 @@ echo "$toolchain" > "$build/.toolchain"
 
 (cd "$build" && coq_makefile -f _CoqProject -o Makefile && make -j"$(nproc)" TIMED=1)
 touch "$build/.built"
+if [ "$build_only" -eq 1 ]; then
+  echo "proof build prepared; audits and cross-checks have not run"
+  exit 0
+fi
 
 # The pinned OCaml Flambda compiler recursively walks the extracted module's
 # top-level expressions. The complete erfcx entry exceeds even 32 MiB on

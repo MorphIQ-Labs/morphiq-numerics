@@ -305,10 +305,10 @@ jobs:
     needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-24.04
-    # The erfcx analytic tables and Q256 composition bring a native cold
-    # proof build plus audits to roughly 45 minutes. Leave headroom for
-    # the smaller hosted runner; every proof and audit still runs.
-    timeout-minutes: 90
+    # The erfcx/normal cold build alone took 64 minutes on this runner; the
+    # 533-entry kernel audit and extracted corpora need additional time.
+    # Checkpoint the completed build before running the full assurance gate.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -360,17 +360,17 @@ jobs:
           path: ${{ runner.temp }}/formal-build
           key: formal-build-${{ steps.keys.outputs.deps }}-${{ hashFiles('formal/**', 'scripts/check_formal.sh', 'target/gappa-proofs/**') }}
           restore-keys: formal-build-${{ steps.keys.outputs.deps }}-
-      - name: Proofs build, are bound to the source, assume only the expected axioms, and match the Rust bit for bit
-        id: proofs
+      - name: Build the source-bound proofs for the cache
         run: |
           mkdir -p "$RUNNER_TEMP/formal-build"
           rm -f "$RUNNER_TEMP/formal-build/.built"
           chmod -R a+rwX "$RUNNER_TEMP/formal-build"
           docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
-            ./scripts/check_formal.sh --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
+            ./scripts/check_formal.sh --build-only --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
             target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
-      # Saved whenever the build itself succeeded (check_formal.sh marks the
-      # tree), even if a later check failed, so the next run reuses it.
+      # Save immediately after a completed build, before the costly audits.
+      # A timeout there must not discard the compiled proofs. Every later
+      # invocation still checks source/toolchain identity and reruns the audits.
       - name: Was the proof build completed
         id: built
         if: ${{ !cancelled() && steps.build.outputs.cache-hit != 'true' }}
@@ -381,3 +381,9 @@ jobs:
         with:
           path: ${{ runner.temp }}/formal-build
           key: ${{ steps.build.outputs.cache-primary-key }}
+      - name: Proofs are bound to the source, assume only the expected axioms, and match the Rust bit for bit
+        id: proofs
+        run: |
+          docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
+            ./scripts/check_formal.sh --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
+            target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
