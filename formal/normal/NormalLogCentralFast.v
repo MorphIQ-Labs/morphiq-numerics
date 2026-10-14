@@ -38,7 +38,8 @@ Proof.
   assert(LogRange : /4<=Rabs(ln(normal_cdf(B x)))<=2).
   { assert(-2<=ln(normal_cdf(B x))<= -/4)by(split;interval with(i_prec 80)).
     rewrite Rabs_left1 by lra;split;lra. }
-  pose proof(normal_log_dw_ieee a b Fa Fb High Bl)as Log.
+  pose proof(normal_log_dw_ieee a b Fa Fb ltac:(split;lra)
+    ltac:(eapply Rle_trans;[exact Bl|apply bpow_le;lia]))as Log.
   destruct(normal_log_dw64 a b)as[h l];destruct Log as[Fh [Fl [Norm LogError]]].
   assert(InputError : Rabs(ln(B a+B b)-ln(normal_cdf(B x)))<=bpow radix2 (-65)).
   { replace(bpow radix2 (-65))with(2*bpow radix2 (-66))by(bpow_num;field).

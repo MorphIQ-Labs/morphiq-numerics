@@ -55,7 +55,7 @@ pub(super) fn write(out: &mut String) {
     ) {
         let x = crate::test_exact::word(case, "x").abs();
         if x > 0.5 && x <= 37.0 {
-            write_tail_fast(out, x);
+            write_outer_fast_components(out, x);
         }
         if (f64::from_bits(0x3de0_0000_0000_0000)..=37.0).contains(&x) {
             write_density_fast(out, x);
@@ -321,7 +321,7 @@ pub(super) fn write(out: &mut String) {
             }
         };
         if bits > 0.5_f64.to_bits() {
-            write_tail_fast(out, f64::from_bits(bits));
+            write_outer_fast_components(out, f64::from_bits(bits));
         }
         let value = normal_distribution::scaled_erfcx(f64::from_bits(bits));
         writeln!(
@@ -360,18 +360,25 @@ pub(super) fn write(out: &mut String) {
     }
 }
 
-fn write_tail_fast(out: &mut String, x: f64) {
-    let (value, eps) = normal_distribution::fast(Operation::Cdf, -x).unwrap();
-    writeln!(
-        out,
-        "normal_tail_fast {:016x} : {:016x} {:016x} {:016x} {}",
-        x.to_bits(),
-        value.hi().to_bits(),
-        value.lo().to_bits(),
-        eps.to_bits(),
-        super::opt(normal_distribution::fast_decide(Operation::Cdf, -x))
-    )
-    .unwrap();
+fn write_outer_fast_components(out: &mut String, x: f64) {
+    for (name, op, argument) in [
+        ("normal_tail_fast", Operation::Cdf, -x),
+        ("normal_outer_cdf", Operation::Cdf, x),
+        ("normal_outer_center_positive", Operation::Centered, x),
+        ("normal_outer_center_negative", Operation::Centered, -x),
+    ] {
+        let (value, eps) = normal_distribution::fast(op, argument).unwrap();
+        writeln!(
+            out,
+            "{name} {:016x} : {:016x} {:016x} {:016x} {}",
+            x.to_bits(),
+            value.hi().to_bits(),
+            value.lo().to_bits(),
+            eps.to_bits(),
+            super::opt(normal_distribution::fast_decide(op, argument))
+        )
+        .unwrap();
+    }
 }
 
 fn write_central_value(out: &mut String, x: f64) {

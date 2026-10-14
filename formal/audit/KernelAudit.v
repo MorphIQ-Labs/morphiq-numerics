@@ -684,3 +684,6 @@ Print Assumptions NormalErfcxFastScaled.normal_erfcx_fast_scaled_ieee.
 
 Require Import NormalTailDecision.
 Print Assumptions NormalTailDecision.normal_tail_fast_decided.
+
+Require Import NormalOuterSigned.
+Print Assumptions NormalOuterSigned.normal_outer_signed_decided.
