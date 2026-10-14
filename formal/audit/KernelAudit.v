@@ -595,3 +595,6 @@ Print Assumptions NormalDensityFast.normal_density_fast_ieee.
 Print Assumptions NormalFastDecision.normal_interval_decide_ok.
 Print Assumptions NormalDensityDecision.normal_density_guard_bounds.
 Print Assumptions NormalDensityDecision.normal_density_fast_decided.
+
+Require Import NormalDensityTiny.
+Print Assumptions NormalDensityTiny.normal_density_tiny_correct.

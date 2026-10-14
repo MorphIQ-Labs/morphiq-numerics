@@ -27,6 +27,7 @@ fn workload(name: &str) -> Vec<f64> {
         .map(|i| {
             let u = f64::from(i) / 1023.0;
             match name {
+                "tiny" => (u - 0.5) * super::SMALL,
                 "central" => u - 0.5,
                 "ordinary" => 10.0 * u - 5.0,
                 "negative_tail" => -8.0 - 28.0 * u,
@@ -91,7 +92,9 @@ fn bench<G: Kernel>(name: &str, op: Operation, complement: bool, kind: &str, xs:
 fn normal_local_performance() {
     use super::lanes::Normal;
     std::println!("function,workload,count,scalar_ns,batch_ns,speedup,accurate_count");
+    let selected = std::env::var("MORPHIQ_NORMAL_BENCH_WORKLOAD").ok();
     for kind in [
+        "tiny",
         "central",
         "ordinary",
         "negative_tail",
@@ -100,6 +103,9 @@ fn normal_local_performance() {
         "log_overflow",
         "mixed",
     ] {
+        if selected.as_deref().is_some_and(|selected| selected != kind) {
+            continue;
+        }
         let xs = workload(kind);
         bench::<Normal<0>>("pdf", Operation::Pdf, false, kind, &xs);
         bench::<Normal<1>>("cdf", Operation::Cdf, false, kind, &xs);

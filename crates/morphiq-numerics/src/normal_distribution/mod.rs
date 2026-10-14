@@ -123,6 +123,7 @@ pub(crate) fn special(op: Operation, x: f64) -> Option<f64> {
         });
     }
     match op {
+        Operation::Pdf if x.abs() < SMALL => Some(tables::DENSITY.0),
         Operation::Pdf if x.abs() >= tables::PDF_ZERO => Some(0.0),
         Operation::Cdf if x >= tables::CDF_ONE => Some(1.0),
         Operation::Cdf if x <= -tables::TAIL_ZERO => Some(0.0),

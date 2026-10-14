@@ -219,6 +219,9 @@ impl<const OP: u8> Kernel for Normal<OP> {
         // Saturation is itself a vector operation. Ordered comparisons keep
         // NaN payloads on the scalar special-value path.
         match op {
+            Operation::Pdf if k.mask_bits(k.lt(k.abs(xv), k.splat(SMALL))) == all => {
+                return k.store(k.splat(tables::DENSITY.0));
+            }
             Operation::Pdf if k.mask_bits(k.le(k.splat(tables::PDF_ZERO), k.abs(xv))) == all => {
                 return k.store(k.splat(0.0));
             }

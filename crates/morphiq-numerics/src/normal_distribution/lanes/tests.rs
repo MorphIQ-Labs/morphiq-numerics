@@ -84,6 +84,14 @@ fn normal_lanes_preserve_scalar_intermediates_and_results() {
     }
     for backend in backends() {
         backend.vectorize(Compare(&xs));
+        for x in [
+            SMALL.next_down(),
+            -SMALL.next_down(),
+            -0.0,
+            f64::from_bits(1),
+        ] {
+            backend.vectorize(Compare(&[x; 17]));
+        }
         // Exercise homogeneous saturation as well as the mixed fixture stream,
         // including both finite neighbors of the log-CDF overflow boundary.
         for case in entries(
