@@ -52,7 +52,7 @@ impl WithSimd for Compare<'_> {
     }
 }
 
-#[inline(always)]
+#[inline]
 fn check<G: Kernel, K: Simd>(k: K, xs: &[f64], out: &mut [f64]) {
     crate::lanes::run::<G, K>(k, xs, out);
     for (&x, &y) in xs.iter().zip(out.iter()) {

@@ -46,7 +46,7 @@ fn select<K: Simd>(k: K, mask: K::M, a: Dw<K>, b: Dw<K>) -> Dw<K> {
     (k.select(mask, a.0, b.0), k.select(mask, a.1, b.1))
 }
 
-#[inline(always)]
+#[cfg_attr(not(debug_assertions), inline(always))]
 fn center<K: Simd>(k: K, x: K::F) -> Dw<K> {
     let density = constant(k, tables::DENSITY);
     let leading = mul_f64(k, density, x);
@@ -67,7 +67,7 @@ fn center<K: Simd>(k: K, x: K::F) -> Dw<K> {
     select(k, small, leading, mul(k, leading, p))
 }
 
-#[inline(always)]
+#[cfg_attr(not(debug_assertions), inline(always))]
 fn gaussian<K: Simd>(k: K, x: K::F) -> (Dw<K>, K::F) {
     let x = k.select(k.lt(x, k.splat(SMALL)), k.splat(0.0), x);
     let (h, l) = two_prod(k, x, k.mul(k.splat(-0.5), x));
@@ -84,7 +84,7 @@ fn scaled<K: Simd>(k: K, y: Dw<K>, scale: K::F) -> Dw<K> {
     two_sum(k, k.mul(y.0, scale), k.mul(y.1, scale))
 }
 
-#[inline(always)]
+#[cfg_attr(not(debug_assertions), inline(always))]
 fn scaled_erfcx<K: Simd>(k: K, x: K::F) -> Dw<K> {
     let z = mul_f64(k, constant(k, tables::INV_SQRT2), x);
     let table = k.lt(z.0, k.splat(16.0));
@@ -104,18 +104,18 @@ fn scaled_erfcx<K: Simd>(k: K, x: K::F) -> Dw<K> {
     two_sum(k, f.0, k.add(f.1, k.mul(z.1, derivative)))
 }
 
-#[inline(always)]
+#[cfg_attr(not(debug_assertions), inline(always))]
 fn tail<K: Simd>(k: K, x: K::F) -> Dw<K> {
     let (g, scale) = gaussian(k, x);
     scaled(k, mul(k, g, scaled_erfcx(k, x)), k.mul(scale, k.splat(0.5)))
 }
 
-#[inline(always)]
+#[cfg_attr(not(debug_assertions), inline(always))]
 fn log_dw<K: Simd>(k: K, x: Dw<K>) -> Dw<K> {
     add_f64(k, crate::ln::lanes::fallback::ln(k, x.0), k.div(x.1, x.0))
 }
 
-#[inline(always)]
+#[cfg_attr(not(debug_assertions), inline(always))]
 fn log_complement<K: Simd>(k: K, q: Dw<K>) -> Dw<K> {
     let tiny = k.lt(q.0, k.splat(f64::from_bits(0x3c90_0000_0000_0000)));
     let bits = k.mask_bits(tiny);
@@ -138,7 +138,10 @@ fn log_complement<K: Simd>(k: K, q: Dw<K>) -> Dw<K> {
 
 /// Candidate values for finite |x| <= 37 and |x| >= TINY. The caller
 /// screens special values and replaces inactive lanes before entering here.
-#[inline(always)]
+// In debug builds, keep a call boundary so composing several kernels does
+// not accumulate every intrinsic temporary in one multi-megabyte frame.
+// Optimized builds inline into the backend's target-feature context.
+#[cfg_attr(not(debug_assertions), inline(always))]
 fn candidate<K: Simd>(k: K, op: Operation, x: K::F) -> Dw<K> {
     let a = k.abs(x);
     if matches!(op, Operation::Pdf) {
