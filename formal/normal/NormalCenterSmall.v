@@ -1,5 +1,5 @@
-(** Linear centered-CDF branch: the omitted Gaussian terms and the actual
-    normalized double-word product, including its input-domain obligations. *)
+(** Density-times-argument multiplication and the omitted Gaussian terms
+    in the small centered-CDF branch, with explicit input-domain obligations. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz.
 From Flocq Require Import Core IEEE754.Bits.
 From Interval Require Import Tactic.
@@ -45,12 +45,11 @@ Qed.
 Definition normal_center_small64 x :=
   let '(h,l):=normal_density_constant64 in mul_f64_64 h l x.
 
-Theorem normal_center_small_ieee x : finite x ->
-  bpow radix2 (-450)<=Rabs(B x)<=bpow radix2 (-33) ->
+Theorem normal_center_linear_ieee x : finite x ->
+  bpow radix2 (-450)<=Rabs(B x)<=1 ->
   let '(h,l):=normal_center_small64 x in
   finite h /\ finite l /\ B h=rndF(B h+B l) /\
-  Rabs((B h+B l)-normal_density_constant*B x)<=normal_density_constant*Rabs(B x)*bpow radix2 (-103) /\
-  Rabs((B h+B l)-normal_center(B x))<=normal_density_constant*Rabs(B x)*bpow radix2 (-66).
+  Rabs((B h+B l)-normal_density_constant*B x)<=normal_density_constant*Rabs(B x)*bpow radix2 (-103).
 Proof.
   intros Fx X;pose proof normal_density_constant_words as Words;rewrite normal_density_constant_exact in Words.
   destruct Words as[Fh [Fl [High [Low [Value Norm]]]]].
@@ -94,12 +93,27 @@ Proof.
       (normal_density_constant*B x*((1+a)*(1+b)-1))by ring.
     rewrite !Rabs_mult,(Rabs_pos_eq normal_density_constant)by lra.
     apply Rmult_le_compat_l;[apply Rmult_le_pos;[lra|apply Rabs_pos]|exact Combined]. }
-  split;[exact Fhigh|];split;[exact Flow|];split;[exact Normal|];split;[exact Linear|].
+  repeat split;assumption.
+Qed.
+
+Theorem normal_center_small_ieee x : finite x ->
+  bpow radix2 (-450)<=Rabs(B x)<=bpow radix2 (-33) ->
+  let '(h,l):=normal_center_small64 x in
+  finite h /\ finite l /\ B h=rndF(B h+B l) /\
+  Rabs((B h+B l)-normal_density_constant*B x)<=normal_density_constant*Rabs(B x)*bpow radix2 (-103) /\
+  Rabs((B h+B l)-normal_center(B x))<=normal_density_constant*Rabs(B x)*bpow radix2 (-66).
+Proof.
+  intros Fx X.
+  pose proof(normal_center_linear_ieee x Fx
+    ltac:(split;[exact(proj1 X)|eapply Rle_trans;[exact(proj2 X)|interval with(i_prec 80)]]))as LinearValue.
+  destruct(normal_center_small64 x)as[h l];destruct LinearValue as[Fh [Fl [Norm Linear]]].
+  split;[exact Fh|];split;[exact Fl|];split;[exact Norm|];split;[exact Linear|].
+  assert(Constant : 0<normal_density_constant)by(unfold normal_density_constant;interval with(i_prec 80)).
   pose proof(normal_center_linear_error (B x)(proj2 X))as Approximation.
   replace((B h+B l)-normal_center(B x))with
     (((B h+B l)-normal_density_constant*B x)+(normal_density_constant*B x-normal_center(B x)))by ring.
   eapply Rle_trans;[apply Rabs_triang|];rewrite(Rabs_minus_sym(normal_density_constant*B x)(normal_center(B x))).
   assert(Budget : bpow radix2 (-103)+bpow radix2 (-67)<=bpow radix2 (-66))by(bpow_num;interval with(i_prec 200)).
-  assert(Scale : 0<=normal_density_constant*Rabs(B x))by nra.
+  assert(Scale : 0<=normal_density_constant*Rabs(B x))by(apply Rmult_le_pos;[lra|apply Rabs_pos]).
   nra.
 Qed.

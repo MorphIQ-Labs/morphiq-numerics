@@ -125,6 +125,10 @@ let compute op args =
       (match args with
        | [x] -> String.concat " " (List.map show_bits (x_normal_center_tail (z_of_u64 (hex x))))
        | _ -> failwith "normal_center_tail takes a word")
+  | "normal_center_shape" ->
+      (match args with
+       | [x] -> String.concat " " (List.map show_bits (x_normal_center_shape (z_of_u64 (hex x))))
+       | _ -> failwith "normal_center_shape takes a word")
   | "normal_accurate_outer_cdf" | "normal_accurate_outer_center" | "normal_accurate_log_positive"
   | "normal_accurate_log_central" | "normal_accurate_log_negative" ->
       (match args with

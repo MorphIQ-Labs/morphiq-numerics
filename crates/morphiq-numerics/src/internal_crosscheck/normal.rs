@@ -318,6 +318,17 @@ fn write_center_tail(out: &mut String, rng: &mut SplitMix64) {
                 normal_distribution::center_tail(h).to_bits()
             )
             .unwrap();
+            let shape = normal_distribution::center_polynomial(
+                crate::double_word::DoubleWord::product(x, x),
+            );
+            writeln!(
+                out,
+                "normal_center_shape {:016x} : {:016x} {:016x}",
+                x.to_bits(),
+                shape.hi().to_bits(),
+                shape.lo().to_bits()
+            )
+            .unwrap();
         }
     }
 }

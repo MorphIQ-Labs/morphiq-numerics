@@ -51,12 +51,17 @@ fn center(x: f64) -> Dw {
         return density.mul_f64(x);
     }
     let z = Dw::product(x, x);
+    density.mul_f64(x).mul(center_polynomial(z))
+}
+
+#[inline]
+pub(crate) fn center_polynomial(z: Dw) -> Dw {
     let tail = center_tail(z.hi());
     let mut p = dw(tables::CENTER[3]).add(z.mul_f64(tail));
     for n in (0..3).rev() {
         p = dw(tables::CENTER[n]).add(z.mul(p));
     }
-    density.mul_f64(x).mul(p)
+    p
 }
 
 #[inline]
