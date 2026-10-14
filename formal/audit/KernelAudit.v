@@ -687,3 +687,6 @@ Print Assumptions NormalTailDecision.normal_tail_fast_decided.
 
 Require Import NormalOuterSigned.
 Print Assumptions NormalOuterSigned.normal_outer_signed_decided.
+
+Require Import NormalLogNegativeFast.
+Print Assumptions NormalLogNegativeFast.normal_log_negative_decided.

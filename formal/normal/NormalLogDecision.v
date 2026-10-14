@@ -11,8 +11,8 @@ Open Scope R_scope.
 Definition normal_log_guard64 h := fmul (b64_abs h)(erfcx_pow2 (-62)).
 Definition normal_log_decide64 h l := normal_interval_decide64 h l (normal_log_guard64 h).
 
-Theorem normal_log_decide_ok h l target v : finite h -> finite l ->
-  Rabs(B h)<=4 -> Rabs(B l)<=bpow radix2 (-52) -> /4<=Rabs target<=2 ->
+Theorem normal_log_wide_decide_ok h l target v : finite h -> finite l ->
+  Rabs(B h)<=1024 -> Rabs(B l)<=bpow radix2 (-44) -> /4<=Rabs target<=1024 ->
   Rabs((B h+B l)-target)<=7*bpow radix2 (-65)*Rabs target ->
   normal_log_decide64 h l=Some v -> finite v /\ B v=rndF target.
 Proof.
@@ -28,22 +28,33 @@ Proof.
   pose proof(rnd_err_below _ (-20)ltac:(lia)Product)as Rounded.
   rewrite <-Value,B_abs,C in Rounded;change(-20-54)%Z with(-74)%Z in Rounded.
   apply Rabs_le_inv in Rounded.
-  assert(HighTarget : Rabs target<=Rabs(B h)+7*bpow radix2 (-65)*Rabs target+bpow radix2 (-52)).
+  assert(HighTarget : Rabs target<=Rabs(B h)+7*bpow radix2 (-65)*Rabs target+bpow radix2 (-44)).
   { pose proof(Rabs_triang_inv target (B h+B l))as Difference.
     rewrite Rabs_minus_sym in Difference.
     pose proof(Rabs_triang(B h)(B l));lra. }
   assert(Guard : 0<=B(normal_log_guard64 h) /\
     7*bpow radix2 (-65)*Rabs target+bpow radix2 (-74)<=B(normal_log_guard64 h) /\
-    B(normal_log_guard64 h)<=bpow radix2 (-59)).
+    B(normal_log_guard64 h)<=bpow radix2 (-50)).
   { pose proof(Rabs_pos(B h));bpow_num_all;repeat split;nra. }
   destruct Guard as[E [Budget Upper]].
   unfold normal_log_decide64 in Decision.
   apply(normal_interval_decide_ok h l (normal_log_guard64 h)target
     (7*bpow radix2 (-65)*Rabs target)(-20)v);try assumption.
-  - lra.
   - lia.
   - bpow_num_all;lra.
   - rewrite Rabs_minus_sym;exact Error.
+Qed.
+
+Theorem normal_log_decide_ok h l target v : finite h -> finite l ->
+  Rabs(B h)<=4 -> Rabs(B l)<=bpow radix2 (-52) -> /4<=Rabs target<=2 ->
+  Rabs((B h+B l)-target)<=7*bpow radix2 (-65)*Rabs target ->
+  normal_log_decide64 h l=Some v -> finite v /\ B v=rndF target.
+Proof.
+  intros Fh Fl H L Target Error Decision.
+  apply(normal_log_wide_decide_ok h l target v);try assumption.
+  - lra.
+  - eapply Rle_trans;[exact L|apply bpow_le;lia].
+  - split;lra.
 Qed.
 
 Definition normal_log_central_decide64 x :=

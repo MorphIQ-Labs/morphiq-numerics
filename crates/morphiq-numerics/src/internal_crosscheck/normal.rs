@@ -363,6 +363,7 @@ pub(super) fn write(out: &mut String) {
 fn write_outer_fast_components(out: &mut String, x: f64) {
     for (name, op, argument) in [
         ("normal_tail_fast", Operation::Cdf, -x),
+        ("normal_log_negative", Operation::LogCdf, -x),
         ("normal_outer_cdf", Operation::Cdf, x),
         ("normal_outer_center_positive", Operation::Centered, x),
         ("normal_outer_center_negative", Operation::Centered, -x),
