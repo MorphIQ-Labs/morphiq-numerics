@@ -121,6 +121,16 @@ let compute op args =
   | "normal_erfcx_small_table" ->
       let ((n, e, l), _) = value args in
       let ((n, e), l) = x_normal_erfcx_small_table n e l in show (n, e, l)
+  | "normal_erfcx_extended_table" ->
+      let ((n, e, l), _) = value args in
+      let ((n, e), l) = x_normal_erfcx_extended_table n e l in show (n, e, l)
+  | "normal_erfcx_positive" ->
+      let ((n, e, l), _) = value args in
+      let ((n, e), l) = x_normal_erfcx_positive n e l in show (n, e, l)
+  | "normal_accurate_tail" ->
+      (match args with
+       | [x] -> let ((n, e), l) = x_normal_accurate_tail (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "normal_accurate_tail takes a word")
   | "normal_scaled_argument" ->
       (match args with
        | [x] -> let ((n, e), l) = x_normal_scaled_argument (z_of_u64 (hex x)) in show (n, e, l)

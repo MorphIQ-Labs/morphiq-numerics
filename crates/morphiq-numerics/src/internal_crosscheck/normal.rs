@@ -168,4 +168,79 @@ pub(super) fn write(out: &mut String) {
         )
         .unwrap();
     }
+    // Extended inputs can straddle a table boundary while rounding to the
+    // boundary itself. Exercise both sides at each last-binade cell and the
+    // cap just below 16, where the rounded lookup would otherwise be outside
+    // the table. Check the significand before final binary64 rounding.
+    let mut table = Vec::new();
+    for i in 0..32 {
+        let high = Q256::from_f64(8.0 + f64::from(i) * 0.25);
+        for shift in [50, 60, 100, 200, 250] {
+            let low = Q256::ONE.mul_pow2(-shift);
+            table.extend([high.add(low.neg()), high, high.add(low)]);
+        }
+    }
+    for shift in [49, 50, 51, 52, 60, 100, 200, 250] {
+        table.push(Q256::from_f64(16.0).add(Q256::ONE.mul_pow2(-shift).neg()));
+    }
+    for _ in 0..256 {
+        let high = Q256::from_f64(f64::from_bits(
+            0.25_f64.to_bits() + rng.next_u64() % (16.0_f64.to_bits() - 0.25_f64.to_bits()),
+        ));
+        table.push(high.add(high.mul_pow2(-100)));
+    }
+    for x in table {
+        writeln!(
+            out,
+            "normal_erfcx_extended_table {} : {}",
+            q256(x),
+            q256(crate::erfcx::accurate::positive(x))
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "normal_erfcx_positive {} : {}",
+            q256(x),
+            q256(crate::erfcx::accurate::positive(x))
+        )
+        .unwrap();
+    }
+    for i in 0..256 {
+        let high = Q256::from_f64(match i {
+            0 => 16.0,
+            1 => 16.0_f64.next_up(),
+            2 => f64::MAX * 0.5,
+            _ => f64::from_bits(
+                16.0_f64.to_bits() + rng.next_u64() % (0x7fe0_0000_0000_0000 - 16.0_f64.to_bits()),
+            ),
+        });
+        let x = high.add(high.mul_pow2(-100));
+        writeln!(
+            out,
+            "normal_erfcx_positive {} : {}",
+            q256(x),
+            q256(crate::erfcx::accurate::positive(x))
+        )
+        .unwrap();
+    }
+    for i in 0..512 {
+        let x = match i {
+            0 => 0.5,
+            1 => 0.5_f64.next_up(),
+            2 => 1.0,
+            3 => 8.0,
+            4 => 23.0,
+            5 => 38.6,
+            _ => f64::from_bits(
+                0.5_f64.to_bits() + rng.next_u64() % (38.6_f64.to_bits() - 0.5_f64.to_bits()),
+            ),
+        };
+        writeln!(
+            out,
+            "normal_accurate_tail {:016x} : {}",
+            x.to_bits(),
+            q256(accurate::tail(x))
+        )
+        .unwrap();
+    }
 }
