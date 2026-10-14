@@ -598,3 +598,12 @@ Print Assumptions NormalDensityDecision.normal_density_fast_decided.
 
 Require Import NormalDensityTiny.
 Print Assumptions NormalDensityTiny.normal_density_tiny_correct.
+
+From Binary64 Require Import IEEE64NormalizedMul.
+Require Import NormalCenterSmall NormalCenterSmallDecision.
+Print Assumptions IEEE64NormalizedMul.mul_f64_normalized_ieee.
+Print Assumptions NormalCenterSmall.normal_density_constant_exact.
+Print Assumptions NormalCenterSmall.normal_center_linear_error.
+Print Assumptions NormalCenterSmall.normal_center_small_ieee.
+Print Assumptions NormalCenterSmallDecision.normal_center_small_range.
+Print Assumptions NormalCenterSmallDecision.normal_center_small_decided.

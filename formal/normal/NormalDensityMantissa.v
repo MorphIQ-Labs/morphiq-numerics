@@ -13,7 +13,7 @@ Definition normal_density_constant64 := two_sum64 normal_density_hi normal_densi
 
 Lemma normal_density_constant_words : let '(h,l):=normal_density_constant64 in
   finite h /\ finite l /\ 3/8<=B h<=/2 /\ Rabs(B l)<=bpow radix2 (-54) /\
-  B h+B l=B normal_density_hi+B normal_density_lo.
+  B h+B l=B normal_density_hi+B normal_density_lo /\ B h=rndF(B h+B l).
 Proof.
   destruct normal_density_hi_ok as[Fh H];destruct normal_density_lo_ok as[Fl L].
   assert (Range : 39/100<=B normal_density_hi+B normal_density_lo<=41/100).
@@ -27,6 +27,7 @@ Proof.
   rewrite <-High in Error;change(0-54)%Z with(-54)%Z in Error.
   assert (Low : Rabs(B l)<=bpow radix2 (-54)).
   { replace(B l)with(-(B h-(B normal_density_hi+B normal_density_lo)))by lra;rewrite Rabs_Ropp;exact Error. }
+  assert (Normalized : B h=rndF(B h+B l))by(rewrite Total;exact High).
   repeat split;try assumption;apply Rabs_le_inv in Error;bpow_num_all;lra.
 Qed.
 
@@ -49,7 +50,7 @@ Proof.
   unfold normal_density_mantissa64;destruct(normal_gaussian64 x)as[[gh gl]k].
   destruct normal_density_constant64 as[dh dl].
   destruct Gaussian as[Fgh [Fgl [K [Gnorm Gerror]]]].
-  destruct Words as[_ [_ [Gh Gl]]];destruct Constant as[Fdh [Fdl [Dh [Dl Dvalue]]]].
+  destruct Words as[_ [_ [Gh Gl]]];destruct Constant as[Fdh [Fdl [Dh [Dl [Dvalue Dnorm]]]]].
   assert (Glo : -/2^51<=B gl/B gh<=/2^51).
   { apply Rabs_le_inv in Gl;unfold Rdiv;bpow_num_all;split;interval with(i_prec 100). }
   assert (Dlo : -/2^51<=B dl/B dh<=/2^51).

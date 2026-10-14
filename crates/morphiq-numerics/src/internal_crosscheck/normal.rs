@@ -292,6 +292,33 @@ pub(super) fn write(out: &mut String) {
         .unwrap();
     }
     write_compositions(out, &mut rng);
+    write_center_small(out, &mut rng);
+}
+
+fn write_center_small(out: &mut String, rng: &mut SplitMix64) {
+    let lower = 0x23d0_0000_0000_0000;
+    let upper = 0x3de0_0000_0000_0000;
+    for i in 0..4096 {
+        let bits = match i {
+            0 => lower,
+            1 => lower + 1,
+            2 => upper - 1,
+            _ => lower + rng.next_u64() % (upper - lower),
+        };
+        for x in [f64::from_bits(bits), -f64::from_bits(bits)] {
+            let (value, eps) = normal_distribution::fast(Operation::Centered, x).unwrap();
+            writeln!(
+                out,
+                "normal_center_small {:016x} : {:016x} {:016x} {:016x} {}",
+                x.to_bits(),
+                value.hi().to_bits(),
+                value.lo().to_bits(),
+                eps.to_bits(),
+                super::opt(normal_distribution::fast_decide(Operation::Centered, x))
+            )
+            .unwrap();
+        }
+    }
 }
 
 fn write_compositions(out: &mut String, rng: &mut SplitMix64) {

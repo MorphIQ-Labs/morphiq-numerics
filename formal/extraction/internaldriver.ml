@@ -115,11 +115,12 @@ let compute op args =
        | [x] -> let (k, words) = x_normal_gaussian (z_of_u64 (hex x)) in
            String.concat " " (string_of_int (int_of_z k) :: List.map show_bits words)
        | _ -> failwith "normal_gaussian takes a word")
-  | "normal_density_fast" ->
+  | "normal_density_fast" | "normal_center_small" ->
       (match args with
-       | [x] -> let (words, decision) = x_normal_density_fast (z_of_u64 (hex x)) in
+       | [x] -> let f = if op = "normal_density_fast" then x_normal_density_fast else x_normal_center_small in
+           let (words, decision) = f (z_of_u64 (hex x)) in
            String.concat " " (List.map show_bits words @ [show_opt decision])
-       | _ -> failwith "normal_density_fast takes a word")
+       | _ -> failwith (op ^ " takes a word"))
   | "normal_accurate_outer_cdf" | "normal_accurate_outer_center" | "normal_accurate_log_positive"
   | "normal_accurate_log_central" | "normal_accurate_log_negative" ->
       (match args with
