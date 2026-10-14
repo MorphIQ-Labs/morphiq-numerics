@@ -1,10 +1,10 @@
 (** The actual signed linear centered-CDF value and its rounded guard.
     An accepted interval test returns the correctly rounded centered CDF. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz.
-From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
+From Flocq Require Import Core.
 From Interval Require Import Tactic.
-From Binary64 Require Import Binary64Add IEEE64 RoundingConstant RoundingTest.
-Require Import StageGappa NormalCentered NormalCenterSmall NormalFastDecision NormalDensityDecision.
+From Binary64 Require Import Binary64Add IEEE64 RoundingConstant.
+Require Import StageGappa NormalCentered NormalCenterSmall NormalRelativeDecision.
 Open Scope R_scope.
 
 Theorem normal_center_small_range x : finite x ->
@@ -70,9 +70,9 @@ Qed.
 
 Definition normal_center_small_decide64 x :=
   let '(h,l):=normal_center_small64 x in
-  normal_interval_decide64 h l (normal_density_guard64 (b64_abs h)).
+  normal_relative_decide64 h l.
 
-Local Opaque normal_center_small64 normal_density_guard64 normal_interval_decide64.
+Local Opaque normal_center_small64 normal_relative_decide64.
 
 Theorem normal_center_small_decided x v : finite x ->
   bpow radix2 (-450)<=Rabs(B x)<=bpow radix2 (-33) ->
@@ -81,17 +81,5 @@ Proof.
   intros F X Decision;pose proof(normal_center_small_range x F X)as Fast.
   unfold normal_center_small_decide64 in Decision;destruct(normal_center_small64 x)as[h l].
   destruct Fast as[k [Fh [Fl [K [H [L Error]]]]]].
-  assert(Fabs : finite(b64_abs h))by(unfold b64_abs;destruct h;simpl in *;congruence).
-  pose proof(normal_density_guard_bounds (b64_abs h)k Fabs K)as Guard.
-  rewrite B_abs in Guard;specialize(Guard H);destruct Guard as[Fe [E [Budget Upper]]].
-  apply(normal_interval_decide_ok h l (normal_density_guard64(b64_abs h))(normal_center(B x))
-    (bpow radix2 (k-68))(k-21)v);try assumption.
-  - assert(bpow radix2 k<=1)by(change 1 with(bpow radix2 0);apply bpow_le;lia);lra.
-  - lia.
-  - replace(k-52)%Z with(k+ -52)%Z in L by ring;replace(k-61)%Z with(k+ -61)%Z in Upper by ring.
-    replace(k-21)%Z with(k+ -21)%Z by ring;rewrite bpow_plus in L,Upper|-*.
-    assert(bpow radix2 (-52)+bpow radix2 (-61)<=bpow radix2 (-21))by(bpow_num;interval with(i_prec 100)).
-    pose proof(bpow_gt_0 radix2 k);nra.
-  - replace(k-21-54)%Z with(k-75)%Z by ring;exact Budget.
-  - rewrite Rabs_minus_sym;exact Error.
+  exact(normal_relative_decide_ok h l k (normal_center(B x))v Fh Fl K H L Error Decision).
 Qed.

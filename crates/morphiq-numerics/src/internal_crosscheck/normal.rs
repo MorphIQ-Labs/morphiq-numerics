@@ -57,6 +57,10 @@ pub(super) fn write(out: &mut String) {
         if (f64::from_bits(0x3de0_0000_0000_0000)..=37.0).contains(&x) {
             write_density_fast(out, x);
         }
+        if (f64::from_bits(0x3de0_0000_0000_0000)..=0.5).contains(&x) {
+            write_center_fast(out, x);
+            write_center_fast(out, -x);
+        }
     }
     let lower = f64::from_bits(0x26f0_0000_0000_0000);
     for i in 0..512 {
@@ -294,6 +298,34 @@ pub(super) fn write(out: &mut String) {
     write_compositions(out, &mut rng);
     write_center_small(out, &mut rng);
     write_center_tail(out, &mut rng);
+    for i in 0..4096 {
+        let lower = 0x3de0_0000_0000_0000;
+        let upper = 0.5_f64.to_bits();
+        let bits = match i {
+            0 => lower,
+            1 => lower + 1,
+            2 => upper,
+            3 => upper - 1,
+            _ => lower + rng.next_u64() % (upper - lower),
+        };
+        for x in [f64::from_bits(bits), -f64::from_bits(bits)] {
+            write_center_fast(out, x);
+        }
+    }
+}
+
+fn write_center_fast(out: &mut String, x: f64) {
+    let (value, eps) = normal_distribution::fast(Operation::Centered, x).unwrap();
+    writeln!(
+        out,
+        "normal_center_fast {:016x} : {:016x} {:016x} {:016x} {}",
+        x.to_bits(),
+        value.hi().to_bits(),
+        value.lo().to_bits(),
+        eps.to_bits(),
+        super::opt(normal_distribution::fast_decide(Operation::Centered, x))
+    )
+    .unwrap();
 }
 
 fn write_center_tail(out: &mut String, rng: &mut SplitMix64) {

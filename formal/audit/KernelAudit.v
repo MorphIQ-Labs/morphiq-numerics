@@ -656,3 +656,9 @@ Print Assumptions NormalCenterFastPolynomial.normal_center_shape_error.
 Require Import NormalCenterSmall NormalCenterFastLinear.
 Print Assumptions NormalCenterSmall.normal_center_linear_ieee.
 Print Assumptions NormalCenterFastLinear.normal_center_linear_regular_ieee.
+
+Require Import NormalRelativeDecision NormalCenterFastValue NormalCenterFastDecision.
+Print Assumptions NormalRelativeDecision.normal_relative_decide_ok.
+Print Assumptions NormalCenterFastValue.normal_center_regular_ieee.
+Print Assumptions NormalCenterFastDecision.normal_center_regular_range.
+Print Assumptions NormalCenterFastDecision.normal_center_regular_decided.
