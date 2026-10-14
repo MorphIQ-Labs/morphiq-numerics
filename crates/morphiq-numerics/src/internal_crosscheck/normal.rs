@@ -293,6 +293,33 @@ pub(super) fn write(out: &mut String) {
     }
     write_compositions(out, &mut rng);
     write_center_small(out, &mut rng);
+    write_center_tail(out, &mut rng);
+}
+
+fn write_center_tail(out: &mut String, rng: &mut SplitMix64) {
+    let lower = 0x3de0_0000_0000_0000;
+    let upper = 0.5_f64.to_bits();
+    for i in 0..512 {
+        let bits = match i {
+            0 => lower,
+            1 => lower + 1,
+            2 => upper,
+            3 => upper - 1,
+            _ => lower + rng.next_u64() % (upper - lower),
+        };
+        for x in [f64::from_bits(bits), -f64::from_bits(bits)] {
+            let (h, l) = crate::eft::two_prod(x, x);
+            writeln!(
+                out,
+                "normal_center_tail {:016x} : {:016x} {:016x} {:016x}",
+                x.to_bits(),
+                h.to_bits(),
+                l.to_bits(),
+                normal_distribution::center_tail(h).to_bits()
+            )
+            .unwrap();
+        }
+    }
 }
 
 fn write_center_small(out: &mut String, rng: &mut SplitMix64) {

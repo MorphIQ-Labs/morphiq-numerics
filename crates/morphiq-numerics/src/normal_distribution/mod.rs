@@ -51,15 +51,21 @@ fn center(x: f64) -> Dw {
         return density.mul_f64(x);
     }
     let z = Dw::product(x, x);
-    let mut tail = tables::CENTER[12].0;
-    for n in (4..12).rev() {
-        tail = tables::CENTER[n].0 + z.hi() * tail;
-    }
+    let tail = center_tail(z.hi());
     let mut p = dw(tables::CENTER[3]).add(z.mul_f64(tail));
     for n in (0..3).rev() {
         p = dw(tables::CENTER[n]).add(z.mul(p));
     }
     density.mul_f64(x).mul(p)
+}
+
+#[inline]
+pub(crate) fn center_tail(z: f64) -> f64 {
+    let mut tail = tables::CENTER[12].0;
+    for n in (4..12).rev() {
+        tail = tables::CENTER[n].0 + z * tail;
+    }
+    tail
 }
 
 /// exp(-x²/2) as a double-word mantissa and an external binary exponent.
