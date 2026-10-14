@@ -60,3 +60,21 @@ Print Assumptions Q256.from_f64_ok.
 Print Assumptions Q256.from_limbs_ok.
 Print Assumptions Q256.neg_ok.
 Print Assumptions IEEE64Eft.two_prod_ieee.
+
+From Binary64 Require FiniteInterval.
+Print Assumptions FiniteInterval.neighbour_enclosure.
+Print Assumptions FiniteInterval.monotone_enclosure.
+Print Assumptions FiniteInterval.add_enclosure.
+Print Assumptions FiniteInterval.sub_enclosure.
+Print Assumptions FiniteInterval.negate_enclosure.
+Print Assumptions FiniteInterval.product_corners.
+Print Assumptions FiniteInterval.reciprocal_enclosure.
+Print Assumptions FiniteInterval.nonnegative_clamp.
+Print Assumptions FiniteInterval.abs_positive.
+Print Assumptions FiniteInterval.abs_negative.
+Print Assumptions FiniteInterval.abs_crossing.
+Print Assumptions FiniteInterval.max_enclosure.
+Print Assumptions FiniteInterval.square_enclosure.
+Print Assumptions FiniteInterval.exp_enclosure.
+Print Assumptions FiniteInterval.sqrt_enclosure.
+Print Assumptions FiniteInterval.ln_enclosure.
