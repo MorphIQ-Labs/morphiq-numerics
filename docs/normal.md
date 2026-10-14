@@ -181,3 +181,7 @@ host and workload, never CI speed assertions.
 Native Apple M1 Pro measurements, raw repetitions, source hashes and
 reproduction commands are in
 [`measurements/normal-m1pro`](../crates/reference/measurements/normal-m1pro/README.md).
+The public scalar wrappers and their shared dispatch helpers expose their
+fixed operation to consumer optimization with `#[inline]`; the
+[separate consumer comparison](../crates/reference/measurements/normal-m1pro/consumer-inlining/README.md)
+records the effect across the crate boundary.

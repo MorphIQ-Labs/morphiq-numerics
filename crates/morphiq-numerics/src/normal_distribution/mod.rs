@@ -126,6 +126,7 @@ fn log_complement(q: Dw) -> Dw {
     Dw::sum(h, l - q.lo() / (1.0 - q.hi()))
 }
 
+#[inline]
 pub(crate) fn special(op: Operation, x: f64) -> Option<f64> {
     if x.is_nan() {
         return Some(x);
@@ -151,6 +152,7 @@ pub(crate) fn special(op: Operation, x: f64) -> Option<f64> {
 }
 
 /// A candidate value and its absolute guard, before the final rounding test.
+#[inline]
 pub(crate) fn fast(op: Operation, x: f64) -> Option<(Dw, f64)> {
     let a = x.abs();
     // The centered product's cross terms must stay within the double-word
@@ -190,6 +192,7 @@ pub(crate) fn fast(op: Operation, x: f64) -> Option<(Dw, f64)> {
     Some((value, value.hi().abs() * guard(op)))
 }
 
+#[inline]
 pub(crate) fn evaluate(op: Operation, x: f64) -> f64 {
     if let Some(value) = special(op, x) {
         return value;

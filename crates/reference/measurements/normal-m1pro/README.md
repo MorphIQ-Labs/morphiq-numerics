@@ -1,7 +1,9 @@
 # Standard-normal scalar and NEON measurements
 
 `run-1.csv` through `run-3.csv` retain three same-host repetitions on Apple
-M1 Pro. `summary.csv` gives medians and min/max spread; its speedup is the
+M1 Pro at `755326c`, before the consumer-inlining adjustment. The
+[current consumer comparison](consumer-inlining/README.md) records that
+adjustment separately. `summary.csv` gives medians and min/max spread; its speedup is the
 ratio of median scalar throughput time to median batch time. All times are
 nanoseconds per argument. `environment.json` records the host, toolchain,
 base revision and hashes of the measured implementation/harness sources.
