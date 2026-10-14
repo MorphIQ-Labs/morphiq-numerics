@@ -25,6 +25,8 @@
 //!   unit uniforms and Box–Muller normal pairs;
 //! - [`reduce`]: sums, dot products and sums of squares in a specified order,
 //!   with compensated variants as accurate as twice the working precision;
+//! - [`interval`]: finite conservative outward enclosures with typed domain and
+//!   range failures; these are not tight directed-rounding operations;
 //! - [`ulp`]: units in the last place, and distances measured in them.
 //!
 //! The crate is `no_std`, forbids `unsafe` and never calls a platform math
@@ -47,6 +49,7 @@ mod exp2;
 mod expm1;
 #[cfg(test)]
 mod internal_crosscheck;
+pub mod interval;
 #[cfg(feature = "simd")]
 mod lanes;
 mod ln;

@@ -15,6 +15,7 @@ use morphiq_numerics::elementary::{
     cos, exp, exp_slice, exp2, exp2_slice, expm1, expm1_slice, ln, ln_1p, ln_1p_slice, ln_slice,
     log2, log10, sin, sincos, sqrt, tan,
 };
+use morphiq_numerics::interval::{FiniteInterval, IntervalError};
 use morphiq_numerics::log_space::{
     log_diff_exp, log_sum_exp, log_sum_exp_and_normalize, log_sum_exp_pairs,
 };
@@ -890,6 +891,8 @@ pub fn corpus_digest() -> [u8; 32] {
         (-27.0, 520.0),
     );
 
+    interval_section(&mut r, &mut words);
+
     r.0.finalize().into()
 }
 
@@ -996,4 +999,80 @@ pub fn corpus_digest_hex(out: &mut [u8; 64]) -> &str {
         out[2 * i + 1] = HEX[usize::from(byte & 0xf)];
     }
     core::str::from_utf8(out).expect("hex digits are ASCII")
+}
+
+/// Every finite-interval operation, including typed errors and zero signs.
+fn interval_section(r: &mut Recorder, words: &mut Words) {
+    r.label("finite_interval");
+    let edges = [
+        0.0,
+        -0.0,
+        f64::from_bits(1),
+        -f64::from_bits(1),
+        f64::MIN_POSITIVE,
+        -f64::MIN_POSITIVE,
+        f64::MAX,
+        -f64::MAX,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::NAN,
+        1.0,
+        -1.0,
+        0.5,
+        -1000.0,
+        710.0,
+    ];
+    for i in 0..4096 {
+        let a = if i < edges.len() * edges.len() {
+            edges[i % edges.len()]
+        } else {
+            f64::from_bits(words.next_word())
+        };
+        let b = if i < edges.len() * edges.len() {
+            edges[i / edges.len()]
+        } else {
+            f64::from_bits(words.next_word())
+        };
+        record_interval(r, FiniteInterval::point(a));
+        record_interval(r, FiniteInterval::new(a, b));
+        if let (Ok(x), Ok(y)) = (
+            FiniteInterval::new(if a <= b { a } else { b }, if a <= b { b } else { a }),
+            FiniteInterval::new(
+                if b <= 1.0 { b } else { 1.0 },
+                if b <= 1.0 { 1.0 } else { b },
+            ),
+        ) {
+            for probe in [a, b, 0.0, f64::NAN, f64::INFINITY] {
+                r.u64(u64::from(x.contains(probe)));
+            }
+            for value in [
+                Ok(x.negated()),
+                Ok(x.abs()),
+                Ok(x.max(y)),
+                x.checked_add(y),
+                x.checked_sub(y),
+                x.checked_mul(y),
+                x.checked_div(y),
+                x.checked_square(),
+                x.checked_ln(),
+                x.checked_exp(),
+                x.checked_sqrt(),
+            ] {
+                record_interval(r, value);
+            }
+        }
+    }
+}
+
+fn record_interval(r: &mut Recorder, value: Result<FiniteInterval, IntervalError>) {
+    match value {
+        Ok(x) => {
+            r.u64(0);
+            r.f64(x.lower());
+            r.f64(x.upper());
+        }
+        Err(IntervalError::InvalidBounds) => r.u64(1),
+        Err(IntervalError::Domain) => r.u64(2),
+        Err(IntervalError::Range) => r.u64(3),
+    }
 }

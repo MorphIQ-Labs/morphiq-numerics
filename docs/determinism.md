@@ -39,6 +39,8 @@ functions unnoticed.
 | `exp_slice`, `ln_slice`, `ln_1p_slice` | 1,000 slices of each length from 1 to 17, each element in turn a special value or branch edge of the function, a random encoding, or an argument in `[−746, 710)`, `[0, 4)` or `[−1, 9)` respectively | every element of each output slice |
 | `exp2_slice`, `expm1_slice` | 1,000 slices of each length from 1 to 17, mixing special values, screen edges, random encodings, and arguments in `[−1076, 1025)` or `[−38, 710)`; an additional `expm1_slice_small` section samples `[−1/32, 1/32)` | every output element, scalar and SIMD builds alike |
 
+| `finite_interval` | every pair of 16 edge values, then random encodings, 4,096 iterations | constructors, membership, negation, absolute value, maximum, every checked arithmetic/elementary operation; endpoint bits or typed error codes |
+
 ## Where it is checked
 
 The test `every_output_matches_the_committed_digest` runs:
