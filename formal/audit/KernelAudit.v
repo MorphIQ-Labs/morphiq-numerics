@@ -461,3 +461,15 @@ Print Assumptions NormalLogAnalytic.normal_log_tail_identity.
 Print Assumptions NormalLogAnalytic.normal_atanh_identity.
 Print Assumptions NormalLogAnalytic.normal_atanh_series100_error.
 Print Assumptions NormalLogAnalytic.normal_log_complement_series299_error.
+Require NormalResidualGrid NormalTableLookup.
+Print Assumptions NormalResidualGrid.normal_q_ordered_difference_radius.
+Print Assumptions NormalResidualGrid.normal_q_opposite_difference_radius.
+Print Assumptions NormalResidualGrid.normal_extended_residual_radius.
+Print Assumptions NormalResidualGrid.normal_q_compare_abs.
+Print Assumptions NormalTableLookup.normal_table_input_round.
+Print Assumptions NormalTableLookup.normal_extended_small_cell_radius.
+Print Assumptions NormalTableLookup.normal_q_erfcx_small_table_error.
+Require NormalLastTableCell.
+Print Assumptions NormalLastTableCell.normal_last_cell.
+Print Assumptions NormalLastTableCell.normal_rounded_cell.
+Print Assumptions NormalLastTableCell.normal_extended_last_cell_miss.

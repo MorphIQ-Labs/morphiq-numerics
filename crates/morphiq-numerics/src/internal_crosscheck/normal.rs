@@ -146,4 +146,26 @@ pub(super) fn write(out: &mut String) {
         )
         .unwrap();
     }
+    for i in 0..256 {
+        let high = match i {
+            0 => 0.5,
+            1 => 1.0,
+            2 => 2.0,
+            3 => 4.0,
+            4 => 8.0_f64.next_down(),
+            _ => f64::from_bits(
+                0.375_f64.to_bits() + rng.next_u64() % (8.0_f64.to_bits() - 0.375_f64.to_bits()),
+            ),
+        };
+        let high = Q256::from_f64(high);
+        let low = high.mul_pow2(-100);
+        let x = high.add(if i % 2 == 0 { low } else { low.neg() });
+        writeln!(
+            out,
+            "normal_erfcx_small_table {} : {}",
+            q256(x),
+            q256(crate::erfcx::accurate::positive(x))
+        )
+        .unwrap();
+    }
 }
