@@ -15,7 +15,7 @@ fn mul<K: Simd>(k: K, a: Dw<K>, b: Dw<K>) -> Dw<K> {
 }
 
 #[inline(always)]
-fn table<K: Simd>(k: K, x: K::F) -> Dw<K> {
+pub(crate) fn table<K: Simd>(k: K, x: K::F) -> Dw<K> {
     let words = k.store(x);
     let mut coefficients = [K::Array::default(); 13];
     let mut h = K::Array::default();
@@ -60,7 +60,7 @@ fn table<K: Simd>(k: K, x: K::F) -> Dw<K> {
 }
 
 #[inline(always)]
-fn asymptotic<K: Simd>(k: K, x: K::F) -> Dw<K> {
+pub(crate) fn asymptotic<K: Simd>(k: K, x: K::F) -> Dw<K> {
     let yh = k.div(k.splat(1.0), x);
     let (p, pe) = two_prod(k, x, yh);
     let yl = k.mul(k.sub(k.sub(k.splat(1.0), p), pe), yh);
@@ -103,18 +103,8 @@ fn reciprocal<K: Simd>(k: K, x: K::F) -> (Dw<K>, K::F) {
 
 #[inline(always)]
 fn reflected<K: Simd>(k: K, x: K::F) -> (Dw<K>, K::Array) {
-    use crate::exp::tables::{INV_N, S_L1, S_L2, S_L3, SHIFTER};
     let (s, se) = two_prod(k, x, x);
-    let t = k.add(k.mul(s, k.splat(INV_N)), k.splat(SHIFTER));
-    let n = k.sub(t, k.splat(SHIFTER));
-    let r1 = k.sub(s, k.mul(n, k.splat(S_L1)));
-    let p2 = k.mul(n, k.splat(S_L2));
-    let r0 = k.sub(r1, p2);
-    let rh = k.sub(k.add(r0, k.splat(6144.0)), k.splat(6144.0));
-    let rt = k.add(k.sub(k.sub(k.sub(r1, rh), p2), k.mul(n, k.splat(S_L3))), se);
-    let table_exp = crate::exp::lanes::table(k, t, 0);
-    let y = crate::exp::lanes::stage_b_at(k, &table_exp, rh, rt);
-    let y = fast_two_sum(k, y.0, y.1);
+    let (y, n) = crate::exp::lanes::stage_b_double_word(k, s, se);
     let mut scales = K::Array::default();
     let mut exponents = K::Array::default();
     let mut reflect = 0;

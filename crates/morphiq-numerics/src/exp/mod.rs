@@ -207,6 +207,30 @@ pub(crate) fn stage_b_at(j: usize, r_h: f64, r_t: f64) -> (f64, f64) {
     (y, e + rest)
 }
 
+/// The library's fast `exp` kernel at the double-word argument `s + se`:
+/// `(Y, k)` with `exp(s + se) ≈ Y·2^k` (`docs/exp.md` §3–§4; the low word
+/// joins the reduction's `rr`). For `|s| < 710` and `|se| <= 2^-44`,
+/// the normalized mantissa error is at most `209 * 2^-78`, proved by
+/// `ErfcxReflectionExp.reflection_exp_ieee`. Scaling is left to the caller.
+#[inline]
+pub(crate) fn stage_b_double_word(s: f64, se: f64) -> (f64, f64, i32) {
+    // Stage B at an exact double-word square. The low input word joins
+    // the residual before the shared polynomial and table reconstruction.
+    let t = s * INV_N + SHIFTER;
+    let n = t - SHIFTER;
+    let ni = n as i32;
+    let j = ni.rem_euclid(512) as usize;
+    let k = ni.div_euclid(512);
+    let r1 = s - n * S_L1;
+    let p2 = n * S_L2;
+    let r0 = r1 - p2;
+    let rh = (r0 + 6144.0) - 6144.0;
+    let rt = (((r1 - rh) - p2) - n * S_L3) + se;
+    let (yh, yl) = stage_b_at(j, rh, rt);
+    let (yh, yl) = fast_two_sum(yh, yl);
+    (yh, yl, k)
+}
+
 /// `2^(j/512)` as a double-word `(hi, lo)`.
 #[inline]
 fn table(j: usize) -> (f64, f64) {

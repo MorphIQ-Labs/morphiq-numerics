@@ -79,6 +79,11 @@ pub(crate) struct Table<K: Simd> {
 /// Unscreened exponents must lie in [-1022, 1023].
 #[inline(always)]
 pub(crate) fn table<K: Simd>(k: K, t: K::F, screened: u64) -> Table<K> {
+    load_table(k, t, screened, true)
+}
+
+#[inline(always)]
+fn load_table<K: Simd>(k: K, t: K::F, screened: u64, scale_result: bool) -> Table<K> {
     let t_lanes = k.store(t);
     let (mut t_hi, mut t_lo, mut scale) = (
         K::Array::default(),
@@ -99,16 +104,37 @@ pub(crate) fn table<K: Simd>(k: K, t: K::F, screened: u64) -> Table<K> {
         let (hi, lo) = S_T[j];
         t_hi.as_mut()[i] = f64::from_bits(hi);
         t_lo.as_mut()[i] = f64::from_bits(lo);
-        // 2^k, |k| ≤ 1016 past the screen (docs/exp.md §3).
-        #[allow(clippy::cast_sign_loss)] // in [7, 2039]
-        let biased = ((n_int >> 9) + 1023) as u64;
-        scale.as_mut()[i] = f64::from_bits(biased << 52);
+        scale.as_mut()[i] = if scale_result {
+            // Normal 2^k on table()'s documented scaling domain.
+            #[allow(clippy::cast_sign_loss)] // biased exponent in [1, 2046]
+            let biased = ((n_int >> 9) + 1023) as u64;
+            f64::from_bits(biased << 52)
+        } else {
+            1.0
+        };
     }
     Table {
         hi: k.load(t_hi),
         lo: k.load(t_lo),
         scale: k.load(scale),
     }
+}
+
+/// Shared double-word exponential stage, matching `super::stage_b_double_word`.
+/// Returns normalized words and the exact reduction integer `n = 512*k + j`.
+/// No binary64 `2^k` is formed: the caller owns the result's scaling domain.
+#[inline(always)]
+pub(crate) fn stage_b_double_word<K: Simd>(k: K, s: K::F, se: K::F) -> (Dw<K>, K::F) {
+    let t = k.add(k.mul(s, k.splat(INV_N)), k.splat(SHIFTER));
+    let n = k.sub(t, k.splat(SHIFTER));
+    let r1 = k.sub(s, k.mul(n, k.splat(S_L1)));
+    let p2 = k.mul(n, k.splat(S_L2));
+    let r0 = k.sub(r1, p2);
+    let rh = k.sub(k.add(r0, k.splat(6144.0)), k.splat(6144.0));
+    let rt = k.add(k.sub(k.sub(k.sub(r1, rh), p2), k.mul(n, k.splat(S_L3))), se);
+    let table_exp = load_table(k, t, 0, false);
+    let y = stage_b_at(k, &table_exp, rh, rt);
+    (fast_two_sum(k, y.0, y.1), n)
 }
 
 /// `Stages::a_value` on every lane.

@@ -411,3 +411,32 @@ Print Assumptions NormalGaussianIntegral.gaussian_integral_remainder_bound.
 Print Assumptions NormalGaussianIntegral.gaussian_integral_limit.
 Print Assumptions NormalErfcxIdentity.normalized_tail_gaussian_identity.
 Print Assumptions NormalErfcxIdentity.positive_erfcx_gaussian.
+
+(** Normal components; no whole-dispatch theorem is claimed for the private
+    experimental kernels. *)
+Require NormalGaussianKernel NormalConstants NormalAccurateGaussian
+  NormalAccurateRounding NormalAccurateDensity NormalDensitySaturation
+  NormalCenterConstants NormalCenterHorner NormalCenterApproximation
+  NormalAccurateCenter NormalAccurateCentralCdf.
+Print Assumptions NormalGaussianKernel.normal_half_square_exact.
+Print Assumptions NormalGaussianKernel.normal_gaussian_regular_ieee.
+Print Assumptions NormalGaussianKernel.normal_gaussian_small_error.
+Print Assumptions NormalConstants.normal_density_dw_error.
+Print Assumptions NormalConstants.normal_inv_sqrt2_dw_error.
+Print Assumptions NormalConstants.normal_two_inv_sqrt_pi_dw_error.
+Print Assumptions NormalConstants.normal_ln2_dw_error.
+Print Assumptions NormalConstants.normal_q_density_error.
+Print Assumptions NormalConstants.normal_q_inv_sqrt2_error.
+Print Assumptions NormalConstants.normal_q_ln2_error.
+Print Assumptions NormalConstants.normal_pdf_zero_bracket.
+Print Assumptions NormalAccurateGaussian.normal_q_gaussian_regular_error.
+Print Assumptions NormalAccurateGaussian.normal_q_gaussian_tiny_error.
+Print Assumptions NormalAccurateRounding.normal_q_bounded_rounded.
+Print Assumptions NormalAccurateDensity.normal_q_density_regular_rounded.
+Print Assumptions NormalDensitySaturation.normal_pdf_zero_midpoint.
+Print Assumptions NormalCenterConstants.normal_q_center_coefficient_error.
+Print Assumptions NormalCenterHorner.normal_q_center_horner_error.
+Print Assumptions NormalCenterApproximation.normal_center_horner_truncation.
+Print Assumptions NormalCenterApproximation.normal_center_horner_lipschitz.
+Print Assumptions NormalAccurateCenter.normal_q_center_rounded.
+Print Assumptions NormalAccurateCentralCdf.normal_q_central_cdf_rounded.

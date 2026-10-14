@@ -12,7 +12,7 @@ Definition accurate_n s := fsub (fadd (fmul s ExpReduction.c_inv_l) ExpReduction
 Definition accurate_residual s se n :=
   add (add (q_float s) (q_float se)) (neg_q (mul (q_float n) q_logstep)).
 
-Lemma accurate_n_ieee s : finite s -> /4<=B s<=709.79 ->
+Lemma accurate_n_ieee s : finite s -> -745.1333<=B s<=709.79 ->
   finite (accurate_n s) /\ exists ni : Z,
     B (accurate_n s)=IZR ni /\ (Z.abs ni<=137601)%Z /\
     Rabs (B s-IZR ni*(ln 2/128))<=0.002708.
@@ -30,7 +30,7 @@ Proof.
 Qed.
 
 Theorem accurate_residual_error s se n ni : finite s -> finite se -> finite n ->
-  Rabs (B s)<=710 -> Rabs (B se)<=bpow radix2 (-44) ->
+  Rabs (B s)<=746 -> Rabs (B se)<=bpow radix2 (-44) ->
   B n=IZR ni -> (Z.abs ni<=137601)%Z ->
   valid (accurate_residual s se n) /\
   Rabs (qval (accurate_residual s se n)-(B s+B se-IZR ni*(ln 2/128)))<=bpow radix2 (-241).
@@ -44,10 +44,10 @@ Proof.
     apply Rabs_le. bpow_num_all. lra. }
   assert (Nabs : Rabs (IZR ni)<=137601) by (rewrite Rabs_Zabs; apply IZR_le; exact Ni).
   destruct (add_any _ _ Qs Qse) as [A Ae]. rewrite Vs,Vse in Ae.
-  assert (Aerror : Rabs (qval (add (q_float s) (q_float se))-(B s+B se))<=710*bpow radix2 (-254)).
-  { eapply Rle_trans; [exact Ae | ]. replace (710*bpow radix2 (-254)) with (bpow radix2 (-254)*710) by ring.
+  assert (Aerror : Rabs (qval (add (q_float s) (q_float se))-(B s+B se))<=746*bpow radix2 (-254)).
+  { eapply Rle_trans; [exact Ae | ]. replace (746*bpow radix2 (-254)) with (bpow radix2 (-254)*746) by ring.
     apply Rmult_le_compat_l; [apply bpow_ge_0 | apply Rmax_lub; [exact S | bpow_num_all; lra]]. }
-  assert (Arange : Rabs (qval (add (q_float s) (q_float se)))<=711).
+  assert (Arange : Rabs (qval (add (q_float s) (q_float se)))<=747).
   { apply Rabs_le_inv in Aerror,S,Se. apply Rabs_le. bpow_num_all. lra. }
   destruct (mul_any _ _ Qn L) as [P Pe]. rewrite Vn in Pe.
   assert (Perror : Rabs (qval (mul (q_float n) q_logstep)-IZR ni*(ln 2/128))<=

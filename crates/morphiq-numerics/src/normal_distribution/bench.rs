@@ -1,0 +1,108 @@
+//! Local development measurements; never a timing assertion or CI speed gate.
+use super::{Operation, evaluate, fast, special};
+use crate::lanes::{Kernel, map};
+use core::hint::black_box;
+use std::time::{Duration, Instant};
+use std::vec;
+use std::vec::Vec;
+
+fn measure(mut run: impl FnMut(), count: usize) -> f64 {
+    let start = Instant::now();
+    let mut repetitions = 0_u32;
+    loop {
+        run();
+        repetitions += 1;
+        if start.elapsed() >= Duration::from_millis(150) {
+            break;
+        }
+    }
+    #[allow(clippy::cast_precision_loss)] // measurement sizes
+    {
+        start.elapsed().as_secs_f64() * 1e9 / (f64::from(repetitions) * count as f64)
+    }
+}
+
+fn workload(name: &str) -> Vec<f64> {
+    (0..1024)
+        .map(|i| {
+            let u = f64::from(i) / 1023.0;
+            match name {
+                "central" => u - 0.5,
+                "ordinary" => 10.0 * u - 5.0,
+                "negative_tail" => -8.0 - 28.0 * u,
+                "positive_tail" => 8.0 + 28.0 * u,
+                "underflow" => 37.0 + 2.0 * u,
+                "mixed" => match i % 5 {
+                    0 => u - 0.5,
+                    1 => -3.0 * u,
+                    2 => 6.0 * u,
+                    3 => -8.0 - 28.0 * u,
+                    _ => 20.0 * u,
+                },
+                _ => unreachable!(),
+            }
+        })
+        .collect()
+}
+
+fn bench<G: Kernel>(name: &str, op: Operation, complement: bool, kind: &str, xs: &[f64]) {
+    let mut out = vec![0.0; xs.len()];
+    let scalar = measure(
+        || {
+            for (o, &x) in out.iter_mut().zip(black_box(xs)) {
+                *o = G::scalar(x);
+            }
+            black_box(&out);
+        },
+        xs.len(),
+    );
+    let batch = measure(
+        || {
+            map::<G>(black_box(xs), &mut out);
+            black_box(&out);
+        },
+        xs.len(),
+    );
+    let mut fallback = 0;
+    for &x in xs {
+        let x = if complement { -x } else { x };
+        if special(op, x).is_some() {
+            continue;
+        }
+        let decided = fast(op, x).is_some_and(|(y, eps)| {
+            (y.hi() + (y.lo() - eps)).to_bits() == (y.hi() + (y.lo() + eps)).to_bits()
+        });
+        if !decided {
+            fallback += 1;
+        }
+    }
+    std::println!(
+        "{name},{kind},{},{scalar:.3},{batch:.3},{:.3},{fallback}",
+        xs.len(),
+        scalar / batch
+    );
+    // Keep the scalar composition referenced independently of G::scalar.
+    black_box(evaluate(op, xs[0]));
+}
+
+#[test]
+#[ignore = "same-host release-mode measurement; no timing assertions"]
+fn normal_local_performance() {
+    use super::lanes::Normal;
+    std::println!("function,workload,count,scalar_ns,batch_ns,speedup,accurate_count");
+    for kind in [
+        "central",
+        "ordinary",
+        "negative_tail",
+        "positive_tail",
+        "underflow",
+        "mixed",
+    ] {
+        let xs = workload(kind);
+        bench::<Normal<0>>("pdf", Operation::Pdf, false, kind, &xs);
+        bench::<Normal<1>>("cdf", Operation::Cdf, false, kind, &xs);
+        bench::<Normal<2>>("ccdf", Operation::Cdf, true, kind, &xs);
+        bench::<Normal<3>>("centered", Operation::Centered, false, kind, &xs);
+        bench::<Normal<4>>("log_cdf", Operation::LogCdf, false, kind, &xs);
+    }
+}

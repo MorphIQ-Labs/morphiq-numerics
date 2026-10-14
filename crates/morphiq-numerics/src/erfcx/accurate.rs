@@ -24,8 +24,31 @@ pub(super) fn taylor(x: f64) -> Q256 {
     if h == 0.0 {
         return a0;
     }
+    taylor_at(idx, c, Q256::from_f64(h))
+}
+
+/// Positive erfcx at an extended argument, retaining the input's low bits.
+#[cfg(test)]
+pub(crate) fn positive(x: Q256) -> Q256 {
+    if x.cmp_abs(Q256::from_f64(16.0)) != core::cmp::Ordering::Less {
+        return asym_value(x);
+    }
+    // A rounded lookup argument may cross a cell boundary. Keep the true
+    // Q256 argument inside the Taylor theorem's |h| <= 1/8 domain, including
+    // values immediately below 16 that round to 16 in binary64.
+    let high = x.to_f64().min(f64::from_bits(16.0_f64.to_bits() - 1));
+    let (mut idx, mut c, _, _) = t_reduce(high);
+    let mut h = x.add(Q256::from_f64(c).neg());
+    if h.cmp_abs(Q256::from_f64(0.125)) == core::cmp::Ordering::Greater {
+        (idx, c, _, _) = t_reduce(high.next_down());
+        h = x.add(Q256::from_f64(c).neg());
+    }
+    taylor_at(idx, c, h)
+}
+
+fn taylor_at(idx: usize, c: f64, hq: Q256) -> Q256 {
+    let a0 = q(F_AT_C[idx]);
     let cq = Q256::from_f64(c);
-    let hq = Q256::from_f64(h);
     let a1 = cq.mul(a0).add(cq.mul(a0)).add(q(C2).neg());
     let mut sum = a0.add(a1.mul(hq));
     let lim = a0.top() - 262;
@@ -55,7 +78,10 @@ pub(super) fn taylor(x: f64) -> Q256 {
 }
 
 pub(crate) fn asym(x: f64) -> Q256 {
-    let xq = Q256::from_f64(x);
+    asym_value(Q256::from_f64(x))
+}
+
+fn asym_value(xq: Q256) -> Q256 {
     let y = xq.recip();
     let t = y.mul(y);
     let half = Q256::from_f64(0.5);

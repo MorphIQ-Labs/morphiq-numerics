@@ -100,6 +100,21 @@ let compute op args =
       (match args with
        | [x] -> show_bits (x_erfcx_entry (z_of_u64 (hex x)))
        | _ -> failwith "erfcx_entry takes a word")
+  | "normal_accurate_gaussian" | "normal_accurate_density" | "normal_accurate_center" | "normal_accurate_central_cdf" ->
+      (match args with
+       | [x] ->
+           let f = match op with
+             | "normal_accurate_gaussian" -> x_normal_accurate_gaussian
+             | "normal_accurate_density" -> x_normal_accurate_density
+             | "normal_accurate_center" -> x_normal_accurate_center
+             | _ -> x_normal_accurate_central_cdf in
+           let ((n, e), l) = f (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "normal accurate component takes a word")
+  | "normal_gaussian" ->
+      (match args with
+       | [x] -> let (k, words) = x_normal_gaussian (z_of_u64 (hex x)) in
+           String.concat " " (string_of_int (int_of_z k) :: List.map show_bits words)
+       | _ -> failwith "normal_gaussian takes a word")
   | "erfcx_accurate_exp" ->
       (match args with
        | [s; se] -> let ((n, e), l) = x_erfcx_accurate_exp (z_of_u64 (hex s)) (z_of_u64 (hex se)) in show (n, e, l)

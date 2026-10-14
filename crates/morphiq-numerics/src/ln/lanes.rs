@@ -11,7 +11,9 @@ use super::stages::{A_H, K_H, K2_H, TWO_53, TWO_M46};
 use super::{FRACTION, TWO_54, ln, ln_1p};
 use crate::lanes::{Kernel, decide_relative, lanes_mask, mask_from};
 
-mod fallback;
+pub(crate) mod fallback;
+#[cfg(test)]
+pub(crate) mod stage_b;
 
 /// `ln` as a lane kernel.
 pub(crate) struct Ln;

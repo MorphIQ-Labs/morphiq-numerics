@@ -57,6 +57,8 @@ mod log2;
 mod log_norm_pdf;
 pub mod log_space;
 pub mod normal;
+#[cfg(test)]
+mod normal_distribution;
 mod q128;
 mod q256;
 pub mod random;
