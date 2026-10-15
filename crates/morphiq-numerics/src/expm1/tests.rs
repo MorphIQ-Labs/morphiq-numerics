@@ -175,3 +175,70 @@ fn exponential_stages_agree_with_accurate_results_and_mostly_decide() {
         assert!(b_missed < 256);
     }
 }
+
+/// Which part of `expm1` decides `x`, and its value: `expm1`'s branches, for
+/// the native measurements' path counts.
+#[cfg(feature = "simd")]
+fn decided_by(x: f64) -> (&'static str, f64) {
+    use super::{
+        EPS, SMALL, TINY, X_MINUS_ONE, X_OVERFLOW, general_accurate, general_fast, small_accurate,
+        small_fast, stages,
+    };
+    let magnitude = x.abs();
+    if x.is_nan() || x >= X_OVERFLOW || x <= X_MINUS_ONE || magnitude < TINY {
+        return ("screen", super::expm1(x));
+    }
+    if magnitude < SMALL {
+        if let Some(y) = decide_with(small_fast(x), EPS) {
+            return ("small_fast", y);
+        }
+        return ("small_accurate", small_accurate(x).to_f64());
+    }
+    if let Some(y) = stages::stages(x) {
+        return ("stages", y);
+    }
+    let reduced = Reduced::of(x);
+    if let Some(y) = decide_with(general_fast(&reduced), EPS) {
+        return ("fast", y);
+    }
+    ("accurate", general_accurate(&reduced).to_f64())
+}
+
+/// Same-host timing of `expm1`, scalar and per lane backend
+/// (`lanes::tests::bench`); no timing assertion.
+#[cfg(feature = "simd")]
+#[test]
+#[ignore = "same-host release-mode measurement; no timing assertions"]
+fn native_performance() {
+    use crate::lanes::tests::bench::{Draw, function, tables};
+    use core::mem::size_of_val;
+    tables(&[
+        ("expm1::POLY", size_of_val(&super::tables::POLY)),
+        (
+            "expm1::RECIPROCALS",
+            size_of_val(&super::tables::RECIPROCALS),
+        ),
+    ]);
+    static EXPM1_SCREENED: [f64; 6] = [f64::NAN, f64::INFINITY, -40.0, 710.0, 1e-300, 0.0];
+    static EXPM1_DOMAIN: Draw = Draw::Uniform(-37.4, 746.4);
+    static EXPM1_MIXED: [Draw; 4] = [
+        Draw::Uniform(-30.0, 30.0),
+        Draw::Uniform(-1.0 / 32.0, 1.0 / 16.0),
+        Draw::Values(&EXPM1_SCREENED),
+        Draw::Uniform(-37.4, 746.4),
+    ];
+    static EXPM1_SMALL: Draw = Draw::Uniform(-1.0 / 32.0, 1.0 / 16.0);
+    function::<crate::expm1::lanes::Expm1>(
+        "expm1",
+        decided_by,
+        &[
+            ("common", Draw::Uniform(-30.0, 30.0)),
+            ("small", EXPM1_SMALL),
+            ("domain", EXPM1_DOMAIN),
+            ("screened", Draw::Values(&EXPM1_SCREENED)),
+            ("mixed", Draw::Mixed(&EXPM1_MIXED)),
+            ("fallback", Draw::Fallback(&EXPM1_DOMAIN)),
+            ("fallback_small", Draw::Fallback(&EXPM1_SMALL)),
+        ],
+    );
+}

@@ -147,3 +147,84 @@ fn representative_fast_paths_decide_and_match_the_oracle() {
         assert_eq!(got.to_bits(), word(case, "y").to_bits());
     }
 }
+
+/// Which part of `erfcx` decides `x`, and its value: `erfcx`'s branches, for
+/// the native measurements' path counts.
+#[cfg(feature = "simd")]
+fn decided_by(x: f64) -> (&'static str, f64) {
+    if let Some(y) = special(x) {
+        return ("screen", y);
+    }
+    let (name, fast) = match region(x) {
+        Region::T => ("table", fast_t(x)),
+        Region::YA => ("asymptotic", fast_ya(x)),
+        Region::YB => ("reciprocal", fast_yb(x)),
+        Region::N => ("negative", fast_n(x)),
+    };
+    match fast {
+        Some(y) => (name, y),
+        None => ("accurate", accurate::accurate(x).to_f64()),
+    }
+}
+
+/// Same-host timing of `erfcx`, scalar and per lane backend
+/// (`lanes::tests::bench`); no timing assertion.
+#[cfg(feature = "simd")]
+#[test]
+#[ignore = "same-host release-mode measurement; no timing assertions"]
+fn native_performance() {
+    use crate::lanes::tests::bench::{Draw, function, tables};
+    use core::mem::size_of_val;
+    tables(&[
+        ("erfcx::tables::T", size_of_val(&super::tables::T)),
+        ("erfcx::tables::PA", size_of_val(&super::tables::PA)),
+        (
+            "erfcx::accurate_tables::F_AT_C",
+            size_of_val(&super::accurate_tables::F_AT_C),
+        ),
+        (
+            "erfcx::accurate_tables::RECIP",
+            size_of_val(&super::accurate_tables::RECIP),
+        ),
+        (
+            "erfcx::accurate_tables::T2",
+            size_of_val(&super::accurate_tables::T2),
+        ),
+    ]);
+    static ERFCX_SCREENED: [f64; 6] = [
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        -27.0,
+        0.0,
+        1e-20,
+    ];
+    static ERFCX_BROAD: Draw = Draw::Uniform(-26.6, 4122.6);
+    static ERFCX_MIXED: [Draw; 6] = [
+        Draw::Uniform(-0.5, 16.5),
+        Draw::Uniform(16.0, 496.0),
+        Draw::Uniform(512.0, 4096.0),
+        Draw::Uniform(-26.6, 26.1),
+        Draw::Bits(0x7fc2_0dd7_5042_9b6e, 0x002d_f228_afbd_6491),
+        Draw::Values(&ERFCX_SCREENED),
+    ];
+    static ERFCX_TABLE: Draw = Draw::Uniform(-0.5, 16.5);
+    function::<super::lanes::Erfcx>(
+        "erfcx",
+        decided_by,
+        &[
+            ("table", ERFCX_TABLE),
+            ("positive_common", Draw::Uniform(0.0, 6.0)),
+            ("asymptotic", Draw::Uniform(16.0, 496.0)),
+            ("reciprocal", Draw::Uniform(512.0, 4096.0)),
+            ("negative", Draw::Uniform(-26.6, 26.1)),
+            (
+                "subnormal",
+                Draw::Bits(0x7fc2_0dd7_5042_9b6e, 0x002d_f228_afbd_6491),
+            ),
+            ("screened", Draw::Values(&ERFCX_SCREENED)),
+            ("mixed", Draw::Mixed(&ERFCX_MIXED)),
+            ("fallback", Draw::Fallback(&ERFCX_BROAD)),
+        ],
+    );
+}

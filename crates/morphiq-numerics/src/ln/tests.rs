@@ -301,3 +301,160 @@ fn each_stage_returns_the_reference_bits_wherever_it_decides() {
     assert!(h_decided > h_tried - h_tried / 64);
     assert!(b_decided > b_tried - b_tried / 64);
 }
+
+/// Which part of `ln` decides `x`, and its value: `ln`'s branches, for the
+/// native measurements' path counts.
+#[cfg(feature = "simd")]
+fn decided_by(x: f64) -> (&'static str, f64) {
+    if x.is_nan() || x <= 0.0 || x == f64::INFINITY || x == 1.0 {
+        return ("screen", super::ln(x));
+    }
+    let reduced = Reduced::of(x);
+    if let Some(y) = super::stage::parts(reduced.e, reduced.y).3 {
+        return ("stage", y);
+    }
+    if let Some(y) = decide(reduced.fast_value()) {
+        return ("fast", y);
+    }
+    (
+        "accurate",
+        reduced.accurate_value(reduced.z_exact()).to_f64(),
+    )
+}
+
+/// Which part of `ln_1p` decides `x`, and its value: `ln_1p`'s branches, for
+/// the native measurements' path counts.
+#[cfg(feature = "simd")]
+fn ln_1p_decided_by(x: f64) -> (&'static str, f64) {
+    use super::stages::{stage_b, stage_b_screen, stage_h, stage_h_screen};
+    use super::{TWO_M54, ln_1p_reference, small_accurate};
+    if stage_h_screen(x)
+        && let Some(y) = stage_h(x)
+    {
+        return ("stage_h", y);
+    }
+    if stage_b_screen(x)
+        && let Some(y) = stage_b(x)
+    {
+        return ("stage_b", y);
+    }
+    let magnitude = x.abs();
+    if x.is_nan() || x <= -1.0 || x == f64::INFINITY || magnitude < TWO_M54 {
+        return ("screen", ln_1p_reference(x));
+    }
+    if magnitude < TWO_M7 {
+        if let Some(y) = decide(ln_1p_double_word(DoubleWord::from_f64(x))) {
+            return ("small_fast", y);
+        }
+        return ("small_accurate", small_accurate(x).to_f64());
+    }
+    let (h, l) = split(x);
+    let reduced = Reduced::of(h);
+    if let Some(y) = decide(reduced.fast_value().add_f64(l / h)) {
+        return ("fast", y);
+    }
+    (
+        "accurate",
+        reduced.accurate_value(reduced.z_prime(l)).to_f64(),
+    )
+}
+
+/// Same-host timing of `ln` and `ln_1p`, scalar and per lane backend
+/// (`lanes::tests::bench`); no timing assertion.
+#[cfg(feature = "simd")]
+#[test]
+#[ignore = "same-host release-mode measurement; no timing assertions"]
+fn native_performance() {
+    use crate::lanes::tests::bench::{Draw, function, tables};
+    use core::mem::size_of_val;
+    tables(&[
+        ("ln::tables::R_BITS", size_of_val(&super::tables::R_BITS)),
+        (
+            "ln::tables::NEG_LN_R_BITS",
+            size_of_val(&super::tables::NEG_LN_R_BITS),
+        ),
+        (
+            "ln::tables::NEG_LN_R_Q128",
+            size_of_val(&super::tables::NEG_LN_R_Q128),
+        ),
+        (
+            "ln::tables::RECIPROCALS",
+            size_of_val(&super::tables::RECIPROCALS),
+        ),
+        ("ln::tables::POLY", size_of_val(&super::tables::POLY)),
+        ("ln::stage_tables::R", size_of_val(&super::stage_tables::R)),
+        ("ln::stage_tables::T", size_of_val(&super::stage_tables::T)),
+        (
+            "ln::stage_tables::EL",
+            size_of_val(&super::stage_tables::EL),
+        ),
+        ("ln::stage_tables::H", size_of_val(&super::stage_tables::H)),
+        ("ln::stage_tables::B", size_of_val(&super::stage_tables::B)),
+    ]);
+    static LN_SCREENED: [f64; 7] = [
+        f64::NAN,
+        f64::INFINITY,
+        -1.0,
+        0.0,
+        -0.0,
+        1.0,
+        f64::NEG_INFINITY,
+    ];
+    static LN_POSITIVE: Draw = Draw::Bits(1, 0x7fef_ffff_ffff_ffff);
+    static LN_CLOSE: Draw = Draw::Uniform(
+        1.0 - 1.0 / 281_474_976_710_656.0,
+        1.0 / 140_737_488_355_328.0,
+    );
+    static LN_MIXED: [Draw; 4] = [
+        Draw::Uniform(0.5, 1.5),
+        Draw::Bits(1, 0x7fef_ffff_ffff_ffff),
+        Draw::Values(&LN_SCREENED),
+        Draw::Bits(1, 0x000f_ffff_ffff_ffff),
+    ];
+    function::<crate::ln::lanes::Ln>(
+        "ln",
+        decided_by,
+        &[
+            ("common", Draw::Uniform(0.5, 1.5)),
+            ("positive", LN_POSITIVE),
+            ("close_to_one", LN_CLOSE),
+            ("subnormal", Draw::Bits(1, 0x000f_ffff_ffff_ffff)),
+            ("screened", Draw::Values(&LN_SCREENED)),
+            ("mixed", Draw::Mixed(&LN_MIXED)),
+            ("fallback", Draw::Fallback(&LN_CLOSE)),
+        ],
+    );
+    static LN1P_SCREENED: [f64; 7] = [f64::NAN, f64::INFINITY, -1.0, -2.0, 0.0, -0.0, 1e-300];
+    static LN1P_HUGE: Draw = Draw::Bits(0x7fb0_0000_0000_0000, 1 << 54);
+    static LN1P_WIDE: Draw = Draw::LogUniform(-2.0, 62.0, -1.0);
+    static LN1P_MIXED: [Draw; 4] = [
+        Draw::LogUniform(
+            -30.0 * core::f64::consts::LOG2_E,
+            30.0 * core::f64::consts::LOG2_E,
+            0.0,
+        ),
+        Draw::LogUniform(-2.0, 62.0, -1.0),
+        Draw::Values(&LN1P_SCREENED),
+        Draw::Uniform(-1.0 / 128.0, 1.0 / 64.0),
+    ];
+    function::<crate::ln::lanes::Ln1p>(
+        "ln_1p",
+        ln_1p_decided_by,
+        &[
+            (
+                "exp_neg",
+                Draw::LogUniform(
+                    -30.0 * core::f64::consts::LOG2_E,
+                    30.0 * core::f64::consts::LOG2_E,
+                    0.0,
+                ),
+            ),
+            ("wide", LN1P_WIDE),
+            ("small", Draw::Uniform(-1.0 / 128.0, 1.0 / 64.0)),
+            ("huge", LN1P_HUGE),
+            ("screened", Draw::Values(&LN1P_SCREENED)),
+            ("mixed", Draw::Mixed(&LN1P_MIXED)),
+            ("fallback", Draw::Fallback(&LN1P_HUGE)),
+        ],
+    );
+}
