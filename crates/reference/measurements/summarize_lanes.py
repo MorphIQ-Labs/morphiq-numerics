@@ -20,7 +20,11 @@ from pathlib import Path
 
 def records(path):
     with open(path, newline="") as f:
-        for row in csv.reader(f):
+        # libtest writes `test NAME ... ` without a newline, so a test's first
+        # record follows it on the same line.
+        lines = (line.split(" ... ", 1)[-1] if line.startswith("test ") else line
+                 for line in f)
+        for row in csv.reader(lines):
             if row and row[0] in {"time", "path", "table", "cache", "backends"}:
                 yield row
 
