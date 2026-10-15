@@ -269,6 +269,8 @@ jobs:
           ./scripts/install_sde.sh "$RUNNER_TEMP/sde"
           echo "$RUNNER_TEMP/sde" >> "$GITHUB_PATH"
       - run: ./scripts/check_lanes_sde.sh
+      - name: No lane kernel calls an AVX2 or AVX-512F operation out of line
+        run: ./scripts/check_lane_codegen.sh
 
   # Machine-checked proofs, bound to the source they describe: the double-word
   # error bounds and two_prod's exactness (docs/double-word.md), the Gappa
