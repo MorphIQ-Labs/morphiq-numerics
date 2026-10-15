@@ -2,7 +2,7 @@
 From Coq Require Import Reals ZArith Lia Lra Psatz.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
 From Interval Require Import Tactic.
-From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Eft RoundingConstant.
+From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Eft RoundingConstant RoundingTest.
 Require Import StageGappa LnFastCompose NormalLogReciprocalStage NormalConstants
   NormalLogTailPolynomial NormalLogTailApprox NormalLogMillsIdentity NormalLogTailSquare
   NormalCenterFastTail ErfcxTailIntegral NormalTailAnalytic ErfcxDecision.
@@ -43,7 +43,7 @@ Theorem normal_log_tail_base_words x : finite x -> 37<=B x<=bpow radix2 45 ->
   let '(h,l):=normal_log_tail_base64 x in
   finite h /\ finite l /\ B h=rndF(B h+B l) /\
   Rabs(B h)<=64 /\ Rabs(B l)<=128 /\ 3<=B h+B l<=34 /\
-  Rabs(B h+B l-(ln(B x)+ln(2*PI)/2))<=bpow radix2 (-59)+bpow radix2 (-96).
+  Rabs(B h+B l-(ln(B x)+ln(2*PI)/2))<=bpow radix2 (-65)+bpow radix2 (-96).
 Proof.
   intros Fx X;pose proof(normal_log_reciprocal_ieee x Fx X)as Log.
   pose proof normal_log_tail_constant_words as Constant.
@@ -53,7 +53,7 @@ Proof.
   destruct Constant as[Fc [Fd [NormCD [C [D [RangeC ErrorC]]]]]].
   assert(LogRange : 3<=ln(B x)<=32)by(split;interval with(i_prec 100)).
   assert(RangeAB : 2<=B a+B b<=33).
-  { apply Rabs_le_inv in LogError;rewrite(Rabs_pos_eq(ln(B x)))in LogError by lra;bpow_num_all;lra. }
+  { apply Rabs_le_inv in LogError;bpow_num_all;lra. }
   assert(Cancel : Rabs(B a+B b)+Rabs(B c+B d)<=4*Rabs(B a+B b+(B c+B d))).
   { rewrite !Rabs_pos_eq by lra;lra. }
   pose proof(lf_add_pair a b c d Fa Fb Fc Fd NormAB NormCD
@@ -66,12 +66,12 @@ Proof.
   { rewrite Value;replace((B a+B b+(B c+B d))*(1+e)-(B a+B b+(B c+B d)))with
       ((B a+B b+(B c+B d))*e)by ring.
     rewrite Rabs_mult,Rabs_pos_eq by lra;pose proof(Rabs_pos e);bpow_num_all;nra. }
-  assert(Error : Rabs(B h+B l-(ln(B x)+ln(2*PI)/2))<=bpow radix2 (-59)+bpow radix2 (-96)).
+  assert(Error : Rabs(B h+B l-(ln(B x)+ln(2*PI)/2))<=bpow radix2 (-65)+bpow radix2 (-96)).
   { replace(B h+B l-(ln(B x)+ln(2*PI)/2))with
       ((B h+B l-(B a+B b+(B c+B d)))+((B a+B b-ln(B x))+(B c+B d-ln(2*PI)/2)))by ring.
     eapply Rle_trans;[apply Rabs_triang|].
     eapply Rle_trans;[apply Rplus_le_compat_l,Rabs_triang|].
-    rewrite(Rabs_pos_eq(ln(B x)))in LogError by lra;bpow_num_all;nra. }
+    bpow_num_all;nra. }
   assert(Range : 3<=B h+B l<=34).
   { assert(C0 : /2<=ln(2*PI)/2<=1)by(split;interval with(i_prec 100)).
     apply Rabs_le_inv in Error;bpow_num_all;lra. }
@@ -91,7 +91,7 @@ Theorem normal_log_tail_correction_words x : finite x -> 37<=B x<=bpow radix2 45
   finite h /\ finite l /\ B h=rndF(B h+B l) /\
   Rabs(B h)<=64 /\ Rabs(B l)<=128 /\ 2<=B h+B l<=36 /\
   Rabs(B h+B l-(ln(B x)+ln(2*PI)/2-ln(tail_integral(2*((1/B x)*(1/B x))))))<=
-    3*bpow radix2 (-60)+bpow radix2 (-95).
+    bpow radix2 (-60)+bpow radix2 (-65)+bpow radix2 (-95).
 Proof.
   intros Fx X;pose proof(normal_log_tail_base_words x Fx X)as Base.
   destruct(normal_log_tail_value_ieee x Fx X)as[Fp ErrorP].
@@ -125,7 +125,7 @@ Proof.
     pose proof(Rabs_pos((B h+B l-(B a+B b+B p))/(B a+B b+B p))).
     unfold prec in Relative;change(- (53))%Z with(-53)%Z in Relative;bpow_num_all;nra. }
   assert(Error : Rabs(B h+B l-(ln(B x)+ln(2*PI)/2-ln(tail_integral(2*((1/B x)*(1/B x))))))<=
-    3*bpow radix2 (-60)+bpow radix2 (-95)).
+    bpow radix2 (-60)+bpow radix2 (-65)+bpow radix2 (-95)).
   { replace(B h+B l-(ln(B x)+ln(2*PI)/2-ln(tail_integral(2*((1/B x)*(1/B x))))))with
       ((B h+B l-(B a+B b+B p))+((B a+B b-(ln(B x)+ln(2*PI)/2))+
        (B p+ln(tail_integral(2*((1/B x)*(1/B x)))))))by ring.
@@ -152,7 +152,7 @@ Theorem normal_log_tail_moderate_words x : finite x -> 37<=B x<=bpow radix2 45 -
   let '(h,l):=normal_log_tail_moderate64 x in
   finite h /\ finite l /\ B h=rndF(B h+B l) /\
   512<=Rabs(B h)<=bpow radix2 90 /\
-  Rabs(ln(normal_tail(B x))-(B h+B l))<=bpow radix2 (-67)*Rabs(ln(normal_tail(B x))).
+  Rabs(ln(normal_tail(B x))-(B h+B l))<=bpow radix2 (-69)*Rabs(ln(normal_tail(B x))).
 Proof.
   intros Fx X.
   pose proof(normal_log_tail_square_exact x Fx ltac:(split;[eapply Rle_trans;[|exact(proj1 X)];interval with(i_prec 100)|exact(proj2 X)]))as Square.
@@ -193,13 +193,13 @@ Proof.
   { rewrite Identity;rewrite Rabs_left1 by(rewrite ValueAB in SquareRange;nra).
     rewrite ValueAB in SquareRange;split;nra. }
   assert(PreError : Rabs((B a+B b+(-B c+-B d))-ln(normal_tail(B x)))<=
-    (3/2^69)*Rabs(ln(normal_tail(B x)))).
+    (7/2^72)*Rabs(ln(normal_tail(B x)))).
   { replace((B a+B b+(-B c+-B d))-ln(normal_tail(B x)))with
       (-(B c+B d-(ln(B x)+ln(2*PI)/2-ln(tail_integral(2*((1/B x)*(1/B x)))))))
       by(rewrite ValueAB,Identity;ring).
     rewrite Rabs_Ropp;eapply Rle_trans;[exact ErrorCD|];bpow_num_all;lra. }
-  pose proof(lf_rounded_sum _ _ _ (3/2^69) e ltac:(interval with(i_prec 100)) PreError E Value)as Error.
-  assert(FinalError : Rabs(ln(normal_tail(B x))-(B h+B l))<=bpow radix2 (-67)*Rabs(ln(normal_tail(B x)))).
+  pose proof(lf_rounded_sum _ _ _ (7/2^72) e ltac:(interval with(i_prec 100)) PreError E Value)as Error.
+  assert(FinalError : Rabs(ln(normal_tail(B x))-(B h+B l))<=bpow radix2 (-69)*Rabs(ln(normal_tail(B x)))).
   { rewrite Rabs_minus_sym;eapply Rle_trans;[exact Error|].
     apply Rmult_le_compat_r;[apply Rabs_pos|interval with(i_prec 150)]. }
   assert(TotalRange : 512<=Rabs(B h+B l)<=bpow radix2 90).
@@ -215,7 +215,7 @@ Proof.
 Qed.
 
 Definition normal_log_tail_moderate_decide64 x :=
-  let '(h,l):=normal_log_tail_moderate64 x in erfcx_decide64 h l.
+  let '(h,l):=normal_log_tail_moderate64 x in decide_with h l (erfcx_pow2(-68)).
 
 Theorem normal_log_tail_moderate_decided x v : finite x -> 37<=B x<=bpow radix2 45 ->
   normal_log_tail_moderate_decide64 x=Some v ->
@@ -224,8 +224,13 @@ Proof.
   intros Fx X;pose proof(normal_log_tail_moderate_words x Fx X)as Words.
   unfold normal_log_tail_moderate_decide64;destruct(normal_log_tail_moderate64 x)as[h l].
   destruct Words as[Fh [Fl [Norm [H Error]]]];intros Decision.
-  destruct(erfcx_decide_ieee h l (ln(normal_tail(B x))) v Fh Fl
+  destruct(erfcx_pow2_ok(-68)ltac:(lia))as[Fe Eps].
+  destruct(decide_with_ok h l (erfcx_pow2(-68)) (ln(normal_tail(B x))) (bpow radix2(-69)) v Fh Fl Fe
     ltac:(split;[eapply Rle_trans;[|exact(proj1 H)];interval with(i_prec 80)|
-      eapply Rle_trans;[exact(proj2 H)|apply bpow_le;lia]])Norm Error Decision)as[Eq Value].
-  subst v;split;assumption.
+      eapply Rle_trans;[exact(proj2 H)|apply bpow_le;lia]])Norm)as[Eq Value].
+  - split;apply bpow_le;lia.
+  - rewrite Eps;split;bpow_num;lra.
+  - exact Error.
+  - exact Decision.
+  - subst v;split;[exact Fh|symmetry;exact Value].
 Qed.

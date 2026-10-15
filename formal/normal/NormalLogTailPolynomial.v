@@ -84,9 +84,9 @@ Proof.
   rewrite E0,E1,E2,E3,E4,E5,E6,V0,V1,V2,V3,V4,V5,V6,V7. reflexivity.
 Qed.
 
-Theorem normal_log_tail_value_ieee x : finite x -> 37<=B x<=bpow radix2 45 ->
+Theorem normal_log_tail_value_model_ieee x : finite x -> 37<=B x<=bpow radix2 45 ->
   finite(normal_log_tail_value64 x) /\
-  Rabs(B(normal_log_tail_value64 x)+ln(tail_integral(2*((1/B x)*(1/B x)))))<=bpow radix2 (-60).
+  B(normal_log_tail_value64 x)=normal_log_tail_value_r(1/B x).
 Proof.
   intros Fx X;destruct one_ok as[F1 B1].
   assert(Z : bpow radix2 (-45)<=1/B x<=/32).
@@ -115,6 +115,17 @@ Proof.
   assert(Value : B(normal_log_tail_value64 x)=normal_log_tail_value_r(1/B x)).
   { unfold normal_log_tail_value64;change(B(fmul u (normal_log_tail_horner64 u))=normal_log_tail_value_r(1/B x)).
     rewrite Bv,Bp,Bu,Br;reflexivity. }
+  split;assumption.
+Qed.
+
+Theorem normal_log_tail_value_ieee x : finite x -> 37<=B x<=bpow radix2 45 ->
+  finite(normal_log_tail_value64 x) /\
+  Rabs(B(normal_log_tail_value64 x)+ln(tail_integral(2*((1/B x)*(1/B x)))))<=bpow radix2 (-60).
+Proof.
+  intros Fx X;destruct(normal_log_tail_value_model_ieee x Fx X)as[Fv Value].
+  assert(Z37 : bpow radix2 (-45)<=1/B x<=1/37).
+  { replace(bpow radix2 (-45))with(/bpow radix2 45)by(bpow_num;field).
+    unfold Rdiv;rewrite !Rmult_1_l;split;apply Rinv_le_contravar;bpow_num_all;lra. }
   split;[exact Fv|];rewrite Value.
   pose proof(normal_log_tail_model (1/B x) Z37)as Evaluation.
   assert(T : 0<=(1/B x)*(1/B x)<=/1369).
@@ -126,4 +137,17 @@ Proof.
   eapply Rle_trans;[apply Rabs_triang|].
   eapply Rle_trans;[apply Rplus_le_compat;[exact Evaluation|exact Approximation]|].
   bpow_num;lra.
+Qed.
+
+Lemma normal_log_first_polynomial_range x : finite x -> 37<=B x<=64 ->
+  0<=B(normal_log_tail_value64 x)<=0.001.
+Proof.
+  intros F X;assert(Z : bpow radix2(-45)<=1/B x<=1/37).
+  { replace(bpow radix2(-45))with(/bpow radix2 45)by(bpow_num;field).
+    unfold Rdiv;rewrite !Rmult_1_l;split;apply Rinv_le_contravar;bpow_num_all;lra. }
+  destruct(normal_log_tail_value_model_ieee x F ltac:(bpow_num_all;split;lra))as[_ Value].
+  rewrite Value;pose proof(normal_log_tail_model (1/B x)Z)as Error.
+  assert(P : 0.0002<=normal_log_tail_polynomial((1/B x)*(1/B x))<=0.0009).
+  { unfold normal_log_tail_polynomial;split;interval with(i_prec 100). }
+  apply Rabs_le_inv in Error;bpow_num_all;split;lra.
 Qed.
