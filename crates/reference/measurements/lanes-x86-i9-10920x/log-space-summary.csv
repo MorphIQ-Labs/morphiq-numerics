@@ -1,0 +1,7 @@
+workload,unit,samples,ns_median,ns_min,ns_max
+"log_sum_exp, n = 2",call,3,37.100,37.000,37.300
+log_diff_exp,call,3,30.900,30.800,31.600
+"log_sum_exp_pairs, N = 2",pair,3,34.700,34.500,35.000
+"log_sum_exp_and_normalize, N = 1",pair,3,48.300,47.600,48.900
+log_sum_exp + separate normalization,pair,3,63.200,63.100,64.800
+"log_sum_exp, n = 1000",element,3,12.500,12.100,12.800

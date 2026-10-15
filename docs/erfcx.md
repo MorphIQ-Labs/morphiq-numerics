@@ -597,8 +597,10 @@ median ranges, in nanoseconds per argument:
 The shared host was not idle: one-minute load averages were 3.83 and 5.13
 at the run boundaries. This task's proof and certificate processes were
 paused during timing; unrelated host activity, frequency and power settings
-were not controlled. These are preliminary same-host observations and
-establish no native x86 performance claim. Mixed-region two-lane dispatch
+were not controlled. These are preliminary same-host observations. Native x86
+timing on one i9-10920X, every region and backend, is in
+[lanes-x86-i9-10920x](../crates/reference/measurements/lanes-x86-i9-10920x/README.md): the table region batches at 11.0 ns against 17.6
+ns scalar, the asymptotic tail at 4.9 against 31.0. Mixed-region two-lane dispatch
 adds about 2% here; homogeneous regions benefit from vector evaluation.
 [Raw rounds, process timing and source hashes](../crates/reference/measurements/erfcx-m1pro/)
 retain every sample and the environment record.

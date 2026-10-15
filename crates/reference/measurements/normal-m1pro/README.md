@@ -66,8 +66,7 @@ slowdowns; the implementation does not promise a gain for every mixture or
 slice length. Underflow workloads are dominated by the shared Q256 fallback,
 so their SIMD speedup is near one.
 
-Native x86 hardware was unavailable. SSE2, AVX2+FMA and AVX-512F measurements
-for all five functions are outstanding in
-[#124](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/124).
-Rosetta and Intel SDE validate correctness only. No native x86 performance
-claim follows from these ARM results.
+No native x86 performance claim follows from these ARM results. SSE2,
+AVX2+FMA and AVX-512F measurements of all five functions, on one native
+i9-10920X, are in [`lanes-x86-i9-10920x`](../lanes-x86-i9-10920x/README.md);
+Rosetta and Intel SDE validate correctness only.

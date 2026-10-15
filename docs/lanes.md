@@ -325,8 +325,10 @@ The cascade adds at most one detection check and one feature-enabled call per
 backend. On aarch64 it has one backend, NEON, so the NEON figures below are
 unaffected. On x86-64 it lets a slice shorter than the widest chunk, such as
 a two-element batch on AVX2 or AVX-512F, run on SSE2's two lanes instead of
-the scalar function. That gain is inferred from the kernels running the same
-operations; it has not been measured, since no x86-64 host was timed.
+the scalar function. Measured on one i9-10920X, a two-element slice beats the
+scalar loop for every function except `ln` and `ln_1p`, and a one-element
+slice costs 2.1–2.8 ns more than a scalar call
+([native x86 measurements](../crates/reference/measurements/lanes-x86-i9-10920x/README.md#short-slices-and-dispatch-overhead)).
 
 `crates/reference/src/bin/bench-batched.rs` times a loop of the scalar
 function against the batched one, as the median over 31 rounds of the time per
@@ -358,9 +360,13 @@ than it did over the double-word path. On log-uniform arguments, the lanes
 stage H screens out (`|x|` below `2^−46` or from `2^53`) take stage B or the
 fallback, so they gain least.
 
-Only the NEON figures are measured. SSE2, AVX2 and AVX-512F are checked for
-bit equality, not timed: timing on a CI runner is not evidence, and no x86-64
-host was measured.
+SSE2, AVX2 and AVX-512F were timed natively on one Intel i9-10920X (Cascade
+Lake), each backend alone and through the cascade, for every lane kernel and
+workload ([measurements](../crates/reference/measurements/lanes-x86-i9-10920x/README.md)).
+For the arguments above, the dispatched batch there takes 3.4 ns (`exp`
+`[−30, 0)`), 7.2 ns (`ln` `[0.5, 2)`) and 3.4 ns (`ln_1p` `e^d`), against
+6.1, 9.1 and 8.5 ns for the scalar loop. Those figures describe that host
+only. Timing on a CI runner is not evidence.
 
 A same-host run of the previous `ln` implementation (commit `e053de4`,
 load 2.15) measured 29.81/29.76 ns for the two scalar workloads and
@@ -383,8 +389,10 @@ Before extracting the shared lane evaluators, the same host measured `exp`
 batches at 2.32/7.44 ns for its two ranges; afterwards, 2.34–2.35/7.51–7.58 ns.
 Wide domains gain less because screened inputs still use scalar fallbacks.
 The scalar accurate-path rates remain those measured in [exp2.md](exp2.md)
-and [expm1.md](expm1.md); SIMD makes the same decisions per argument.
-No native x86 timing is claimed.
+and [expm1.md](expm1.md); SIMD makes the same decisions per argument. On the
+i9-10920X, `exp2` `[−30, 0)` and `expm1` `[−30, 0)` batch at 2.8 and 3.8 ns,
+against 8.4 and 11.1 ns scalar
+([measurements](../crates/reference/measurements/lanes-x86-i9-10920x/README.md)).
 
 The shared logarithm fallback was measured on the same M1 Pro and toolchain
 (2026-10-12), with other builds paused during timing. The benchmark includes
@@ -407,8 +415,9 @@ Ordinary `ln` scalar timing also improves, from 6.52–6.58 ns to
 6.01–6.08 ns, after extracting its fallback completion. The dispatch keeps
 the decided mask through the common branch and computes the pending mask
 only when needed; adding mask work to every batch measurably slowed the
-common `ln_1p` workloads. These are local NEON measurements, not native x86
-results.
+common `ln_1p` workloads. These are local NEON measurements. On the
+i9-10920X, the AVX2 and AVX-512F fallback paths for these arguments ran 2–3×
+slower than scalar at this revision (#162).
 
 The seeded scalar pass-rate tests send 81 of 1,048,576 `ln` inputs past the
 reciprocal stage (0.0077%). Exercising the double-word fallbacks directly,

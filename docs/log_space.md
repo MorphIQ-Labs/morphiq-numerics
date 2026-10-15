@@ -436,7 +436,11 @@ makes it 1.66× faster.
 
 On AVX2 and AVX-512F, a batch of two pairs is shorter than one lane chunk.
 The backend cascade ([lanes.md](lanes.md) §1) runs it on SSE2's two lanes.
-That lane-pair comparison was not timed on x86-64.
+On one i9-10920X with `simd`, `log_sum_exp_pairs` takes 34.7 ns per pair at
+`N = 2` against 37.1 ns for `log_sum_exp` at `n = 2`, and the fused
+`log_sum_exp_and_normalize` 48.9 ns against 64.8 ns for the separate pair
+([measurements](../crates/reference/measurements/lanes-x86-i9-10920x/README.md#compositions)). The run without `simd` was not
+timed there.
 
 **Scalar pair specialization, native x86-64.** `bench-log-space` reuses the
 fixed-seed input and timing approach of `bench-batched`, retaining every

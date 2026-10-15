@@ -101,8 +101,11 @@ keeps `|r| ≤ 2^−10.5`, where a degree-5 polynomial is accurate to `2^−75.9
 issue #114); measured inside a consumer's EM loop on an Apple M1 Pro, `N = 512`
 cost 2.6% more. The smaller table was chosen to leave
 room in a 32 KiB L1 data cache, as on many x86-64 cores, for a consumer's own
-working set and `ln_1p`'s table. That trade-off is inferred for x86-64, not
-measured there (§11).
+working set and `ln_1p`'s table. On one x86-64 host, an i9-10920X with 32 KiB
+of L1d, 4 KiB of competing cache traffic per 64-element call cost `exp` 0.2–0.4
+ns per argument beyond the traffic's own cost, flat from 16 KiB to 4 MiB of
+competing data ([measurements](../crates/reference/measurements/lanes-x86-i9-10920x/README.md#tables-and-cache)). `N = 1024` was not
+measured there, so the trade-off itself remains inferred (§11).
 
 1. `t = RN(RN(x·INV_N) + S)`, with `INV_N = RN(512 / ln 2)` (*generated*) and
    the shifter `S = 1.5·2^52`. `|x·INV_N| < 520,017`, so `t` lies in
@@ -738,5 +741,7 @@ the same code in the same build:
 
 That is about 5× the throughput and 2.2× shorter latency. Batched, two NEON
 lanes take 2.34 ns per argument on `[−30, 0]` ([lanes.md](lanes.md) §7). Only
-this host is measured. On x86-64 the table's smaller footprint (§3) is
-expected to matter more than here, but that is inferred, not measured.
+this host is measured here. On an i9-10920X the same scalar loop takes 6.1 ns
+and the AVX-512F batch 3.4 ns, with 20.0 ns of dependency-chain latency
+([measurements](../crates/reference/measurements/lanes-x86-i9-10920x/README.md)); the table-footprint trade-off of §3 is measured
+there only at `N = 512`.
