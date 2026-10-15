@@ -86,3 +86,28 @@ pub const fn two_prod(a: f64, b: f64) -> (f64, f64) {
     let e = (((a_head * b_head - p) + a_head * b_tail) + a_tail * b_head) + a_tail * b_tail;
     (p, e)
 }
+
+/// [`two_prod`] for a crate kernel whose arguments are proved to stay in its
+/// domain `D` (see [`two_prod`]): there a fused multiply-add's error term,
+/// `RN(a·b − p)`, is Dekker's bit for bit ([lanes.md](../../../docs/lanes.md)
+/// §2), so a build that targets FMA computes it in one instruction and every
+/// other build runs Dekker's operations. Each caller names the proof that
+/// keeps it in `D`; the public [`two_prod`] stays Dekker's everywhere.
+#[must_use]
+#[inline]
+pub(crate) fn two_prod_d(a: f64, b: f64) -> (f64, f64) {
+    #[cfg(all(feature = "std", target_feature = "fma"))]
+    {
+        let p = a * b;
+        // Reason: with `target_feature = "fma"` this is one hardware fused
+        // multiply-add, not the software fallback the lint guards against.
+        // Exit condition: a fused multiply-add in `core`, usable without `std`.
+        #[allow(clippy::disallowed_methods)]
+        let e = a.mul_add(b, -p);
+        (p, e)
+    }
+    #[cfg(not(all(feature = "std", target_feature = "fma")))]
+    {
+        two_prod(a, b)
+    }
+}

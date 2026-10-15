@@ -9,7 +9,7 @@ mod tables;
 mod tests;
 
 use crate::double_word::DoubleWord as Dw;
-use crate::eft::two_prod;
+use crate::eft::two_prod_d;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Operation {
@@ -78,7 +78,8 @@ pub(crate) fn gaussian(x: f64) -> (Dw, i32) {
     let (h, l) = if x < SMALL {
         (0.0, 0.0)
     } else {
-        two_prod(x, -0.5 * x)
+        // In D: NormalGaussianKernel.normal_half_square_exact.
+        two_prod_d(x, -0.5 * x)
     };
     let (yh, yl, k) = crate::exp::stage_b_double_word(h, l);
     (Dw::sum(yh, yl), k)
@@ -170,7 +171,8 @@ pub(crate) fn fast(op: Operation, x: f64) -> Option<(Dw, f64)> {
         Operation::Cdf if a <= 0.5 => center(x).add_f64(0.5),
         Operation::LogCdf if a <= 0.5 => log_dw(center(x).add_f64(0.5)),
         Operation::LogCdf if x < 0.0 => {
-            let (h, l) = two_prod(a, -0.5 * a);
+            // In D: NormalGaussianKernel.normal_half_square_exact.
+            let (h, l) = two_prod_d(a, -0.5 * a);
             let ln_scaled = log_dw(scaled_erfcx(a)).sub(dw(tables::LN2));
             Dw::sum(h, l).add(ln_scaled)
         }
@@ -235,11 +237,13 @@ pub(crate) fn tail_first(op: Operation, x: f64) -> Option<f64> {
 #[inline]
 pub(crate) fn tail_first_parts(x: f64) -> (f64, f64) {
     let a = x.abs();
-    let (h, l) = two_prod(a, -0.5 * a);
+    // In D: NormalGaussianKernel.normal_half_square_exact.
+    let (h, l) = two_prod_d(a, -0.5 * a);
     let (ye, le, k) = crate::exp::stage_a_double_word(h, l);
     let f = scaled_erfcx(a);
     // ye·f.hi exactly; the cross terms in binary64.
-    let (p, pe) = two_prod(ye, f.hi());
+    // In D: NormalTailFirst.normal_tail_first_parts_ok.
+    let (p, pe) = two_prod_d(ye, f.hi());
     let pl = pe + (ye * f.lo() + le * f.hi());
     #[allow(clippy::cast_possible_truncation)] // |k| <= 1016
     let scale = pow2(k as i32 - 1);
@@ -287,7 +291,8 @@ pub(crate) fn density_first(x: f64) -> Option<f64> {
 pub(crate) fn density_first_parts(x: f64) -> (f64, f64, i64, [f64; 2]) {
     let a = x.abs();
     // h + l = −a²/2 exactly; s + e = h − ln √(2π)'s high word exactly.
-    let (h, l) = two_prod(a, -0.5 * a);
+    // In D: NormalGaussianKernel.normal_half_square_exact.
+    let (h, l) = two_prod_d(a, -0.5 * a);
     let (s, e) = crate::eft::two_sum(h, -tables::LN_SQRT_2PI.0);
     let se = e + (l - tables::LN_SQRT_2PI.1);
     let (y, w, k) = crate::exp::stage_a_double_word(s, se);
