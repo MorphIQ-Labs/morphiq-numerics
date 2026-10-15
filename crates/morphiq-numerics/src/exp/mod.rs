@@ -183,6 +183,18 @@ impl Stages {
     }
 }
 
+/// Stage A at a double-word argument `s + se` (§5a): `(y, l, k)` with `y + l`
+/// within `0x1.7p−61` of `2^(j/512)·e^R`, `R = s + se − (512k + j)·L`, for
+/// `|s| < 704` and `|se| ≤ 2^−42` (certified: `formal/exp/stage_a_dw.g`).
+/// The low word joins stage A's reduced argument with one more rounding.
+#[inline]
+pub(crate) fn stage_a_double_word(s: f64, se: f64) -> (f64, f64, i64) {
+    let Stages { n, j, k, r1 } = Stages::of(s);
+    let r = (r1 - n * S_L2D) + se;
+    let (y, l) = stage_a_at(j, r);
+    (y, l, k)
+}
+
 /// Shared exponential stage A after the caller's proved reduction.
 #[inline]
 pub(crate) fn stage_a_at(j: usize, r: f64) -> (f64, f64) {

@@ -61,6 +61,7 @@ pub(super) fn write(out: &mut String) {
         }
         if (f64::from_bits(0x3de0_0000_0000_0000)..=37.0).contains(&x) {
             write_density_fast(out, x);
+            write_density_first(out, x);
         }
         if (f64::from_bits(0x23d0_0000_0000_0000)..=0.5).contains(&x) {
             write_central_value(out, x);
@@ -118,6 +119,7 @@ pub(super) fn write(out: &mut String) {
         )
         .unwrap();
         write_density_fast(out, x);
+        write_density_first(out, x);
     }
     for i in 0..256 {
         let high = match i {
@@ -571,6 +573,21 @@ fn write_compositions(out: &mut String, rng: &mut SplitMix64) {
         )
         .unwrap();
     }
+}
+
+fn write_density_first(out: &mut String, x: f64) {
+    let (y, l, _, [s, se]) = normal_distribution::density_first_parts(x);
+    writeln!(
+        out,
+        "normal_density_first {:016x} : {:016x} {:016x} {:016x} {:016x} {}",
+        x.to_bits(),
+        s.to_bits(),
+        se.to_bits(),
+        y.to_bits(),
+        l.to_bits(),
+        super::opt(normal_distribution::density_first(x))
+    )
+    .unwrap();
 }
 
 fn write_density_fast(out: &mut String, x: f64) {

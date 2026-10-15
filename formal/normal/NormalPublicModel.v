@@ -5,7 +5,7 @@ From Flocq Require Import IEEE754.Binary IEEE754.Bits.
 From Binary64 Require Import IEEE64 IEEE64Add.
 From Q Require Q256.
 Require Import ErfcxDecision ErfcxAccurateSquare ErfcxAccurateTerms NormalConstants NormalComparisons
-  NormalFastDispatch NormalTailThresholdConstants NormalLogOverflowConstants
+  NormalFastDispatch NormalDensityFirst NormalTailThresholdConstants NormalLogOverflowConstants
   NormalAccurateDensity NormalAccurateCenter NormalAccurateCentralCdf NormalAccurateTailFull
   NormalAccurateOuter NormalAccurateLogCentral NormalAccurateLogNegative NormalAccurateLogPositive.
 Open Scope R_scope.
@@ -49,8 +49,14 @@ Definition normal_fix_zero64 op x y :=
   | _=>y
   end.
 Definition normal_accurate64 op x := normal_fix_zero64 op x (Q256.to_f64(normal_accurate_value64 op x)).
-Definition normal_regular64 op x := match normal_fast_dispatch64 op x with
-  | Some y=>y | None=>normal_accurate64 op x end.
+(** The density's first stage, tried before the fast dispatch. *)
+Definition normal_first64 op x := match op with
+  | NormalPdf=>if normal_lt normal_thirty_seven (b64_abs x) then None else normal_density_first64 x
+  | _=>None end.
+Definition normal_regular64 op x := match normal_first64 op x with
+  | Some y=>y
+  | None=>match normal_fast_dispatch64 op x with
+    | Some y=>y | None=>normal_accurate64 op x end end.
 Definition normal_entry64 op x := match normal_special64 op x with
   | Some y=>y | None=>normal_regular64 op x end.
 Definition normal_ccdf_entry64 x :=
