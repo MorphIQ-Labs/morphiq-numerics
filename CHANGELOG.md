@@ -10,6 +10,16 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.8](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.7...v0.0.8) - 2026-10-15
+
+### Added
+
+- *(normal)* implement scalar and SIMD normal compositions ([#157](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/157))
+
+### Performance
+
+- *(lanes)* measure scalar and SIMD kernels on native x86 hardware ([#164](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/164))
+
 ## [0.0.7](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.6...v0.0.7) - 2026-10-14
 
 ### Added
