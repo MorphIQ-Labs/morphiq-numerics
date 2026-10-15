@@ -302,6 +302,13 @@ intermediate-word tests and the cross-target digest check lane equivalence.
 - **The determinism digest's `exp_slice`, `exp2_slice`, `expm1_slice`, `ln_slice` and `ln_1p_slice`
   sections** ([determinism.md](determinism.md)), with and without `simd`.
 
+- **No lane operation out of line** (`scripts/check_lane_codegen.sh`, in the
+  `simd (avx512, sde)` job): the release library's disassembly has no call
+  from a non-test function to an AVX2 or AVX-512F helper, other than the
+  store and load by which `lanes::cold` enters and leaves the wrapper (§7).
+  An out-of-line operation still returns the scalar bits, so only the code
+  shows it.
+
 **Backends in CI.** `MORPHIQ_REQUIRE_BACKENDS` fails the run when a listed
 backend is absent, so each job states what it exercised: the `test` job
 requires `avx2` and `sse2` on its x86-64 hosts and `neon` on its aarch64
@@ -326,9 +333,9 @@ backend. On aarch64 it has one backend, NEON, so the NEON figures below are
 unaffected. On x86-64 it lets a slice shorter than the widest chunk, such as
 a two-element batch on AVX2 or AVX-512F, run on SSE2's two lanes instead of
 the scalar function. Measured on one i9-10920X, a two-element slice beats the
-scalar loop for every function except `ln` and `ln_1p`, and a one-element
-slice costs 2.1–2.8 ns more than a scalar call
-([native x86 measurements](../crates/reference/measurements/lanes-x86-i9-10920x/README.md#short-slices-and-dispatch-overhead)).
+scalar loop for every function, and a one-element slice costs 2.1–2.8 ns
+more than a scalar call
+([native x86 measurements](../crates/reference/measurements/lanes-x86-i9-10920x-cold-paths/README.md)).
 
 `crates/reference/src/bin/bench-batched.rs` times a loop of the scalar
 function against the batched one, as the median over 31 rounds of the time per
@@ -362,11 +369,33 @@ fallback, so they gain least.
 
 SSE2, AVX2 and AVX-512F were timed natively on one Intel i9-10920X (Cascade
 Lake), each backend alone and through the cascade, for every lane kernel and
-workload ([measurements](../crates/reference/measurements/lanes-x86-i9-10920x/README.md)).
-For the arguments above, the dispatched batch there takes 3.4 ns (`exp`
-`[−30, 0)`), 7.2 ns (`ln` `[0.5, 2)`) and 3.4 ns (`ln_1p` `e^d`), against
-6.1, 9.1 and 8.5 ns for the scalar loop. Those figures describe that host
-only. Timing on a CI runner is not evidence.
+workload ([measurements](../crates/reference/measurements/lanes-x86-i9-10920x-cold-paths/README.md)).
+For the arguments above, the dispatched batch there takes 3.3 ns (`exp`
+`[−30, 0)`), 3.1 ns (`ln` `[0.5, 2)`) and 3.2 ns (`ln_1p` `e^d`), against
+6.0, 9.1 and 8.3 ns for the scalar loop
+([after #162](../crates/reference/measurements/lanes-x86-i9-10920x-cold-paths/README.md)). Those figures describe that host only. Timing on a
+CI runner is not evidence.
+
+**Uncommon paths and lane masks.** Two rules keep a kernel's operations in
+lanes, and the native x86 measurements are what found them (#162):
+
+- **A kernel's uncommon path runs through `lanes::cold`.** That is an
+  `#[inline(never)]` function that re-enters `Simd::vectorize`, so the path
+  stays out of the common chunk's code but is compiled with the backend's
+  features. A function outside that wrapper cannot inline an AVX2 or AVX-512F
+  helper. `ln`'s and `ln_1p`'s fallbacks once made 200–300 helper calls per
+  chunk that way and ran 2–3× slower than scalar, while SSE2, which is enabled
+  for the whole x86-64 target, was unaffected. The hot side passes and
+  receives vectors: passing the chunk's arrays kept them in memory and slowed
+  `ln_1p`'s common path by about 10%.
+- **A lane mask is computed in lanes.** That is either a comparison, as in
+  `ln`'s screen, or `mask_from`, which tests each lane's bit of a broadcast
+  integer. Storing one word per lane and reloading them as a vector stalls
+  store forwarding on every chunk.
+
+Together these took `ln` `[0.5, 2)` from 7.2 to 3.1 ns per argument on the
+i9-10920X, `ln` near 1 from 172 to 36 ns, `ln_1p` beyond `2^1020` from 185 to
+27 ns, and `expm1` 4–10% faster.
 
 A same-host run of the previous `ln` implementation (commit `e053de4`,
 load 2.15) measured 29.81/29.76 ns for the two scalar workloads and
@@ -390,9 +419,9 @@ batches at 2.32/7.44 ns for its two ranges; afterwards, 2.34–2.35/7.51–7.58 
 Wide domains gain less because screened inputs still use scalar fallbacks.
 The scalar accurate-path rates remain those measured in [exp2.md](exp2.md)
 and [expm1.md](expm1.md); SIMD makes the same decisions per argument. On the
-i9-10920X, `exp2` `[−30, 0)` and `expm1` `[−30, 0)` batch at 2.8 and 3.8 ns,
-against 8.4 and 11.1 ns scalar
-([measurements](../crates/reference/measurements/lanes-x86-i9-10920x/README.md)).
+i9-10920X, `exp2` `[−30, 0)` and `expm1` `[−30, 0)` batch at 2.8 and 3.6 ns,
+against 8.4 and 11.2 ns scalar
+([measurements](../crates/reference/measurements/lanes-x86-i9-10920x-cold-paths/README.md)).
 
 The shared logarithm fallback was measured on the same M1 Pro and toolchain
 (2026-10-12), with other builds paused during timing. The benchmark includes
@@ -416,8 +445,8 @@ Ordinary `ln` scalar timing also improves, from 6.52–6.58 ns to
 the decided mask through the common branch and computes the pending mask
 only when needed; adding mask work to every batch measurably slowed the
 common `ln_1p` workloads. These are local NEON measurements. On the
-i9-10920X, the AVX2 and AVX-512F fallback paths for these arguments ran 2–3×
-slower than scalar at this revision (#162).
+i9-10920X the dispatched batches take 36.5 ns (`ln` near 1) and 27.3 ns
+(`ln_1p` beyond `2^1020`), against 86.9 and 96.8 ns scalar.
 
 The seeded scalar pass-rate tests send 81 of 1,048,576 `ln` inputs past the
 reciprocal stage (0.0077%). Exercising the double-word fallbacks directly,
