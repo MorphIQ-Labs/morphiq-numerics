@@ -102,6 +102,34 @@ Proof.
   split;rewrite Total;assumption.
 Qed.
 
+Theorem normal_gaussian_extended_ieee x : finite x -> bpow radix2 (-33)<=B x<=39 ->
+  let '(yh,yl,k):=normal_gaussian64 x in
+  finite yh /\ finite yl /\ (-1100<=k<=1100)%Z /\
+  B yh=rndF(B yh+B yl) /\
+  Rabs(exp(- B x*B x/2)/bpow radix2 k-(B yh+B yl))<=209*bpow radix2 (-78).
+Proof.
+  intros F X. assert (Domain : bpow radix2 (-400)<=B x<=39).
+  { split;[apply Rle_trans with(bpow radix2 (-33));[apply bpow_le;lia|lra]|lra]. }
+  pose proof(normal_half_square_exact x F Domain) as Square.
+  unfold normal_gaussian64;destruct(normal_half_square64 x) as [h l].
+  destruct Square as [Fh [Fl [Exact [H L]]]].
+  assert (Small : Rabs(B h)<762).
+  { assert (Low : Rabs(B l)<=/2).
+    { apply Rle_trans with(bpow radix2 (-44));[exact L|change(/2)with(bpow radix2 (-1));apply bpow_le;lia]. }
+    apply Rabs_le_inv in Low. pose proof(bpow_gt_0 radix2 (-33)).
+    apply Rabs_lt;split;nra. }
+  pose proof(reflection_exp_wide_ieee h l Fh Small Fl L) as Exp.
+  destruct(reflection_exp64 h l) as [[yh yl]k].
+  destruct Exp as [Fyh [Fyl [K [Yh [Yl [Norm Error]]]]]].
+  rewrite Exact in Error.
+  pose proof(two_sum_ieee yh yl Fyh Fyl
+    ltac:(apply Rle_trans with 3;[rewrite Rabs_pos_eq;lra|interval with(i_prec 64)])
+    ltac:(apply Rle_trans with(bpow radix2 (-52));[exact Yl|apply bpow_le;lia])) as Sum.
+  destruct(two_sum64 yh yl) as [a b]. destruct Sum as [Fa [Fb [Value Total]]].
+  split;[exact Fa|]. split;[exact Fb|]. split;[exact K|].
+  split;rewrite Total;assumption.
+Qed.
+
 Theorem normal_gaussian_small_error x : Rabs x<=bpow radix2 (-33) ->
   0<=1-exp(-x*x/2)<=bpow radix2 (-67).
 Proof.

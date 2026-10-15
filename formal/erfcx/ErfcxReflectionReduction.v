@@ -10,7 +10,7 @@ Require erfcx_reflection_reduction.
 Open Scope R_scope.
 
 Lemma reflection_reduction_bound (R dL dh se : R) (k : Z) :
-  (Z.abs k <= 525000)%Z -> Rabs R <= 0.000677 -> Rabs dL <= bpow radix2 (-129) ->
+  (Z.abs k <= 565000)%Z -> Rabs R <= 0.000677 -> Rabs dL <= bpow radix2 (-129) ->
   Rabs dh <= bpow radix2 (-41) -> Rabs se <= bpow radix2 (-44) ->
   let r1 := R + IZR k * (l2_g + l3_g + dL) in
   let rh := rn (r1 - IZR k * l2_g) + dh in
@@ -19,7 +19,7 @@ Lemma reflection_reduction_bound (R dL dh se : R) (k : Z) :
   Rabs rt <= bpow radix2 (-40) /\ Rabs rh <= 0.000678.
 Proof.
   intros Hk HR HdL Hdh Hse. cbv zeta.
-  assert (Hn : -525000 <= round radix2 (FIX_exp 0) Gappa_round_def.rndNE (IZR k) <= 525000)
+  assert (Hn : -565000 <= round radix2 (FIX_exp 0) Gappa_round_def.rndNE (IZR k) <= 565000)
     by (rewrite rnd_int; split; apply IZR_le; lia).
   apply Rabs_le_inv in HR. apply Rabs_le_inv in HdL.
   apply Rabs_le_inv in Hdh. apply Rabs_le_inv in Hse.
@@ -35,7 +35,7 @@ Definition reflection_reduced64 n r1 se : f64 * f64 :=
   (rh, fadd rt0 se).
 
 Theorem reflection_reduced_ieee x n r1 se (ni : Z) :
-  finite x -> finite n -> B n = IZR ni -> (Z.abs ni <= 525000)%Z -> finite r1 ->
+  finite x -> finite n -> B n = IZR ni -> (Z.abs ni <= 565000)%Z -> finite r1 ->
   B r1 = B x - IZR ni * B st_l1 -> Rabs (B x - IZR ni * L) <= 0.000677 ->
   Rabs (B r1) < bpow radix2 (-10) ->
   (ni <> 0%Z -> on_grid (-63) (B r1)) -> (ni = 0%Z -> B r1 = B x) ->
@@ -94,6 +94,29 @@ Theorem reflection_reduce_ieee x se :
 Proof.
   intros Fx Hx Fse Hse. unfold reflection_reduce64.
   pose proof (stage_of_extended_ok x Fx Hx) as H.
+  destruct (stage_of x) as [[[n j] k] r1].
+  destruct H as [ni [Bn [Fn [Ni [Nk [J [K [Fr [Br [Hr [Rb [Gr Zr]]]]]]]]]]]].
+  pose proof (reflection_reduced_ieee x n r1 se ni Fx Fn Bn ltac:(lia)
+    Fr Br ltac:(lra) Rb Gr Zr Fse Hse) as Red.
+  destruct (reflection_reduced64 n r1 se) as [rh rt].
+  assert (HR : Rabs (B x - IZR ni * L + B se) <= 0.000677).
+  { apply Rle_trans with (1 := Rabs_triang _ _).
+    change (bpow radix2 (-44)) with (/17592186044416) in Hse. lra. }
+  destruct Red as [Frh [Frt [Grh [Rh [Rt Err]]]]].
+  exists ni. repeat split; try assumption; lia.
+Qed.
+
+Theorem reflection_reduce_wide_ieee x se :
+  finite x -> Rabs (B x) < 762 -> finite se -> Rabs (B se) <= bpow radix2 (-44) ->
+  let '(j,k,rh,rt) := reflection_reduce64 x se in
+  exists ni : Z, ni = (512*k+j)%Z /\ (0 <= j < 512)%Z /\ (-1100 <= k <= 1100)%Z /\
+    finite rh /\ finite rt /\ on_grid (-40) (B rh) /\
+    Rabs (B rh) <= 0.000678 /\ Rabs (B rt) <= bpow radix2 (-40) /\
+    Rabs (B x - IZR ni * L + B se) <= 0.000677 /\
+    Rabs (B rh + B rt - (B x - IZR ni * L + B se)) <= bpow radix2 (-92).
+Proof.
+  intros Fx Hx Fse Hse. unfold reflection_reduce64.
+  pose proof (stage_of_wide_ok x Fx Hx) as H.
   destruct (stage_of x) as [[[n j] k] r1].
   destruct H as [ni [Bn [Fn [Ni [Nk [J [K [Fr [Br [Hr [Rb [Gr Zr]]]]]]]]]]]].
   pose proof (reflection_reduced_ieee x n r1 se ni Fx Fn Bn ltac:(lia)

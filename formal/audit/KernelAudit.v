@@ -701,3 +701,8 @@ Print Assumptions NormalLogPositiveFast.normal_log_positive_decided.
 Require Import NormalPublicEntry.
 Print Assumptions NormalPublicEntry.normal_public_contract.
 Print Assumptions NormalPublicEntry.normal_ccdf_public_contract.
+
+Require Import NormalFiniteDensity NormalFiniteTail NormalUnderflowCandidate.
+Print Assumptions NormalFiniteDensity.normal_finite_density_ieee.
+Print Assumptions NormalFiniteTail.normal_finite_tail_ieee.
+Print Assumptions NormalFiniteTail.normal_finite_log_tail_ieee.

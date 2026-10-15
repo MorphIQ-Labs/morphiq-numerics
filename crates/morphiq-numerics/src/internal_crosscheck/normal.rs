@@ -69,6 +69,23 @@ pub(super) fn write(out: &mut String) {
             .unwrap();
         }
         let x = input.abs();
+        if x > 37.0 && x < 39.0 {
+            for (op, name) in [
+                (Operation::Pdf, "normal_finite_density"),
+                (Operation::Cdf, "normal_finite_tail"),
+            ] {
+                let (h, l) = normal_distribution::finite_tail::candidate(op, x);
+                writeln!(
+                    out,
+                    "{name} {:016x} : {:016x} {:016x} {}",
+                    x.to_bits(),
+                    h.to_bits(),
+                    l.to_bits(),
+                    super::opt(normal_distribution::finite_tail::decide(op, x))
+                )
+                .unwrap();
+            }
+        }
         if x > 0.5 && x <= 37.0 {
             write_outer_fast_components(out, x);
         }

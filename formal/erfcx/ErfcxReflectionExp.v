@@ -83,6 +83,59 @@ Proof.
   - rewrite Value, Exact. exact E.
 Qed.
 
+Theorem reflection_exp_wide_ieee x se :
+  finite x -> Rabs (B x) < 762 -> finite se -> Rabs (B se) <= bpow radix2 (-44) ->
+  let '(yh,yl,k) := reflection_exp64 x se in
+  finite yh /\ finite yl /\ (-1100 <= k <= 1100)%Z /\
+  0.999 <= B yh <= 2.001 /\ Rabs (B yl) <= bpow radix2 (-52) /\
+  B yh = rndF (B yh + B yl) /\
+  Rabs (exp (B x + B se) / bpow radix2 k - (B yh + B yl)) <= IZR 209 * bpow radix2 (-78).
+Proof.
+  intros Fx Hx Fse Hse. unfold reflection_exp64.
+  pose proof (reflection_reduce_wide_ieee x se Fx Hx Fse Hse) as Red.
+  revert Red. generalize (reflection_reduce64 x se). intros [[[j k] rh] rt] Red.
+  destruct Red as [ni [Nk [J [K [Frh [Frt [Grh [Rh [Rt [HR Err]]]]]]]]]].
+  pose proof (stage_b_at_extended_ok rh rt (Z.to_nat j)
+    (B x - IZR ni * L + B se) Frh Frt Grh Rh Rt Err HR ltac:(lia)) as Stage.
+  revert Stage. generalize (stage_b_at rh rt (Z.to_nat j)). intros [y l] Stage.
+  destruct Stage as [Fy [Fl [Y [Low E]]]].
+  assert (Yabs : Rabs (B y) <= bpow radix2 1021).
+  { rewrite Rabs_pos_eq by lra. apply Rle_trans with (bpow radix2 2);
+      [change (bpow radix2 2) with 4; lra | apply bpow_le; lia]. }
+  assert (Labs : Rabs (B l) <= bpow radix2 1021)
+    by (apply Rle_trans with (1 := Low); apply bpow_le; lia).
+  assert (Dom : Rabs (B l) <= Rabs (B y)).
+  { change (bpow radix2 (-20)) with (/1048576) in Low.
+    rewrite (Rabs_pos_eq (B y)) by lra. lra. }
+  pose proof (fast_two_sum_ieee y l Fy Fl Yabs Labs (or_intror (or_introl Dom))) as FS.
+  revert FS. generalize (fast_two_sum64 y l). intros [yh yl] FS.
+  destruct FS as [Fyh [Fyl [High Exact]]].
+  pose proof (reduced_exponential_range j (B x - IZR ni * L + B se) J HR) as Ideal.
+  assert (Sum : 0.9992 <= B y + B l <= 2.0001).
+  { pose proof (Rabs_le_inv _ _ E) as Er.
+    change (IZR 209) with 209 in Er.
+    change (bpow radix2 (-78)) with (/302231454903657293676544) in Er.
+    split; lra. }
+  pose proof (rnd_err_below (B y + B l) 2 ltac:(lia)
+    ltac:(change (bpow radix2 2) with 4; apply Rabs_le; lra)) as Round.
+  rewrite <- High in Round.
+  assert (Yh : 0.999 <= B yh <= 2.001).
+  { pose proof (Rabs_le_inv _ _ Round) as Rr.
+    change (bpow radix2 (2 - 54)) with (/4503599627370496) in Rr. split; lra. }
+  assert (Yl : Rabs (B yl) <= bpow radix2 (-52)).
+  { replace (B yl) with (- (B yh - (B y + B l))) by lra.
+    rewrite Rabs_Ropp. exact Round. }
+  assert (Scale : exp (B x + B se) =
+    (exp (INR (Z.to_nat j) * ln 2 / 512) * exp (B x - IZR ni * L + B se)) * bpow radix2 k).
+  { rewrite <- exp_split. f_equal. rewrite Z2Nat.id by lia. rewrite Nk. ring. }
+  assert (Value : exp (B x + B se) / bpow radix2 k =
+    exp (INR (Z.to_nat j) * ln 2 / 512) * exp (B x - IZR ni * L + B se)).
+  { rewrite Scale. field. apply Rgt_not_eq, bpow_gt_0. }
+  split; [exact Fyh | split; [exact Fyl | split; [exact K | split; [exact Yh | split; [exact Yl | split]]]]].
+  - rewrite Exact. exact High.
+  - rewrite Value, Exact. exact E.
+Qed.
+
 Theorem reflection_square_exp_ieee x : finite x -> B reflection_limit < B x < - /2 ->
   let '(s,se) := two_prod64 x x in
   let '(yh,yl,k) := reflection_exp64 s se in

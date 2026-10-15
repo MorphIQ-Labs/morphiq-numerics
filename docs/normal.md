@@ -22,7 +22,7 @@ The probability identities follow by substituting `t=x/sqrt(2)` in the
 
 A fast result is returned only when its computed error bound fits one
 binary64 rounding cell. Ordinary compositions compare the rounded interval
-endpoints; the negative far tail tests the distance to the nearer midpoint.
+endpoints; far tails test the distance to a rounding midpoint.
 The accepted result is correctly rounded,
 nearest with ties to even. Otherwise the original binary64 argument enters
 an integer-significand Q256 composition. No whole-domain correct-rounding
@@ -91,7 +91,7 @@ from a rounded binary64 square.
 
 ## Fast compositions
 
-For `abs(x) <= 37`, the Gaussian factor retains both words of `-x²/2`,
+For `abs(x) <= 39`, the Gaussian factor retains both words of `-x²/2`,
 evaluates the shared double-word exponential, and carries its binary scale
 separately. Density multiplies the generated `1/sqrt(2π)` double word before
 scaling. For `abs(x) < 2^-33`, the density rounds directly to its generated
@@ -177,10 +177,39 @@ including its smallest scaled operands. `NormalLogTailHuge.v` and
 by `2^480` twice, exactly, without overflow or double rounding.
 
 Both branches use the existing nearest-midpoint test with guard `2^-66`.
-An undecided input still enters the original Q256 composition. PDF,
-negative CDF, positive CCDF and positive log-CDF retain finite unsaturated bands beyond
-37; those bands currently use Q256. Centered CDF and the positive CDF are
-already saturated there.
+An undecided input still enters the original Q256 composition.
+
+## Finite underflow bands
+
+For `37 < abs(x) < 39`, density and tail probabilities reuse the Gaussian
+and scaled-erfcx mantissas. Their reduction and evaluation proofs cover
+this wider interval. The public saturation screens run first, so only the
+finite unsaturated PDF, negative CDF, positive CCDF and positive log-CDF
+bands reach the candidate. Centered CDF and positive CDF are already
+saturated there.
+
+The candidate scales both mantissa words by `2^(k+600)`. This keeps the
+leading word normal until the final grid test. `NormalFiniteScale.v`
+bounds trailing-word underflow and proves the scaled expansion remains
+normalized. If its high word is at least `1.5 * 2^-422`, the relative
+rounding test uses guard `2^-65`; multiplication by `2^-600` is then exact.
+
+Below that split, let `c = abs(RN(h * 2^-600))`. The binary64 subnormal
+spacing is `2^-1074`, hence its half-spacing on the scaled grid is
+`2^-475`. The rounded residual `(h - c * 2^600) + l` selects `c` or its
+adjacent encoding. Acceptance requires the recomputed distance plus
+`RN(h * 2^-65 + 2^-520)` to be strictly below `2^-475`. The absolute term
+covers residual arithmetic even at zero. `NormalUnderflowCandidate.v`
+and `NormalFiniteRound.v` prove this test, including zero and the normal
+boundary; rejected inputs use Q256.
+
+For positive log-CDF, the same accepted tail magnitude rounds
+`-ln(1-q)`: `NormalFiniteLog.v` bounds its difference from `q` by `2q²`,
+with `q <= 2^-980`, inside the shared guard. Negation produces the
+negative result, including negative zero. `NormalFiniteDensity.v` and
+`NormalFiniteTail.v` compose these bounds with the evaluated mantissas,
+and `NormalFastDispatch.v` connects the accepted candidates to the
+public function targets.
 
 ## Accurate compositions
 
@@ -210,7 +239,10 @@ evaluation when vector setup would not amortize.
 Negative far-tail lanes use their own mask and both tail branches above.
 A mixed batch keeps the ordinary lanes on their vector kernel; only rejected
 far-tail lanes enter Q256. Every backend uses the scalar sequence, including
-the reciprocal and the two exact scaling multiplications.
+the reciprocal and the two exact scaling multiplications. The finite
+underflow candidates use the same scalar scaling, adjacent-encoding
+selection and rounding test on every backend. Mixed chunks keep other
+eligible lanes on their own vector paths.
 
 `generators/normal_reference.py` produces independent mpmath witnesses,
 including threshold neighbors, hard rounding cases, subnormals, signed zeros
