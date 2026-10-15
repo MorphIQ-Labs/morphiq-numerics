@@ -297,3 +297,77 @@ fn measure_cost() {
         }
     }
 }
+
+/// Which part of `exp` decides `x`, and its value: `exp`'s branches, for the
+/// native measurements' path counts.
+#[cfg(feature = "simd")]
+fn decided_by(x: f64) -> (&'static str, f64) {
+    use super::{MAGNITUDE, ONE_HIGH, ONE_LOW, STAGES, Stages, X_OVERFLOW, X_ZERO, fallback};
+    if x.to_bits() & MAGNITUDE < STAGES {
+        let stages = Stages::of(x);
+        if let Some(y) = stages.a() {
+            return ("stage_a", y);
+        }
+        if let Some(y) = stages.b() {
+            return ("stage_b", y);
+        }
+    }
+    if x.is_nan() || x >= X_OVERFLOW || x <= X_ZERO || (ONE_LOW..ONE_HIGH).contains(&x) {
+        return ("screen", fallback(x));
+    }
+    let reduced = Reduced::of(x);
+    if reduced.k >= -1021
+        && let Some(y) = reduced.fast()
+    {
+        return ("fast", y);
+    }
+    ("accurate", fallback(x))
+}
+
+/// Same-host timing of `exp`, scalar and per lane backend
+/// (`lanes::tests::bench`); no timing assertion.
+#[cfg(feature = "simd")]
+#[test]
+#[ignore = "same-host release-mode measurement; no timing assertions"]
+fn native_performance() {
+    use crate::lanes::tests::bench::{Draw, function, tables};
+    use core::mem::size_of_val;
+    tables(&[
+        ("exp::POLY", size_of_val(&super::tables::POLY)),
+        ("exp::T_BITS", size_of_val(&super::tables::T_BITS)),
+        ("exp::T_Q128", size_of_val(&super::tables::T_Q128)),
+        ("exp::RECIPROCALS", size_of_val(&super::tables::RECIPROCALS)),
+        ("exp::POLY_S", size_of_val(&super::tables::POLY_S)),
+        ("exp::S_T", size_of_val(&super::tables::S_T)),
+    ]);
+    static EXP_SCREENED: [f64; 8] = [
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        709.79,
+        710.0,
+        1000.0,
+        -746.0,
+        -1000.0,
+    ];
+    static EXP_DOMAIN: Draw = Draw::Uniform(-745.0, 1454.0);
+    static EXP_MIXED: [Draw; 4] = [
+        Draw::Uniform(-30.0, 30.0),
+        Draw::Uniform(-745.0, 1454.0),
+        Draw::Values(&EXP_SCREENED),
+        Draw::Uniform(-745.0, 36.6),
+    ];
+    function::<crate::exp::lanes::Exp>(
+        "exp",
+        decided_by,
+        &[
+            ("common", Draw::Uniform(-30.0, 30.0)),
+            ("unit", Draw::Uniform(-1.0, 2.0)),
+            ("domain", EXP_DOMAIN),
+            ("subnormal", Draw::Uniform(-745.0, 36.6)),
+            ("screened", Draw::Values(&EXP_SCREENED)),
+            ("mixed", Draw::Mixed(&EXP_MIXED)),
+            ("fallback", Draw::Fallback(&EXP_DOMAIN)),
+        ],
+    );
+}

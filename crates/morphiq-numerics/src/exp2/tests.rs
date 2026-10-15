@@ -150,3 +150,52 @@ fn fallback_residual_reaches_the_proved_lower_bound() {
         assert!(reconstructed.cmp(&Exact::of_f64(x)).is_eq());
     }
 }
+
+/// Which part of `exp2` decides `x`, and its value: `exp2`'s branches, for
+/// the native measurements' path counts.
+#[cfg(feature = "simd")]
+fn decided_by(x: f64) -> (&'static str, f64) {
+    use super::{ONE_HIGH, ONE_LOW, stages};
+    if x.is_nan() || x >= X_OVERFLOW || x <= X_ZERO || (ONE_LOW..ONE_HIGH).contains(&x) {
+        return ("screen", super::exp2(x));
+    }
+    if let Some(y) = stages::stages(x) {
+        return ("stages", y);
+    }
+    let reduced = Reduced::of(x);
+    if reduced.k >= -1021
+        && let Some(y) = decide_scaled(reduced.fast_value(), reduced.k)
+    {
+        return ("fast", y);
+    }
+    ("accurate", reduced.accurate_value().to_f64())
+}
+
+/// Same-host timing of `exp2`, scalar and per lane backend
+/// (`lanes::tests::bench`); no timing assertion.
+#[cfg(feature = "simd")]
+#[test]
+#[ignore = "same-host release-mode measurement; no timing assertions"]
+fn native_performance() {
+    use crate::lanes::tests::bench::{Draw, function};
+    static EXP2_SCREENED: [f64; 6] = [f64::NAN, f64::INFINITY, -1076.0, 1024.0, 1e-300, 0.0];
+    static EXP2_DOMAIN: Draw = Draw::Uniform(-1075.0, 2099.0);
+    static EXP2_MIXED: [Draw; 4] = [
+        Draw::Uniform(-30.0, 30.0),
+        Draw::Uniform(-1075.0, 2099.0),
+        Draw::Values(&EXP2_SCREENED),
+        Draw::Uniform(-1075.0, 53.0),
+    ];
+    function::<crate::exp2::lanes::Exp2>(
+        "exp2",
+        decided_by,
+        &[
+            ("common", Draw::Uniform(-30.0, 30.0)),
+            ("domain", EXP2_DOMAIN),
+            ("subnormal", Draw::Uniform(-1075.0, 53.0)),
+            ("screened", Draw::Values(&EXP2_SCREENED)),
+            ("mixed", Draw::Mixed(&EXP2_MIXED)),
+            ("fallback", Draw::Fallback(&EXP2_DOMAIN)),
+        ],
+    );
+}

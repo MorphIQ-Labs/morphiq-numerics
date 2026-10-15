@@ -16,8 +16,9 @@ simd,std --no-run`; invoke the resulting test binary with
 
 Median nanoseconds per argument: baseline 3743.90; candidate 3747.28 (+0.09%).
 Task-owned proof processes were paused during measurement. Unrelated host
-activity and frequency/power settings were not controlled. These observations
-establish no native x86 performance claim.
+activity and frequency/power settings were not controlled. These are M1 Pro
+observations; native x86 timing is in
+[`lanes-x86-i9-10920x`](../../lanes-x86-i9-10920x/README.md).
 
 The refactor changes AArch64 register allocation and reduces the affected
 accurate-path stack frame from 432 to 400 bytes. Instruction identity is not

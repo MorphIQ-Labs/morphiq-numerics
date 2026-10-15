@@ -1,0 +1,83 @@
+date: 2026-10-15T10:11:35Z
+revision: 49467c40969d95fee7729eeb5e5d4056166c2464
+worktree_clean: yes
+pinned_cpu: 2
+repetitions: 3
+lib_test: /home/stephen/Development/MorphIQ-Labs/core/morphiq-numerics/target/release/deps/morphiq_numerics-374045a010aa49f8
+rustflags: unset
+kernel: Linux 7.2.8-200.fc44.x86_64 x86_64
+os: Fedora Linux 44 (Workstation Edition)
+governor: performance
+epp: performance
+intel_no_turbo: 0
+smt_sibling: 2,14
+rustc: rustc 1.97.1 (8bab26f4f 2026-07-14)
+rustc: binary: rustc
+rustc: commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452
+rustc: commit-date: 2026-07-14
+rustc: host: x86_64-unknown-linux-gnu
+rustc: release: 1.97.1
+rustc: LLVM version: 22.1.6
+lscpu: Architecture:                            x86_64
+lscpu: CPU op-mode(s):                          32-bit, 64-bit
+lscpu: Address sizes:                           46 bits physical, 48 bits virtual
+lscpu: Byte Order:                              Little Endian
+lscpu: CPU(s):                                  24
+lscpu: On-line CPU(s) list:                     0-23
+lscpu: Vendor ID:                               GenuineIntel
+lscpu: Model name:                              Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz
+lscpu: CPU family:                              6
+lscpu: Model:                                   85
+lscpu: Thread(s) per core:                      2
+lscpu: Core(s) per socket:                      12
+lscpu: Socket(s):                               1
+lscpu: Stepping:                                7
+lscpu: CPU(s) scaling MHz:                      74%
+lscpu: CPU max MHz:                             4800.0000
+lscpu: CPU min MHz:                             1200.0000
+lscpu: BogoMIPS:                                6999.82
+lscpu: Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 ssbd mba ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm mpx rdt_a avx512f avx512dq rdseed adx smap clflushopt clwb intel_pt avx512cd avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts hwp hwp_act_window hwp_epp hwp_pkg_req vnmi avx512_vnni md_clear flush_l1d arch_capabilities
+lscpu: Virtualization:                          VT-x
+lscpu: L1d cache:                               384 KiB (12 instances)
+lscpu: L1i cache:                               384 KiB (12 instances)
+lscpu: L2 cache:                                12 MiB (12 instances)
+lscpu: L3 cache:                                19.3 MiB (1 instance)
+lscpu: NUMA node(s):                            1
+lscpu: NUMA node0 CPU(s):                       0-23
+lscpu: Vulnerability Gather data sampling:      Mitigation; Microcode
+lscpu: Vulnerability Ghostwrite:                Not affected
+lscpu: Vulnerability Indirect target selection: Mitigation; Aligned branch/return thunks
+lscpu: Vulnerability Itlb multihit:             KVM: Mitigation: Split huge pages
+lscpu: Vulnerability L1tf:                      Not affected
+lscpu: Vulnerability Mds:                       Not affected
+lscpu: Vulnerability Meltdown:                  Not affected
+lscpu: Vulnerability Mmio stale data:           Mitigation; Clear CPU buffers; SMT vulnerable
+lscpu: Vulnerability Old microcode:             Not affected
+lscpu: Vulnerability Reg file data sampling:    Not affected
+lscpu: Vulnerability Retbleed:                  Mitigation; Enhanced IBRS
+lscpu: Vulnerability Spec rstack overflow:      Not affected
+lscpu: Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+lscpu: Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+lscpu: Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI SW loop, KVM SW loop
+lscpu: Vulnerability Srbds:                     Not affected
+lscpu: Vulnerability Tsa:                       Not affected
+lscpu: Vulnerability Tsx async abort:           Mitigation; TSX disabled
+lscpu: Vulnerability Vmscape:                   Mitigation; IBPB before exit to userspace
+load before lanes 1: 4.94 22.41 23.28
+load before normal 1: 1.59 2.60 9.91
+load before log_space 1: 1.50 2.40 9.42
+load before reference bins 1: 1.50 2.40 9.42
+load before consumer 1: 1.39 2.34 9.28
+load after repetition 1: 1.36 2.31 9.24
+load before lanes 2: 1.36 2.31 9.24
+load before normal 2: 1.13 1.22 4.30
+load before log_space 2: 1.15 1.21 4.12
+load before reference bins 2: 1.15 1.21 4.12
+load before consumer 2: 1.11 1.20 4.07
+load after repetition 2: 1.10 1.19 4.05
+load before lanes 3: 1.10 1.19 4.05
+load before normal 3: 1.28 1.14 2.25
+load before log_space 3: 1.39 1.19 2.20
+load before reference bins 3: 1.39 1.19 2.20
+load before consumer 3: 1.38 1.20 2.19
+load after repetition 3: 1.51 1.23 2.19
