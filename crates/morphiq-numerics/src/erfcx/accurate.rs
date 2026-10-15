@@ -10,6 +10,8 @@ fn q(c: C) -> Q256 {
     Q256::new(false, c.0, c.1)
 }
 
+#[cold]
+#[inline(never)]
 pub(super) fn accurate(x: f64) -> Q256 {
     match region(x) {
         Region::T => taylor(x),

@@ -216,19 +216,16 @@ pub(crate) fn stage_b_at(j: usize, r_h: f64, r_t: f64) -> (f64, f64) {
 pub(crate) fn stage_b_double_word(s: f64, se: f64) -> (f64, f64, i32) {
     // Stage B at an exact double-word square. The low input word joins
     // the residual before the shared polynomial and table reconstruction.
-    let t = s * INV_N + SHIFTER;
-    let n = t - SHIFTER;
-    let ni = n as i32;
-    let j = ni.rem_euclid(512) as usize;
-    let k = ni.div_euclid(512);
-    let r1 = s - n * S_L1;
+    // The reduction is the stages' own (§3), as the proof's `stage_of` models.
+    let Stages { n, j, k, r1 } = Stages::of(s);
     let p2 = n * S_L2;
     let r0 = r1 - p2;
     let rh = (r0 + 6144.0) - 6144.0;
     let rt = (((r1 - rh) - p2) - n * S_L3) + se;
     let (yh, yl) = stage_b_at(j, rh, rt);
     let (yh, yl) = fast_two_sum(yh, yl);
-    (yh, yl, k)
+    #[allow(clippy::cast_possible_truncation)] // |k| <= 1025 for |s| < 710
+    (yh, yl, k as i32)
 }
 
 /// `2^(j/512)` as a double-word `(hi, lo)`.
