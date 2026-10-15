@@ -10,9 +10,8 @@ These count as security issues:
 
 ## Reporting a vulnerability
 
-Report privately through GitHub: on this repository's **Security** tab, choose
-**Report a vulnerability**. Please don't open a public issue, pull request, or
-discussion for a suspected vulnerability.
+This repository is private. Report a suspected vulnerability as an issue here
+with the `security` label; don't raise it outside the repository.
 
 A useful report gives:
 - the function, version or commit, and target;
@@ -20,9 +19,9 @@ A useful report gives:
 - the result returned and the result expected, with your reference, such as
   MPFR at a stated precision.
 
-The report is acknowledged and tracked in the private advisory. A fix is
-developed there, released, and then disclosed through a GitHub security
-advisory, crediting the reporter unless they ask otherwise.
+The report is acknowledged and tracked on its issue. The fix lands through a
+pull request that closes it and ships in the next release, whose changelog
+names the affected versions.
 
 ## Supported versions
 

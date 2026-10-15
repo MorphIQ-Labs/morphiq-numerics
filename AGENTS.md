@@ -6,7 +6,7 @@ This file is the repository's engineering contract for human and agent contribut
 
 ## Purpose and Architecture
 
-`morphiq-numerics` provides binary64 numerical primitives whose results are **correctly rounded** and **identical on every target**, computed **at least as fast as the best available implementation** of each function: elementary functions, seeded random streams and the normal family. It is the shared numerics substrate for MorphIQ Labs' engines and is published openly under MIT OR Apache-2.0. Read [the provenance policy](docs/PROVENANCE.md) before any change. Scope, intent and progress are recorded in GitHub issues, epics and milestones, never in repository documents.
+`morphiq-numerics` provides binary64 numerical primitives whose results are **correctly rounded** and **identical on every target**, computed **at least as fast as the best available implementation** of each function: elementary functions, seeded random streams and the normal family. It is the shared numerics substrate for MorphIQ Labs' engines and is licensed under MIT OR Apache-2.0. Read [the provenance policy](docs/PROVENANCE.md) before any change. Scope, intent and progress are recorded in GitHub issues, epics and milestones, never in repository documents.
 
 The library's public API is what `crates/morphiq-numerics/src/lib.rs` lists, and each function's contract and derivation is a document in `docs/`; documentation must not describe functions that are not in the source tree.
 
@@ -106,13 +106,14 @@ Releases follow the MorphIQ Labs model, driven by release-plz (`.github/workflow
 
 | Setting | Value | Why |
 | --- | --- | --- |
+| Visibility | private | Internal MorphIQ Labs library. |
 | Default branch | `main` | One long-lived branch. |
 | Organization ruleset "Default branch policy" | PR required, linear history, signed commits, no force-push or deletion, threads resolved | Inherited; GitHub signs the squash commits it creates. |
 | Organization rulesets | `v*` tag protection; repository transfer and deletion blocked | Inherited. |
 | Repository ruleset "Main branch protection" | squash only; every CI job a strict required check; no bypass | GitHub reports a job skipped behind a failed one as passing, so every job must itself be required. A job is added here in the same change that adds it to CI. |
 | Merge method | squash only; title from the PR | Release automation reads the subject. |
 | Delete branch on merge | on | |
-| Security | secret scanning and push protection, private vulnerability reporting, Dependabot alerts | Public repository. |
+| Security | secret scanning and push protection, Dependabot alerts | Private vulnerability reporting and security advisories are public-repository features; reports are issues in this repository. |
 
 Check them with `gh api repos/MorphIQ-Labs/morphiq-numerics/rulesets` rather than assuming.
 
