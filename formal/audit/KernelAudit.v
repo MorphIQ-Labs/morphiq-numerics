@@ -706,3 +706,6 @@ Require Import NormalFiniteDensity NormalFiniteTail NormalUnderflowCandidate.
 Print Assumptions NormalFiniteDensity.normal_finite_density_ieee.
 Print Assumptions NormalFiniteTail.normal_finite_tail_ieee.
 Print Assumptions NormalFiniteTail.normal_finite_log_tail_ieee.
+Require Import NormalLogFirst NormalLogTailStages.
+Print Assumptions NormalLogFirst.normal_log_first_decided.
+Print Assumptions NormalLogTailStages.normal_log_tail_stages_decided.

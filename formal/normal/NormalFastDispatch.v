@@ -7,7 +7,7 @@ Require Import StageGappa ErfcxDecision NormalComparisons
   NormalAccurateDensity NormalAccurateCentralCdf NormalCentered NormalTailAnalytic
   NormalDensityDecision NormalCenterCentral NormalCdfCentralFast NormalTailDecision
   NormalOuterSigned NormalLogDecision NormalLogNegativeFast NormalLogPositiveFast
-  NormalLogTailModerate NormalLogTailHuge NormalLogOverflowConstants
+  NormalLogTailStages NormalLogTailHuge NormalLogOverflowConstants
   NormalFiniteDensity NormalFiniteTail.
 Open Scope R_scope.
 
@@ -127,7 +127,7 @@ Definition normal_log_dispatch64 op x :=
   | NormalLogCdf=>if normal_lt x (fneg normal_thirty_seven)then
       let a:=b64_abs x in
       if normal_lt a normal_log_overflow then
-        if normal_lt a (erfcx_pow2 45)then normal_log_tail_moderate_decide64 a
+        if normal_lt a (erfcx_pow2 45)then normal_log_tail_stages64 a
         else normal_log_tail_huge_decide64 a
       else None
     else normal_ordinary_dispatch64 op x
@@ -154,7 +154,7 @@ Proof.
   destruct(erfcx_pow2_ok 45 ltac:(lia))as[Fhuge Huge].
   destruct(normal_lt(b64_abs x)(erfcx_pow2 45))eqn:Large.
   - apply normal_lt_true in Large;try assumption;rewrite Huge in Large.
-    pose proof(normal_log_tail_moderate_decided (b64_abs x) v Fa ltac:(split;lra) Decision)as Result.
+    pose proof(normal_log_tail_stages_decided (b64_abs x) v Fa ltac:(split;lra) Decision)as Result.
     rewrite B_abs,normal_negative_cdf in Result by lra;exact Result.
   - apply normal_lt_false in Large;try assumption;rewrite Huge in Large.
     pose proof(normal_log_tail_huge_decided (b64_abs x) v Fa ltac:(split;lra) Decision)as Result.

@@ -11,7 +11,7 @@ Definition normal_log_reciprocal_parts64 x := ln_parts (rd_e(bits_of_b64 x)) x.
 
 Theorem normal_log_reciprocal_parts_ieee x : finite x -> 37<=B x<=bpow radix2 45 ->
   let '(h,l,e):=normal_log_reciprocal_parts64 x in
-  finite h /\ finite l /\ Rabs(B h)<=34 /\ Rabs(B l)<=1 /\
+  finite h /\ finite l /\ Rabs(B h)<=34 /\ Rabs(B l)<=bpow radix2(-12) /\
   Rabs(B h+B l-ln(B x))<=bpow radix2(-65).
 Proof.
   intros Fx X;assert(Domain : bpow radix2(-53)<=B x<=bpow radix2 1020).
@@ -36,7 +36,8 @@ Proof.
   assert(H : Rabs(B h)<=34).
   { assert(Lbound : Rabs(B l)<=1)by lra;apply Rabs_le_inv in Error,Lbound;
     apply Rabs_le;bpow_num_all;split;lra. }
-  repeat split;try assumption;pose proof(Rabs_pos(B l));lra.
+  repeat split;try assumption.
+  pose proof(Rabs_pos(ln(B x)-(B h+B l)));bpow_num_all;nra.
 Qed.
 
 Definition normal_log_reciprocal64 x :=
@@ -44,14 +45,14 @@ Definition normal_log_reciprocal64 x :=
 
 Theorem normal_log_reciprocal_ieee x : finite x -> 37<=B x<=bpow radix2 45 ->
   let '(h,l):=normal_log_reciprocal64 x in finite h /\ finite l /\ B h=rndF(B h+B l) /\
-  Rabs(B h)<=1024 /\ Rabs(B l)<=2048 /\ Rabs(B h+B l-ln(B x))<=/2^64*Rabs(ln(B x)).
+  Rabs(B h)<=1024 /\ Rabs(B l)<=2048 /\ Rabs(B h+B l-ln(B x))<=bpow radix2(-65).
 Proof.
   intros Fx X;pose proof(normal_log_reciprocal_parts_ieee x Fx X)as Parts.
   unfold normal_log_reciprocal64;destruct(normal_log_reciprocal_parts64 x)as[[a b]e].
   destruct Parts as[Fa [Fb [A [Bv Error]]]].
   pose proof(two_sum_ieee a b Fa Fb
     ltac:(apply Rle_trans with 34;[exact A|interval with(i_prec 80)])
-    ltac:(apply Rle_trans with 1;[exact Bv|interval with(i_prec 80)]))as Sum.
+    ltac:(apply Rle_trans with 1;[bpow_num_all;lra|interval with(i_prec 80)]))as Sum.
   destruct(two_sum64 a b)as[h l];destruct Sum as[Fh [Fl [High Total]]].
   assert(Norm : B h=rndF(B h+B l))by(rewrite Total;exact High).
   assert(Log : 3<=ln(B x)<=32)by(split;interval with(i_prec 100)).
@@ -61,6 +62,17 @@ Proof.
       [change(bpow radix2 6)with 64;apply Rabs_le;lra|lia]. }
   assert(L : Rabs(B l)<=128)by(apply Rabs_le_inv in H;apply Rabs_le;lra).
   repeat split;try assumption;try lra.
-  rewrite Total;apply Rle_trans with(bpow radix2(-65));[exact Error|].
-  rewrite Rabs_pos_eq by lra;bpow_num_all;nra.
+  rewrite Total;exact Error.
+Qed.
+
+Lemma normal_log_first_parts_range x : finite x -> 37<=B x<=64 ->
+  let '(h,l,e):=normal_log_reciprocal_parts64 x in
+  finite h /\ finite l /\ 3<=B h<=5 /\ Rabs(B l)<=bpow radix2(-12) /\
+  Rabs(B h+B l-ln(B x))<=bpow radix2(-65).
+Proof.
+  intros F X;pose proof(normal_log_reciprocal_parts_ieee x F ltac:(bpow_num_all;split;lra))as Parts.
+  destruct(normal_log_reciprocal_parts64 x)as[[h l]e].
+  destruct Parts as[Fh [Fl [H [L Error]]]].
+  assert(Log : 3.6<=ln(B x)<=4.2)by(split;interval with(i_prec 100)).
+  repeat split;try assumption;apply Rabs_le_inv in L,Error;bpow_num_all;lra.
 Qed.

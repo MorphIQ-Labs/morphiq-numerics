@@ -1,11 +1,37 @@
 //! Negative log-CDF tails with accepted-rounding proofs in
-//! NormalLogTailModerate.v and NormalLogTailHuge.v.
+//! NormalLogFirst.v, NormalLogTailModerate.v and NormalLogTailHuge.v.
 use super::{Dw, dw, tables};
+
+const FIRST_LIMIT: f64 = 64.0;
+const FIRST_GUARD: f64 = f64::from_bits(0x3ce0_0000_0000_0000); // 2^-49
 
 const HUGE: f64 = f64::from_bits(0x42c0_0000_0000_0000); // 2^45
 const DOWN: f64 = f64::from_bits(0x21f0_0000_0000_0000); // 2^-480
 const UP: f64 = f64::from_bits(0x5df0_0000_0000_0000); // 2^480
+const MODERATE_GUARD: f64 = f64::from_bits(0x3bb0_0000_0000_0000); // 2^-68
 const GUARD: f64 = f64::from_bits(0x3bd0_0000_0000_0000); // 2^-66
+
+/// Binary64 reconstruction on 37 <= a <= 64 (NormalLogFirst.v).
+#[inline]
+pub(crate) fn first_candidate(a: f64) -> (f64, f64) {
+    let r = 1.0 / a;
+    let u = r * r;
+    let mut p = tables::LOG_TAIL[7];
+    for i in (0..7).rev() {
+        p = tables::LOG_TAIL[i] + u * p;
+    }
+    let (h, l, _, _) = crate::ln::stage::parts(0, a);
+    let c = (h + tables::LN_SQRT_2PI.0) + (l + (tables::LN_SQRT_2PI.1 + u * p));
+    let sq = Dw::product(a, -0.5 * a);
+    let (high, low) = crate::eft::fast_two_sum(sq.hi(), -c);
+    (high, low + sq.lo())
+}
+
+#[inline]
+pub(crate) fn first_decide(a: f64) -> Option<f64> {
+    let (h, l) = first_candidate(a);
+    crate::ln::stages::decide(h, l, FIRST_GUARD)
+}
 
 /// For 37 < a < LOG_OVERFLOW. Returns a normalized candidate and the
 /// power-of-two factor applied twice after a successful rounding test.
@@ -34,12 +60,18 @@ pub(super) fn decide(a: f64) -> Option<f64> {
     if !(37.0..tables::LOG_OVERFLOW).contains(&a) {
         return None;
     }
+    if a <= FIRST_LIMIT
+        && let Some(v) = first_decide(a)
+    {
+        return Some(v);
+    }
     let (y, scale) = candidate(a);
-    crate::erfcx::decide(y.hi(), y.lo(), GUARD).map(
-        |v| {
-            if a >= HUGE { (v * scale) * scale } else { v }
-        },
+    crate::erfcx::decide(
+        y.hi(),
+        y.lo(),
+        if a >= HUGE { GUARD } else { MODERATE_GUARD },
     )
+    .map(|v| if a >= HUGE { (v * scale) * scale } else { v })
 }
 
 #[test]
@@ -112,10 +144,30 @@ fn log_tail_local_measurement() {
 #[cfg(feature = "simd")]
 pub(super) mod lanes {
     use super::*;
-    use crate::lanes::{Dw as LaneDw, add_dw, add_f64, lanes_mask, two_prod, two_sum};
+    use crate::lanes::{
+        Dw as LaneDw, add_dw, add_f64, fast_two_sum, lanes_mask, two_prod, two_sum,
+    };
     use morphiq_numerics_arch::Simd;
     #[cfg(test)]
     use morphiq_numerics_arch::WithSimd;
+
+    #[inline(always)]
+    fn first_candidate<K: Simd>(k: K, a: K::F) -> LaneDw<K> {
+        let r = k.div(k.splat(1.0), a);
+        let u = k.mul(r, r);
+        let mut p = k.splat(tables::LOG_TAIL[7]);
+        for i in (0..7).rev() {
+            p = k.add(k.splat(tables::LOG_TAIL[i]), k.mul(u, p));
+        }
+        let (h, l, _) = crate::ln::lanes::direct_parts(k, a);
+        let c = k.add(
+            k.add(h, k.splat(tables::LN_SQRT_2PI.0)),
+            k.add(l, k.add(k.splat(tables::LN_SQRT_2PI.1), k.mul(u, p))),
+        );
+        let sq = two_prod(k, a, k.mul(k.splat(-0.5), a));
+        let (high, low) = fast_two_sum(k, sq.0, k.neg(c));
+        (high, k.add(low, sq.1))
+    }
 
     #[inline(always)]
     fn candidate<K: Simd>(k: K, a: K::F) -> (LaneDw<K>, K::F) {
@@ -155,8 +207,31 @@ pub(super) mod lanes {
     /// All inputs are finite magnitudes in [37, LOG_OVERFLOW).
     #[inline(always)]
     pub(crate) fn decide<K: Simd>(k: K, a: K::F) -> (K::F, u64) {
+        let eligible = k.le(a, k.splat(FIRST_LIMIT));
+        if k.mask_bits(eligible) != 0 {
+            let y = first_candidate(k, k.select(eligible, a, k.splat(38.0)));
+            let low = k.add(y.0, k.sub(y.1, k.splat(FIRST_GUARD)));
+            let high = k.add(y.0, k.add(y.1, k.splat(FIRST_GUARD)));
+            let decided = k.and_m(eligible, k.and_m(k.le(low, high), k.le(high, low)));
+            let accepted = k.mask_bits(decided);
+            if accepted == lanes_mask::<K>() {
+                return (low, accepted);
+            }
+            let (second, second_accepted) = second_decide(k, k.select(decided, k.splat(38.0), a));
+            return (k.select(decided, low, second), accepted | second_accepted);
+        }
+        second_decide(k, a)
+    }
+
+    #[inline(always)]
+    fn second_decide<K: Simd>(k: K, a: K::F) -> (K::F, u64) {
         let (y, scale) = candidate(k, a);
-        let accepted = crate::lanes::decide_relative(k, y, GUARD);
+        let eps = k.select(
+            k.le(k.splat(HUGE), a),
+            k.splat(GUARD),
+            k.splat(MODERATE_GUARD),
+        );
+        let accepted = crate::lanes::decide_relative_vector(k, y, eps);
         (k.mul(k.mul(y.0, scale), scale), accepted)
     }
 
@@ -172,9 +247,45 @@ pub(super) mod lanes {
                 let mut input = K::Array::default();
                 input.as_mut().fill(38.0);
                 input.as_mut()[..chunk.len()].copy_from_slice(chunk);
+                let first_input = k.select(
+                    k.le(k.load(input), k.splat(FIRST_LIMIT)),
+                    k.load(input),
+                    k.splat(38.0),
+                );
+                let first = first_candidate(k, first_input);
+                let first_hi = k.store(first.0);
+                let first_lo = k.store(first.1);
+                let (values, accepted) = decide(k, k.load(input));
+                let values = k.store(values);
                 let (y, scale) = candidate(k, k.load(input));
                 let (hi, lo, scale) = (k.store(y.0), k.store(y.1), k.store(scale));
                 for (i, &a) in chunk.iter().enumerate() {
+                    let fa = if a <= FIRST_LIMIT { a } else { 38.0 };
+                    let (fh, fl) = super::first_candidate(fa);
+                    assert_eq!(
+                        (
+                            first_hi.as_ref()[i].to_bits(),
+                            first_lo.as_ref()[i].to_bits()
+                        ),
+                        (fh.to_bits(), fl.to_bits()),
+                        "first stage a={fa:e} {}",
+                        K::NAME
+                    );
+                    let decision = super::decide(a);
+                    assert_eq!(
+                        accepted >> i & 1 != 0,
+                        decision.is_some(),
+                        "decision a={a:e} {}",
+                        K::NAME
+                    );
+                    if let Some(v) = decision {
+                        assert_eq!(
+                            values.as_ref()[i].to_bits(),
+                            v.to_bits(),
+                            "result a={a:e} {}",
+                            K::NAME
+                        );
+                    }
                     let (scalar, expected_scale) = super::candidate(a);
                     assert_eq!(
                         (

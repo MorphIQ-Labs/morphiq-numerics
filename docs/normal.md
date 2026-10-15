@@ -176,7 +176,21 @@ including its smallest scaled operands. `NormalLogTailHuge.v` and
 `NormalLogTailScale.v` prove that the accepted high word can be multiplied
 by `2^480` twice, exactly, without overflow or double rounding.
 
-Both branches use the existing nearest-midpoint test with guard `2^-66`.
+The normalized moderate candidate has proved relative error at most `2^-69`
+and uses the nearest-midpoint test with guard `2^-68`. The huge branch uses
+its original `2^-66` guard. The moderate bound retains the reciprocal stage’s
+absolute `2^-65` logarithm error through normalization and reconstruction.
+
+On `37 <= a <= 64`, a cheaper first stage precedes the normalized moderate
+candidate. It evaluates the same eight-term correction and reciprocal-table
+logarithm, adds their correction in binary64, uses FastTwoSum to subtract it
+from the exact square's high word, and adds the square's trailing word.
+`log_tail_first.g` certifies reconstruction error; `NormalLogFirst.v`
+composes the logarithm, constant, polynomial and square bounds to an absolute
+error at most `6 * 2^-52`. The rounded-endpoint test uses `2^-49`, including
+its own rounding error. `NormalLogTailStages.v` proves that an undecided first
+stage can fall through to the normalized candidate. SIMD performs the same
+sequence and sends only unresolved lanes to the second candidate.
 An undecided input still enters the original Q256 composition.
 
 ## Finite underflow bands

@@ -56,6 +56,18 @@ pub(super) fn write(out: &mut String) {
         let input = crate::test_exact::word(case, "x");
         write_public_entries(out, input);
         if input < -37.0 && normal_distribution::special(Operation::LogCdf, input).is_none() {
+            if -input <= 64.0 {
+                let (h, l) = normal_distribution::log_tail::first_candidate(-input);
+                writeln!(
+                    out,
+                    "normal_log_first {:016x} : {:016x} {:016x} {}",
+                    (-input).to_bits(),
+                    h.to_bits(),
+                    l.to_bits(),
+                    super::opt(normal_distribution::log_tail::first_decide(-input))
+                )
+                .unwrap();
+            }
             let (value, scale) = normal_distribution::log_tail::candidate(-input);
             writeln!(
                 out,
