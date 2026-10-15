@@ -125,13 +125,15 @@ let compute op args =
        | [x] -> let (k, words) = x_normal_gaussian (z_of_u64 (hex x)) in
            String.concat " " (string_of_int (int_of_z k) :: List.map show_bits words)
        | _ -> failwith "normal_gaussian takes a word")
-  | "normal_density_fast" | "normal_density_first" | "normal_center_small" | "normal_center_fast"
+  | "normal_density_fast" | "normal_density_first" | "normal_tail_first_cdf" | "normal_tail_first_center" | "normal_center_small" | "normal_center_fast"
   | "normal_center_central" | "normal_cdf_central" | "normal_log_central" | "normal_tail_fast"
   | "normal_outer_cdf" | "normal_outer_center_positive" | "normal_outer_center_negative" | "normal_log_negative" | "normal_log_positive" ->
       (match args with
        | [x] -> let f = match op with
              | "normal_density_fast" -> x_normal_density_fast
              | "normal_density_first" -> x_normal_density_first
+             | "normal_tail_first_cdf" -> x_normal_tail_first_cdf
+             | "normal_tail_first_center" -> x_normal_tail_first_center
              | "normal_center_small" -> x_normal_center_small
              | "normal_center_fast" -> x_normal_center_fast
              | "normal_center_central" -> x_normal_center_central
