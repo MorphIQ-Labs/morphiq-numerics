@@ -52,6 +52,20 @@ pub(super) fn q_ln2() -> Q256 {
         -256,
     )
 }
+pub(super) const LN_SQRT_2PI: (f64, f64) = (
+    f64::from_bits(0x3fed67f1c864beb5),
+    f64::from_bits(0xbc865b5a1b7ff5df),
+);
+pub(super) const LOG_TAIL: [f64; 8] = [
+    f64::from_bits(0x3ff0000000000000),
+    f64::from_bits(0xc004000000000000),
+    f64::from_bits(0x4028aaaaaaaaaaab),
+    f64::from_bits(0xc056100000000000),
+    f64::from_bits(0x408981999999999a),
+    f64::from_bits(0xc0c1f86aaaaaaaab),
+    f64::from_bits(0x40fdcac249249249),
+    f64::from_bits(0xc13c5fb020000000),
+];
 pub(super) const CENTER: [(f64, f64); 13] = [
     (
         f64::from_bits(0x3ff0000000000000),

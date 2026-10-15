@@ -691,6 +691,10 @@ Print Assumptions NormalOuterSigned.normal_outer_signed_decided.
 Require Import NormalLogNegativeFast.
 Print Assumptions NormalLogNegativeFast.normal_log_negative_decided.
 
+Require Import NormalLogTailModerate NormalLogTailHuge.
+Print Assumptions NormalLogTailModerate.normal_log_tail_moderate_decided.
+Print Assumptions NormalLogTailHuge.normal_log_tail_huge_decided.
+
 Require Import NormalLogPositiveFast.
 Print Assumptions NormalLogPositiveFast.normal_log_positive_decided.
 

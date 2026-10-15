@@ -20,8 +20,10 @@ The probability identities follow by substituting `t=x/sqrt(2)` in the
 
 ## Numerical contract
 
-A fast result is returned only when its computed error interval has identical
-binary64 endpoint encodings. The accepted result is correctly rounded,
+A fast result is returned only when its computed error bound fits one
+binary64 rounding cell. Ordinary compositions compare the rounded interval
+endpoints; the negative far tail tests the distance to the nearer midpoint.
+The accepted result is correctly rounded,
 nearest with ties to even. Otherwise the original binary64 argument enters
 an integer-significand Q256 composition. No whole-domain correct-rounding
 claim is made: there is no established worst-case separation result for these
@@ -134,6 +136,50 @@ low-word endpoints and the final additions. `NormalFastDispatch.v` joins the
 actual branch comparisons to the component acceptance theorems and the
 common Gaussian targets.
 
+### Negative far tail
+
+For `x < -37`, write `a = -x` and `u = 1/a²`. The normalized Mills integral
+`J` from the positive erfcx derivation gives
+
+```text
+ln Φ(-a) = -a²/2 - ln(a) - ln(2π)/2 + ln J(2u).
+```
+
+`NormalLogMillsIdentity.v` proves this identity. For `37 < a < 2^45`,
+the square is exact in double-word arithmetic. The existing double-word
+logarithm supplies `ln(a)`, and a degree-eight polynomial supplies `-ln J(2u)`.
+Its coefficients follow by equating coefficients in `S' = (ln S)' S`, where
+`S(u) = sum (-1)^n (2n-1)!! u^n` is the Mills asymptotic series.
+`generators/normal_constants.py` derives them with exact rational arithmetic;
+`generators/normal_log_tail.py` emits their proof encodings and evaluation
+certificate. No external approximation coefficients are used.
+
+The positive-real [erfc asymptotic remainder, DLMF 7.12.1](https://dlmf.nist.gov/7.12.i),
+is bounded by the first omitted term. `NormalLogTailApprox.v` instantiates
+the existing improper-integral remainder theorem and bounds the logarithmic
+remainder. Sollya independently certifies the logarithmic polynomial fit.
+Gappa includes reciprocal rounding, the squared reciprocal, rounded
+coefficients, and every Horner multiplication and addition.
+`NormalLogTailPolynomial.v` connects that certificate to the binary64
+operations: the correction's absolute error is at most `2^-60`.
+`NormalLogTailModerate.v` composes the logarithm, constant, correction and
+exact square, proving relative error at most `2^-67` before the rounding test.
+
+For `2^45 <= a < LOG_OVERFLOW`, first form `r = a * 2^-480` exactly, then
+the exact double-word product `r * (-r/2)`. The logarithmic correction has
+magnitude at most 1028, already proved in `NormalLogOverflow.v`; omitting it
+in this scaled candidate remains within relative error `2^-67`.
+`NormalLogTailSquare.v` proves the product's error-free-transform domain,
+including its smallest scaled operands. `NormalLogTailHuge.v` and
+`NormalLogTailScale.v` prove that the accepted high word can be multiplied
+by `2^480` twice, exactly, without overflow or double rounding.
+
+Both branches use the existing nearest-midpoint test with guard `2^-66`.
+An undecided input still enters the original Q256 composition. PDF,
+negative CDF, positive CCDF and positive log-CDF retain finite unsaturated bands beyond
+37; those bands currently use Q256. Centered CDF and the positive CDF are
+already saturated there.
+
 ## Accurate compositions
 
 Q256 evaluates the same identities from the original input. The central
@@ -158,6 +204,11 @@ proved error-free product. Saturated homogeneous vectors skip polynomial
 work. Inactive lanes are replaced by safe arguments; rejected or inactive
 lanes use the scalar path. Short or mixed two-lane batches can use scalar
 evaluation when vector setup would not amortize.
+
+Negative far-tail lanes use their own mask and both tail branches above.
+A mixed batch keeps the ordinary lanes on their vector kernel; only rejected
+far-tail lanes enter Q256. Every backend uses the scalar sequence, including
+the reciprocal and the two exact scaling multiplications.
 
 `generators/normal_reference.py` produces independent mpmath witnesses,
 including threshold neighbors, hard rounding cases, subnormals, signed zeros

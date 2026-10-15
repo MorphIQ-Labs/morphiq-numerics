@@ -209,6 +209,43 @@ impl<const OP: u8> Kernel for Normal<OP> {
 
     #[inline(always)]
     fn lanes<K: Simd>(k: K, input: K::Array) -> K::Array {
+        if OP != 4 {
+            return Self::regular(k, input);
+        }
+        let x = k.load(input);
+        let far = k.and_m(
+            k.lt(x, k.splat(-37.0)),
+            k.lt(k.splat(-tables::LOG_OVERFLOW), x),
+        );
+        let active = k.mask_bits(far);
+        if active.count_ones() < 2 {
+            return Self::regular(k, input);
+        }
+        let a = k.neg(k.select(far, x, k.splat(-38.0)));
+        let (tail, accepted) = super::log_tail::lanes::decide(k, a);
+        let mut out = if active == lanes_mask::<K>() {
+            k.store(tail)
+        } else {
+            // Zero is a special value. It excludes far-tail lanes from the
+            // ordinary polynomial while retaining SIMD for the other lanes.
+            let regular = Self::regular(k, k.store(k.select(far, k.splat(0.0), x)));
+            k.store(k.select(far, tail, k.load(regular)))
+        };
+        let pending = active & !accepted;
+        if pending != 0 {
+            for (i, value) in out.as_mut().iter_mut().enumerate() {
+                if pending >> i & 1 != 0 {
+                    *value = super::accurate::evaluate(Operation::LogCdf, input.as_ref()[i]);
+                }
+            }
+        }
+        out
+    }
+}
+
+impl<const OP: u8> Normal<OP> {
+    #[inline(always)]
+    fn regular<K: Simd>(k: K, input: K::Array) -> K::Array {
         let op = operation::<OP>();
         let xv = if OP == 2 {
             k.neg(k.load(input))

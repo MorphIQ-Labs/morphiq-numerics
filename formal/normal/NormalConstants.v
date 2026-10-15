@@ -124,6 +124,26 @@ Proof.
   change(Rabs((80260960185991308862233904206310070533990667611589946606122867505419956976172*bpow radix2 (-256))/(ln 2)-1)<=bpow radix2 (-255)).
   bpow_num. apply Rabs_le;split;interval with(i_prec 400).
 Qed.
+Definition normal_ln_sqrt_2pi_hi := b64_of_bits 4606452282016710325.
+Lemma normal_ln_sqrt_2pi_hi_ok : finite normal_ln_sqrt_2pi_hi /\ B normal_ln_sqrt_2pi_hi=8277062471433909/2^53.
+Proof.
+  split.
+  - exact(bits_finite 4606452282016710325 false 8277062471433909 (-53) eq_refl).
+  - exact(bits_val 4606452282016710325 false 8277062471433909 53 eq_refl).
+Qed.
+Definition normal_ln_sqrt_2pi_lo := b64_of_bits 13584645768576234975.
+Lemma normal_ln_sqrt_2pi_lo_ok : finite normal_ln_sqrt_2pi_lo /\ B normal_ln_sqrt_2pi_lo=-6292892054189535/2^107.
+Proof.
+  split.
+  - exact(bits_finite 13584645768576234975 true 6292892054189535 (-107) eq_refl).
+  - exact(bits_val 13584645768576234975 true 6292892054189535 107 eq_refl).
+Qed.
+Theorem normal_ln_sqrt_2pi_dw_error :
+  Rabs((B normal_ln_sqrt_2pi_hi+B normal_ln_sqrt_2pi_lo)/(ln(2*PI)/2)-1)<=bpow radix2 (-105).
+Proof.
+  destruct normal_ln_sqrt_2pi_hi_ok as [_ H],normal_ln_sqrt_2pi_lo_ok as [_ L].
+  rewrite H,L. bpow_num. apply Rabs_le;split;interval with(i_prec 200).
+Qed.
 Definition normal_center_data : list constant := [
 ([0%Z; 0%Z; 0%Z; 9223372036854775808%Z],(-255)%Z);
 ([12297829382473034411%Z; 12297829382473034410%Z; 12297829382473034410%Z; 12297829382473034410%Z],(-257)%Z);

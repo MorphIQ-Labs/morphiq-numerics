@@ -1,5 +1,5 @@
 //! Local development measurements; never a timing assertion or CI speed gate.
-use super::{Operation, evaluate, fast, special};
+use super::{Operation, evaluate, fast_decide, special};
 use crate::lanes::{Kernel, map};
 use core::hint::black_box;
 use std::time::{Duration, Instant};
@@ -49,6 +49,15 @@ fn workload(name: &str) -> Vec<f64> {
                 "central" => u - 0.5,
                 "ordinary" => 10.0 * u - 5.0,
                 "negative_tail" => -8.0 - 28.0 * u,
+                "negative_far_tail" => -37.0 - u,
+                "negative_wide_tail" => {
+                    let exponent = 6 + i * 506 / 1023;
+                    let fraction = u64::try_from(i)
+                        .unwrap()
+                        .wrapping_mul(0x9e37_79b9_7f4a_7c15)
+                        & ((1 << 50) - 1);
+                    -f64::from_bits((u64::try_from(exponent + 1023).unwrap() << 52) | fraction)
+                }
                 "positive_tail" => 8.0 + 28.0 * u,
                 "underflow" => 37.0 + 2.0 * u,
                 "log_overflow" => -super::tables::LOG_OVERFLOW * (1.0 + u),
@@ -91,9 +100,7 @@ fn bench<G: Kernel>(name: &str, op: Operation, complement: bool, kind: &str, xs:
         if special(op, x).is_some() {
             continue;
         }
-        let decided = fast(op, x).is_some_and(|(y, eps)| {
-            (y.hi() + (y.lo() - eps)).to_bits() == (y.hi() + (y.lo() + eps)).to_bits()
-        });
+        let decided = fast_decide(op, x).is_some();
         if !decided {
             fallback += 1;
         }
@@ -124,6 +131,8 @@ fn normal_local_performance() {
         "central",
         "ordinary",
         "negative_tail",
+        "negative_far_tail",
+        "negative_wide_tail",
         "positive_tail",
         "underflow",
         "log_overflow",

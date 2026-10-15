@@ -55,6 +55,19 @@ pub(super) fn write(out: &mut String) {
     ) {
         let input = crate::test_exact::word(case, "x");
         write_public_entries(out, input);
+        if input < -37.0 && normal_distribution::special(Operation::LogCdf, input).is_none() {
+            let (value, scale) = normal_distribution::log_tail::candidate(-input);
+            writeln!(
+                out,
+                "normal_log_far_tail {:016x} : {:016x} {:016x} {:016x} {}",
+                (-input).to_bits(),
+                value.hi().to_bits(),
+                value.lo().to_bits(),
+                scale.to_bits(),
+                super::opt(normal_distribution::fast_decide(Operation::LogCdf, input))
+            )
+            .unwrap();
+        }
         let x = input.abs();
         if x > 0.5 && x <= 37.0 {
             write_outer_fast_components(out, x);

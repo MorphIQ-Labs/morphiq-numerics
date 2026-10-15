@@ -16,9 +16,12 @@ set -eu
 cd "$(dirname "$0")/.."
 
 failed=0
-for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig; do
+for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig formal/normal; do
   f=${dir#formal/}
-  sha256sum --check --quiet "$dir/binding.sha256"
+  binding="$dir/binding.sha256"
+  # Normal compositions share the end-to-end proof manifest.
+  if [ "$f" = normal ]; then binding=formal/binding.sha256; fi
+  sha256sum --check --quiet "$binding"
   # A function with its own polynomial replays its Sollya script.
   if [ -f "generators/${f}_poly.sollya" ]; then
     sollya "generators/${f}_poly.sollya" | grep -E '^([a-z]+[0-9]+|[a-z_]*error_bound|[a-z_]*remainder_bound) ' \

@@ -4,6 +4,7 @@ pub(crate) mod accurate;
 mod bench;
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;
+pub(crate) mod log_tail;
 mod tables;
 #[cfg(test)]
 mod tests;
@@ -203,6 +204,9 @@ pub(crate) fn evaluate(op: Operation, x: f64) -> f64 {
 /// The actual fast-path decision, also transcribed for the proof cross-check.
 #[inline]
 pub(crate) fn fast_decide(op: Operation, x: f64) -> Option<f64> {
+    if matches!(op, Operation::LogCdf) && x < -37.0 {
+        return log_tail::decide(-x);
+    }
     if let Some((y, eps)) = fast(op, x) {
         let low = y.hi() + (y.lo() - eps);
         let high = y.hi() + (y.lo() + eps);
