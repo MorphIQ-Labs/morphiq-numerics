@@ -3,7 +3,7 @@ From Coq Require Import Reals ZArith Lia Lra Psatz.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
 From Interval Require Import Tactic.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Eft RoundingConstant.
-Require Import StageGappa LnFastCompose LnFastValue NormalConstants
+Require Import StageGappa LnFastCompose NormalLogReciprocalStage NormalConstants
   NormalLogTailPolynomial NormalLogTailApprox NormalLogMillsIdentity NormalLogTailSquare
   NormalCenterFastTail ErfcxTailIntegral NormalTailAnalytic ErfcxDecision.
 Open Scope R_scope.
@@ -36,7 +36,7 @@ Proof.
 Qed.
 
 Definition normal_log_tail_base64 x :=
-  let '(a,b):=lf_ln_fast_value x in
+  let '(a,b):=normal_log_reciprocal64 x in
   let '(c,d):=normal_log_tail_constant64 in add64 a b c d.
 
 Theorem normal_log_tail_base_words x : finite x -> 37<=B x<=bpow radix2 45 ->
@@ -45,9 +45,9 @@ Theorem normal_log_tail_base_words x : finite x -> 37<=B x<=bpow radix2 45 ->
   Rabs(B h)<=64 /\ Rabs(B l)<=128 /\ 3<=B h+B l<=34 /\
   Rabs(B h+B l-(ln(B x)+ln(2*PI)/2))<=bpow radix2 (-59)+bpow radix2 (-96).
 Proof.
-  intros Fx X;pose proof(lf_ln_fast_value_ok x Fx ltac:(lra))as Log.
+  intros Fx X;pose proof(normal_log_reciprocal_ieee x Fx X)as Log.
   pose proof normal_log_tail_constant_words as Constant.
-  unfold normal_log_tail_base64;destruct(lf_ln_fast_value x)as[a b].
+  unfold normal_log_tail_base64;destruct(normal_log_reciprocal64 x)as[a b].
   destruct(normal_log_tail_constant64)as[c d].
   destruct Log as[Fa [Fb [NormAB [A [Bv LogError]]]]].
   destruct Constant as[Fc [Fd [NormCD [C [D [RangeC ErrorC]]]]]].

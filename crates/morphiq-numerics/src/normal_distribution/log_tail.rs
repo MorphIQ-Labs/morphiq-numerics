@@ -24,10 +24,8 @@ pub(crate) fn candidate(a: f64) -> (Dw, f64) {
     for i in (0..7).rev() {
         p = tables::LOG_TAIL[i] + u * p;
     }
-    let correction = crate::ln::Reduced::of(a)
-        .fast_value()
-        .add(dw(tables::LN_SQRT_2PI))
-        .add_f64(u * p);
+    let (h, l, _, _) = crate::ln::stage::parts(0, a);
+    let correction = Dw::sum(h, l).add(dw(tables::LN_SQRT_2PI)).add_f64(u * p);
     (Dw::product(a, -0.5 * a).sub(correction), 1.0)
 }
 
@@ -141,11 +139,9 @@ pub(super) mod lanes {
                 k.splat(tables::LN_SQRT_2PI.0),
                 k.splat(tables::LN_SQRT_2PI.1),
             );
-            let correction = add_f64(
-                k,
-                add_dw(k, crate::ln::lanes::fallback::ln(k, a), c),
-                k.mul(u, p),
-            );
+            let (lh, ll, _) = crate::ln::lanes::direct_parts(k, a);
+            let logarithm = two_sum(k, lh, ll);
+            let correction = add_f64(k, add_dw(k, logarithm, c), k.mul(u, p));
             let square = two_prod(k, a, k.mul(k.splat(-0.5), a));
             let regular = add_dw(k, square, (k.neg(correction.0), k.neg(correction.1)));
             y = (

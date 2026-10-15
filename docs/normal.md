@@ -146,8 +146,8 @@ ln Φ(-a) = -a²/2 - ln(a) - ln(2π)/2 + ln J(2u).
 ```
 
 `NormalLogMillsIdentity.v` proves this identity. For `37 < a < 2^45`,
-the square is exact in double-word arithmetic. The existing double-word
-logarithm supplies `ln(a)`, and a degree-eight polynomial supplies `-ln J(2u)`.
+the square is exact in double-word arithmetic. The existing reciprocal
+logarithm stage supplies `ln(a)`, and a degree-eight polynomial supplies `-ln J(2u)`.
 Its coefficients follow by equating coefficients in `S' = (ln S)' S`, where
 `S(u) = sum (-1)^n (2n-1)!! u^n` is the Mills asymptotic series.
 `generators/normal_constants.py` derives them with exact rational arithmetic;
@@ -162,7 +162,9 @@ Gappa includes reciprocal rounding, the squared reciprocal, rounded
 coefficients, and every Horner multiplication and addition.
 `NormalLogTailPolynomial.v` connects that certificate to the binary64
 operations: the correction's absolute error is at most `2^-60`.
-`NormalLogTailModerate.v` composes the logarithm, constant, correction and
+`NormalLogReciprocalStage.v` bounds that logarithm expansion by `2^-65`
+absolutely and proves its normalization. `NormalLogTailModerate.v` composes
+the logarithm, constant, correction and
 exact square, proving relative error at most `2^-67` before the rounding test.
 
 For `2^45 <= a < LOG_OVERFLOW`, first form `r = a * 2^-480` exactly, then
