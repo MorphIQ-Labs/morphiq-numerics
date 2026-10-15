@@ -602,6 +602,10 @@ Print Assumptions NormalDensityDecision.normal_density_fast_decided.
 Require Import NormalDensityFirst.
 Print Assumptions NormalDensityFirst.normal_density_first_ok.
 
+Require Import NormalTailFirst.
+Print Assumptions NormalTailFirst.normal_tail_first_parts_ok.
+Print Assumptions NormalTailFirst.normal_tail_first_ok.
+
 Require Import NormalDensityTiny.
 Print Assumptions NormalDensityTiny.normal_density_tiny_correct.
 

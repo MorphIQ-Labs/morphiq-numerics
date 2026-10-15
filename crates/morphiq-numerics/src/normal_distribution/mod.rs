@@ -192,6 +192,60 @@ pub(crate) fn fast(op: Operation, x: f64) -> Option<(Dw, f64)> {
     Some((value, value.hi().abs() * guard(op)))
 }
 
+/// The CDF family's first-stage guard on the tail probability `q`: its
+/// relative error bound, rounded up to `2^−58` (docs/normal.md, the CDF
+/// family's first stage; formal/normal/NormalTailFirst.v).
+const E_TAIL_FIRST: f64 = f64::from_bits(0x3c50_0000_0000_0000);
+/// The complements' allowance for the test's own roundings near one.
+const E_TAIL_FIRST_ONE: f64 = f64::from_bits(0x39b0_0000_0000_0000); // 2^−100
+
+/// The CDF family's first stage on the tail, `1/2 < |x| <= 36`:
+/// `q = Φ(−|x|) = exp(−x²/2)·erfcx(|x|/√2)/2` with the Gaussian through exp's
+/// lean stage A at the exact double-word `−x²/2`, multiplied into the fast
+/// scaled erfcx by one exact product, then `q`, `1 − q` or `±(1/2 − q)` and
+/// a rounding test. `None` sends the argument to the double-word stage.
+#[inline]
+pub(crate) fn tail_first(op: Operation, x: f64) -> Option<f64> {
+    let (qh, ql) = tail_first_parts(x);
+    let e = qh * E_TAIL_FIRST;
+    let (y, w, e) = match op {
+        Operation::Cdf if x < 0.0 => (qh, ql, e),
+        Operation::Cdf => {
+            let (s, t) = crate::eft::fast_two_sum(1.0, -qh);
+            (s, t - ql, e + E_TAIL_FIRST_ONE)
+        }
+        Operation::Centered => {
+            let (s, t) = crate::eft::fast_two_sum(0.5, -qh);
+            let (s, t) = (s, t - ql);
+            let e = e + E_TAIL_FIRST_ONE;
+            if x.is_sign_negative() {
+                (-s, -t, e)
+            } else {
+                (s, t, e)
+            }
+        }
+        _ => return None,
+    };
+    let low = y + (w - e);
+    let high = y + (w + e);
+    (low.to_bits() == high.to_bits()).then_some(low)
+}
+
+/// The first stage's tail words `(qh, ql)`, also for the cross-check.
+#[inline]
+pub(crate) fn tail_first_parts(x: f64) -> (f64, f64) {
+    let a = x.abs();
+    let (h, l) = two_prod(a, -0.5 * a);
+    let (ye, le, k) = crate::exp::stage_a_double_word(h, l);
+    let f = scaled_erfcx(a);
+    // ye·f.hi exactly; the cross terms in binary64.
+    let (p, pe) = two_prod(ye, f.hi());
+    let pl = pe + (ye * f.lo() + le * f.hi());
+    #[allow(clippy::cast_possible_truncation)] // |k| <= 1016
+    let scale = pow2(k as i32 - 1);
+    (p * scale, pl * scale)
+}
+
 #[inline]
 pub(crate) fn evaluate(op: Operation, x: f64) -> f64 {
     if let Some(value) = special(op, x) {
@@ -200,6 +254,13 @@ pub(crate) fn evaluate(op: Operation, x: f64) -> f64 {
     if matches!(op, Operation::Pdf)
         && x.abs() <= 37.0
         && let Some(value) = density_first(x)
+    {
+        return value;
+    }
+    if matches!(op, Operation::Cdf | Operation::Centered)
+        && x.abs() > 0.5
+        && x.abs() <= 36.0
+        && let Some(value) = tail_first(op, x)
     {
         return value;
     }

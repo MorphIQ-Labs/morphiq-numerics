@@ -58,6 +58,10 @@ pub(super) fn write(out: &mut String) {
         let x = input.abs();
         if x > 0.5 && x <= 37.0 {
             write_outer_fast_components(out, x);
+            if x <= 36.0 {
+                write_tail_first(out, x);
+                write_tail_first(out, -x);
+            }
         }
         if (f64::from_bits(0x3de0_0000_0000_0000)..=37.0).contains(&x) {
             write_density_fast(out, x);
@@ -326,6 +330,10 @@ pub(super) fn write(out: &mut String) {
         };
         if bits > 0.5_f64.to_bits() {
             write_outer_fast_components(out, f64::from_bits(bits));
+            if f64::from_bits(bits) <= 36.0 {
+                write_tail_first(out, f64::from_bits(bits));
+                write_tail_first(out, -f64::from_bits(bits));
+            }
         }
         let value = normal_distribution::scaled_erfcx(f64::from_bits(bits));
         writeln!(
@@ -361,6 +369,25 @@ pub(super) fn write(out: &mut String) {
         for x in [f64::from_bits(bits), -f64::from_bits(bits)] {
             write_center_fast(out, x);
         }
+    }
+}
+
+fn write_tail_first(out: &mut String, x: f64) {
+    use normal_distribution::Operation;
+    let (qh, ql) = normal_distribution::tail_first_parts(x);
+    for (name, op) in [
+        ("normal_tail_first_cdf", Operation::Cdf),
+        ("normal_tail_first_center", Operation::Centered),
+    ] {
+        writeln!(
+            out,
+            "{name} {:016x} : {:016x} {:016x} {}",
+            x.to_bits(),
+            qh.to_bits(),
+            ql.to_bits(),
+            super::opt(normal_distribution::tail_first(op, x))
+        )
+        .unwrap();
     }
 }
 

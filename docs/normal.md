@@ -117,6 +117,32 @@ Because both stages return only `RN(φ(x))` when they return, the first
 stage changes no result. It removes the double-word exponential's stage B
 and the double-word multiplication by `1/sqrt(2π)` from the common path.
 
+## The CDF family's first stage
+
+For `1/2 < abs(x) <= 36`, CDF, CCDF (through CDF at `-x`) and the centered
+CDF first try a lean stage on the tail `q = Φ(-a)`, `a = abs(x)`, written as
+
+```
+q = exp(-a²/2) erfcx(a/sqrt(2)) / 2.
+```
+
+`exp(-a²/2)` comes from exp's stage A at the exact double word `-a²/2`
+([exp.md](exp.md) §5a) instead of stage B. The fast scaled erfcx below is
+multiplied in by one exact `two_prod` of the high words and binary64 cross
+terms, without a double-word product or renormalizing additions, and the
+`1/2` joins the power-of-two scale. The words `qh + ql` are within
+`33·2^-64` of `q` relatively (`NormalTailFirst.normal_tail_first_parts_ok`):
+stage A's `23·2^-65`, erfcx's `2^-66`, the cross terms' roundings and the
+scaling. CDF for `x < 0` tests `qh + ql` directly. CDF for `x > 0` and the
+centered CDF form `1 - q` and `±(1/2 - q)` with an exact Fast2Sum and one
+rounded subtraction. Each test takes the guard `RN(qh·2^-58)`, and the
+complements add `2^-100` to cover the test's own roundings near one. The
+test's scale follows `qh`'s binade, so the first stage is limited to
+`abs(x) <= 36`, where `q >= 2^-960`. A result it returns is the correctly
+rounded target (`NormalTailFirst.normal_tail_first_ok`); between 96% and
+99.6% of tail arguments are decided (12 million uniform arguments over three
+ranges), and the rest continue to the fast composition below.
+
 ## Fast compositions
 
 For `abs(x) <= 37`, the Gaussian factor retains both words of `-x²/2`,
