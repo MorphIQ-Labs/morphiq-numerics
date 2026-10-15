@@ -93,7 +93,7 @@ rustfmt defaults; `snake_case` functions, `UpperCamelCase` types, `SCREAMING_SNA
 
 ## Pull Requests and Releases
 
-Every change lands through a pull request; `main` accepts no direct pushes. The pull request title is a conventional commit (`feat(elementary): correctly rounded exp`), checked by CI, and becomes the squash commit's subject, which release automation reads. A pull request states what changed and why, its numerical impact (which functions' results can change, and why that is correct), and closes the issues it resolves (`Closes #N`).
+Every change lands through a pull request; `main` accepts no direct pushes. Only the repository owner merges: contributors and agents open and update pull requests, and never merge one, enable auto-merge or approve on the owner's behalf. The pull request title is a conventional commit (`feat(elementary): correctly rounded exp`), checked by CI, and becomes the squash commit's subject, which release automation reads. A pull request states what changed and why, its numerical impact (which functions' results can change, and why that is correct), and closes the issues it resolves (`Closes #N`).
 
 Releases follow the MorphIQ Labs model, driven by release-plz (`.github/workflows/release.yml`, `release-plz.toml`). After each merge to `main` it opens or refreshes a `chore: release` pull request that bumps the workspace version and writes the `CHANGELOG.md` section from the conventional-commit subjects since the last tag. That pull request is reviewed, checked and squash-merged like any other; merging it tags `v{version}`, one tag for the workspace, and creates the GitHub release. Never hand-cut a tag, hand-edit a released changelog section or bump the version outside the release pull request.
 
@@ -113,6 +113,7 @@ Releases follow the MorphIQ Labs model, driven by release-plz (`.github/workflow
 | Merge method | squash only; title from the PR | Release automation reads the subject. |
 | Delete branch on merge | on | |
 | Security | secret scanning and push protection, private vulnerability reporting, Dependabot alerts | Public repository. |
+| Interaction limit | collaborators only, renewed every six months | Only the owner opens issues and pull requests or comments; GitHub caps the limit at six months, so it is renewed before it expires. |
 
 Check them with `gh api repos/MorphIQ-Labs/morphiq-numerics/rulesets` rather than assuming.
 
