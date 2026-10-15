@@ -3,6 +3,8 @@
 
     python3 -I summarize_lanes.py OUT_DIR lanes-1.csv lanes-2.csv ...
 
+Runs may be gzip-compressed (`lanes-1.csv.gz`).
+
 Pools every timed round of every run. Writes OUT_DIR/summary.csv (time
 records: median, min and max ns per element, median ns per call, and the
 scalar loop's median at the same length over the mode's), OUT_DIR/cache.csv
@@ -12,6 +14,7 @@ code. Standard library only; no timing threshold is applied.
 """
 
 import csv
+import gzip
 import statistics
 import sys
 from collections import defaultdict
@@ -19,7 +22,8 @@ from pathlib import Path
 
 
 def records(path):
-    with open(path, newline="") as f:
+    opener = gzip.open if str(path).endswith(".gz") else open
+    with opener(path, "rt", newline="") as f:
         # libtest writes `test NAME ... ` without a newline, so a test's first
         # record follows it on the same line.
         lines = (line.split(" ... ", 1)[-1] if line.startswith("test ") else line

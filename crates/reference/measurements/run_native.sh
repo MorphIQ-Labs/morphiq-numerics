@@ -16,7 +16,8 @@
 #
 # MORPHIQ_BENCH_CPU (default 2) is the logical CPU every process is pinned
 # to. Any MORPHIQ_LANES_BENCH_* variable is passed through to the lanes
-# benchmark. Summarize with summarize_lanes.py.
+# benchmark. The lanes CSVs are gzipped at the end; summarize them with
+# summarize_lanes.py.
 set -euo pipefail
 
 out=${1:?usage: run_native.sh OUT_DIR [REPETITIONS]}
@@ -39,7 +40,7 @@ for line in sys.stdin:
     m = json.loads(line)
     if m.get("reason") == "compiler-artifact" and m.get("executable") and m["target"]["name"] == "morphiq_numerics":
         print(m["executable"])')
-consumer="$out/normal-consumer-bench"
+consumer=target/release/normal-consumer-bench
 rustc -O -C codegen-units=1 --edition=2024 \
     crates/reference/measurements/normal-m1pro/consumer-inlining/benchmark.rs \
     --extern morphiq_numerics=target/release/libmorphiq_numerics.rlib \
@@ -92,4 +93,5 @@ for r in $(seq 1 "$repetitions"); do
     "${pin[@]}" "$consumer" >"$out/consumer-$r.txt"
     load "after repetition $r"
 done
+gzip -9 -n "$out"/lanes-*.csv
 echo "== done: $out" >&2
