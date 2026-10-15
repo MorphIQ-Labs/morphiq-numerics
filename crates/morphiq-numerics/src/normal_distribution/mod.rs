@@ -197,7 +197,40 @@ pub(crate) fn evaluate(op: Operation, x: f64) -> f64 {
     if let Some(value) = special(op, x) {
         return value;
     }
+    if matches!(op, Operation::Pdf)
+        && x.abs() <= 37.0
+        && let Some(value) = density_first(x)
+    {
+        return value;
+    }
     fast_decide(op, x).unwrap_or_else(|| accurate::evaluate(op, x))
+}
+
+/// The density's first-stage bound: `stage_a_double_word`'s `0x1.7p−61`, the
+/// argument's error and the test's own rounding, rounded up to `1.75·2^−61`
+/// (docs/normal.md, density first stage; formal/normal/NormalDensityFirst.v).
+const E_DENSITY_FIRST: f64 = f64::from_bits(0x3c2c_0000_0000_0000);
+
+/// The density's first stage: `RN(φ(x))` as `exp(−x²/2 − ln √(2π))`, through
+/// exp's lean stage A at the exact double-word argument, when its rounding
+/// test decides; `None` sends the argument to the double-word stage. For
+/// `2^−33 ≤ |x| ≤ 37`.
+#[inline]
+pub(crate) fn density_first(x: f64) -> Option<f64> {
+    let (y, l, k, _) = density_first_parts(x);
+    crate::exp::decide(y, l, E_DENSITY_FIRST, k)
+}
+
+/// The first stage's words `(y, l, k, [s, se])`, also for the cross-check.
+#[inline]
+pub(crate) fn density_first_parts(x: f64) -> (f64, f64, i64, [f64; 2]) {
+    let a = x.abs();
+    // h + l = −a²/2 exactly; s + e = h − ln √(2π)'s high word exactly.
+    let (h, l) = two_prod(a, -0.5 * a);
+    let (s, e) = crate::eft::two_sum(h, -tables::LN_SQRT_2PI.0);
+    let se = e + (l - tables::LN_SQRT_2PI.1);
+    let (y, w, k) = crate::exp::stage_a_double_word(s, se);
+    (y, w, k, [s, se])
 }
 
 /// The actual fast-path decision, also transcribed for the proof cross-check.

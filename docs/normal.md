@@ -69,7 +69,8 @@ lengths, accept empty slices, and return exactly the scalar bits.
 `generators/normal_constants.py` generates the double-word and Q256 constants,
 the degree-12 fast central coefficients, degree-40 accurate central
 coefficients and saturation encodings. Independent 600- and 1000-bit
-calculations must agree. The constant and threshold certificates check the
+calculations must agree. `ln sqrt(2π)` is generated as a double word for the
+density's first stage only; the accurate paths don't use it. The constant and threshold certificates check the
 encoded dyadics against their mathematical definitions.
 
 | Least nonnegative input reaching the screen | Encoding |
@@ -86,6 +87,35 @@ checks and monotonicity. PDF uses `φ(x)=2^-1075`; CDF-to-one uses
 screen separately bounds `-ln(1-q)` at the tail-zero neighbors. Negative
 log-CDF overflow includes its logarithmic correction rather than deciding
 from a rounded binary64 square.
+
+## The density's first stage
+
+For `2^-33 <= abs(x) <= 37`, the density first tries a lean stage that
+decides about 99.2% of arguments (measured over 12 million uniform arguments
+on six ranges). It writes
+
+```
+φ(x) = exp(-x²/2 - ln sqrt(2π)),
+```
+
+forms `h + l = -x²/2` exactly (`two_prod`), subtracts the generated
+`ln sqrt(2π)` double word with a TwoSum on the high words and one rounded
+addition of the low words, and evaluates exp's stage A at the resulting
+double-word argument `s + se` ([exp.md](exp.md) §5a). `|s| < 704` and
+`|se| <= 2^-42`. The argument is within `2^-95` of `-x²/2 - ln sqrt(2π)`:
+the low words' two roundings (`2^-97`, `2^-96`) and the constant's
+certified `2^-105`. Stage A's result is then within
+`23·2^-65 + 2^-92` of `φ(x)/2^k`, and the rounding test of
+[exp.md](exp.md) §7 takes `E = 1.75·2^-61`, which covers that and the
+test's own `2^-63`. A result it returns is `RN(φ(x))`
+(`NormalDensityFirst.normal_density_first_ok`); every other argument
+continues to the fast composition below, and the public model
+(`NormalPublicModel.normal_regular64`) tries the stages in the code's
+order.
+
+Because both stages return only `RN(φ(x))` when they return, the first
+stage changes no result. It removes the double-word exponential's stage B
+and the double-word multiplication by `1/sqrt(2π)` from the common path.
 
 ## Fast compositions
 

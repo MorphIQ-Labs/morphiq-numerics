@@ -207,6 +207,33 @@ and each hypothesis holds (the reduction, `stage_mvt.g`, the approximation and
 table bounds). `exp_stage_a_ok` composes it with the test (§7): for every finite
 `|x| < 704`, a value stage A returns is `RN(e^x)`.
 
+## 5a. Stage A at a double-word argument
+
+`stage_a_double_word(s, se)` serves callers whose argument is a double word
+`s + se`, `|s| < 704`, `|se| <= 2^−42`: the normal density's first stage
+([normal.md](normal.md)). It reduces `s` exactly as §3 does, and the low
+word joins stage A's reduced argument with one more rounding:
+
+    r = RN(RN(r1 − RN(ni·L2D)) + se).
+
+The reduced argument is now `R = s + se − ni·L = R0 + se`, with
+`|R0| <= 0.000676902` (`stage_of_extended_ok`), so `|R| <= 0.000677` and the
+approximation bound of §5 applies unchanged. The extra rounding makes
+`|r − R| <= 2·2^−64 + 2^−77 <= 257·2^−71`, so the mean value term is at most
+`2^−73` (*certified*: `formal/exp/stage_mvt_dw.g`).
+
+**Error: `|th + l − T_j·e^R| <= 0x1.7p−61`** (*certified*:
+`formal/exp/stage_a_dw.g`, which also bounds `|l| <= 0x1.6ap−10`). It
+is the bound of §5 with the low word's rounding and the larger mean value
+term. The caller takes the scale `k` and applies the rounding test of §7
+with its own bound, which must also cover the caller's argument error.
+
+**Machine-checked:** `formal/exp/ExpStageADw.v` transcribes
+`stage_a_double_word` on binary64. `stage_a_at_chain` proves that stage A's
+operation chain, for any binary64 `|r| <= 2^−10`, rounds as the certificates
+model it; `stage_a_dw_value_ok` composes it with the reduction,
+`stage_mvt_dw.g` and `stage_a_dw.g`.
+
 ## 6. Stage B
 
 A tighter evaluation for the arguments stage A leaves undecided, with one
