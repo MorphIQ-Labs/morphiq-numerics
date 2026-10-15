@@ -11,6 +11,9 @@
 
 use std::vec::Vec;
 
+#[cfg(test)]
+pub(crate) mod bench;
+
 use morphiq_numerics_arch::{Scalar, Simd, WithSimd};
 
 use super::{Kernel, chunks, run, two_prod};
@@ -378,7 +381,7 @@ impl Backend {
 impl Backend {
     /// `super::chunks` on this backend: `G`'s lanes on the whole chunks at
     /// the start of `xs`; returns how many elements that covered.
-    fn chunks<G: Kernel>(&self, xs: &[f64], out: &mut [f64]) -> usize {
+    pub(crate) fn chunks<G: Kernel>(&self, xs: &[f64], out: &mut [f64]) -> usize {
         match self {
             Backend::Scalar(s) => chunks::<G, _>(*s, xs, out),
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

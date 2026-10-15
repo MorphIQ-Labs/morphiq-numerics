@@ -38,7 +38,8 @@ Unrelated CPU-intensive jobs and VM activity were present. No task-owned
 compiler or proof process overlapped these retained measurements. Frequency,
 power settings and affinity were not controlled. The spread is substantial;
 these are observations on this host under load, not confidence intervals or
-universal speed claims. No native x86 timing claim is made.
+universal speed claims. The same benchmark on one native x86 host is in
+[`lanes-x86-i9-10920x`](../../lanes-x86-i9-10920x/README.md#compositions).
 
 Median scalar ns/argument (all samples retained):
 
