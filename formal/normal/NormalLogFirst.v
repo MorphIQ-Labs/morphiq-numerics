@@ -23,7 +23,7 @@ Proof.
   intros H L Ch Cl T E P;unfold normal_log_first_correction_r;cbv zeta.
   apply Rabs_le_inv in L,Cl,T,E.
   repeat split;try apply Rabs_le;try split;
-    erfcx_goal(normal_log_tail_first.l1 h ch l cl p ltac:(ring) t e).
+    erfcx_goal(normal_log_tail_first.l1 h ch l cl p t e).
 Qed.
 
 Lemma normal_log_first_add k a b : finite a -> finite b ->
