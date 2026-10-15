@@ -1,0 +1,608 @@
+//! Compare the normal components' actual integer significands and DW words
+//! with their extracted Coq transcriptions, before final rounding can hide a
+//! reduction or operation-order discrepancy.
+use super::{SplitMix64, q256};
+use crate::normal_distribution::{self, Operation, accurate};
+use crate::q256::Q256;
+use std::fmt::Write as _;
+use std::string::String;
+use std::vec::Vec;
+
+pub(super) fn write(out: &mut String) {
+    let mut rng = SplitMix64::new(0x6e6f_726d_636f_7101);
+    let mut central = Vec::new();
+    for x in [
+        0.0_f64,
+        f64::from_bits(1),
+        f64::MIN_POSITIVE,
+        f64::from_bits(0x23d0_0000_0000_0000),
+        f64::from_bits(0x26f0_0000_0000_0000),
+        f64::from_bits(0x3de0_0000_0000_0000),
+        0.25,
+        0.5,
+    ] {
+        for y in [x.next_down(), x, x.next_up()] {
+            if y.abs() <= 0.5 {
+                central.extend([y, -y]);
+            }
+        }
+    }
+    for _ in 0..256 {
+        let bits = rng.next_u64() % (0.5_f64.to_bits() + 1);
+        central.extend([f64::from_bits(bits), -f64::from_bits(bits)]);
+    }
+    for x in central {
+        writeln!(
+            out,
+            "normal_accurate_center {:016x} : {}",
+            x.to_bits(),
+            q256(accurate::center(x))
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "normal_accurate_central_cdf {:016x} : {}",
+            x.to_bits(),
+            q256(accurate::central_cdf(x))
+        )
+        .unwrap();
+    }
+    // Include the oracle fixture inputs as well as the random corpus, so
+    // rounding-sensitive cases exercise rejected interval decisions too.
+    for case in crate::test_exact::entries(
+        include_str!("../../../reference/fixtures/normal.json"),
+        &["cases"],
+    ) {
+        let input = crate::test_exact::word(case, "x");
+        write_public_entries(out, input);
+        let x = input.abs();
+        if x > 0.5 && x <= 37.0 {
+            write_outer_fast_components(out, x);
+        }
+        if (f64::from_bits(0x3de0_0000_0000_0000)..=37.0).contains(&x) {
+            write_density_fast(out, x);
+        }
+        if (f64::from_bits(0x23d0_0000_0000_0000)..=0.5).contains(&x) {
+            write_central_value(out, x);
+            write_central_value(out, -x);
+        }
+        if (f64::from_bits(0x3de0_0000_0000_0000)..=0.5).contains(&x) {
+            write_center_fast(out, x);
+            write_center_fast(out, -x);
+        }
+    }
+    let lower = f64::from_bits(0x26f0_0000_0000_0000);
+    for i in 0..512 {
+        let x = match i {
+            0 => lower,
+            1 => lower.next_up(),
+            2 => 0.5,
+            3 => 8.0,
+            4 => 37.0,
+            5 => 38.5,
+            _ => f64::from_bits(
+                lower.to_bits() + rng.next_u64() % (38.5_f64.to_bits() - lower.to_bits()),
+            ),
+        };
+        writeln!(
+            out,
+            "normal_accurate_gaussian {:016x} : {}",
+            x.to_bits(),
+            q256(accurate::gaussian(x))
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "normal_accurate_density {:016x} : {}",
+            x.to_bits(),
+            q256(accurate::density(x))
+        )
+        .unwrap();
+    }
+    for i in 0..512 {
+        #[allow(clippy::cast_precision_loss)] // exactly 53 random bits
+        let u = (rng.next_u64() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+        let x = match i {
+            0 => f64::from_bits(0x3de0_0000_0000_0000),
+            1 => 0.5,
+            2 => 37.0,
+            _ => 0.5 + 36.5 * u,
+        };
+        let (y, k) = normal_distribution::gaussian(x);
+        writeln!(
+            out,
+            "normal_gaussian {:016x} : {k} {:016x} {:016x}",
+            x.to_bits(),
+            y.hi().to_bits(),
+            y.lo().to_bits()
+        )
+        .unwrap();
+        write_density_fast(out, x);
+    }
+    for i in 0..256 {
+        let high = match i {
+            0 => 16.0,
+            1 => 16.0_f64.next_up(),
+            2 => 32.0,
+            3 => f64::MAX * 0.5,
+            _ => f64::from_bits(
+                16.0_f64.to_bits() + rng.next_u64() % (0x7fe0_0000_0000_0000 - 16.0_f64.to_bits()),
+            ),
+        };
+        let high = Q256::from_f64(high);
+        let low = high.mul_pow2(-100);
+        let x = high.add(if i % 2 == 0 { low } else { low.neg() });
+        writeln!(
+            out,
+            "normal_erfcx_asym {} : {}",
+            q256(x),
+            q256(crate::erfcx::accurate::asym_value(x))
+        )
+        .unwrap();
+    }
+    for i in 0..256 {
+        let x = match i {
+            0 => f64::from_bits(1),
+            1 => f64::MIN_POSITIVE,
+            2 => f64::MAX,
+            3 => 23.0,
+            _ => f64::from_bits(1 + rng.next_u64() % f64::MAX.to_bits()),
+        };
+        writeln!(
+            out,
+            "normal_scaled_argument {:016x} : {}",
+            x.to_bits(),
+            q256(accurate::scaled_argument(x))
+        )
+        .unwrap();
+        let x = match i {
+            0 => 23.0,
+            1 => 38.6,
+            2 => 38.5,
+            _ => f64::from_bits(
+                23.0_f64.to_bits() + rng.next_u64() % (38.6_f64.to_bits() - 23.0_f64.to_bits()),
+            ),
+        };
+        writeln!(
+            out,
+            "normal_accurate_tail_asym {:016x} : {}",
+            x.to_bits(),
+            q256(accurate::tail(x))
+        )
+        .unwrap();
+    }
+    for i in 0..256 {
+        let high = match i {
+            0 => 0.5,
+            1 => 1.0,
+            2 => 2.0,
+            3 => 4.0,
+            4 => 8.0_f64.next_down(),
+            _ => f64::from_bits(
+                0.375_f64.to_bits() + rng.next_u64() % (8.0_f64.to_bits() - 0.375_f64.to_bits()),
+            ),
+        };
+        let high = Q256::from_f64(high);
+        let low = high.mul_pow2(-100);
+        let x = high.add(if i % 2 == 0 { low } else { low.neg() });
+        writeln!(
+            out,
+            "normal_erfcx_small_table {} : {}",
+            q256(x),
+            q256(crate::erfcx::accurate::positive(x))
+        )
+        .unwrap();
+    }
+    // Extended inputs can straddle a table boundary while rounding to the
+    // boundary itself. Exercise both sides at each last-binade cell and the
+    // cap just below 16, where the rounded lookup would otherwise be outside
+    // the table. Check the significand before final binary64 rounding.
+    let mut table = Vec::new();
+    for i in 0..32 {
+        let high = Q256::from_f64(8.0 + f64::from(i) * 0.25);
+        for shift in [50, 60, 100, 200, 250] {
+            let low = Q256::ONE.mul_pow2(-shift);
+            table.extend([high.add(low.neg()), high, high.add(low)]);
+        }
+    }
+    for shift in [49, 50, 51, 52, 60, 100, 200, 250] {
+        table.push(Q256::from_f64(16.0).add(Q256::ONE.mul_pow2(-shift).neg()));
+    }
+    for _ in 0..256 {
+        let high = Q256::from_f64(f64::from_bits(
+            0.25_f64.to_bits() + rng.next_u64() % (16.0_f64.to_bits() - 0.25_f64.to_bits()),
+        ));
+        table.push(high.add(high.mul_pow2(-100)));
+    }
+    for x in table {
+        writeln!(
+            out,
+            "normal_erfcx_extended_table {} : {}",
+            q256(x),
+            q256(crate::erfcx::accurate::positive(x))
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "normal_erfcx_positive {} : {}",
+            q256(x),
+            q256(crate::erfcx::accurate::positive(x))
+        )
+        .unwrap();
+    }
+    for i in 0..256 {
+        let high = Q256::from_f64(match i {
+            0 => 16.0,
+            1 => 16.0_f64.next_up(),
+            2 => f64::MAX * 0.5,
+            _ => f64::from_bits(
+                16.0_f64.to_bits() + rng.next_u64() % (0x7fe0_0000_0000_0000 - 16.0_f64.to_bits()),
+            ),
+        });
+        let x = high.add(high.mul_pow2(-100));
+        writeln!(
+            out,
+            "normal_erfcx_positive {} : {}",
+            q256(x),
+            q256(crate::erfcx::accurate::positive(x))
+        )
+        .unwrap();
+    }
+    for i in 0..512 {
+        let x = match i {
+            0 => 0.5,
+            1 => 0.5_f64.next_up(),
+            2 => 1.0,
+            3 => 8.0,
+            4 => 23.0,
+            5 => 38.6,
+            _ => f64::from_bits(
+                0.5_f64.to_bits() + rng.next_u64() % (38.6_f64.to_bits() - 0.5_f64.to_bits()),
+            ),
+        };
+        writeln!(
+            out,
+            "normal_accurate_tail {:016x} : {}",
+            x.to_bits(),
+            q256(accurate::tail(x))
+        )
+        .unwrap();
+    }
+    for exponent in [-2047, -1024, -1, 0, 1, 1024, 2047] {
+        for mantissa in [1.0, 1.0_f64.next_up(), 1.5, 2.0_f64.next_down()] {
+            let high = Q256::from_f64(mantissa).mul_pow2(exponent);
+            let low = high.mul_pow2(-100);
+            for x in [high.add(low.neg()), high, high.add(low)] {
+                writeln!(
+                    out,
+                    "normal_logarithm {} : {}",
+                    q256(x),
+                    q256(accurate::logarithm(x))
+                )
+                .unwrap();
+            }
+        }
+    }
+    let mut complements = Vec::new();
+    for exponent in [
+        -2, -3, -10, -53, -255, -500, -1022, -1074, -1075, -1100, -2048,
+    ] {
+        for mantissa in [1.0, 1.375, 2.0_f64.next_down()] {
+            let high = Q256::from_f64(mantissa).mul_pow2(exponent);
+            let low = high.mul_pow2(-100);
+            complements.extend([high.add(low.neg()), high, high.add(low)]);
+        }
+    }
+    let half = Q256::from_f64(0.5);
+    complements.extend([half, half.add(Q256::ONE.mul_pow2(-100).neg())]);
+    for x in complements {
+        writeln!(
+            out,
+            "normal_log_complement {} : {}",
+            q256(x),
+            q256(accurate::log_complement(x))
+        )
+        .unwrap();
+    }
+    // The fast tail keeps both words of x/sqrt(2), especially at the
+    // erfcx table/middle boundary near x=16*sqrt(2).
+    let mut fast_scale_rng = SplitMix64::new(0x6e6f_726d_7363_616c);
+    let boundary = 0x4036_a09e_667f_3bcd;
+    for i in 0..2048 {
+        let bits = match i {
+            0 => 0.5_f64.to_bits(),
+            1 => 0.5_f64.to_bits() + 1,
+            2 => boundary - 1,
+            3 => boundary,
+            4 => boundary + 1,
+            5 => 37.0_f64.to_bits() - 1,
+            6 => 37.0_f64.to_bits(),
+            _ => {
+                0.5_f64.to_bits()
+                    + fast_scale_rng.next_u64() % (37.0_f64.to_bits() - 0.5_f64.to_bits())
+            }
+        };
+        if bits > 0.5_f64.to_bits() {
+            write_outer_fast_components(out, f64::from_bits(bits));
+        }
+        let value = normal_distribution::scaled_erfcx(f64::from_bits(bits));
+        writeln!(
+            out,
+            "normal_erfcx_fast_scaled {bits:016x} : {:016x} {:016x}",
+            value.hi().to_bits(),
+            value.lo().to_bits()
+        )
+        .unwrap();
+        let z = normal_distribution::scaled_argument(f64::from_bits(bits));
+        writeln!(
+            out,
+            "normal_fast_scaled_argument {bits:016x} : {:016x} {:016x}",
+            z.hi().to_bits(),
+            z.lo().to_bits()
+        )
+        .unwrap();
+    }
+    write_compositions(out, &mut rng);
+    write_center_central(out);
+    write_center_small(out, &mut rng);
+    write_center_tail(out, &mut rng);
+    for i in 0..4096 {
+        let lower = 0x3de0_0000_0000_0000;
+        let upper = 0.5_f64.to_bits();
+        let bits = match i {
+            0 => lower,
+            1 => lower + 1,
+            2 => upper,
+            3 => upper - 1,
+            _ => lower + rng.next_u64() % (upper - lower),
+        };
+        for x in [f64::from_bits(bits), -f64::from_bits(bits)] {
+            write_center_fast(out, x);
+        }
+    }
+}
+
+fn write_outer_fast_components(out: &mut String, x: f64) {
+    for (name, op, argument) in [
+        ("normal_tail_fast", Operation::Cdf, -x),
+        ("normal_log_negative", Operation::LogCdf, -x),
+        ("normal_log_positive", Operation::LogCdf, x),
+        ("normal_outer_cdf", Operation::Cdf, x),
+        ("normal_outer_center_positive", Operation::Centered, x),
+        ("normal_outer_center_negative", Operation::Centered, -x),
+    ] {
+        let (value, eps) = normal_distribution::fast(op, argument).unwrap();
+        writeln!(
+            out,
+            "{name} {:016x} : {:016x} {:016x} {:016x} {}",
+            x.to_bits(),
+            value.hi().to_bits(),
+            value.lo().to_bits(),
+            eps.to_bits(),
+            super::opt(normal_distribution::fast_decide(op, argument))
+        )
+        .unwrap();
+    }
+}
+
+fn write_central_value(out: &mut String, x: f64) {
+    for (name, op) in [
+        ("normal_center_central", Operation::Centered),
+        ("normal_cdf_central", Operation::Cdf),
+        ("normal_log_central", Operation::LogCdf),
+    ] {
+        let (value, eps) = normal_distribution::fast(op, x).unwrap();
+        writeln!(
+            out,
+            "{name} {:016x} : {:016x} {:016x} {:016x} {}",
+            x.to_bits(),
+            value.hi().to_bits(),
+            value.lo().to_bits(),
+            eps.to_bits(),
+            super::opt(normal_distribution::fast_decide(op, x))
+        )
+        .unwrap();
+    }
+}
+
+fn write_center_central(out: &mut String) {
+    let mut rng = SplitMix64::new(0x6e6f_726d_6365_6e74);
+    let lower = 0x23d0_0000_0000_0000;
+    let split = 0x3de0_0000_0000_0000;
+    let upper = 0.5_f64.to_bits();
+    for i in 0..4096 {
+        let bits = match i {
+            0 => lower,
+            1 => lower + 1,
+            2 => split - 1,
+            3 => split,
+            4 => split + 1,
+            5 => upper - 1,
+            6 => upper,
+            _ => lower + rng.next_u64() % (upper - lower),
+        };
+        for x in [f64::from_bits(bits), -f64::from_bits(bits)] {
+            write_central_value(out, x);
+        }
+    }
+}
+
+fn write_center_fast(out: &mut String, x: f64) {
+    let (value, eps) = normal_distribution::fast(Operation::Centered, x).unwrap();
+    writeln!(
+        out,
+        "normal_center_fast {:016x} : {:016x} {:016x} {:016x} {}",
+        x.to_bits(),
+        value.hi().to_bits(),
+        value.lo().to_bits(),
+        eps.to_bits(),
+        super::opt(normal_distribution::fast_decide(Operation::Centered, x))
+    )
+    .unwrap();
+}
+
+fn write_center_tail(out: &mut String, rng: &mut SplitMix64) {
+    let lower = 0x3de0_0000_0000_0000;
+    let upper = 0.5_f64.to_bits();
+    for i in 0..512 {
+        let bits = match i {
+            0 => lower,
+            1 => lower + 1,
+            2 => upper,
+            3 => upper - 1,
+            _ => lower + rng.next_u64() % (upper - lower),
+        };
+        for x in [f64::from_bits(bits), -f64::from_bits(bits)] {
+            let (h, l) = crate::eft::two_prod(x, x);
+            writeln!(
+                out,
+                "normal_center_tail {:016x} : {:016x} {:016x} {:016x}",
+                x.to_bits(),
+                h.to_bits(),
+                l.to_bits(),
+                normal_distribution::center_tail(h).to_bits()
+            )
+            .unwrap();
+            let shape = normal_distribution::center_polynomial(
+                crate::double_word::DoubleWord::product(x, x),
+            );
+            writeln!(
+                out,
+                "normal_center_shape {:016x} : {:016x} {:016x}",
+                x.to_bits(),
+                shape.hi().to_bits(),
+                shape.lo().to_bits()
+            )
+            .unwrap();
+        }
+    }
+}
+
+fn write_center_small(out: &mut String, rng: &mut SplitMix64) {
+    let lower = 0x23d0_0000_0000_0000;
+    let upper = 0x3de0_0000_0000_0000;
+    for i in 0..4096 {
+        let bits = match i {
+            0 => lower,
+            1 => lower + 1,
+            2 => upper - 1,
+            _ => lower + rng.next_u64() % (upper - lower),
+        };
+        for x in [f64::from_bits(bits), -f64::from_bits(bits)] {
+            let (value, eps) = normal_distribution::fast(Operation::Centered, x).unwrap();
+            writeln!(
+                out,
+                "normal_center_small {:016x} : {:016x} {:016x} {:016x} {}",
+                x.to_bits(),
+                value.hi().to_bits(),
+                value.lo().to_bits(),
+                eps.to_bits(),
+                super::opt(normal_distribution::fast_decide(Operation::Centered, x))
+            )
+            .unwrap();
+        }
+    }
+}
+
+fn write_compositions(out: &mut String, rng: &mut SplitMix64) {
+    for i in 0..128 {
+        let x = match i {
+            0 => 0.5_f64.next_up(),
+            1 => 1.0,
+            2 => 8.0,
+            3 => 23.0,
+            4 => 38.6,
+            _ => f64::from_bits(
+                0.5_f64.to_bits() + 1 + rng.next_u64() % (38.6_f64.to_bits() - 0.5_f64.to_bits()),
+            ),
+        };
+        for (name, op) in [
+            ("normal_accurate_outer_cdf", Operation::Cdf),
+            ("normal_accurate_outer_center", Operation::Centered),
+            ("normal_accurate_log_positive", Operation::LogCdf),
+        ] {
+            writeln!(
+                out,
+                "{name} {:016x} : {}",
+                x.to_bits(),
+                q256(accurate::value(op, x))
+            )
+            .unwrap();
+        }
+    }
+    for i in 0..64 {
+        let x = match i {
+            0 => 0.0,
+            1 => f64::from_bits(1),
+            2 => f64::MIN_POSITIVE,
+            3 => 0.25,
+            4 => 0.5,
+            _ => f64::from_bits(rng.next_u64() % (0.5_f64.to_bits() + 1)),
+        };
+        for x in [x, -x] {
+            writeln!(
+                out,
+                "normal_accurate_log_central {:016x} : {}",
+                x.to_bits(),
+                q256(accurate::value(Operation::LogCdf, x))
+            )
+            .unwrap();
+        }
+    }
+    for i in 0..128 {
+        let x = match i {
+            0 => 0.5_f64.next_up(),
+            1 => 8.0,
+            2 => 23.0,
+            3 => 38.6,
+            4 => f64::from_bits(0x5fe0_0000_0000_0000),
+            5 => f64::from_bits(0x5ff0_0000_0000_0000),
+            6 => f64::from_bits(0x6000_0000_0000_0000),
+            7 => f64::MAX,
+            _ => f64::from_bits(
+                0.5_f64.to_bits() + 1 + rng.next_u64() % (f64::MAX.to_bits() - 0.5_f64.to_bits()),
+            ),
+        };
+        writeln!(
+            out,
+            "normal_accurate_log_negative {:016x} : {}",
+            x.to_bits(),
+            q256(accurate::value(Operation::LogCdf, -x))
+        )
+        .unwrap();
+    }
+}
+
+fn write_density_fast(out: &mut String, x: f64) {
+    let (density, eps) = normal_distribution::fast(Operation::Pdf, x).unwrap();
+    writeln!(
+        out,
+        "normal_density_fast {:016x} : {:016x} {:016x} {:016x} {}",
+        x.to_bits(),
+        density.hi().to_bits(),
+        density.lo().to_bits(),
+        eps.to_bits(),
+        super::opt(normal_distribution::fast_decide(Operation::Pdf, x))
+    )
+    .unwrap();
+}
+
+fn write_public_entries(out: &mut String, x: f64) {
+    use crate::normal::*;
+    type Function = fn(f64) -> f64;
+    for (name, function) in [
+        ("normal_entry_pdf", norm_pdf as Function),
+        ("normal_entry_cdf", norm_cdf),
+        ("normal_entry_ccdf", norm_ccdf),
+        ("normal_entry_center", norm_cdf_centered),
+        ("normal_entry_log", log_norm_cdf),
+    ] {
+        writeln!(
+            out,
+            "{name} {:016x} : {:016x}",
+            x.to_bits(),
+            function(x).to_bits()
+        )
+        .unwrap();
+    }
+}

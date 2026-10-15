@@ -1,5 +1,5 @@
 //! Scaled complementary error function: table, reciprocal and reflection kernels.
-mod accurate;
+pub(crate) mod accurate;
 #[cfg(test)]
 pub(crate) use accurate::{asym as accurate_asym, reflected_exponential as accurate_reflected_exp};
 #[cfg(test)]
@@ -18,7 +18,8 @@ mod tables;
 pub(crate) mod tests;
 
 use crate::eft::{fast_two_sum, two_prod, two_sum};
-use crate::exp::tables::{INV_N, S_L1, S_L2, S_L3, SHIFTER};
+pub(crate) use crate::exp::stage_b_double_word as exp_dw;
+use crate::exp::tables::SHIFTER;
 use crate::ulp::ulp;
 use tables::{CS, DEG, PA, T};
 
@@ -186,7 +187,7 @@ pub(crate) fn table_leading(idx: usize, h: f64) -> (f64, f64, f64, f64, f64, f64
 
 /// The double-word polynomial value for region T.
 #[inline]
-pub(super) fn t_eval(x: f64) -> (f64, f64) {
+pub(crate) fn t_eval(x: f64) -> (f64, f64) {
     let (idx, _c, h, e) = t_reduce(x);
     let a = &T[idx];
     // H: h on the 2^(e−23) grid, so |H| ≤ 2^17 grid steps (≤ 18 bits) and
@@ -334,28 +335,6 @@ pub(super) fn fast_yb(x: f64) -> Option<f64> {
 }
 
 // ---------------------------------------------------------------- region N
-
-/// The library's fast `exp` kernel at the double-word argument `s + se`:
-/// `(Y, k)` with `exp(s + se) ≈ Y·2^k` (`docs/exp.md` §3–§4; the low word
-/// joins the reduction's `rr`).
-#[inline]
-pub(super) fn exp_dw(s: f64, se: f64) -> (f64, f64, i32) {
-    // Stage B at an exact double-word square. The low input word joins
-    // the residual before the shared polynomial and table reconstruction.
-    let t = s * INV_N + SHIFTER;
-    let n = t - SHIFTER;
-    let ni = n as i32;
-    let j = ni.rem_euclid(512) as usize;
-    let k = ni.div_euclid(512);
-    let r1 = s - n * S_L1;
-    let p2 = n * S_L2;
-    let r0 = r1 - p2;
-    let rh = (r0 + 6144.0) - 6144.0;
-    let rt = (((r1 - rh) - p2) - n * S_L3) + se;
-    let (yh, yl) = crate::exp::stage_b_at(j, rh, rt);
-    let (yh, yl) = fast_two_sum(yh, yl);
-    (yh, yl, k)
-}
 
 /// Double-word erfcx for `X_OVF < x < −1/2`, as `(hi, lo, k)`.
 #[inline]

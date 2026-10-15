@@ -52,7 +52,7 @@ fn reduced<K: Simd>(k: K, x: K::F) -> Dw<K> {
 
 /// Every lane is a positive finite input other than one.
 #[inline(always)]
-pub(super) fn ln<K: Simd>(k: K, x: K::F) -> Dw<K> {
+pub(crate) fn ln<K: Simd>(k: K, x: K::F) -> Dw<K> {
     reduced(k, x)
 }
 

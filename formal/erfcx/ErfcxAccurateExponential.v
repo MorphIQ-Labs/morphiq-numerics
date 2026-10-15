@@ -73,7 +73,7 @@ Definition q_reflection_exponential s se :=
   q_exp_scaled (accurate_residual s se (accurate_n s)) (Z.to_nat (ni mod 128)) (ni/128).
 
 Theorem q_reflection_exponential_error s se : finite s -> finite se ->
-  /4<=B s<=709.79 -> Rabs (B se)<=bpow radix2 (-44) ->
+  -745.1333<=B s<=709.79 -> Rabs (B se)<=bpow radix2 (-44) ->
   valid (q_reflection_exponential s se) /\ exists e, Rabs e<=bpow radix2 (-238) /\
   qval (q_reflection_exponential s se)=2*exp (B s+B se)*(1+e).
 Proof.
@@ -118,6 +118,6 @@ Proof.
   assert (Sbound : /4<=B s<=709.79).
   { pose proof reflection_limit_value as Limit.
     apply Rabs_le_inv in Serange. bpow_num_all. split; nra. }
-  destruct (q_reflection_exponential_error s se S Se Sbound Serange) as [Q [e [E Value]]].
+  destruct (q_reflection_exponential_error s se S Se ltac:(lra) Serange) as [Q [e [E Value]]].
   split; [exact Q | ]. exists e. split; [exact E | rewrite <- Exact; exact Value].
 Qed.

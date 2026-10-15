@@ -19,7 +19,10 @@ use morphiq_numerics::interval::{FiniteInterval, IntervalError};
 use morphiq_numerics::log_space::{
     log_diff_exp, log_sum_exp, log_sum_exp_and_normalize, log_sum_exp_pairs,
 };
-use morphiq_numerics::normal::{erfcx, erfcx_slice, log_norm_pdf};
+use morphiq_numerics::normal::{
+    erfcx, erfcx_slice, log_norm_cdf, log_norm_cdf_slice, log_norm_pdf, norm_ccdf, norm_ccdf_slice,
+    norm_cdf, norm_cdf_centered, norm_cdf_centered_slice, norm_cdf_slice, norm_pdf, norm_pdf_slice,
+};
 use morphiq_numerics::random::{
     SplitMix64, Xoshiro256PlusPlus, normal_pair, unit_closed_open, unit_open,
 };
@@ -892,6 +895,7 @@ pub fn corpus_digest() -> [u8; 32] {
     );
 
     interval_section(&mut r, &mut words);
+    normal_distribution_section(&mut r, &mut words);
 
     r.0.finalize().into()
 }
@@ -1074,5 +1078,69 @@ fn record_interval(r: &mut Recorder, value: Result<FiniteInterval, IntervalError
         Err(IntervalError::InvalidBounds) => r.u64(1),
         Err(IntervalError::Domain) => r.u64(2),
         Err(IntervalError::Range) => r.u64(3),
+    }
+}
+
+/// Scalar and slice normal-family outputs, with threshold neighbors,
+/// signed special values, every short-vector remainder and random encodings.
+fn normal_distribution_section(r: &mut Recorder, words: &mut Words) {
+    let edges = [
+        0_u64,
+        1 << 63,
+        1,
+        (1 << 63) | 1,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0x7ff8_1234_5678_9abc,
+        0xfff8_1234_5678_9abc,
+        0x23d0_0000_0000_0000,
+        0x3de0_0000_0000_0000,
+        0x3fe0_0000_0000_0000,
+        0x4020_95b0_59d6_7c4d,
+        0x4020_bfaf_e7a9_1e68,
+        0x4036_a09e_667f_3bcd,
+        0x4042_8000_0000_0000,
+        0x4043_3e21_dc3f_3bd8,
+        0x4043_4a42_9ac2_a6bc,
+        0x5ff6_a09e_667f_3bcd,
+    ];
+    type Scalar = fn(f64) -> f64;
+    type Slice = fn(&[f64], &mut [f64]);
+    for (name, scalar, slice) in [
+        ("norm_pdf", norm_pdf as Scalar, norm_pdf_slice as Slice),
+        ("norm_cdf", norm_cdf, norm_cdf_slice),
+        ("norm_ccdf", norm_ccdf, norm_ccdf_slice),
+        (
+            "norm_cdf_centered",
+            norm_cdf_centered,
+            norm_cdf_centered_slice,
+        ),
+        ("log_norm_cdf", log_norm_cdf, log_norm_cdf_slice),
+    ] {
+        r.label(name);
+        for &bits in &edges {
+            for sign in [0, 1 << 63] {
+                for neighbor in [bits.saturating_sub(1), bits, bits.saturating_add(1)] {
+                    r.f64(scalar(f64::from_bits(neighbor ^ sign)));
+                }
+            }
+        }
+        for i in 0..512 {
+            r.f64(scalar(batched_input(words, &edges, i, -40.0, 40.0)));
+        }
+        r.label("slice");
+        for len in 0..=17 {
+            for sample in 0..8 {
+                let mut input = [0.0; 17];
+                let mut output = [0.0; 17];
+                for (i, x) in input[..len].iter_mut().enumerate() {
+                    *x = batched_input(words, &edges, sample * 17 + i, -40.0, 40.0);
+                }
+                slice(&input[..len], &mut output[..len]);
+                for &y in &output[..len] {
+                    r.f64(y);
+                }
+            }
+        }
     }
 }

@@ -33,6 +33,8 @@ use crate::random::SplitMix64;
 use std::fmt::Write as _;
 use std::string::String;
 
+mod normal;
+
 fn q128(q: Q128) -> String {
     let (n, m, e) = q.parts();
     #[allow(clippy::cast_possible_truncation)] // the low limb
@@ -244,6 +246,7 @@ fn internal_crosscheck_corpus() {
     let path = std::env::var("MORPHIQ_INTERNAL_CORPUS").expect("MORPHIQ_INTERNAL_CORPUS");
     let mut rng = SplitMix64::new(0x7163_726f_7373_0001);
     let mut out = String::new();
+    normal::write(&mut out);
     q256_exponent_corpus(&mut out);
     erfcx_accurate_tail_corpus(&mut out);
     erfcx_accurate_exponential_corpus(&mut out);

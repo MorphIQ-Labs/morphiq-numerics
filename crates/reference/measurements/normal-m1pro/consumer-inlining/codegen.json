@@ -1,0 +1,8 @@
+{
+  "baseline": {
+    "calls_to_shared_evaluate": 10
+  },
+  "inline": {
+    "calls_to_shared_evaluate": 2
+  }
+}

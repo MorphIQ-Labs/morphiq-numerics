@@ -100,6 +100,106 @@ let compute op args =
       (match args with
        | [x] -> show_bits (x_erfcx_entry (z_of_u64 (hex x)))
        | _ -> failwith "erfcx_entry takes a word")
+  | "normal_entry_pdf" | "normal_entry_cdf" | "normal_entry_ccdf" | "normal_entry_center" | "normal_entry_log" ->
+      (match args with
+       | [x] -> let f = match op with
+             | "normal_entry_pdf" -> x_normal_entry_pdf
+             | "normal_entry_cdf" -> x_normal_entry_cdf
+             | "normal_entry_ccdf" -> x_normal_entry_ccdf
+             | "normal_entry_center" -> x_normal_entry_center
+             | _ -> x_normal_entry_log in
+           show_bits (f (z_of_u64 (hex x)))
+       | _ -> failwith (op ^ " takes a word"))
+  | "normal_accurate_gaussian" | "normal_accurate_density" | "normal_accurate_center" | "normal_accurate_central_cdf" ->
+      (match args with
+       | [x] ->
+           let f = match op with
+             | "normal_accurate_gaussian" -> x_normal_accurate_gaussian
+             | "normal_accurate_density" -> x_normal_accurate_density
+             | "normal_accurate_center" -> x_normal_accurate_center
+             | _ -> x_normal_accurate_central_cdf in
+           let ((n, e), l) = f (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "normal accurate component takes a word")
+  | "normal_gaussian" ->
+      (match args with
+       | [x] -> let (k, words) = x_normal_gaussian (z_of_u64 (hex x)) in
+           String.concat " " (string_of_int (int_of_z k) :: List.map show_bits words)
+       | _ -> failwith "normal_gaussian takes a word")
+  | "normal_density_fast" | "normal_center_small" | "normal_center_fast"
+  | "normal_center_central" | "normal_cdf_central" | "normal_log_central" | "normal_tail_fast"
+  | "normal_outer_cdf" | "normal_outer_center_positive" | "normal_outer_center_negative" | "normal_log_negative" | "normal_log_positive" ->
+      (match args with
+       | [x] -> let f = match op with
+             | "normal_density_fast" -> x_normal_density_fast
+             | "normal_center_small" -> x_normal_center_small
+             | "normal_center_fast" -> x_normal_center_fast
+             | "normal_center_central" -> x_normal_center_central
+             | "normal_cdf_central" -> x_normal_cdf_central
+             | "normal_log_central" -> x_normal_log_central
+             | "normal_tail_fast" -> x_normal_tail_fast
+             | "normal_outer_cdf" -> x_normal_outer_cdf
+             | "normal_outer_center_positive" -> x_normal_outer_center_positive
+             | "normal_outer_center_negative" -> x_normal_outer_center_negative
+             | "normal_log_negative" -> x_normal_log_negative
+             | _ -> x_normal_log_positive in
+           let (words, decision) = f (z_of_u64 (hex x)) in
+           String.concat " " (List.map show_bits words @ [show_opt decision])
+       | _ -> failwith (op ^ " takes a word"))
+  | "normal_center_tail" ->
+      (match args with
+       | [x] -> String.concat " " (List.map show_bits (x_normal_center_tail (z_of_u64 (hex x))))
+       | _ -> failwith "normal_center_tail takes a word")
+  | "normal_fast_scaled_argument" | "normal_erfcx_fast_scaled" ->
+      (match args with
+       | [x] -> let f = if op = "normal_fast_scaled_argument" then x_normal_fast_scaled_argument else x_normal_erfcx_fast_scaled in
+           String.concat " " (List.map show_bits (f (z_of_u64 (hex x))))
+       | _ -> failwith (op ^ " takes a word"))
+  | "normal_center_shape" ->
+      (match args with
+       | [x] -> String.concat " " (List.map show_bits (x_normal_center_shape (z_of_u64 (hex x))))
+       | _ -> failwith "normal_center_shape takes a word")
+  | "normal_accurate_outer_cdf" | "normal_accurate_outer_center" | "normal_accurate_log_positive"
+  | "normal_accurate_log_central" | "normal_accurate_log_negative" ->
+      (match args with
+       | [x] ->
+           let f = match op with
+             | "normal_accurate_outer_cdf" -> x_normal_accurate_outer_cdf
+             | "normal_accurate_outer_center" -> x_normal_accurate_outer_center
+             | "normal_accurate_log_positive" -> x_normal_accurate_log_positive
+             | "normal_accurate_log_central" -> x_normal_accurate_log_central
+             | _ -> x_normal_accurate_log_negative in
+           let ((n, e), l) = f (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "normal accurate composition takes a word")
+  | "normal_erfcx_asym" ->
+      let ((n, e, l), _) = value args in
+      let ((n, e), l) = x_normal_erfcx_asym n e l in show (n, e, l)
+  | "normal_erfcx_small_table" ->
+      let ((n, e, l), _) = value args in
+      let ((n, e), l) = x_normal_erfcx_small_table n e l in show (n, e, l)
+  | "normal_erfcx_extended_table" ->
+      let ((n, e, l), _) = value args in
+      let ((n, e), l) = x_normal_erfcx_extended_table n e l in show (n, e, l)
+  | "normal_erfcx_positive" ->
+      let ((n, e, l), _) = value args in
+      let ((n, e), l) = x_normal_erfcx_positive n e l in show (n, e, l)
+  | "normal_logarithm" ->
+      let ((n, e, l), _) = value args in
+      let ((n, e), l) = x_normal_logarithm n e l in show (n, e, l)
+  | "normal_log_complement" ->
+      let ((n, e, l), _) = value args in
+      let ((n, e), l) = x_normal_log_complement n e l in show (n, e, l)
+  | "normal_accurate_tail" ->
+      (match args with
+       | [x] -> let ((n, e), l) = x_normal_accurate_tail (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "normal_accurate_tail takes a word")
+  | "normal_scaled_argument" ->
+      (match args with
+       | [x] -> let ((n, e), l) = x_normal_scaled_argument (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "normal_scaled_argument takes a word")
+  | "normal_accurate_tail_asym" ->
+      (match args with
+       | [x] -> let ((n, e), l) = x_normal_accurate_tail_asym (z_of_u64 (hex x)) in show (n, e, l)
+       | _ -> failwith "normal_accurate_tail_asym takes a word")
   | "erfcx_accurate_exp" ->
       (match args with
        | [s; se] -> let ((n, e), l) = x_erfcx_accurate_exp (z_of_u64 (hex s)) (z_of_u64 (hex se)) in show (n, e, l)

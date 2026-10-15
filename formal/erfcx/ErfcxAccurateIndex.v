@@ -11,7 +11,7 @@ Definition accurate_index s :=
   (bits_of_b64 (fadd (fmul s ExpReduction.c_inv_l) ExpReduction.shifter)-
    bits_of_b64 ExpReduction.shifter)%Z.
 
-Theorem accurate_index_ok s : finite s -> /4<=B s<=709.79 ->
+Theorem accurate_index_ok s : finite s -> -745.1333<=B s<=709.79 ->
   finite (accurate_n s) /\ B (accurate_n s)=IZR (accurate_index s) /\
   (Z.abs (accurate_index s)<=137601)%Z /\
   Rabs (B s-IZR (accurate_index s)*(ln 2/128))<=0.002708.

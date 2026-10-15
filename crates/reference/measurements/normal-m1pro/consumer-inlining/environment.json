@@ -1,0 +1,17 @@
+{
+  "date_utc": "2026-10-14T21:19:25.513548+00:00",
+  "cpu": "Apple M1 Pro",
+  "os": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: aarch64-apple-darwin\nrelease: 1.97.1\nLLVM version: 22.1.6",
+  "baseline": "755326c8773a6002d02ed15538c6f8d4e1231f9e",
+  "candidate_change": "#[inline] on normal_distribution::{special,fast,evaluate}; no arithmetic or branch changes",
+  "candidate_mod_sha256": "e0318fdc30ccc78900b5c76c7b4897afa6c5ef51538f0bf9701d5493e9d3b218",
+  "benchmark_sha256": "a2274cc5bd62dddea374f78e249a976d8def7e934e4070353f5946bec9052f94",
+  "library_build": "cargo build --release --locked -p morphiq-numerics --all-features",
+  "consumer_flags": "-O -C codegen-units=1 --edition=2024; no LTO or target-cpu override",
+  "conditions": "Unrelated CPU-intensive jobs and VM activity were present; no task-owned compilation or proof job ran during the retained timings. Default OS frequency/power management; no affinity. Alternating process order, seven pairs, three samples per function per process, 150 ms per path; one process warmup per variant before recorded pairs. Timings exclude process startup and pre-timing scalar/SIMD bit checks.",
+  "binary_bytes": {
+    "baseline": 605344,
+    "inline": 606080
+  }
+}

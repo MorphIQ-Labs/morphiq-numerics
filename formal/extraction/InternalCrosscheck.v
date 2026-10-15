@@ -22,6 +22,21 @@ Require LnFastValue Ln1pFast LnFastDecision LnEntry.
 Require ErfcxReciprocal ErfcxSquare ErfcxMiddlePolynomial ErfcxProduct ErfcxMiddleValue ErfcxQuotient ErfcxQuotientScale ErfcxTailCorrection ErfcxTailValue ErfcxTableSplit ErfcxTableProducts ErfcxTableData ErfcxTableReduction ErfcxTableEntry.
 Require ErfcxReflectionExp ErfcxReflectionSubtract ErfcxReflectionFast.
 Require ErfcxMiddleFast ErfcxTailFast ErfcxAccurateProduct ErfcxAccurateExponential.
+Require NormalGaussianKernel NormalDensityFast NormalDensityDecision NormalFastDecision NormalAccurateGaussian NormalAccurateDensity
+  NormalAccurateCenter NormalAccurateCentralCdf NormalErfcxAsymptotic
+  NormalScaledArgument NormalAccurateTail NormalTableLookup NormalExtendedTable
+  NormalExtendedErfcx NormalAccurateTailFull NormalLogSeries NormalComplementSeries
+  NormalAccurateOuter NormalAccurateLogPositive NormalAccurateLogCentral NormalAccurateLogNegative.
+Require NormalCenterSmall NormalCenterSmallDecision.
+Require NormalCenterFastSquare.
+Require NormalCenterFastPolynomial.
+Require NormalCenterFastValue NormalCenterFastDecision.
+Require NormalCenterCentral NormalCdfCentralFast.
+Require NormalLogDw NormalLogCentralFast NormalLogDecision.
+Require NormalFastScaledArgument NormalErfcxFastScaled.
+Require NormalTailFast NormalTailDecision.
+Require NormalOuterSigned.
+Require NormalLogNegativeFast.
 Import ListNotations.
 
 Definition limbs (k : nat) (x : Z) : list Z := map (fun i => dig x (Z.of_nat i)) (seq 0 k).
@@ -30,6 +45,90 @@ Definition q128_in (n : bool) (e : Z) (l : list Z) : q128 := Q128.Q n (Limbs.v l
 Definition q128_out (x : q128) : bool * Z * list Z := (Q128.neg x, Q128.e x, limbs 2 (Q128.m x)).
 Definition q256_in (n : bool) (e : Z) (l : list Z) : q256 := Q256.Q n l e.
 Definition q256_out (x : q256) : bool * Z * list Z := (Q256.neg x, Q256.e x, Q256.m x).
+
+Require Import NormalLogPositiveFast.
+Require Import NormalPublicModel NormalFastDispatch.
+Definition x_normal_entry_pdf x := bits_of_b64 (normal_entry64 NormalPdf (b64_of_bits x)).
+Definition x_normal_entry_cdf x := bits_of_b64 (normal_entry64 NormalCdf (b64_of_bits x)).
+Definition x_normal_entry_ccdf x := bits_of_b64 (normal_ccdf_entry64 (b64_of_bits x)).
+Definition x_normal_entry_center x := bits_of_b64 (normal_entry64 NormalCentered (b64_of_bits x)).
+Definition x_normal_entry_log x := bits_of_b64 (normal_entry64 NormalLogCdf (b64_of_bits x)).
+Definition x_normal_accurate_gaussian x := q256_out (NormalAccurateGaussian.normal_q_gaussian_regular (b64_of_bits x)).
+Definition x_normal_accurate_density x := q256_out (NormalAccurateDensity.normal_q_density_regular (b64_of_bits x)).
+Definition x_normal_accurate_center x := q256_out (NormalAccurateCenter.normal_q_center (b64_of_bits x)).
+Definition x_normal_accurate_central_cdf x := q256_out (NormalAccurateCentralCdf.normal_q_central_cdf (b64_of_bits x)).
+Definition x_normal_gaussian x :=
+  let '(h,l,k) := NormalGaussianKernel.normal_gaussian64 (b64_of_bits x) in
+  (k,map bits_of_b64 [h;l]).
+Definition x_normal_density_fast x :=
+  let '(h,l,k) := NormalDensityFast.normal_density_fast64 (b64_of_bits x) in
+  let e:=NormalDensityDecision.normal_density_guard64 h in
+  (map bits_of_b64 [h;l;e],option_map bits_of_b64 (NormalFastDecision.normal_interval_decide64 h l e)).
+Definition x_normal_center_small x :=
+  let '(h,l) := NormalCenterSmall.normal_center_small64 (b64_of_bits x) in
+  let e:=NormalDensityDecision.normal_density_guard64 (b64_abs h) in
+  (map bits_of_b64 [h;l;e],option_map bits_of_b64 (NormalCenterSmallDecision.normal_center_small_decide64 (b64_of_bits x))).
+Definition x_normal_center_tail x :=
+  let '(h,l,t) := NormalCenterFastSquare.normal_center_square_tail64 (b64_of_bits x) in
+  map bits_of_b64 [h;l;t].
+Definition x_normal_center_shape x :=
+  let '(h,l) := NormalCenterFastPolynomial.normal_center_shape64 (b64_of_bits x) in
+  map bits_of_b64 [h;l].
+Definition x_normal_center_fast x :=
+  let '(h,l) := NormalCenterFastValue.normal_center_regular64 (b64_of_bits x) in
+  let e:=NormalDensityDecision.normal_density_guard64 (b64_abs h) in
+  (map bits_of_b64 [h;l;e],option_map bits_of_b64 (NormalCenterFastDecision.normal_center_regular_decide64 (b64_of_bits x))).
+Definition x_normal_center_central x :=
+  let '(h,l) := NormalCenterCentral.normal_center_central64 (b64_of_bits x) in
+  let e:=NormalDensityDecision.normal_density_guard64 (b64_abs h) in
+  (map bits_of_b64 [h;l;e],option_map bits_of_b64 (NormalCenterCentral.normal_center_central_decide64 (b64_of_bits x))).
+Definition x_normal_cdf_central x :=
+  let '(h,l) := NormalCdfCentralFast.normal_cdf_central_fast64 (b64_of_bits x) in
+  let e:=NormalDensityDecision.normal_density_guard64 (b64_abs h) in
+  (map bits_of_b64 [h;l;e],option_map bits_of_b64 (NormalCdfCentralFast.normal_cdf_central_decide64 (b64_of_bits x))).
+Definition x_normal_log_central x :=
+  let '(h,l) := NormalLogCentralFast.normal_log_central_fast64 (b64_of_bits x) in
+  let e:=NormalLogDecision.normal_log_guard64 h in
+  (map bits_of_b64 [h;l;e],option_map bits_of_b64 (NormalLogDecision.normal_log_central_decide64 (b64_of_bits x))).
+Definition x_normal_fast_scaled_argument x :=
+  let '(h,l) := NormalFastScaledArgument.normal_fast_scaled_argument64 (b64_of_bits x) in
+  map bits_of_b64 [h;l].
+Definition x_normal_erfcx_fast_scaled x :=
+  let '(h,l) := NormalErfcxFastScaled.normal_erfcx_fast_scaled64 (b64_of_bits x) in
+  map bits_of_b64 [h;l].
+Definition x_normal_tail_fast x :=
+  let '(h,l,k) := NormalTailFast.normal_tail_fast64 (b64_of_bits x) in
+  let e:=NormalDensityDecision.normal_density_guard64 (b64_abs h) in
+  (map bits_of_b64 [h;l;e],option_map bits_of_b64 (NormalTailDecision.normal_tail_decide64 (b64_of_bits x))).
+Definition x_normal_outer_complement negative c x :=
+  let '(h,l) := NormalOuterSigned.normal_outer_signed_fast64 negative c (b64_of_bits x) in
+  let e:=NormalDensityDecision.normal_density_guard64 (b64_abs h) in
+  (map bits_of_b64 [h;l;e],option_map bits_of_b64 (NormalOuterSigned.normal_outer_signed_decide64 negative c (b64_of_bits x))).
+Definition x_normal_outer_cdf x := x_normal_outer_complement false (ErfcxDecision.erfcx_pow2 0) x.
+Definition x_normal_outer_center_positive x := x_normal_outer_complement false (ErfcxDecision.erfcx_pow2 (-1)) x.
+Definition x_normal_outer_center_negative x := x_normal_outer_complement true (ErfcxDecision.erfcx_pow2 (-1)) x.
+Definition x_normal_log_negative x :=
+  let '(h,l) := NormalLogNegativeFast.normal_log_negative_fast64 (b64_of_bits x) in
+  let e:=NormalLogDecision.normal_log_guard64 h in
+  (map bits_of_b64 [h;l;e],option_map bits_of_b64 (NormalLogNegativeFast.normal_log_negative_decide64 (b64_of_bits x))).
+Definition x_normal_log_positive x :=
+  let '(h,l,_) := NormalLogPositiveFast.normal_log_positive_fast64 (b64_of_bits x) in
+  let e:=NormalLogDecision.normal_log_guard64 h in
+  (map bits_of_b64 [h;l;e],option_map bits_of_b64 (NormalLogPositiveFast.normal_log_positive_decide64 (b64_of_bits x))).
+Definition x_normal_erfcx_asym n e l := q256_out (NormalErfcxAsymptotic.normal_q_erfcx_asymptotic (q256_in n e l)).
+Definition x_normal_scaled_argument x := q256_out (NormalScaledArgument.normal_q_scaled_argument (b64_of_bits x)).
+Definition x_normal_accurate_tail_asym x := q256_out (NormalAccurateTail.normal_q_tail_asym (b64_of_bits x)).
+Definition x_normal_erfcx_small_table n e l := q256_out (NormalTableLookup.normal_q_erfcx_small_table (q256_in n e l)).
+Definition x_normal_erfcx_extended_table n e l := q256_out (NormalExtendedTable.normal_q_erfcx_extended_table (q256_in n e l)).
+Definition x_normal_erfcx_positive n e l := q256_out (NormalExtendedErfcx.normal_q_erfcx_positive (q256_in n e l)).
+Definition x_normal_accurate_tail x := q256_out (NormalAccurateTailFull.normal_q_tail (b64_of_bits x)).
+Definition x_normal_logarithm n e l := q256_out (NormalLogSeries.normal_q_logarithm (q256_in n e l)).
+Definition x_normal_log_complement n e l := q256_out (NormalComplementSeries.normal_q_log_complement (q256_in n e l)).
+Definition x_normal_accurate_outer_cdf x := q256_out (NormalAccurateOuter.normal_q_outer_complement ErfcxAccurateTerms.q_one (b64_of_bits x)).
+Definition x_normal_accurate_outer_center x := q256_out (NormalAccurateOuter.normal_q_outer_complement ErfcxAccurateSquare.q_half (b64_of_bits x)).
+Definition x_normal_accurate_log_positive x := q256_out (NormalAccurateLogPositive.normal_q_log_cdf_positive (b64_of_bits x)).
+Definition x_normal_accurate_log_central x := q256_out (NormalAccurateLogCentral.normal_q_log_cdf_central (b64_of_bits x)).
+Definition x_normal_accurate_log_negative x := q256_out (NormalAccurateLogNegative.normal_q_log_cdf_negative (b64_of_bits x)).
 
 Definition x_q128_mul n1 e1 l1 n2 e2 l2 := q128_out (Q128.mul (q128_in n1 e1 l1) (q128_in n2 e2 l2)).
 Definition x_q128_add n1 e1 l1 n2 e2 l2 := q128_out (Q128.add (q128_in n1 e1 l1) (q128_in n2 e2 l2)).
@@ -243,5 +342,5 @@ Definition x_erfcx_tail_unscaled_fast x :=
  | Some y => Some (bits_of_b64 y) | None => None
  end.
 
-Extraction "internalcrosscheck.ml" x_erfcx_entry x_erfcx_accurate_negative x_erfcx_accurate_taylor x_erfcx_accurate_exp x_erfcx_accurate_tail x_erfcx_table_fast x_erfcx_tail_scaled_fast x_erfcx_tail_subnormal_fast x_erfcx_middle_fast x_erfcx_tail_unscaled_fast x_erfcx_reflection_fast x_erfcx_reflection_value x_erfcx_reflection_square x_erfcx_reflection_exp x_erfcx_table_value x_erfcx_table_reduce x_erfcx_table_leading x_erfcx_table_split x_erfcx_tail x_erfcx_tail_correction x_erfcx_quotient x_erfcx_scaled_quotient x_erfcx_middle x_erfcx_product x_erfcx_reciprocal_correction x_erfcx_reciprocal_square x_erfcx_reciprocal x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
+Extraction "internalcrosscheck.ml" x_normal_entry_pdf x_normal_entry_cdf x_normal_entry_ccdf x_normal_entry_center x_normal_entry_log x_normal_log_positive x_normal_log_negative x_normal_outer_cdf x_normal_outer_center_positive x_normal_outer_center_negative x_normal_tail_fast x_normal_fast_scaled_argument x_normal_erfcx_fast_scaled x_normal_log_central x_normal_center_central x_normal_cdf_central x_normal_center_fast x_normal_center_shape x_normal_center_tail x_normal_center_small x_normal_density_fast x_normal_accurate_outer_cdf x_normal_accurate_outer_center x_normal_accurate_log_positive x_normal_accurate_log_central x_normal_accurate_log_negative x_normal_log_complement x_normal_logarithm x_normal_erfcx_positive x_normal_accurate_tail x_normal_erfcx_extended_table x_normal_erfcx_small_table x_normal_scaled_argument x_normal_accurate_tail_asym x_normal_erfcx_asym x_normal_accurate_gaussian x_normal_accurate_density x_normal_accurate_center x_normal_accurate_central_cdf x_normal_gaussian x_erfcx_entry x_erfcx_accurate_negative x_erfcx_accurate_taylor x_erfcx_accurate_exp x_erfcx_accurate_tail x_erfcx_table_fast x_erfcx_tail_scaled_fast x_erfcx_tail_subnormal_fast x_erfcx_middle_fast x_erfcx_tail_unscaled_fast x_erfcx_reflection_fast x_erfcx_reflection_value x_erfcx_reflection_square x_erfcx_reflection_exp x_erfcx_table_value x_erfcx_table_reduce x_erfcx_table_leading x_erfcx_table_split x_erfcx_tail x_erfcx_tail_correction x_erfcx_quotient x_erfcx_scaled_quotient x_erfcx_middle x_erfcx_product x_erfcx_reciprocal_correction x_erfcx_reciprocal_square x_erfcx_reciprocal x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64
   x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs x_q256_top x_q256_mul_pow2.
