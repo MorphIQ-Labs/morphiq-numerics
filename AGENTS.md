@@ -6,7 +6,7 @@ This file is the repository's engineering contract for human and agent contribut
 
 ## Purpose and Architecture
 
-`morphiq-numerics` provides binary64 numerical primitives whose results are **correctly rounded** and **identical on every target**, computed **at least as fast as the best available implementation** of each function: elementary functions, seeded random streams and the normal family. It is the shared numerics substrate for MorphIQ Labs' engines and is published openly under MIT OR Apache-2.0. Read [the provenance policy](docs/PROVENANCE.md) before any change. Scope, intent and progress are recorded in GitHub issues, epics and milestones, never in repository documents.
+`morphiq-numerics` provides binary64 numerical primitives: elementary functions, seeded random streams and the normal family. The required standard is **correctly rounded** results that are **identical on every target**, computed **at least as fast as the best available implementation** of each function. This is a requirement, not a claim that every current implementation meets it. Correctness claims are limited to the domains established by the proofs, and performance claims to the hosts, workloads and comparisons established by measurements. An unmet requirement remains incomplete work. It is the shared numerics substrate for MorphIQ Labs' engines and is published openly under MIT OR Apache-2.0. Read [the provenance policy](docs/PROVENANCE.md) before any change. Scope, intent and progress are recorded in GitHub issues, epics and milestones, never in repository documents.
 
 The library's public API is what `crates/morphiq-numerics/src/lib.rs` lists, and each function's contract and derivation is a document in `docs/`; documentation must not describe functions that are not in the source tree.
 
@@ -45,7 +45,7 @@ Each function follows the same pipeline, which secures correct rounding first an
 4. **Rounding test:** Ziv's strategy. The fast result is returned only when its error interval provably cannot straddle a rounding boundary.
 5. **Accurate path:** `Q128` or `Q256` integer-significand arithmetic (no fused multiply-add needed), with an error bound proved small enough for the published worst cases of that function. Where no worst-case result covers a domain, correct rounding there is not claimed; the proved bound is stated instead. Its rate is measured and reported; an input region that always reaches it is a performance defect unless shown to be unavoidable.
 6. **Generators:** every coefficient and constant comes from a versioned generator under `generators/`, with pinned tools and a recorded precision, and CI replays it. A canonical algorithm's coefficients are regenerated here to the fast path's required accuracy.
-7. **Measurement:** same-host scalar and batched throughput and latency against the step 1 references, with the accurate-path rate. The function meets the performance bar, or its shortfall is diagnosed and recorded on its issue.
+7. **Measurement:** same-host scalar and batched throughput and latency against the step 1 references, with the accurate-path rate. The function must meet the performance bar before it is complete or ships. A shortfall is diagnosed and recorded on its issue, which remains open until measurements demonstrate that the shortfall is resolved. Recording a shortfall does not satisfy the bar.
 
 ## Invariants and Trust Boundaries
 
@@ -119,4 +119,6 @@ Check them with `gh api repos/MorphIQ-Labs/morphiq-numerics/rulesets` rather tha
 
 ## Definition of Done
 
-A change is complete when its contract is stated, its implementation follows a documented derivation with generated constants, its results match the independent oracle bit for bit wherever correct rounding is claimed, its proofs are rerun and bound, same-host measurements show it meets the performance bar (or the shortfall is recorded on its issue with a diagnosis), every gate passes on every target, the determinism digest is unchanged or deliberately updated with the reason, documentation describes the new current state, and every same-pattern sibling is fixed.
+A change is complete when its contract is stated, its implementation follows a documented derivation with generated constants, its results match the independent oracle bit for bit wherever correct rounding is claimed, its proofs are rerun and bound, same-host measurements show it meets the performance bar, every gate passes on every target, the determinism digest is unchanged or deliberately updated with the reason, documentation describes the new current state, and every same-pattern sibling is fixed.
+
+A known shortfall in correctness, performance or architecture keeps the affected work incomplete until it is fixed and the required evidence establishes that. Passing CI, merging code, documenting the shortfall or moving it to a follow-up issue does not make that work complete. Missing evidence also leaves the corresponding requirement unestablished; it is never reported as satisfied.
