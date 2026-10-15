@@ -214,6 +214,44 @@ impl<const OP: u8> Kernel for Normal<OP> {
 
     #[inline(always)]
     fn lanes<K: Simd>(k: K, input: K::Array) -> K::Array {
+        let op = operation::<OP>();
+        let xv = if OP == 2 {
+            k.neg(k.load(input))
+        } else {
+            k.load(input)
+        };
+        let all = lanes_mask::<K>();
+        // Saturation is itself a vector operation. Ordered comparisons keep
+        // NaN payloads on the scalar special-value path.
+        match op {
+            Operation::Pdf if k.mask_bits(k.lt(k.abs(xv), k.splat(SMALL))) == all => {
+                return k.store(k.splat(tables::DENSITY.0));
+            }
+            Operation::Pdf if k.mask_bits(k.le(k.splat(tables::PDF_ZERO), k.abs(xv))) == all => {
+                return k.store(k.splat(0.0));
+            }
+            Operation::Cdf if k.mask_bits(k.le(k.splat(tables::CDF_ONE), xv)) == all => {
+                return k.store(k.splat(1.0));
+            }
+            Operation::Cdf if k.mask_bits(k.le(xv, k.splat(-tables::TAIL_ZERO))) == all => {
+                return k.store(k.splat(0.0));
+            }
+            Operation::Centered
+                if k.mask_bits(k.le(k.splat(tables::CENTERED_HALF), k.abs(xv))) == all =>
+            {
+                return k.store(k.to_float(k.or_u(
+                    k.splat_bits(0.5_f64.to_bits()),
+                    k.and_u(k.to_bits(xv), k.splat_bits(1 << 63)),
+                )));
+            }
+            Operation::LogCdf if k.mask_bits(k.le(k.splat(tables::TAIL_ZERO), xv)) == all => {
+                return k.store(k.splat(-0.0));
+            }
+            Operation::LogCdf if k.mask_bits(k.le(xv, k.splat(-tables::LOG_OVERFLOW))) == all => {
+                return k.store(k.splat(f64::NEG_INFINITY));
+            }
+            _ => {}
+        }
         if OP == 3 {
             return Self::regular(k, input);
         }
@@ -314,38 +352,6 @@ impl<const OP: u8> Normal<OP> {
         } else {
             k.load(input)
         };
-        let all = lanes_mask::<K>();
-        // Saturation is itself a vector operation. Ordered comparisons keep
-        // NaN payloads on the scalar special-value path.
-        match op {
-            Operation::Pdf if k.mask_bits(k.lt(k.abs(xv), k.splat(SMALL))) == all => {
-                return k.store(k.splat(tables::DENSITY.0));
-            }
-            Operation::Pdf if k.mask_bits(k.le(k.splat(tables::PDF_ZERO), k.abs(xv))) == all => {
-                return k.store(k.splat(0.0));
-            }
-            Operation::Cdf if k.mask_bits(k.le(k.splat(tables::CDF_ONE), xv)) == all => {
-                return k.store(k.splat(1.0));
-            }
-            Operation::Cdf if k.mask_bits(k.le(xv, k.splat(-tables::TAIL_ZERO))) == all => {
-                return k.store(k.splat(0.0));
-            }
-            Operation::Centered
-                if k.mask_bits(k.le(k.splat(tables::CENTERED_HALF), k.abs(xv))) == all =>
-            {
-                return k.store(k.to_float(k.or_u(
-                    k.splat_bits(0.5_f64.to_bits()),
-                    k.and_u(k.to_bits(xv), k.splat_bits(1 << 63)),
-                )));
-            }
-            Operation::LogCdf if k.mask_bits(k.le(k.splat(tables::TAIL_ZERO), xv)) == all => {
-                return k.store(k.splat(-0.0));
-            }
-            Operation::LogCdf if k.mask_bits(k.le(xv, k.splat(-tables::LOG_OVERFLOW))) == all => {
-                return k.store(k.splat(f64::NEG_INFINITY));
-            }
-            _ => {}
-        }
         let mut x = input;
         let mut active = 0_u64;
         for (i, v) in x.as_mut().iter_mut().enumerate() {
