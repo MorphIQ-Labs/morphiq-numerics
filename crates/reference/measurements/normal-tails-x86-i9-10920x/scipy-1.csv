@@ -1,0 +1,3 @@
+function,workload,count,scalar_ns,batch_ns,scalar_chain_ns,nonfinite
+scipy_1.16.3,negative_far_tail,1024,15.413,16.691,43.741,0
+scipy_1.16.3,negative_first_table,1024,15.460,16.748,42.772,0

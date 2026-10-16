@@ -1,0 +1,12 @@
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,ordinary,1024,33.782,9.412,3.589,2,60.728,10.292
+cdf,ordinary,1024,64.300,18.242,3.525,0,86.032,10.291
+ccdf,ordinary,1024,64.357,18.592,3.461,0,89.918,10.287
+centered,ordinary,1024,71.447,21.850,3.270,2,89.369,10.287
+log_cdf,ordinary,1024,154.851,77.993,1.985,3,155.131,10.289
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 119 filtered out; finished in 3.00s
+
