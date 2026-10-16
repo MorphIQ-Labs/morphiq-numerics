@@ -96,17 +96,29 @@ pub const fn two_prod(a: f64, b: f64) -> (f64, f64) {
 #[must_use]
 #[inline]
 pub(crate) fn two_prod_d(a: f64, b: f64) -> (f64, f64) {
-    #[cfg(all(feature = "std", target_feature = "fma"))]
+    #[cfg(all(
+        feature = "std",
+        any(
+            target_feature = "fma",
+            all(target_arch = "aarch64", target_feature = "neon")
+        )
+    ))]
     {
         let p = a * b;
-        // Reason: with `target_feature = "fma"` this is one hardware fused
-        // multiply-add, not the software fallback the lint guards against.
+        // Reason: x86 FMA and aarch64 NEON both provide hardware binary64
+        // fused multiply-add; this cannot select a software libm fallback.
         // Exit condition: a fused multiply-add in `core`, usable without `std`.
         #[allow(clippy::disallowed_methods)]
         let e = a.mul_add(b, -p);
         (p, e)
     }
-    #[cfg(not(all(feature = "std", target_feature = "fma")))]
+    #[cfg(not(all(
+        feature = "std",
+        any(
+            target_feature = "fma",
+            all(target_arch = "aarch64", target_feature = "neon")
+        )
+    )))]
     {
         two_prod(a, b)
     }
