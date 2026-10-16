@@ -1,0 +1,167 @@
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,tiny,1024,1.393,0.186,7.473,0,6.805,9.994
+cdf,tiny,1024,11.317,4.240,2.669,1,30.870,9.970
+ccdf,tiny,1024,11.637,5.429,2.143,1,30.807,9.951
+centered,tiny,1024,6.795,2.256,3.012,0,24.795,10.090
+log_cdf,tiny,1024,129.688,65.013,1.995,3,150.327,9.893
+pdf,central,1024,31.578,8.709,3.626,0,59.162,9.998
+cdf,central,1024,103.352,14.656,7.052,1,126.411,9.923
+ccdf,central,1024,106.834,20.669,5.169,3,127.507,9.948
+centered,central,1024,97.057,12.067,8.044,0,120.928,9.965
+log_cdf,central,1024,179.701,23.181,7.752,0,202.224,9.911
+pdf,ordinary,1024,33.589,11.363,2.956,2,59.661,10.098
+cdf,ordinary,1024,65.388,16.860,3.878,0,83.804,9.985
+ccdf,ordinary,1024,66.483,18.133,3.666,0,87.639,9.945
+centered,ordinary,1024,70.142,20.093,3.491,2,86.339,9.927
+log_cdf,ordinary,1024,153.769,68.736,2.237,3,150.777,9.912
+pdf,negative_tail,1024,32.658,8.750,3.732,0,60.062,10.064
+cdf,negative_tail,1024,65.042,14.390,4.520,0,87.643,9.890
+ccdf,negative_tail,1024,2.255,0.712,3.166,0,88.289,9.928
+centered,negative_tail,1024,1.846,0.664,2.779,0,86.876,9.998
+log_cdf,negative_tail,1024,133.591,21.769,6.137,0,163.624,9.858
+pdf,positive_tail,1024,31.680,8.727,3.630,0,59.633,10.148
+cdf,positive_tail,1024,1.808,0.665,2.719,0,88.233,10.117
+ccdf,positive_tail,1024,67.322,16.090,4.184,0,90.904,10.156
+centered,positive_tail,1024,1.872,0.685,2.733,0,88.738,10.162
+log_cdf,positive_tail,1024,79.773,21.264,3.752,1,99.470,10.126
+pdf,underflow,1024,903.638,1048.451,0.862,808,7.313,10.215
+cdf,underflow,1024,1.184,0.281,4.216,0,6.744,9.979
+ccdf,underflow,1024,2667.134,3103.578,0.859,759,1664.172,9.922
+centered,underflow,1024,0.982,0.292,3.364,0,10.636,9.915
+log_cdf,underflow,1024,2796.102,3220.090,0.868,759,1699.892,9.921
+pdf,log_overflow,1024,1.391,0.228,6.099,0,6.655,10.072
+cdf,log_overflow,1024,1.402,0.287,4.886,0,6.868,10.055
+ccdf,log_overflow,1024,1.598,0.284,5.634,0,6.940,9.965
+centered,log_overflow,1024,0.981,0.291,3.371,0,10.576,10.012
+log_cdf,log_overflow,1024,1.383,0.309,4.477,0,6.778,9.876
+pdf,mixed,1024,31.667,8.712,3.635,0,58.696,10.023
+cdf,mixed,1024,66.727,31.809,2.098,0,86.743,9.944
+ccdf,mixed,1024,60.675,33.235,1.826,0,100.699,10.043
+centered,mixed,1024,53.221,30.267,1.758,0,86.425,9.959
+log_cdf,mixed,1024,139.890,85.973,1.627,2,142.214,9.848
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 119 filtered out; finished in 24.02s
+
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,ordinary,1,68.997,77.378,0.892,0,58.546,9.931
+cdf,ordinary,1,88.343,92.115,0.959,0,82.152,10.009
+ccdf,ordinary,1,92.246,96.561,0.955,0,87.398,9.903
+centered,ordinary,1,96.631,96.650,1.000,0,86.646,9.961
+log_cdf,ordinary,1,161.426,162.392,0.994,0,152.271,9.868
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 119 filtered out; finished in 3.00s
+
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,ordinary,2,49.773,37.080,1.342,0,58.903,9.910
+cdf,ordinary,2,75.193,48.018,1.566,0,87.573,10.025
+ccdf,ordinary,2,75.528,48.907,1.544,0,87.505,10.141
+centered,ordinary,2,81.001,47.480,1.706,0,86.748,9.913
+log_cdf,ordinary,2,118.880,124.003,0.959,0,150.281,9.878
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 119 filtered out; finished in 3.00s
+
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,ordinary,3,43.786,37.952,1.154,0,58.951,9.939
+cdf,ordinary,3,85.061,91.327,0.931,0,105.465,9.922
+ccdf,ordinary,3,85.075,91.833,0.926,0,99.328,9.983
+centered,ordinary,3,86.915,87.968,0.988,0,86.880,9.945
+log_cdf,ordinary,3,139.649,142.270,0.982,0,207.332,9.898
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 119 filtered out; finished in 3.00s
+
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,ordinary,8,36.273,12.607,2.877,0,59.240,9.927
+cdf,ordinary,8,64.842,21.859,2.966,0,86.551,9.967
+ccdf,ordinary,8,65.950,23.384,2.820,0,87.353,9.950
+centered,ordinary,8,69.797,21.607,3.230,0,86.527,9.955
+log_cdf,ordinary,8,109.791,50.456,2.176,0,156.983,9.922
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 119 filtered out; finished in 3.00s
+
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,ordinary,17,33.881,12.925,2.621,0,58.899,9.929
+cdf,ordinary,17,65.516,30.117,2.175,0,86.858,10.024
+ccdf,ordinary,17,66.217,29.663,2.232,0,87.478,9.959
+centered,ordinary,17,69.024,28.389,2.431,0,86.563,9.930
+log_cdf,ordinary,17,112.540,40.128,2.805,0,133.460,10.082
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 119 filtered out; finished in 3.00s
+
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,mixed,1,68.706,77.264,0.889,0,58.638,9.972
+cdf,mixed,1,137.752,143.229,0.962,0,128.912,9.968
+ccdf,mixed,1,137.631,144.032,0.956,0,127.513,9.984
+centered,mixed,1,133.114,135.454,0.983,0,120.858,9.911
+log_cdf,mixed,1,214.235,216.077,0.991,0,205.115,9.885
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 119 filtered out; finished in 3.00s
+
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,mixed,2,49.467,37.255,1.328,0,59.220,10.043
+cdf,mixed,2,104.333,111.872,0.933,0,95.423,9.989
+ccdf,mixed,2,69.571,76.113,0.914,0,127.643,9.993
+centered,mixed,2,65.988,70.021,0.942,0,120.953,9.920
+log_cdf,mixed,2,175.792,182.649,0.962,0,185.306,10.028
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 119 filtered out; finished in 3.00s
+
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,mixed,3,43.859,37.753,1.162,0,58.663,9.948
+cdf,mixed,3,89.662,95.231,0.942,0,127.112,10.021
+ccdf,mixed,3,67.600,74.329,0.909,0,107.622,10.011
+centered,mixed,3,65.383,69.744,0.937,0,104.159,9.956
+log_cdf,mixed,3,159.304,163.907,0.972,0,185.065,9.984
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 119 filtered out; finished in 3.00s
+
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,mixed,8,36.197,12.756,2.838,0,59.116,9.933
+cdf,mixed,8,74.700,38.400,1.945,0,129.058,10.062
+ccdf,mixed,8,64.872,39.114,1.659,0,115.173,10.026
+centered,mixed,8,57.612,36.524,1.577,0,120.896,9.915
+log_cdf,mixed,8,140.376,76.840,1.827,0,193.719,10.194
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 119 filtered out; finished in 3.00s
+
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,mixed,17,34.619,13.246,2.613,0,60.487,10.234
+cdf,mixed,17,68.841,38.540,1.786,0,108.482,10.141
+ccdf,mixed,17,59.902,34.579,1.732,0,68.838,10.209
+centered,mixed,17,52.997,32.979,1.607,0,58.425,10.263
+log_cdf,mixed,17,130.931,85.262,1.536,0,221.368,10.077
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 119 filtered out; finished in 3.00s
+

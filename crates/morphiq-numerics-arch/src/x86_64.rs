@@ -289,6 +289,11 @@ impl Simd for Avx512 {
     fn mask_bits(self, m: Avx512Mask) -> u64 {
         u64::from(m.0)
     }
+    #[inline(always)]
+    fn mask_from_bits(self, bits: u64) -> Avx512Mask {
+        #[allow(clippy::cast_possible_truncation)] // exactly eight mask lanes
+        Avx512Mask(bits as u8)
+    }
 }
 
 /// The AVX2 and AVX-512F instructions, one helper per backend method. Each

@@ -35,7 +35,7 @@ widest available backend: AVX-512F, AVX2, SSE2 on x86-64; NEON on aarch64;
 scalar operation it names: `add`, `sub`, `mul`, `div` (IEEE 754 binary64,
 round-to-nearest-even), `abs` and `neg` (the sign bit), the ordered
 comparisons `lt` and `le` (false on NaN), the lane masks' `and_m`, `or_m`,
-`not_m`, `mask_bits` and `select`, the reinterpretations `to_bits` and
+`not_m`, `mask_bits`, `mask_from_bits` and `select`, the reinterpretations `to_bits` and
 `to_float`, the 64-bit word operations `and_u`, `or_u`, `sub_u` (wrapping),
 `shr_u` (logical, zero for a count of 64 or more) and `eq_u`, `splat` and `splat_bits`, and `load`, `load_bits` and `store` on
 `[f64; LANES]` and `[u64; LANES]` arrays. `mul_add(a, b, c)` returns `a·b + c`
@@ -86,7 +86,9 @@ other, and `unsafe_op_in_unsafe_fn` is denied. No public function is
 comparisons and mask operations. So every NEON, SSE2 and AVX2 mask lane is all
 ones or all zeros, which `select` (bitwise on SSE2 and NEON, the sign bit on
 AVX2) relies on for its meaning. That is a correctness property, not a safety
-one: any bit pattern is a valid vector.
+one: any bit pattern is a valid vector. `mask_from_bits` ignores bits above
+the lane count. It constructs canonical vector lanes by comparison on NEON,
+SSE2 and AVX2; AVX-512F uses the low eight bits directly as its native mask.
 
 **The floating-point environment.** Every lane operation rounds to nearest,
 ties to even, with subnormals kept: the default MXCSR on x86-64 and FPCR on

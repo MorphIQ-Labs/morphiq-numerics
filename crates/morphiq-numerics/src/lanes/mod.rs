@@ -117,6 +117,62 @@ fn whole_chunks<G: Kernel, K: Simd>(k: K, xs: &[f64], out: &mut [f64]) -> usize 
     covered
 }
 
+/// A kernel's uncommon path, kept out of the common chunk's code.
+pub(crate) trait Cold {
+    /// The path on `s`'s lanes, from the chunk's arguments `x` and the
+    /// common path's partial results `out`.
+    fn run<S: Simd>(self, s: S, x: S::Array, out: S::Array) -> S::Array;
+}
+
+/// `path` on `k`'s lanes, outside the kernel's code but inside `k`'s
+/// feature-enabled wrapper (§7). A function outside that wrapper, such as an
+/// `#[inline(never)]` one, cannot inline the backend's lane operations: on a
+/// backend the target does not enable, every lane operation would become a
+/// call. The hot side passes and receives vectors, as a direct call would:
+/// passing the chunk's arrays instead keeps them in memory through the
+/// common path, which measurably slows it.
+#[cold]
+#[inline(never)]
+pub(crate) fn cold<K: Simd, C: Cold>(k: K, path: C, x: K::F, out: K::F) -> K::F {
+    let (x, out) = (k.store(x), k.store(out));
+    k.load(cold_arrays(k, path, &x, &out))
+}
+
+/// Re-enter the backend from a cold path that already owns scalar arrays.
+/// The caller supplies the cold boundary; this avoids another trampoline
+/// and an array-to-vector-to-array round trip after scalar completion work.
+#[inline(always)]
+pub(crate) fn cold_arrays<K: Simd, C: Cold>(
+    k: K,
+    path: C,
+    x: &K::Array,
+    out: &K::Array,
+) -> K::Array {
+    k.vectorize(ColdPath { path, x, out })
+}
+
+struct ColdPath<'a, C, A> {
+    path: C,
+    x: &'a A,
+    out: &'a A,
+}
+
+impl<C: Cold, A: Copy + AsRef<[f64]> + AsMut<[f64]>> WithSimd for ColdPath<'_, C, A> {
+    type Output = A;
+    /// `S` is the `K` that `cold` was given, so the arrays have its width.
+    #[inline(always)]
+    fn with<S: Simd>(self, s: S) -> A {
+        let mut x = S::Array::default();
+        x.as_mut().copy_from_slice(self.x.as_ref());
+        let mut out = S::Array::default();
+        out.as_mut().copy_from_slice(self.out.as_ref());
+        let y = self.path.run(s, x, out);
+        let mut result = *self.out;
+        result.as_mut().copy_from_slice(y.as_ref());
+        result
+    }
+}
+
 /// `out[i] = G::scalar(xs[i])` on backend `k`'s lanes alone, the last
 /// `xs.len() mod LANES` elements by the scalar function.
 #[cfg(test)]
@@ -224,14 +280,13 @@ pub(crate) fn lanes_mask<K: Simd>() -> u64 {
     (1_u64 << K::LANES) - 1
 }
 
-/// The lane mask with lane `i` true when bit `i` of `bits` is set.
+/// The lane mask with lane `i` true when bit `i` of `bits` is set: `bits`
+/// broadcast, and each lane's own bit tested in lanes. The per-lane bits are
+/// a constant. Writing each lane's flag to memory and reloading the words as
+/// one vector instead stalls store forwarding on every call (§7).
 #[inline(always)]
 pub(crate) fn mask_from<K: Simd>(k: K, bits: u64) -> K::M {
-    let mut words = K::Words::default();
-    for (i, w) in words.as_mut().iter_mut().enumerate() {
-        *w = bits >> i & 1;
-    }
-    k.eq_u(k.load_bits(words), k.splat_bits(1))
+    k.mask_from_bits(bits)
 }
 
 /// Equal rounded interval endpoints, using numerical equality (including ±0).

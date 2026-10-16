@@ -9,7 +9,7 @@ use morphiq_numerics_arch::Simd;
 use super::stage_tables::{EL, H, L0, L1, OFF, R, T};
 use super::stages::{A_H, K_H, K2_H, TWO_53, TWO_M46};
 use super::{FRACTION, TWO_54, ln, ln_1p};
-use crate::lanes::{Kernel, decide_relative, lanes_mask, mask_from};
+use crate::lanes::{Cold, Kernel, cold, cold_arrays, decide_relative, lanes_mask, mask_from};
 
 pub(crate) mod fallback;
 pub(crate) mod stage_b;
@@ -26,13 +26,12 @@ const HIGH_INDEX: f64 = 1.0 + 53.0 / 128.0;
 /// `2^52`, whose encoding's low bits hold an integer below `2^52` exactly.
 const TWO_52: f64 = f64::from_bits(0x4330_0000_0000_0000);
 
-/// `Reduced::of` on every lane of `x`, returning `(y, E)`. Lanes whose bit in `skip` is set reduce 1 instead, and
-/// are discarded. Everything but the table loads is in lanes, as `Reduced::of`
-/// computes it, with its integer steps done exactly in binary64 (docs/lanes.md
-/// §5).
+/// `Reduced::of` on every lane of `x`, returning `(y, E)`; callers put 1 in
+/// the lanes they discard. Everything but the table loads is in lanes, as
+/// `Reduced::of` computes it, with its integer steps done exactly in binary64
+/// (docs/lanes.md §5).
 #[inline(always)]
-fn reduce<K: Simd>(k: K, x: K::F, skip: u64) -> (K::F, K::F) {
-    let x = k.select(lane_mask(k, skip), k.splat(1.0), x);
+fn reduce<K: Simd>(k: K, x: K::F) -> (K::F, K::F) {
     // Step 1: a subnormal x is scaled by 2^54, exactly.
     let tiny = k.lt(x, k.splat(f64::MIN_POSITIVE));
     let bits = k.to_bits(k.select(tiny, k.mul(x, k.splat(TWO_54)), x));
@@ -138,7 +137,12 @@ impl Kernel for Ln {
                 if decided >> i & 1 == 0 {
                     if decided | (1 << i) != all {
                         let open = all & !decided;
-                        return k.store(finish_ln(k, k.load(x), k.load(out), open, scalar_lanes));
+                        return k.store(cold(
+                            k,
+                            FinishLn { open, scalar_lanes },
+                            k.load(x),
+                            k.load(out),
+                        ));
                     }
                     *o = ln(x.as_ref()[i]);
                 }
@@ -148,12 +152,29 @@ impl Kernel for Ln {
     }
 }
 
-/// Complete the uncommon lanes without expanding the common stage's code.
-#[cold]
-#[inline(never)]
-fn finish_ln<K: Simd>(k: K, x: K::F, out: K::F, mut open: u64, scalar_lanes: u64) -> K::F {
-    let x = k.store(x);
-    let mut out = k.store(out);
+/// `ln`'s undecided lanes, `open`, and its screened ones.
+struct FinishLn {
+    open: u64,
+    scalar_lanes: u64,
+}
+
+impl Cold for FinishLn {
+    #[inline(always)]
+    fn run<K: Simd>(self, k: K, x: K::Array, out: K::Array) -> K::Array {
+        finish_ln(k, x, out, self.open, self.scalar_lanes)
+    }
+}
+
+/// Complete the uncommon lanes, through `lanes::cold` so that they stay out
+/// of the common stage's code but inside the backend's features.
+#[inline(always)]
+fn finish_ln<K: Simd>(
+    k: K,
+    x: K::Array,
+    mut out: K::Array,
+    mut open: u64,
+    scalar_lanes: u64,
+) -> K::Array {
     for (i, o) in out.as_mut().iter_mut().enumerate() {
         if scalar_lanes >> i & 1 != 0 {
             *o = ln(x.as_ref()[i]);
@@ -179,21 +200,25 @@ fn finish_ln<K: Simd>(k: K, x: K::F, out: K::F, mut open: u64, scalar_lanes: u64
         let i = open.trailing_zeros() as usize;
         out.as_mut()[i] = super::Reduced::of(x.as_ref()[i]).finish();
     }
-    k.load(out)
+    out
 }
 
 /// `ln`'s reciprocal stage on every lane, and the lanes (bit
 /// `i` set) that `ln` screens out: NaN, `x ≤ 0`, `+∞` and 1.
 #[inline(always)]
 pub(super) fn fast_ln<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
-    let mut scalar_lanes = 0_u64;
-    for (i, &xi) in x.as_ref().iter().enumerate() {
-        if !(xi > 0.0 && xi < f64::INFINITY) || xi == 1.0 {
-            scalar_lanes |= 1 << i;
-        }
-    }
+    // The screen in lanes: 0 < x < +∞ and x ≠ 1 (x ≤ 1 and 1 ≤ x both
+    // hold only at 1); both orderings fail on NaN, as the scalar test does.
+    // Building a lane mask from per-lane bits instead stores each lane and
+    // reloads them as one vector, which stalls store forwarding.
+    let xv = k.load(*x);
+    let one = k.splat(1.0);
+    let inside = k.and_m(k.lt(k.splat(0.0), xv), k.lt(xv, k.splat(f64::INFINITY)));
+    let at_one = k.and_m(k.le(xv, one), k.le(one, xv));
+    let fast = k.and_m(inside, k.not_m(at_one));
+    let scalar_lanes = !k.mask_bits(fast) & lanes_mask::<K>();
     (
-        fast_value(k, reduce(k, k.load(*x), scalar_lanes)),
+        fast_value(k, reduce(k, k.select(fast, xv, one))),
         scalar_lanes,
     )
 }
@@ -213,6 +238,17 @@ impl Kernel for Ln1p {
                 if decided >> i & 1 == 0 {
                     if decided | (1 << i) != all {
                         let open = all & !decided;
+                        if K::LANES == 2 {
+                            // NEON and SSE2 are baseline target features: keeping
+                            // their scalar prefix inside the wrapper adds no
+                            // feature-boundary cost and avoids another call.
+                            return k.store(cold(
+                                k,
+                                FinishLn1p::<true> { open },
+                                k.load(x),
+                                k.load(out),
+                            ));
+                        }
                         return k.store(finish_ln_1p(k, k.load(x), k.load(out), open));
                     }
                     *o = super::ln_1p_after_h(x.as_ref()[i]);
@@ -223,12 +259,45 @@ impl Kernel for Ln1p {
     }
 }
 
-/// Complete the uncommon lanes without expanding the common stage's code.
+/// `ln_1p`'s undecided lanes, `open`.
+struct FinishLn1p<const SCALAR_PREFIX: bool> {
+    open: u64,
+}
+
+impl<const SCALAR_PREFIX: bool> Cold for FinishLn1p<SCALAR_PREFIX> {
+    #[inline(always)]
+    fn run<K: Simd>(self, k: K, x: K::Array, mut out: K::Array) -> K::Array {
+        let open = if SCALAR_PREFIX {
+            finish_ln_1p_scalar::<K>(&x, &mut out, self.open)
+        } else {
+            self.open
+        };
+        if open.count_ones() >= 2 {
+            finish_ln_1p_fallback(k, x, out, open)
+        } else {
+            finish_ln_1p_single::<K>(&x, &mut out, open);
+            out
+        }
+    }
+}
+
+/// Scalar stage B and special values need no backend re-entry. Only two or
+/// more unresolved lanes enter the feature-enabled vector fallback.
 #[cold]
 #[inline(never)]
-fn finish_ln_1p<K: Simd>(k: K, x: K::F, out: K::F, mut open: u64) -> K::F {
+fn finish_ln_1p<K: Simd>(k: K, x: K::F, out: K::F, open: u64) -> K::F {
     let x = k.store(x);
     let mut out = k.store(out);
+    let open = finish_ln_1p_scalar::<K>(&x, &mut out, open);
+    if open.count_ones() >= 2 {
+        return k.load(cold_arrays(k, FinishLn1p::<false> { open }, &x, &out));
+    }
+    finish_ln_1p_single::<K>(&x, &mut out, open);
+    k.load(out)
+}
+
+#[inline(always)]
+fn finish_ln_1p_scalar<K: Simd>(x: &K::Array, out: &mut K::Array, mut open: u64) -> u64 {
     // Stage B remains scalar. Its rare undecided lanes share the
     // double-word fallback; a single lane avoids vector setup overhead.
     for (i, o) in out.as_mut().iter_mut().enumerate() {
@@ -246,30 +315,39 @@ fn finish_ln_1p<K: Simd>(k: K, x: K::F, out: K::F, mut open: u64) -> K::F {
             open &= !(1 << i);
         }
     }
-    if open.count_ones() >= 2 {
-        let input = k.select(mask_from(k, open), k.load(x), k.splat(1.0));
-        let y = fallback::ln_1p(k, input);
-        let accepted = decide_relative(k, y, super::EPS) & open;
-        let values = k.store(y.0);
-        for (i, o) in out.as_mut().iter_mut().enumerate() {
-            if open >> i & 1 != 0 {
-                let xi = x.as_ref()[i];
-                *o = if accepted >> i & 1 != 0 {
-                    values.as_ref()[i]
-                } else if xi.abs() < super::TWO_M7 {
-                    super::small_accurate(xi).to_f64()
-                } else {
-                    let (h, l) = super::split(xi);
-                    let r = super::Reduced::of(h);
-                    r.accurate_value(r.z_prime(l)).to_f64()
-                };
-            }
-        }
-    } else if open != 0 {
+    open
+}
+
+#[inline(always)]
+fn finish_ln_1p_single<K: Simd>(x: &K::Array, out: &mut K::Array, open: u64) {
+    if open != 0 {
         let i = open.trailing_zeros() as usize;
         out.as_mut()[i] = super::ln_1p_reference(x.as_ref()[i]);
     }
-    k.load(out)
+}
+
+#[inline(always)]
+fn finish_ln_1p_fallback<K: Simd>(k: K, x: K::Array, mut out: K::Array, open: u64) -> K::Array {
+    let input = k.select(mask_from(k, open), k.load(x), k.splat(1.0));
+    let y = fallback::ln_1p(k, input);
+    let accepted = decide_relative(k, y, super::EPS) & open;
+    let values = k.store(y.0);
+    for (i, o) in out.as_mut().iter_mut().enumerate() {
+        if open >> i & 1 != 0 {
+            let xi = x.as_ref()[i];
+            *o = if accepted >> i & 1 != 0 {
+                values.as_ref()[i]
+            } else if xi.abs() < super::TWO_M7 {
+                super::small_accurate(xi).to_f64()
+            } else {
+                let (h, l) = super::split(xi);
+                let r = super::Reduced::of(h);
+                r.accurate_value(r.z_prime(l)).to_f64()
+            };
+        }
+    }
+
+    out
 }
 
 /// Stage H's `(s, lo, eps)` on lanes.
@@ -283,8 +361,7 @@ pub(super) type StageH<K> = (<K as Simd>::F, <K as Simd>::F, <K as Simd>::F);
 pub(super) fn stage_h<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
     let one = k.splat(1.0);
     let xv = k.load(*x);
-    // The screen, `2^−46 ≤ |x|` and `−1 < x < 2^53`: `stage_h_screen` on
-    // the encoding, the same predicate (both false on NaN).
+    // The scalar stage-H screen, including its NaN semantics.
     let screen = k.and_m(
         k.and_m(k.le(k.splat(TWO_M46), k.abs(xv)), k.lt(xv, k.splat(TWO_53))),
         k.lt(k.splat(-1.0), xv),
@@ -344,16 +421,6 @@ pub(super) fn stage_h<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
         k.add(k.mul(k.abs(s), k.splat(K2_H)), k.splat(A_H)),
     );
     ((s, lo, eps), scalar_lanes)
-}
-
-/// The lanes whose bit in `bits` is set, as a lane mask.
-#[inline(always)]
-fn lane_mask<K: Simd>(k: K, bits: u64) -> K::M {
-    let mut words = K::Words::default();
-    for (i, w) in words.as_mut().iter_mut().enumerate() {
-        *w = bits >> i & 1;
-    }
-    k.eq_u(k.load_bits(words), k.splat_bits(1))
 }
 
 #[cfg(test)]
