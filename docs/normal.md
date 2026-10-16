@@ -117,7 +117,7 @@ Because both stages return only `RN(φ(x))` when they return, the first
 stage changes no result. It removes the double-word exponential's stage B
 and the double-word multiplication by `1/sqrt(2π)` from the common path.
 
-## The CDF family's first stage
+## The CDF family's tail first stage
 
 For `1/2 < abs(x) <= 36`, CDF, CCDF (through CDF at `-x`) and the centered
 CDF first try a lean stage on the tail `q = Φ(-a)`, `a = abs(x)`, written as
@@ -142,6 +142,38 @@ test's scale follows `qh`'s binade, so the first stage is limited to
 rounded target (`NormalTailFirst.normal_tail_first_ok`); between 96% and
 99.6% of tail arguments are decided (12 million uniform arguments over three
 ranges), and the rest continue to the fast composition below.
+
+## The CDF family's central first stage
+
+For `2^-33 <= abs(x) <= 1/2`, CDF, CCDF and the centered CDF first try a
+lean stage on `C(x) = Φ(x) - 1/2`, written with the central series of the
+fast composition below as
+
+```
+C(x) = φ(0)·x·(1 + E(x²)),   E(z) = c1·z + z²·(c2 + z·(c3 + z·T(z))),
+```
+
+where `T` is the fast composition's degree-8 tail polynomial. Only three
+quantities are carried as double words: the exact square `zh + zl = x²`
+(`two_prod`), `c1·x²` (`e1h` by an exact `two_prod` of `c1`'s high word and
+`zh`, `e1l` gathering its error and the cross terms) and `φ(0)·x`
+(`dh` exact by `two_prod`, `dl` its error plus the constant's low word
+times `x`). The rest of `E` (`e2`, at most `0.0016`) is binary64: Gappa
+certifies `|e1h + e1l + e2 - E(x²)| <= 2^-60` absolutely
+(`formal/normal/center_first.g`). The product `dh·e1h` is exact
+(`two_prod`), the remaining cross terms are summed in binary64, and two
+Fast2Sums renormalize. The words `ch + cl` are within `3.2·2^-60` of `C(x)`
+relatively (`NormalCenterFirst.normal_center_first_parts_ok`): the
+certificate's `2^-60`, the roundings of the remainder and the dropped
+`dl·(e1l + e2)` (about `1.9·2^-60`), and the series' own truncation.
+
+The centered CDF tests `ch + cl` directly. CDF adds `1/2` with an exact
+Fast2Sum (`abs(ch) <= 0.21`) and one rounded addition of the low words.
+Both take the guard `RN(abs(ch)·2^-58)`. A result it returns is the
+correctly rounded target (`NormalCenterFirst.normal_center_first_ok`);
+about 99.1% of CDF and 95.5% of centered-CDF arguments are decided (16
+million uniform arguments over four ranges), and the rest continue to the
+fast composition below.
 
 ## Fast compositions
 
