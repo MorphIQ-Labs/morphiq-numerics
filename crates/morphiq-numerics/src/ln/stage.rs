@@ -7,7 +7,7 @@ use super::stages::{A_H, K_H, K2_H, decide, reduce};
 /// The normalizer supplies `x = 2^e · y`. Return the approximation, its
 /// error bound, and the interval test's decision.
 #[inline(always)]
-pub(super) fn parts(e: i32, y: f64) -> (f64, f64, f64, Option<f64>) {
+pub(crate) fn parts(e: i32, y: f64) -> (f64, f64, f64, Option<f64>) {
     let (re, i, _, z) = reduce(y);
     #[allow(clippy::cast_precision_loss)] // total exponent is in [-1075, 1025]
     let e = (i64::from(e) + re) as f64;

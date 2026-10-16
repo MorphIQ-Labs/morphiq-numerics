@@ -2,8 +2,11 @@
 pub(crate) mod accurate;
 #[cfg(all(test, feature = "simd"))]
 mod bench;
+pub(crate) mod finite_tail;
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;
+mod log_first_table;
+pub(crate) mod log_tail;
 mod tables;
 #[cfg(test)]
 mod tests;
@@ -371,6 +374,21 @@ pub(crate) fn density_first_parts(x: f64) -> (f64, f64, i64, [f64; 2]) {
 /// The actual fast-path decision, also transcribed for the proof cross-check.
 #[inline]
 pub(crate) fn fast_decide(op: Operation, x: f64) -> Option<f64> {
+    let a = x.abs();
+    if a > 37.0 {
+        if matches!(op, Operation::LogCdf) && x < 0.0 {
+            return log_tail::decide(a);
+        }
+        return if a < 39.0
+            && (matches!(op, Operation::Pdf)
+                || matches!(op, Operation::Cdf) && x < 0.0
+                || matches!(op, Operation::LogCdf) && x > 0.0)
+        {
+            finite_tail::decide(op, a)
+        } else {
+            None
+        };
+    }
     if let Some((y, eps)) = fast(op, x) {
         let low = y.hi() + (y.lo() - eps);
         let high = y.hi() + (y.lo() + eps);

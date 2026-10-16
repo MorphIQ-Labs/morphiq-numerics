@@ -200,6 +200,12 @@ pub(crate) fn add_f64<K: Simd>(k: K, x: Dw<K>, y: K::F) -> Dw<K> {
 /// range for every active lane; inactive lanes are masked by their caller.
 #[inline(always)]
 pub(crate) fn decide_relative<K: Simd>(k: K, y: Dw<K>, eps: f64) -> u64 {
+    decide_relative_vector(k, y, k.splat(eps))
+}
+
+/// The same relative test with a separately proved guard in each lane.
+#[inline(always)]
+pub(crate) fn decide_relative_vector<K: Simd>(k: K, y: Dw<K>, eps: K::F) -> u64 {
     let magnitude = k.abs(y.0);
     let bits = k.to_bits(magnitude);
     let exponent = k.and_u(bits, k.splat_bits(0x7ff0_0000_0000_0000));
@@ -207,7 +213,7 @@ pub(crate) fn decide_relative<K: Simd>(k: K, y: Dw<K>, eps: f64) -> u64 {
     let power = k.eq_u(k.and_u(bits, k.splat_bits((1 << 52) - 1)), k.splat_bits(0));
     let g = k.select(power, k.mul(ulp, k.splat(0.5)), ulp);
     k.mask_bits(k.lt(
-        k.add(k.abs(y.1), k.mul(k.splat(eps), magnitude)),
+        k.add(k.abs(y.1), k.mul(eps, magnitude)),
         k.mul(g, k.splat(0.5)),
     ))
 }

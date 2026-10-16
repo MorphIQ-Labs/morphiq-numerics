@@ -5,6 +5,7 @@ The centered-CDF coefficients are the exact integrated Gaussian series,
 (-1)^n / (2^n n! (2n+1)); no external approximation coefficients are used.
 """
 import pathlib
+from fractions import Fraction
 import math
 import struct
 import subprocess
@@ -304,6 +305,21 @@ Proof.
         text += '  lia.\nQed.\n'
         return text
 
+def log_tail_coefficients():
+    """Coefficients of -log(sum (-1)^n (2n-1)!! u^n), through u^8.
+
+    The Mills expansion is the positive-real erfc asymptotic expansion
+    (DLMF 7.12.1), with u=1/x^2. This recurrence is exact rational algebra;
+    the finite-domain remainder is a separate proof obligation.
+    """
+    series = [Fraction(1)]
+    logarithm = [Fraction(0)]
+    for n in range(1, 9):
+        series.append(-(2*n-1)*series[-1])
+        logarithm.append(series[n] - sum((k*logarithm[k]*series[n-k]
+                                         for k in range(1, n)), Fraction(0))/n)
+    return [-c for c in logarithm[1:]]
+
 def generate(precision):
     with mp.workprec(precision):
         constants = {'DENSITY': 1/mp.sqrt(2*mp.pi), 'INV_SQRT2': 1/mp.sqrt(2),
@@ -315,6 +331,9 @@ def generate(precision):
             text += f'pub(super) const {name}: (f64, f64) = {dw(x)};\n'
             if name not in ('TWO_INV_SQRT_PI', 'LN_SQRT_2PI'):
                 text += f'pub(super) fn q_{name.lower()}() -> Q256 {{ {q(x)} }}\n'
+        text += 'pub(super) const LOG_TAIL: [f64; 8] = [\n'
+        text += ''.join(word(mp.mpf(c.numerator)/c.denominator)+',\n'
+                        for c in log_tail_coefficients())+'];\n'
         coeffs = [(-mp.mpf(1))**n/(2**n*mp.factorial(n)*(2*n+1)) for n in range(13)]
         text += 'pub(super) const CENTER: [(f64, f64); 13] = [\n'
         text += ''.join(dw(c)+',\n' for c in coeffs)+'];\n'

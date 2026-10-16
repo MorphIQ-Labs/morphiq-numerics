@@ -27,7 +27,7 @@ Qed.
 Definition normal_fast_scaled_argument64 x :=
   let '(h,l):=normal_inv_sqrt2_constant64 in mul_f64_64 h l x.
 
-Theorem normal_fast_scaled_argument_ieee x : finite x -> /2<=B x<=37 ->
+Theorem normal_fast_scaled_argument_ieee_extended x : finite x -> /2<=B x<=39 ->
   let '(h,l):=normal_fast_scaled_argument64 x in
   finite h /\ finite l /\ B h=rndF(B h+B l) /\
   /4<=B h<=32 /\ Rabs(B l)<=bpow radix2 (-49) /\
@@ -64,7 +64,7 @@ Proof.
   assert(Sqrt : 1<sqrt 2<2)by(split;interval with(i_prec 80)).
   assert(Exact : B h+B l=(B x/sqrt 2)*((1+a)*(1+b))).
   { unfold a,b;field;repeat split;lra. }
-  assert(Target : /3<=B x/sqrt 2<=27)by(split;interval with(i_prec 80)).
+  assert(Target : /3<=B x/sqrt 2<=28)by(split;interval with(i_prec 80)).
   assert(Error : Rabs((B h+B l)-B x/sqrt 2)<=B x/sqrt 2*bpow radix2 (-103)).
   { rewrite Exact;replace(B x/sqrt 2*((1+a)*(1+b))-B x/sqrt 2)with
       (B x/sqrt 2*((1+a)*(1+b)-1))by ring.
@@ -84,3 +84,10 @@ Proof.
   { replace(B h-(B h+B l))with(-B l)in Rounded by ring;rewrite Rabs_Ropp in Rounded;exact Rounded. }
   repeat split;tauto.
 Qed.
+
+Theorem normal_fast_scaled_argument_ieee x : finite x -> /2<=B x<=37 ->
+  let '(h,l):=normal_fast_scaled_argument64 x in
+  finite h /\ finite l /\ B h=rndF(B h+B l) /\
+  /4<=B h<=32 /\ Rabs(B l)<=bpow radix2 (-49) /\
+  Rabs((B h+B l)-B x/sqrt 2)<=B x/sqrt 2*bpow radix2 (-103).
+Proof. intros F X;apply (normal_fast_scaled_argument_ieee_extended x F);split;lra. Qed.

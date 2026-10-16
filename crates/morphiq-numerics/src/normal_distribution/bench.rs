@@ -49,6 +49,16 @@ fn workload(name: &str) -> Vec<f64> {
                 "central" => u - 0.5,
                 "ordinary" => 10.0 * u - 5.0,
                 "negative_tail" => -8.0 - 28.0 * u,
+                "negative_far_tail" => -37.0 - u,
+                "negative_first_table" => -37.0 - 27.0 * u,
+                "negative_wide_tail" => {
+                    let exponent = 6 + i * 506 / 1023;
+                    let fraction = u64::try_from(i)
+                        .unwrap()
+                        .wrapping_mul(0x9e37_79b9_7f4a_7c15)
+                        & ((1 << 50) - 1);
+                    -f64::from_bits((u64::try_from(exponent + 1023).unwrap() << 52) | fraction)
+                }
                 "positive_tail" => 8.0 + 28.0 * u,
                 "underflow" => 37.0 + 2.0 * u,
                 "log_overflow" => -super::tables::LOG_OVERFLOW * (1.0 + u),
@@ -117,16 +127,26 @@ fn normal_local_performance() {
         .map(|value| value.parse::<usize>().expect("integer benchmark length"))
         .unwrap_or(1024);
     assert!((1..=1024).contains(&length));
-    for kind in [
+    let workloads = [
         "tiny",
         "central",
         "ordinary",
         "negative_tail",
+        "negative_far_tail",
+        "negative_first_table",
+        "negative_wide_tail",
         "positive_tail",
         "underflow",
         "log_overflow",
         "mixed",
-    ] {
+    ];
+    if let Some(name) = selected.as_deref() {
+        assert!(
+            workloads.contains(&name),
+            "unknown normal benchmark workload: {name}"
+        );
+    }
+    for kind in workloads {
         if selected.as_deref().is_some_and(|selected| selected != kind) {
             continue;
         }

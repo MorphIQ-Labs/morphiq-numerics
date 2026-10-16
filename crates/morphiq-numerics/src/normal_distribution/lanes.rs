@@ -24,7 +24,7 @@ fn constant<K: Simd>(k: K, x: (f64, f64)) -> Dw<K> {
 }
 
 #[inline(always)]
-fn mul<K: Simd>(k: K, a: Dw<K>, b: Dw<K>) -> Dw<K> {
+pub(super) fn mul<K: Simd>(k: K, a: Dw<K>, b: Dw<K>) -> Dw<K> {
     let (p, e) = two_prod(k, a.0, b.0);
     fast_two_sum(k, p, k.add(e, k.add(k.mul(a.0, b.1), k.mul(a.1, b.0))))
 }
@@ -120,12 +120,17 @@ fn center_first<K: Simd>(k: K, op: Operation, x: K::F) -> (K::F, u64) {
 
 #[cfg_attr(not(debug_assertions), inline(always))]
 fn gaussian<K: Simd>(k: K, x: K::F) -> (Dw<K>, K::F) {
+    gaussian_scaled::<K, 0>(k, x)
+}
+
+#[inline(always)]
+pub(super) fn gaussian_scaled<K: Simd, const SHIFT: i32>(k: K, x: K::F) -> (Dw<K>, K::F) {
     let x = k.select(k.lt(x, k.splat(SMALL)), k.splat(0.0), x);
     let (h, l) = two_prod(k, x, k.mul(k.splat(-0.5), x));
     let (y, n) = crate::exp::lanes::stage_b_double_word(k, h, l);
     let mut scale = K::Array::default();
     for (i, &n) in k.store(n).as_ref().iter().enumerate() {
-        scale.as_mut()[i] = super::pow2((n as i32).div_euclid(512));
+        scale.as_mut()[i] = super::pow2((n as i32).div_euclid(512) + SHIFT);
     }
     (two_sum(k, y.0, y.1), k.load(scale))
 }
@@ -136,7 +141,7 @@ fn scaled<K: Simd>(k: K, y: Dw<K>, scale: K::F) -> Dw<K> {
 }
 
 #[cfg_attr(not(debug_assertions), inline(always))]
-fn scaled_erfcx<K: Simd>(k: K, x: K::F) -> Dw<K> {
+pub(super) fn scaled_erfcx<K: Simd>(k: K, x: K::F) -> Dw<K> {
     let z = mul_f64(k, constant(k, tables::INV_SQRT2), x);
     let table = k.lt(z.0, k.splat(16.0));
     let table_bits = k.mask_bits(table);
@@ -298,6 +303,107 @@ impl<const OP: u8> Kernel for Normal<OP> {
             }
             _ => {}
         }
+        if OP == 3 {
+            return Self::regular(k, input);
+        }
+        let x = if OP == 2 {
+            k.neg(k.load(input))
+        } else {
+            k.load(input)
+        };
+        let a = k.abs(x);
+        let range = k.and_m(
+            k.lt(k.splat(37.0), a),
+            k.lt(
+                a,
+                k.splat(if OP == 0 {
+                    tables::PDF_ZERO
+                } else {
+                    tables::TAIL_ZERO
+                }),
+            ),
+        );
+        let eligible = match operation::<OP>() {
+            Operation::Pdf => range,
+            Operation::Cdf => k.and_m(range, k.lt(x, k.splat(0.0))),
+            Operation::LogCdf => k.and_m(range, k.lt(k.splat(0.0), x)),
+            Operation::Centered => unreachable!(),
+        };
+        let active = k.mask_bits(eligible);
+        if active.count_ones() < 2 {
+            return Self::log_lanes(k, input);
+        }
+        let argument = k.select(eligible, a, k.splat(38.0));
+        let (value, accepted) = super::finite_tail::lanes::decide(k, operation::<OP>(), argument);
+        let mut out = if active == lanes_mask::<K>() {
+            k.store(value)
+        } else {
+            let ordinary =
+                Self::log_lanes(k, k.store(k.select(eligible, k.splat(0.0), k.load(input))));
+            k.store(k.select(eligible, value, k.load(ordinary)))
+        };
+        let pending = active & !accepted;
+        if pending != 0 {
+            for (i, value) in out.as_mut().iter_mut().enumerate() {
+                if pending >> i & 1 != 0 {
+                    let argument = if OP == 2 {
+                        -input.as_ref()[i]
+                    } else {
+                        input.as_ref()[i]
+                    };
+                    *value = super::accurate::evaluate(operation::<OP>(), argument);
+                }
+            }
+        }
+        out
+    }
+}
+
+impl<const OP: u8> Normal<OP> {
+    #[inline(always)]
+    fn log_lanes<K: Simd>(k: K, input: K::Array) -> K::Array {
+        if OP != 4 {
+            return Self::regular(k, input);
+        }
+        let x = k.load(input);
+        let far = k.and_m(
+            k.lt(x, k.splat(-37.0)),
+            k.lt(k.splat(-tables::LOG_OVERFLOW), x),
+        );
+        let active = k.mask_bits(far);
+        if active.count_ones() < 2 {
+            return Self::regular(k, input);
+        }
+        let a = k.neg(k.select(far, x, k.splat(-38.0)));
+        let (tail, accepted) = super::log_tail::lanes::decide(k, a);
+        let mut out = if active == lanes_mask::<K>() {
+            k.store(tail)
+        } else {
+            // Zero is a special value. It excludes far-tail lanes from the
+            // ordinary polynomial while retaining SIMD for the other lanes.
+            let regular = Self::regular(k, k.store(k.select(far, k.splat(0.0), x)));
+            k.store(k.select(far, tail, k.load(regular)))
+        };
+        let pending = active & !accepted;
+        if pending != 0 {
+            for (i, value) in out.as_mut().iter_mut().enumerate() {
+                if pending >> i & 1 != 0 {
+                    *value = super::accurate::evaluate(Operation::LogCdf, input.as_ref()[i]);
+                }
+            }
+        }
+        out
+    }
+
+    #[inline(always)]
+    fn regular<K: Simd>(k: K, input: K::Array) -> K::Array {
+        let op = operation::<OP>();
+        let all = lanes_mask::<K>();
+        let xv = if OP == 2 {
+            k.neg(k.load(input))
+        } else {
+            k.load(input)
+        };
         let mut x = input;
         let mut active = 0_u64;
         for (i, v) in x.as_mut().iter_mut().enumerate() {

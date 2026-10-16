@@ -31,12 +31,12 @@ Definition ln_parts (E : Z) (h : f64) : f64 * f64 * f64 :=
   let eps := fadd (fmul z2 c_kh) (fadd (fmul (b64_abs s) c_k2h) c_ah) in
   (s, lo, eps).
 
-Theorem ln_eval E h : finite h -> bpow radix2 (-53) <= B h <= bpow radix2 1020 ->
+Theorem ln_eval_bounded E h : finite h -> bpow radix2 (-53) <= B h <= bpow radix2 1020 ->
   (-1100 <= E <= 1100)%Z ->
   (E = 0%Z -> B h * bpow radix2 (- rd_e (bits_of_b64 h)) <> 1) ->
   let v := IZR E * ln 2 + ln (B h * bpow radix2 (- rd_e (bits_of_b64 h))) in
   let '(s, lo, eps) := ln_parts E h in
-  finite s /\ finite lo /\ finite eps /\ 0 <= B eps /\ Rabs (B s) <= bpow radix2 999 /\ Rabs (B lo) + B eps <= 1 /\
+  finite s /\ finite lo /\ finite eps /\ 0 <= B eps <= bpow radix2(-65) /\ Rabs (B s) <= bpow radix2 999 /\ Rabs (B lo) + B eps <= 1 /\
   forall w, Rabs (w - v) <= / 2 ^ 123 * Rabs v ->
     Rabs (w - (B s + B lo)) + bpow radix2 (-53) * (Rabs (B lo) + B eps) <= B eps.
 Proof.
@@ -358,6 +358,17 @@ Proof.
   { apply Small. rewrite Be2, Be4. rewrite Rabs_pos_eq; lra. }
   rewrite Be2, Be4, Edb in Beps.
   set (eps := fadd (fmul (fmul z z) c_kh) (fadd (fmul (b64_abs s) c_k2h) c_ah)) in *.
+  assert (EpsUpper : B eps <= bpow radix2(-65)).
+  { assert (Square : 0<=B(fmul z z)<=bpow radix2(-18)).
+    { rewrite Bz2;split.
+      - apply round_ge_generic;[exact _|exact _|apply generic_format_0|apply Rle_0_sqr].
+      - apply round_le_generic;[exact _|exact _|apply fmt_pow;lia|].
+        clear -Zb;apply Rabs_le_inv in Zb;bpow_num;nra. }
+    rewrite Beps;unfold E1;apply Rabs_le_inv in Hda,Hdb.
+    pose proof(Rabs_pos(B s))as Spos.
+    clear -Square Shi Spos Hda Hdb.
+    bpow_num_in Square;bpow_num_in Hda;bpow_num_in Hdb;bpow_num;interval with(i_prec 150). }
+
   assert (Hzr1 : 0 < 1 + zr) by lra.
   assert (Dec : IZR E * ln 2 + ln y = IZR E * ln 2 - ln R + ln (1 + zr)).
   { assert (Y : y = (1 + zr) / R) by (rewrite Bz; field; lra).
@@ -429,10 +440,24 @@ Proof.
   - exact Z2b.
   - reflexivity.
   - exact Beps.
-  - split; [exact Fs | ]. split; [exact Flo | ]. split; [exact Feps | ]. split; [exact Ep | ].
+  - split; [exact Fs | ]. split; [exact Flo | ]. split; [exact Feps | ]. split; [split;[exact Ep|exact EpsUpper] | ].
     split; [apply Rle_trans with 900; [exact Shi | apply Rle_trans with (bpow radix2 10); [bpow_num; lra | apply bpow_le; lia]] | ].
     split; [exact Lo1 | exact Main].
 Qed.
 
 
 Local Strategy opaque [ln_parts].
+
+Theorem ln_eval E h : finite h -> bpow radix2 (-53) <= B h <= bpow radix2 1020 ->
+  (-1100 <= E <= 1100)%Z ->
+  (E = 0%Z -> B h * bpow radix2 (- rd_e (bits_of_b64 h)) <> 1) ->
+  let v := IZR E * ln 2 + ln (B h * bpow radix2 (- rd_e (bits_of_b64 h))) in
+  let '(s, lo, eps) := ln_parts E h in
+  finite s /\ finite lo /\ finite eps /\ 0 <= B eps /\ Rabs (B s) <= bpow radix2 999 /\ Rabs (B lo) + B eps <= 1 /\
+  forall w, Rabs (w - v) <= / 2 ^ 123 * Rabs v ->
+    Rabs (w - (B s + B lo)) + bpow radix2 (-53) * (Rabs (B lo) + B eps) <= B eps.
+Proof.
+  intros F H Range Ne;pose proof(ln_eval_bounded E h F H Range Ne)as Bound.
+  cbv zeta in Bound|-*;destruct(ln_parts E h)as[[s l]e].
+  destruct Bound as[Fs [Fl [Fe [[Lower Upper] Rest]]]];repeat split;tauto.
+Qed.

@@ -18,16 +18,17 @@ cd "$(dirname "$0")/.."
 failed=0
 for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig formal/normal; do
   f=${dir#formal/}
-  # formal/normal's sources and certificates are bound by formal/binding.sha256.
-  if [ -f "$dir/binding.sha256" ]; then
-    sha256sum --check --quiet "$dir/binding.sha256"
-  fi
+  binding="$dir/binding.sha256"
+  # Normal compositions share the end-to-end proof manifest.
+  if [ "$f" = normal ]; then binding=formal/binding.sha256; fi
+  sha256sum --check --quiet "$binding"
   # A function with its own polynomial replays its Sollya script.
-  if [ -f "generators/${f}_poly.sollya" ]; then
-    sollya "generators/${f}_poly.sollya" | grep -E '^([a-z]+[0-9]+|[a-z_]*error_bound|[a-z_]*remainder_bound) ' \
-      | diff -u "generators/${f}_poly.out" -
-    echo "replayed: generators/${f}_poly.sollya"
-  fi
+  for polynomial in "generators/${f}_poly.sollya" generators/${f}_*_poly.sollya; do
+    [ -f "$polynomial" ] || continue
+    sollya "$polynomial" | grep -E '^([a-z]+[0-9]+|[a-z_]*error_bound|[a-z_]*remainder_bound) ' \
+      | diff -u "${polynomial%.sollya}.out" -
+    echo "replayed: $polynomial"
+  done
   for certificate in "$dir"/*.g; do
     # Q256's bounds reach 2^-260: Gappa needs the wider working precision.
     if gappa -Eprecision=400 "$certificate" >/dev/null 2>&1; then

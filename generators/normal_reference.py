@@ -18,9 +18,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / 'crates/reference/fixtures/normal.json'
 NAMES = ['pdf', 'cdf', 'ccdf', 'centered', 'log_cdf']
 
-# Rounding-sensitive inputs discovered by normal_find_rounding_witnesses.
+# Rounding-sensitive inputs from normal_find_rounding_witnesses and the far-tail workload.
 # Expected values are independently regenerated below, never copied from Rust.
 HARD_INPUTS = [
+    'c042df57d5f57d5f',
     '403dac11bd9d4430',
     'c04149f615e7d94b',
     '402d850503c0c448',
@@ -159,22 +160,35 @@ def main():
     points = [0.,-0.,.1,-.1,1.,-1.,math.inf,-math.inf,
               number('7ff8000000001234'),number('fff8000000005678'),number('7ff0000000004321')]
     points += [number(b) for b in HARD_INPUTS]
-    edges = [.5, 9., 16*math.sqrt(2), 37., 40., 2.**-33,2.**-450]
+    edges = [.5, 9., 16*math.sqrt(2), 37., 40., 64., 2.**-33,2.**-450]
     edges += list(thresholds_.values())
     edges += [math.ldexp(1.,e) for e in [-1074,-1073,-1022,-500,-450,-100,-60,-55,-54,-53,-33,-27,-1,0,3,5,26,500,511,512,513,1023]]
     edges += [math.sqrt(2)*i/32 for i in range(33)]
-    for c in edges:
-        for sign in [1.,-1.]:
-            x=sign*c;points.append(x)
-            low=high=x
-            for _ in range(3):
-                low=math.nextafter(low,-math.inf);high=math.nextafter(high,math.inf)
-                points += [low,high]
+    def add_neighbors(edges):
+        for c in edges:
+            for sign in [1.,-1.]:
+                x=sign*c;points.append(x)
+                low=high=x
+                for _ in range(3):
+                    low=math.nextafter(low,-math.inf);high=math.nextafter(high,math.inf)
+                    points.extend([low,high])
+    add_neighbors(edges)
     rng = random.Random(0x35_cdf)
     for _ in range(384):
         points += [rng.uniform(-.5,.5),rng.uniform(-9,9),rng.uniform(-40,40),
                    math.ldexp(rng.uniform(-1,1),rng.randrange(-1073,-27)),
                    -math.ldexp(rng.uniform(1,2),rng.randrange(6,1023))]
+    add_neighbors([2.**44, 2.**45, 2.**46])
+    # Exercise the far log-CDF tail, including the narrow unsaturated bands
+    # of the sibling functions and both sides of the scaled-square split.
+    for _ in range(256):
+        a = rng.uniform(37, 39)
+        points += [-a, a, -math.ldexp(rng.uniform(1, 2), rng.randrange(6, 513))]
+    # Every first-table cell boundary and center, with neighboring encodings.
+    add_neighbors([37.0+i/2 for i in range(55)])
+    for cell in range(27):
+        for _ in range(4):
+            points.append(-rng.uniform(37+cell, 38+cell))
     # Deduplicate by encoding, preserving both zero signs and distinct NaNs.
     points = list(dict.fromkeys(bits(x) for x in points))
     cases=[]

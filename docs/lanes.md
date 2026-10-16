@@ -124,9 +124,10 @@ when `std` is enabled and the build targets x86 FMA (`target_feature = "fma"`)
 or aarch64 NEON (`target_feature = "neon"`, which includes binary64 FMA), and runs
 Dekker's operations otherwise. It is crate-private, and every call names the
 proof that keeps its arguments in `D`: the normal family's exact half square
-(`NormalGaussianKernel.normal_half_square_exact`), its scaled argument
+(`NormalGaussianKernel.normal_half_square_exact` and the negative log-tail
+table's `NormalLogFirst.normal_log_first_square`), its scaled argument
 `a/√2` (`DoubleWord::mul_f64_d`, `NormalFastScaledArgument`) and its CDF first
-stage's product (`NormalTailFirst`), and erfcx's products, reciprocal, square,
+stages' products (`NormalTailFirst`, `NormalCenterFirst`), and erfcx's products, reciprocal, square,
 quotient and reflection square (`ErfcxProduct`, `ErfcxReciprocal`,
 `ErfcxSquare`, `ErfcxQuotient`, `ErfcxReflectionSquare`). The public
 `eft::two_prod` and `DoubleWord`'s operations stay Dekker's on every build,

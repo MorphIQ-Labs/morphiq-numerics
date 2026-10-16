@@ -704,9 +704,21 @@ Print Assumptions NormalOuterSigned.normal_outer_signed_decided.
 Require Import NormalLogNegativeFast.
 Print Assumptions NormalLogNegativeFast.normal_log_negative_decided.
 
+Require Import NormalLogTailModerate NormalLogTailHuge.
+Print Assumptions NormalLogTailModerate.normal_log_tail_moderate_decided.
+Print Assumptions NormalLogTailHuge.normal_log_tail_huge_decided.
+
 Require Import NormalLogPositiveFast.
 Print Assumptions NormalLogPositiveFast.normal_log_positive_decided.
 
 Require Import NormalPublicEntry.
 Print Assumptions NormalPublicEntry.normal_public_contract.
 Print Assumptions NormalPublicEntry.normal_ccdf_public_contract.
+
+Require Import NormalFiniteDensity NormalFiniteTail NormalUnderflowCandidate.
+Print Assumptions NormalFiniteDensity.normal_finite_density_ieee.
+Print Assumptions NormalFiniteTail.normal_finite_tail_ieee.
+Print Assumptions NormalFiniteTail.normal_finite_log_tail_ieee.
+Require Import NormalLogFirst NormalLogTailStages.
+Print Assumptions NormalLogFirst.normal_log_first_decided.
+Print Assumptions NormalLogTailStages.normal_log_tail_stages_decided.
