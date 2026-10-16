@@ -184,6 +184,11 @@ def main():
     for _ in range(256):
         a = rng.uniform(37, 39)
         points += [-a, a, -math.ldexp(rng.uniform(1, 2), rng.randrange(6, 513))]
+    # Every first-table cell boundary and center, with neighboring encodings.
+    add_neighbors([37.0+i/2 for i in range(55)])
+    for cell in range(27):
+        for _ in range(4):
+            points.append(-rng.uniform(37+cell, 38+cell))
     # Deduplicate by encoding, preserving both zero signs and distinct NaNs.
     points = list(dict.fromkeys(bits(x) for x in points))
     cases=[]

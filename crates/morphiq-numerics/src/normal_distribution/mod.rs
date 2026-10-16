@@ -5,6 +5,7 @@ mod bench;
 pub(crate) mod finite_tail;
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;
+mod log_first_table;
 pub(crate) mod log_tail;
 mod tables;
 #[cfg(test)]

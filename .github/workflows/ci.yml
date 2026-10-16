@@ -222,7 +222,24 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: test-${{ matrix.os }}
-      - run: cargo test --locked --workspace --all-features
+      - if: runner.arch != 'ARM64'
+        run: cargo test --locked --workspace --all-features
+      - if: runner.arch == 'ARM64'
+        run: ./scripts/check_fma.sh
+
+  # The scalar kernels' FMA build (eft::two_prod_d): tests, digest and
+  # cross-check corpora byte-identical to the default build's.
+  fma:
+    name: fma (x86-64)
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: fma
+      - run: ./scripts/check_fma.sh
 
   # The determinism digest on targets beyond the test hosts: musl's libc,
   # WebAssembly and bare metal, where a platform libm differs most or is absent. Each runs the reference
