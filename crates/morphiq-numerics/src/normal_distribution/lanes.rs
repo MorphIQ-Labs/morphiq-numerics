@@ -324,8 +324,14 @@ impl<const OP: u8> Kernel for Normal<OP> {
             k.load(input)
         };
         let a = k.abs(x);
+        let far = k.lt(k.splat(37.0), a);
+        // Most chunks need neither finite-tail nor far-log routing. NaNs
+        // also take regular's scalar special-value path.
+        if k.mask_bits(far) == 0 {
+            return Self::regular(k, input);
+        }
         let range = k.and_m(
-            k.lt(k.splat(37.0), a),
+            far,
             k.lt(
                 a,
                 k.splat(if OP == 0 {
