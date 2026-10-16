@@ -26,10 +26,13 @@ fn bench(function: &str, workload: &str, xs: &[f64], functions: [Batch; 3]) {
             }
             for (i, (&a, &b)) in output.iter().zip(&expected).enumerate() {
                 assert!(
-                    a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan()),
+                    a.to_bits() == b.to_bits(),
                     "{function}/{workload} {length} {i}: {a} {b}"
                 );
             }
+        }
+        if std::env::args().any(|arg| arg == "--check-only") {
+            continue;
         }
         for round in 0..12 {
             for offset in 0..3 {
