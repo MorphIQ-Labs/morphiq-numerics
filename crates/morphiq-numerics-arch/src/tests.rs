@@ -52,6 +52,17 @@ impl WithSimd for Check<'_> {
     #[inline(always)]
     fn with<S: Simd>(self, s: S) {
         let n = S::LANES;
+        let all = (1_u64 << n) - 1;
+        for bits in 0..=all {
+            for input in [bits, bits | !all] {
+                let mask = s.mask_from_bits(input);
+                assert_eq!(s.mask_bits(mask), bits, "{}: mask bits", S::NAME);
+                let values = s.store(s.select(mask, s.splat(-1.0), s.splat(1.0)));
+                for (i, &value) in values.as_ref().iter().enumerate() {
+                    assert_eq!(value, if bits >> i & 1 != 0 { -1.0 } else { 1.0 });
+                }
+            }
+        }
         for (xs, ys) in self.0.chunks_exact(n).zip(self.1.chunks_exact(n)) {
             let (mut a, mut b) = (S::Array::default(), S::Array::default());
             a.as_mut().copy_from_slice(xs);

@@ -1,0 +1,16 @@
+from pathlib import Path
+import subprocess,tarfile,io,sys
+repo=Path.cwd();root=Path(sys.argv[1] if len(sys.argv)>1 else 'target/cold-paired').resolve();root.mkdir(exist_ok=True)
+for name,rev in [('original','76825af'),('before','d14a580'),('after','f8f572e')]:
+ dest=root/name;dest.mkdir(exist_ok=True)
+ blob=subprocess.check_output(['git','archive',rev],cwd=repo)
+ with tarfile.open(fileobj=io.BytesIO(blob)) as tf:tf.extractall(dest,filter='data')
+ p=dest/'crates/morphiq-numerics/Cargo.toml';p.write_text(p.read_text()+'\n[lib]\nname = "numerics_'+name+'"\n')
+ p=dest/'crates/morphiq-numerics-arch/Cargo.toml';p.write_text(p.read_text().replace('name = "morphiq-numerics-arch"','name = "morphiq-numerics-arch-'+name+'"'))
+ p=dest/'crates/morphiq-numerics/Cargo.toml';p.write_text(p.read_text().replace('morphiq-numerics-arch = {','morphiq-numerics-arch = { package = "morphiq-numerics-arch-'+name+'",'))
+ p=dest/'Cargo.lock';p.write_text(p.read_text().replace('"morphiq-numerics-arch"','"morphiq-numerics-arch-'+name+'"'))
+ subprocess.run(['cargo','build','--release','--locked','-p','morphiq-numerics','--features','simd,std'],cwd=dest,check=True)
+
+subprocess.run(['rustc','-O','--edition=2024',str(Path(__file__).with_name('paired.rs')),'--extern','original='+str(root/'original/target/release/libnumerics_original.rlib'),'--extern','before='+str(root/'before/target/release/libnumerics_before.rlib'),'--extern','after='+str(root/'after/target/release/libnumerics_after.rlib'),'-L','dependency='+str(root/'original/target/release/deps'),'-L','dependency='+str(root/'before/target/release/deps'),'-L','dependency='+str(root/'after/target/release/deps'),'-o',str(root/'paired')],check=True)
+for run in range(3):
+ with (root/f'paired-{run}.csv').open('w') as f:subprocess.run([str(root/'paired')],stdout=f,check=True)

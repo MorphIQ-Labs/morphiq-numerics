@@ -305,7 +305,8 @@ intermediate-word tests and the cross-target digest check lane equivalence.
 - **No lane operation out of line** (`scripts/check_lane_codegen.sh`, in the
   `simd (avx512, sde)` job): the release library's disassembly has no call
   from a non-test function to an AVX2 or AVX-512F helper, other than the
-  store and load by which `lanes::cold` enters and leaves the wrapper (§7).
+  store and load at `lanes::cold` and the scalar-only
+  `ln::lanes::finish_ln_1p` prefix, which enter and leave the wrapper (§7).
   An out-of-line operation still returns the scalar bits, so only the code
   shows it.
 
@@ -379,7 +380,7 @@ CI runner is not evidence.
 **Uncommon paths and lane masks.** Two rules keep a kernel's operations in
 lanes, and the native x86 measurements are what found them (#162):
 
-- **A kernel's uncommon path runs through `lanes::cold`.** That is an
+- **An uncommon vector path runs through `lanes::cold`.** That is an
   `#[inline(never)]` function that re-enters `Simd::vectorize`, so the path
   stays out of the common chunk's code but is compiled with the backend's
   features. A function outside that wrapper cannot inline an AVX2 or AVX-512F
@@ -387,10 +388,17 @@ lanes, and the native x86 measurements are what found them (#162):
   chunk that way and ran 2–3× slower than scalar, while SSE2, which is enabled
   for the whole x86-64 target, was unaffected. The hot side passes and
   receives vectors: passing the chunk's arrays kept them in memory and slowed
-  `ln_1p`'s common path by about 10%.
+  `ln_1p`'s common path by about 10%. On AVX2 and AVX-512F, `ln_1p` handles scalar stage B and
+  special values before entering the wrapper; only two or more unresolved
+  lanes require vector re-entry. NEON and SSE2 already have baseline target
+  features, so their scalar prefix remains inside the same cold wrapper.
+  Scalar completion helpers borrow one mutable output array; they do not
+  return successive array copies. This keeps the output buffer in place
+  across stage B, special-value completion and the single unresolved lane.
 - **A lane mask is computed in lanes.** That is either a comparison, as in
-  `ln`'s screen, or `mask_from`, which tests each lane's bit of a broadcast
-  integer. Storing one word per lane and reloading them as a vector stalls
+  `ln`'s screen, or `mask_from`, which delegates to the backend
+  `mask_from_bits`: AVX-512F already represents its mask as bits and uses
+  them directly; other backends test each lane's bit of a broadcast integer. Storing one word per lane and reloading them as a vector stalls
   store forwarding on every chunk.
 
 Together these took `ln` `[0.5, 2)` from 7.2 to 3.1 ns per argument on the

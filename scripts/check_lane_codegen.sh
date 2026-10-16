@@ -11,8 +11,9 @@
 #
 # Without BINARY, builds the release library tests (every kernel on every x86
 # backend) and disassembles them; test functions are not checked. The only
-# calls allowed are the store and load that `lanes::cold` makes to enter and
-# leave the wrapper. Exit 1 on a violation, 2 when the check cannot run or the
+# calls allowed are the store and load at `lanes::cold` and the scalar-only
+# prefix `ln::lanes::finish_ln_1p`, to enter and leave the vector wrapper.
+# Exit 1 on a violation, 2 when the check cannot run or the
 # binary has no AVX2 or AVX-512F kernels to check. x86-64 only; needs objdump.
 set -eu
 cd "$(dirname "$0")/.."
@@ -38,7 +39,7 @@ objdump -d --no-show-raw-insn -C "$binary" | awk '
     }
     /call.*helpers::(avx2|avx512)::/ {
         if (fn ~ /::tests::/) next
-        if (fn ~ /^morphiq_numerics::lanes::cold(::)?</ && /helpers::(avx2|avx512)::(load|store)>/) next
+        if (fn ~ /^morphiq_numerics::(lanes::cold|ln::lanes::finish_ln_1p)(::)?</ && /helpers::(avx2|avx512)::(load|store)>/) next
         bad[fn]++
     }
     END {
