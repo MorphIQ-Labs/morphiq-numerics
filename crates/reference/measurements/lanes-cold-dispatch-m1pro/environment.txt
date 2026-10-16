@@ -9,4 +9,4 @@ release: 1.97.1
 LLVM version: 22.1.6
 
 Features: simd,std; release defaults; no RUSTFLAGS. No CPU affinity or fixed frequency.
-Three sequential processes; variants alternate within each round. No other agent build or benchmark ran concurrently with timing.
+Three sequential processes; variants alternate within each round. This task launched no additional build or benchmark concurrently with timing. Other sessions share the host; their load was not sampled continuously.

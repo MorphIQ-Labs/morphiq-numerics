@@ -20,7 +20,8 @@ python3 crates/reference/measurements/lanes-cold-dispatch-m1pro/build_paired.py
 Raw samples and their median/min/max summary are versioned. For length
 4,096, candidate/#165 ratios are: ordinary ln 1.000, near-one ln 1.001,
 ln1p exp-negative 0.999, huge 1.004, mixed 1.003, screened 0.991, and central
-log-CDF 0.999. These small differences do not establish a speedup. The
+log-CDF 0.999. These small differences do not establish a speedup. Other sessions share
+the host and their load was not sampled continuously. The
 screened ARM slowdown in an earlier scalar-prefix candidate is no longer
 observed after retaining the existing two-lane boundary. Compared with main,
 #165's ordinary and near-one ln gains remain present.
