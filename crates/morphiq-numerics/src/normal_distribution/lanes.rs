@@ -67,6 +67,57 @@ fn center<K: Simd>(k: K, x: K::F) -> Dw<K> {
     select(k, small, leading, mul(k, leading, p))
 }
 
+/// `center_first_parts`, with the scalar operation sequence in every lane.
+/// Inputs are restricted to SMALL <= |x| <= 1/2 by the caller.
+#[inline(always)]
+fn center_first_parts<K: Simd>(k: K, x: K::F) -> Dw<K> {
+    let (zh, zl) = two_prod(k, x, x);
+    let c1 = tables::CENTER[1];
+    let (e1h, e1p) = two_prod(k, k.splat(c1.0), zh);
+    let e1l = k.add(
+        e1p,
+        k.add(k.mul(k.splat(c1.0), zl), k.mul(k.splat(c1.1), zh)),
+    );
+    let mut tail = k.splat(tables::CENTER[12].0);
+    for n in (4..12).rev() {
+        tail = k.add(k.splat(tables::CENTER[n].0), k.mul(zh, tail));
+    }
+    let t3 = k.add(k.splat(tables::CENTER[3].0), k.mul(zh, tail));
+    let e2 = k.mul(
+        k.mul(zh, zh),
+        k.add(k.splat(tables::CENTER[2].0), k.mul(zh, t3)),
+    );
+    let (dh, dp) = two_prod(k, k.splat(tables::DENSITY.0), x);
+    let dl = k.add(dp, k.mul(k.splat(tables::DENSITY.1), x));
+    let (ph, pp) = two_prod(k, dh, e1h);
+    let rest = k.add(
+        dl,
+        k.add(
+            pp,
+            k.add(k.add(k.mul(dh, e1l), k.mul(dl, e1h)), k.mul(dh, e2)),
+        ),
+    );
+    let (s, t) = fast_two_sum(k, dh, ph);
+    fast_two_sum(k, s, k.add(t, rest))
+}
+
+#[inline(always)]
+fn center_first<K: Simd>(k: K, op: Operation, x: K::F) -> (K::F, u64) {
+    let (ch, cl) = center_first_parts(k, x);
+    let e = k.mul(k.abs(ch), k.splat(super::E_CENTER_FIRST));
+    let (y, w) = match op {
+        Operation::Centered => (ch, cl),
+        Operation::Cdf => {
+            let (u, v) = fast_two_sum(k, k.splat(0.5), ch);
+            (u, k.add(v, cl))
+        }
+        _ => return (k.splat(0.0), 0),
+    };
+    let low = k.add(y, k.sub(w, e));
+    let high = k.add(y, k.add(w, e));
+    (low, k.mask_bits(k.eq_u(k.to_bits(low), k.to_bits(high))))
+}
+
 #[cfg_attr(not(debug_assertions), inline(always))]
 fn gaussian<K: Simd>(k: K, x: K::F) -> (Dw<K>, K::F) {
     let x = k.select(k.lt(x, k.splat(SMALL)), k.splat(0.0), x);
@@ -259,6 +310,21 @@ impl<const OP: u8> Kernel for Normal<OP> {
                 *v = 0.25;
             }
         }
+        let mut first = k.splat(0.0);
+        let mut first_decided = 0;
+        if matches!(op, Operation::Cdf | Operation::Centered) {
+            let eligible = k.mask_bits(k.and_m(
+                k.le(k.splat(SMALL), k.abs(xv)),
+                k.le(k.abs(xv), k.splat(0.5)),
+            )) & active;
+            if eligible.count_ones() >= 2 {
+                let first_input = k.select(mask_from(k, eligible), xv, k.splat(0.25));
+                let (value, accepted) = center_first(k, op, first_input);
+                first = value;
+                first_decided = accepted & eligible;
+                active &= !first_decided;
+            }
+        }
         // A saturated batch has no polynomial work. A single active lane
         // cannot amortize vector setup or region masking; evaluate it once.
         let central = k.mask_bits(k.le(k.abs(xv), k.splat(0.5))) & active;
@@ -271,9 +337,11 @@ impl<const OP: u8> Kernel for Normal<OP> {
                     && negative != 0
                     && negative != active));
         if active.count_ones() <= 1 || split_regions {
-            let mut out = input;
-            for v in out.as_mut() {
-                *v = Self::scalar(*v);
+            let mut out = k.store(first);
+            for (i, v) in out.as_mut().iter_mut().enumerate() {
+                if first_decided >> i & 1 == 0 {
+                    *v = Self::scalar(input.as_ref()[i]);
+                }
             }
             return out;
         }
@@ -282,7 +350,8 @@ impl<const OP: u8> Kernel for Normal<OP> {
         let low = k.add(y.0, k.sub(y.1, eps));
         let high = k.add(y.0, k.add(y.1, eps));
         let decided = k.mask_bits(k.eq_u(k.to_bits(low), k.to_bits(high))) & active;
-        let mut out = k.store(low);
+        let decided = decided | first_decided;
+        let mut out = k.store(k.select(mask_from(k, first_decided), first, low));
         if decided != lanes_mask::<K>() {
             for (i, o) in out.as_mut().iter_mut().enumerate() {
                 if decided >> i & 1 == 0 {

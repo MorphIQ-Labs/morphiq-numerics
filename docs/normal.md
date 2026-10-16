@@ -175,6 +175,13 @@ about 99.1% of CDF and 95.5% of centered-CDF arguments are decided (16
 million uniform arguments over four ranges), and the rest continue to the
 fast composition below.
 
+The NEON, SSE2, AVX2 and AVX-512 kernels evaluate the same central-stage
+words and endpoint test. Ineligible lanes use a safe central argument during
+that computation; only eligible, accepted lanes keep its result. Mixed
+chunks retain those results while unresolved lanes continue to the existing
+composition or scalar completion. Lane tests compare both words and every
+acceptance decision with the scalar stage before checking public results.
+
 ## Fast compositions
 
 For `abs(x) <= 37`, the Gaussian factor retains both words of `-x²/2`,

@@ -156,11 +156,11 @@ Proof.
   (* c1h·zh exactly *)
   pose proof (two_prod_ieee 0 (-2) normal_center_1_hi zh (proj1 normal_center_1_hi_ok) Fzh
     ltac:(rewrite g_c1h_eq; unfold g_c1h; change (bpow radix2 0) with 1; unfold Gappa_definitions.float2R, F2R;
-          cbn [Defs.Fnum Defs.Fexp Gappa_definitions.Fnum Gappa_definitions.Fexp]; bpow_num; interval)
+          cbn [Defs.Fnum Defs.Fexp Gappa_definitions.Fnum Gappa_definitions.Fexp]; bpow_num; interval with (i_prec 80))
     ltac:(rewrite Rabs_pos_eq by lra; change (bpow radix2 (-2)) with (/ 4); lra) ltac:(lia) ltac:(lia) ltac:(lia)
     ltac:(right; rewrite g_c1h_eq, Rabs_mult, (Rabs_pos_eq (B zh)) by lra; unfold g_c1h, Gappa_definitions.float2R, F2R;
           cbn [Defs.Fnum Defs.Fexp Gappa_definitions.Fnum Gappa_definitions.Fexp];
-          apply Rle_trans with (/ 7 * bpow radix2 (-67)); [bpow_num; lra | apply Rmult_le_compat; [lra | apply bpow_ge_0 | bpow_num; interval | exact Zlow]])) as P1.
+          apply Rle_trans with (/ 7 * bpow radix2 (-67)); [bpow_num; lra | apply Rmult_le_compat; [lra | apply bpow_ge_0 | bpow_num; interval with (i_prec 80) | exact Zlow]])) as P1.
   revert P1. generalize (two_prod64 normal_center_1_hi zh). intros [e1h e1p] P1.
   destruct P1 as [Fe1h [Fe1p [Be1h E1]]]. rewrite g_c1h_eq, rndF_rn in Be1h. rewrite g_c1h_eq in E1.
   assert (Be1p : B e1p = g_c1h * B zh - B e1h) by lra.
@@ -194,7 +194,7 @@ Proof.
     assert (P : Rabs (g_c1h * B zh) >= / 7 * bpow radix2 (-67)).
     { rewrite Rabs_mult, (Rabs_pos_eq (B zh)) by lra. unfold g_c1h, Gappa_definitions.float2R, F2R.
       cbn [Defs.Fnum Defs.Fexp Gappa_definitions.Fnum Gappa_definitions.Fexp].
-      apply Rle_ge, Rmult_le_compat; [lra | apply bpow_ge_0 | bpow_num; interval | exact Zlow]. }
+      apply Rle_ge, Rmult_le_compat; [lra | apply bpow_ge_0 | bpow_num; interval with (i_prec 80) | exact Zlow]. }
     pose proof (rnd_rel (g_c1h * B zh) ltac:(apply Rle_trans with (/ 7 * bpow radix2 (-67)); [bpow_num; lra | lra])) as R.
     change (round radix2 (FLT_exp (-1074) 53) (Znearest (fun n => negb (Z.even n))) (g_c1h * B zh)) with (rndF (g_c1h * B zh)) in R.
     pose proof (Rabs_triang_inv (g_c1h * B zh) (g_c1h * B zh - rndF (g_c1h * B zh))) as T.
@@ -218,8 +218,8 @@ Proof.
   destruct P as [Fe1h [Fe1l [Fe2 [PE [He1h [He1l [He2 He1hlow]]]]]]].
   set (E := center_first_E (B x)) in *.
   destruct normal_density_hi_ok as [Fph Ph]. destruct normal_density_lo_ok as [Fpl Pl].
-  assert (Phr : 0.3989 <= B normal_density_hi <= 0.399) by (rewrite Ph; split; interval).
-  assert (Plr : Rabs (B normal_density_lo) <= bpow radix2 (-55)) by (rewrite Pl; bpow_num; interval).
+  assert (Phr : 0.3989 <= B normal_density_hi <= 0.399) by (rewrite Ph; split; interval with (i_prec 80)).
+  assert (Plr : Rabs (B normal_density_lo) <= bpow radix2 (-55)) by (rewrite Pl; bpow_num; interval with (i_prec 80)).
   assert (Xb : Rabs (B x) <= bpow radix2 (-1)) by (change (bpow radix2 (-1)) with (/ 2); lra).
   assert (Xpos : 0 < Rabs (B x)) by (pose proof (bpow_gt_0 radix2 (-33)); lra).
   (* φ(0)·x exactly *)
@@ -384,7 +384,7 @@ Proof.
     clear - Eu E7 E6 E5 E3 E1 E2 E4 L Alow. apply Rabs_le. bpow_num_all. split; lra. }
   (* (dh + dl) against φ(0)·x *)
   set (Phi := normal_density_constant). set (P := Phi * Rabs (B x)).
-  assert (PhiR : 0.39894 <= Phi <= 0.398943) by (unfold Phi, normal_density_constant; split; interval).
+  assert (PhiR : 0.39894 <= Phi <= 0.398943) by (unfold Phi, normal_density_constant; split; interval with (i_prec 80)).
   assert (DW : Rabs (B normal_density_hi + B normal_density_lo - Phi) <= bpow radix2 (-105) * Phi).
   { pose proof normal_density_dw_error as D. change (/ sqrt (2 * PI)) with Phi in D.
     replace (B normal_density_hi + B normal_density_lo - Phi) with (((B normal_density_hi + B normal_density_lo) / Phi - 1) * Phi)
