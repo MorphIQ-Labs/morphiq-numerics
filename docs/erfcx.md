@@ -551,7 +551,9 @@ use scalar evaluation, avoiding two partially occupied vector evaluations.
 Rejected lanes use Q256. A final partial chunk follows the existing backend
 cascade down to the scalar function.
 
-Only error terms in `two_prod` use hardware FMA. In the table region all
+Only error terms in `two_prod` use hardware FMA, in the lanes and, through
+`eft::two_prod_d` in a build that targets FMA, in the scalar kernels
+([lanes.md](lanes.md) §2). In the table region all
 products follow the scalar multiply/add sequence. In the tail and reflection
 regions, the operands of `two_prod` satisfy the shared exact-product domain;
 scaled reciprocals keep large inputs away from Dekker splitter overflow.
