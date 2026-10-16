@@ -120,7 +120,8 @@ exact are exact by construction with plain multiplications.
 
 **Scalar kernels.** The same equality lets scalar kernels use the fused error
 term. `eft::two_prod_d` computes `RN(a·b − p)` with one fused multiply-add
-when the build targets FMA (`target_feature = "fma"`, with `std`) and runs
+when `std` is enabled and the build targets x86 FMA (`target_feature = "fma"`)
+or aarch64 NEON (`target_feature = "neon"`, which includes binary64 FMA), and runs
 Dekker's operations otherwise. It is crate-private, and every call names the
 proof that keeps its arguments in `D`: the normal family's exact half square
 (`NormalGaussianKernel.normal_half_square_exact`), its scaled argument
@@ -131,7 +132,10 @@ quotient and reflection square (`ErfcxProduct`, `ErfcxReciprocal`,
 `eft::two_prod` and `DoubleWord`'s operations stay Dekker's on every build,
 since their callers' arguments are unconstrained. `scripts/check_fma.sh`
 builds with FMA, runs the tests and the determinism digest, and requires both
-cross-check corpora byte-identical to the default build's.
+cross-check corpora byte-identical to a Dekker build's. On x86 the baseline
+explicitly disables FMA; on aarch64 it disables `std`, keeping the same
+arithmetic API while selecting Dekker. The ARM test jobs run this gate as
+well as the x86 FMA job.
 
 The test `lane_two_prod_is_efts_two_prod` compares the lane product with
 `eft::two_prod` bit for bit: on random encodings without FMA, and on `D`, with
