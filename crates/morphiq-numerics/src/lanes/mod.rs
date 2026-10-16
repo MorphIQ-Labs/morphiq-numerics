@@ -135,11 +135,20 @@ pub(crate) trait Cold {
 #[inline(never)]
 pub(crate) fn cold<K: Simd, C: Cold>(k: K, path: C, x: K::F, out: K::F) -> K::F {
     let (x, out) = (k.store(x), k.store(out));
-    k.load(k.vectorize(ColdPath {
-        path,
-        x: &x,
-        out: &out,
-    }))
+    k.load(cold_arrays(k, path, &x, &out))
+}
+
+/// Re-enter the backend from a cold path that already owns scalar arrays.
+/// The caller supplies the cold boundary; this avoids another trampoline
+/// and an array-to-vector-to-array round trip after scalar completion work.
+#[inline(always)]
+pub(crate) fn cold_arrays<K: Simd, C: Cold>(
+    k: K,
+    path: C,
+    x: &K::Array,
+    out: &K::Array,
+) -> K::Array {
+    k.vectorize(ColdPath { path, x, out })
 }
 
 struct ColdPath<'a, C, A> {
@@ -271,12 +280,7 @@ pub(crate) fn lanes_mask<K: Simd>() -> u64 {
 /// one vector instead stalls store forwarding on every call (§7).
 #[inline(always)]
 pub(crate) fn mask_from<K: Simd>(k: K, bits: u64) -> K::M {
-    let mut lane_bits = K::Words::default();
-    for (i, w) in lane_bits.as_mut().iter_mut().enumerate() {
-        *w = 1 << i;
-    }
-    let lane_bits = k.load_bits(lane_bits);
-    k.eq_u(k.and_u(k.splat_bits(bits), lane_bits), lane_bits)
+    k.mask_from_bits(bits)
 }
 
 /// Equal rounded interval endpoints, using numerical equality (including ±0).

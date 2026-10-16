@@ -62,11 +62,13 @@ fall into these groups:
 
 The "other" cells are mostly short `exp` and `exp2` slices of 4–16 elements.
 Their lane code did not change: they use `mask_from` only in stage B, on
-under 1% of chunks. These differences are in the noise or layout of an
-unchanged path, not a measured cost of the change. The `ln_1p` mixed, all
-screened and `log_norm_cdf` central rows above are reported as small
-slowdowns: they take the uncommon path on most chunks and pay `lanes::cold`'s
-array conversions.
+under 1% of chunks. The measurements alone do not separate timing drift, code layout and
+changed-path costs. The `ln_1p` mixed, all-screened and `log_norm_cdf`
+central rows above report small slowdowns that require further measurement.
+`ln_1p` enters `lanes::cold` for scalar stage B and special values as well
+as vector fallback. Central `log_norm_cdf` does not enter that trampoline;
+it uses the shared lane-mask construction in its logarithm fallback.
+Thus array conversions cannot explain all three rows.
 
 ## Other benchmarks
 
