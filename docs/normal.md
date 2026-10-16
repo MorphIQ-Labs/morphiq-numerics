@@ -186,7 +186,7 @@ candidate. `normal_log_table.py` generates 27 degree-seven Taylor rows for
 `ln(a) + ln(2*pi)/2 + P(1/a²)`, where `P` is the same eight-term Mills
 correction. Half-integer centers and a bit-extracted index give an exact
 residual in `[-1/2, 1/2]`. Each row is checked by Sollya and Coq to absolute
-error `3*2^-52`; `normal_log_table.g` bounds rounded Horner evaluation by
+error `3*2^-52`; `log_table.g` bounds rounded Horner evaluation by
 `9*2^-54`. The generated binary64 encodings are proved to have those values.
 `NormalLogTableCorrection.v` composes the index, reduction and row proofs.
 
