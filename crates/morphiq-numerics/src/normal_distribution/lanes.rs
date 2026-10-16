@@ -310,21 +310,6 @@ impl<const OP: u8> Kernel for Normal<OP> {
                 *v = 0.25;
             }
         }
-        let mut first = k.splat(0.0);
-        let mut first_decided = 0;
-        if matches!(op, Operation::Cdf | Operation::Centered) {
-            let eligible = k.mask_bits(k.and_m(
-                k.le(k.splat(SMALL), k.abs(xv)),
-                k.le(k.abs(xv), k.splat(0.5)),
-            )) & active;
-            if eligible.count_ones() >= 2 {
-                let first_input = k.select(mask_from(k, eligible), xv, k.splat(0.25));
-                let (value, accepted) = center_first(k, op, first_input);
-                first = value;
-                first_decided = accepted & eligible;
-                active &= !first_decided;
-            }
-        }
         // A saturated batch has no polynomial work. A single active lane
         // cannot amortize vector setup or region masking; evaluate it once.
         let central = k.mask_bits(k.le(k.abs(xv), k.splat(0.5))) & active;
@@ -337,21 +322,27 @@ impl<const OP: u8> Kernel for Normal<OP> {
                     && negative != 0
                     && negative != active));
         if active.count_ones() <= 1 || split_regions {
-            let mut out = k.store(first);
-            for (i, v) in out.as_mut().iter_mut().enumerate() {
-                if first_decided >> i & 1 == 0 {
-                    *v = Self::scalar(input.as_ref()[i]);
-                }
+            let mut out = input;
+            for v in out.as_mut() {
+                *v = Self::scalar(*v);
             }
             return out;
+        }
+        if matches!(op, Operation::Cdf | Operation::Centered)
+            && central == all
+            && k.mask_bits(k.le(k.splat(SMALL), k.abs(xv))) == all
+        {
+            let (value, accepted) = center_first(k, op, xv);
+            if accepted == all {
+                return k.store(value);
+            }
         }
         let y = candidate(k, op, k.load(x));
         let eps = k.mul(k.abs(y.0), k.splat(super::guard(op)));
         let low = k.add(y.0, k.sub(y.1, eps));
         let high = k.add(y.0, k.add(y.1, eps));
         let decided = k.mask_bits(k.eq_u(k.to_bits(low), k.to_bits(high))) & active;
-        let decided = decided | first_decided;
-        let mut out = k.store(k.select(mask_from(k, first_decided), first, low));
+        let mut out = k.store(low);
         if decided != lanes_mask::<K>() {
             for (i, o) in out.as_mut().iter_mut().enumerate() {
                 if decided >> i & 1 == 0 {

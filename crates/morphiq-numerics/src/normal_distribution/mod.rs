@@ -305,7 +305,9 @@ pub(crate) fn evaluate(op: Operation, x: f64) -> f64 {
     if let Some(value) = special(op, x) {
         return value;
     }
-    if let Some(value) = first_decide(op, x) {
+    if x.abs() >= SMALL
+        && let Some(value) = first_decide(op, x)
+    {
         return value;
     }
     fast_decide(op, x).unwrap_or_else(|| accurate::evaluate(op, x))
