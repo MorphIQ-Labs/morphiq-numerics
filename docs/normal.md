@@ -22,7 +22,7 @@ The probability identities follow by substituting `t=x/sqrt(2)` in the
 
 A fast result is returned only when its computed error bound fits one
 binary64 rounding cell. Ordinary compositions compare the rounded interval
-endpoints; far tails test the distance to a rounding midpoint.
+endpoints; the negative far tail tests the distance to the nearer midpoint.
 The accepted result is correctly rounded,
 nearest with ties to even. Otherwise the original binary64 argument enters
 an integer-significand Q256 composition. No whole-domain correct-rounding
@@ -91,7 +91,7 @@ from a rounded binary64 square.
 
 ## Fast compositions
 
-For `abs(x) <= 39`, the Gaussian factor retains both words of `-x²/2`,
+For `abs(x) <= 37`, the Gaussian factor retains both words of `-x²/2`,
 evaluates the shared double-word exponential, and carries its binary scale
 separately. Density multiplies the generated `1/sqrt(2π)` double word before
 scaling. For `abs(x) < 2^-33`, the density rounds directly to its generated
@@ -181,16 +181,23 @@ and uses the nearest-midpoint test with guard `2^-68`. The huge branch uses
 its original `2^-66` guard. The moderate bound retains the reciprocal stage’s
 absolute `2^-65` logarithm error through normalization and reconstruction.
 
-On `37 <= a <= 64`, a cheaper first stage precedes the normalized moderate
-candidate. It evaluates the same eight-term correction and reciprocal-table
-logarithm, adds their correction in binary64, uses FastTwoSum to subtract it
-from the exact square's high word, and adds the square's trailing word.
-`log_tail_first.g` certifies reconstruction error; `NormalLogFirst.v`
-composes the logarithm, constant, polynomial and square bounds to an absolute
-error at most `6 * 2^-52`. The rounded-endpoint test uses `2^-49`, including
-its own rounding error. `NormalLogTailStages.v` proves that an undecided first
-stage can fall through to the normalized candidate. SIMD performs the same
-sequence and sends only unresolved lanes to the second candidate.
+On `37 <= a < 64`, a table first stage precedes the normalized moderate
+candidate. `normal_log_table.py` generates 27 degree-seven Taylor rows for
+`ln(a) + ln(2*pi)/2 + P(1/a²)`, where `P` is the same eight-term Mills
+correction. Half-integer centers and a bit-extracted index give an exact
+residual in `[-1/2, 1/2]`. Each row is checked by Sollya and Coq to absolute
+error `3*2^-52`; `normal_log_table.g` bounds rounded Horner evaluation by
+`9*2^-54`. The generated binary64 encodings are proved to have those values.
+`NormalLogTableCorrection.v` composes the index, reduction and row proofs.
+
+The first stage uses FastTwoSum to subtract the correction from the exact
+half-square's high word and then adds its trailing word. `NormalLogFirst.v`
+includes the Mills remainder and reconstruction, proving absolute error
+`11*2^-53`. The rounded-endpoint test uses `6*2^-52`, including its own
+rounding error. `NormalLogTailStages.v` proves that an undecided first stage
+falls through to the normalized candidate; `a = 64` uses that candidate
+directly. SIMD gathers the same coefficients and performs the same operation
+sequence, sending only unresolved lanes to the second candidate.
 An undecided input still enters the original Q256 composition.
 
 ## Finite underflow bands
