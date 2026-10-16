@@ -1,0 +1,22 @@
+{
+  "baseline": "74f7dee",
+  "candidate": "48ab0c9",
+  "measurement_host": "Apple M1 Pro",
+  "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: aarch64-apple-darwin\nrelease: 1.97.1\nLLVM version: 22.1.6\n",
+  "normal_harness": "benchmark-normal.rs, optimized standalone consumer linked to each release library; simd,std",
+  "erfcx_harness": "crates/reference/src/bin/bench-erfcx.rs; --release --features simd,std",
+  "normal_order": [
+    "before",
+    "after",
+    "after",
+    "before",
+    "before",
+    "after"
+  ],
+  "erfcx_order": [
+    "before",
+    "after"
+  ],
+  "sampling": "normal: nine samples per function/build; erfcx: 31 samples per range/mode/build; raw ns/call",
+  "limits": "Unpinned Apple Silicon scheduling. Small differences need paired repeats. These are before/after FMA measurements, not fastest-alternative parity evidence."
+}
