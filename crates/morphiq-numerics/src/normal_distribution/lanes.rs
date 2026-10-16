@@ -272,6 +272,18 @@ impl<const OP: u8> Kernel for Normal<OP> {
             k.load(input)
         };
         let all = lanes_mask::<K>();
+        // The domain screen establishes every lane's eligibility without
+        // scalar screening or far-tail routing. Keep the all-or-nothing
+        // central decision ahead of those more general compositions.
+        if matches!(op, Operation::Cdf | Operation::Centered)
+            && k.mask_bits(k.le(k.abs(xv), k.splat(0.5))) == all
+            && k.mask_bits(k.le(k.splat(SMALL), k.abs(xv))) == all
+        {
+            let (value, accepted) = center_first(k, op, xv);
+            if accepted == all {
+                return k.store(value);
+            }
+        }
         // Saturation is itself a vector operation. Ordered comparisons keep
         // NaN payloads on the scalar special-value path.
         match op {
@@ -398,7 +410,6 @@ impl<const OP: u8> Normal<OP> {
     #[inline(always)]
     fn regular<K: Simd>(k: K, input: K::Array) -> K::Array {
         let op = operation::<OP>();
-        let all = lanes_mask::<K>();
         let xv = if OP == 2 {
             k.neg(k.load(input))
         } else {
@@ -433,15 +444,6 @@ impl<const OP: u8> Normal<OP> {
                 *v = Self::scalar(*v);
             }
             return out;
-        }
-        if matches!(op, Operation::Cdf | Operation::Centered)
-            && central == all
-            && k.mask_bits(k.le(k.splat(SMALL), k.abs(xv))) == all
-        {
-            let (value, accepted) = center_first(k, op, xv);
-            if accepted == all {
-                return k.store(value);
-            }
         }
         let y = candidate(k, op, k.load(x));
         let eps = k.mul(k.abs(y.0), k.splat(super::guard(op)));
