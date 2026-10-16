@@ -1,6 +1,7 @@
 # Log-tail table diagnostic on Apple M1 Pro
 
-The numerical implementation is `c353042`. These samples preceded the
+The measurements are from the table stage at `c353042`, before integration
+with the finite-tail branch. These samples preceded the
 commit's documentation, proof packaging and fixture expansion; its numerical
 operations are identical. `environment.txt` records the host and versions.
 This is a single diagnostic pair on a shared host, not evidence that the
@@ -12,8 +13,9 @@ For 1,024 inputs spanning [-38,-37], the table implementation measures
 with zero Q256 fallbacks. SciPy 1.16.3 `log_ndtr` measures 8.053, 8.916 and
 46.368 ns respectively. The chain includes input-index arithmetic and array
 lookup; it is not a pure instruction-latency number. `morphiq.log` also
-contains unchanged sibling functions whose far tails this branch does not
-optimize; their separate finite-tail change is required as part of the work.
+contains unchanged sibling functions whose far tails that measured revision does not
+optimize. The current stack includes the finite-tail change; final combined
+performance measurements are still required.
 
 The Rust measurement writes a slice of outputs and permits inlining. SciPy's
 scalar measurement calls its exported Cython capsule through a C function
