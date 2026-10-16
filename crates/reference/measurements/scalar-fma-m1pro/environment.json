@@ -15,8 +15,12 @@
   ],
   "erfcx_order": [
     "before",
+    "after",
+    "after",
+    "before",
+    "before",
     "after"
   ],
-  "sampling": "normal: nine samples per function/build; erfcx: 31 samples per range/mode/build; raw ns/call",
+  "sampling": "normal: nine samples per function/build; erfcx: 93 samples per range/mode/build; raw ns/call",
   "limits": "Unpinned Apple Silicon scheduling. Small differences need paired repeats. These are before/after FMA measurements, not fastest-alternative parity evidence."
 }
