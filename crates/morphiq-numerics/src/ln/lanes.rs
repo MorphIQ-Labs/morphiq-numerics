@@ -231,6 +231,17 @@ impl Kernel for Ln1p {
                 if decided >> i & 1 == 0 {
                     if decided | (1 << i) != all {
                         let open = all & !decided;
+                        if K::LANES == 2 {
+                            // NEON and SSE2 are baseline target features: keeping
+                            // their scalar prefix inside the wrapper adds no
+                            // feature-boundary cost and avoids another call.
+                            return k.store(cold(
+                                k,
+                                FinishLn1p::<true> { open },
+                                k.load(x),
+                                k.load(out),
+                            ));
+                        }
                         return k.store(finish_ln_1p(k, k.load(x), k.load(out), open));
                     }
                     *o = super::ln_1p_after_h(x.as_ref()[i]);
@@ -242,14 +253,23 @@ impl Kernel for Ln1p {
 }
 
 /// `ln_1p`'s undecided lanes, `open`.
-struct FinishLn1p {
+struct FinishLn1p<const SCALAR_PREFIX: bool> {
     open: u64,
 }
 
-impl Cold for FinishLn1p {
+impl<const SCALAR_PREFIX: bool> Cold for FinishLn1p<SCALAR_PREFIX> {
     #[inline(always)]
     fn run<K: Simd>(self, k: K, x: K::Array, out: K::Array) -> K::Array {
-        finish_ln_1p_fallback(k, x, out, self.open)
+        let (out, open) = if SCALAR_PREFIX {
+            finish_ln_1p_scalar::<K>(&x, out, self.open)
+        } else {
+            (out, self.open)
+        };
+        if open.count_ones() >= 2 {
+            finish_ln_1p_fallback(k, x, out, open)
+        } else {
+            finish_ln_1p_single::<K>(&x, out, open)
+        }
     }
 }
 
@@ -257,9 +277,17 @@ impl Cold for FinishLn1p {
 /// more unresolved lanes enter the feature-enabled vector fallback.
 #[cold]
 #[inline(never)]
-fn finish_ln_1p<K: Simd>(k: K, x: K::F, out: K::F, mut open: u64) -> K::F {
+fn finish_ln_1p<K: Simd>(k: K, x: K::F, out: K::F, open: u64) -> K::F {
     let x = k.store(x);
-    let mut out = k.store(out);
+    let (out, open) = finish_ln_1p_scalar::<K>(&x, k.store(out), open);
+    if open.count_ones() >= 2 {
+        return k.load(cold_arrays(k, FinishLn1p::<false> { open }, &x, &out));
+    }
+    k.load(finish_ln_1p_single::<K>(&x, out, open))
+}
+
+#[inline(always)]
+fn finish_ln_1p_scalar<K: Simd>(x: &K::Array, mut out: K::Array, mut open: u64) -> (K::Array, u64) {
     // Stage B remains scalar. Its rare undecided lanes share the
     // double-word fallback; a single lane avoids vector setup overhead.
     for (i, o) in out.as_mut().iter_mut().enumerate() {
@@ -277,14 +305,16 @@ fn finish_ln_1p<K: Simd>(k: K, x: K::F, out: K::F, mut open: u64) -> K::F {
             open &= !(1 << i);
         }
     }
-    if open.count_ones() >= 2 {
-        return k.load(cold_arrays(k, FinishLn1p { open }, &x, &out));
-    }
+    (out, open)
+}
+
+#[inline(always)]
+fn finish_ln_1p_single<K: Simd>(x: &K::Array, mut out: K::Array, open: u64) -> K::Array {
     if open != 0 {
         let i = open.trailing_zeros() as usize;
         out.as_mut()[i] = super::ln_1p_reference(x.as_ref()[i]);
     }
-    k.load(out)
+    out
 }
 
 #[inline(always)]

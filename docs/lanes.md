@@ -388,9 +388,10 @@ lanes, and the native x86 measurements are what found them (#162):
   chunk that way and ran 2–3× slower than scalar, while SSE2, which is enabled
   for the whole x86-64 target, was unaffected. The hot side passes and
   receives vectors: passing the chunk's arrays kept them in memory and slowed
-  `ln_1p`'s common path by about 10%. `ln_1p` handles scalar stage B and
+  `ln_1p`'s common path by about 10%. On AVX2 and AVX-512F, `ln_1p` handles scalar stage B and
   special values before entering the wrapper; only two or more unresolved
-  lanes require vector re-entry.
+  lanes require vector re-entry. NEON and SSE2 already have baseline target
+  features, so their scalar prefix remains inside the same cold wrapper.
 - **A lane mask is computed in lanes.** That is either a comparison, as in
   `ln`'s screen, or `mask_from`, which delegates to the backend
   `mask_from_bits`: AVX-512F already represents its mask as bits and uses
