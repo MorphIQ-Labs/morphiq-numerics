@@ -392,6 +392,9 @@ lanes, and the native x86 measurements are what found them (#162):
   special values before entering the wrapper; only two or more unresolved
   lanes require vector re-entry. NEON and SSE2 already have baseline target
   features, so their scalar prefix remains inside the same cold wrapper.
+  Scalar completion helpers borrow one mutable output array; they do not
+  return successive array copies. This keeps the output buffer in place
+  across stage B, special-value completion and the single unresolved lane.
 - **A lane mask is computed in lanes.** That is either a comparison, as in
   `ln`'s screen, or `mask_from`, which delegates to the backend
   `mask_from_bits`: AVX-512F already represents its mask as bits and uses

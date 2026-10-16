@@ -259,16 +259,17 @@ struct FinishLn1p<const SCALAR_PREFIX: bool> {
 
 impl<const SCALAR_PREFIX: bool> Cold for FinishLn1p<SCALAR_PREFIX> {
     #[inline(always)]
-    fn run<K: Simd>(self, k: K, x: K::Array, out: K::Array) -> K::Array {
-        let (out, open) = if SCALAR_PREFIX {
-            finish_ln_1p_scalar::<K>(&x, out, self.open)
+    fn run<K: Simd>(self, k: K, x: K::Array, mut out: K::Array) -> K::Array {
+        let open = if SCALAR_PREFIX {
+            finish_ln_1p_scalar::<K>(&x, &mut out, self.open)
         } else {
-            (out, self.open)
+            self.open
         };
         if open.count_ones() >= 2 {
             finish_ln_1p_fallback(k, x, out, open)
         } else {
-            finish_ln_1p_single::<K>(&x, out, open)
+            finish_ln_1p_single::<K>(&x, &mut out, open);
+            out
         }
     }
 }
@@ -279,15 +280,17 @@ impl<const SCALAR_PREFIX: bool> Cold for FinishLn1p<SCALAR_PREFIX> {
 #[inline(never)]
 fn finish_ln_1p<K: Simd>(k: K, x: K::F, out: K::F, open: u64) -> K::F {
     let x = k.store(x);
-    let (out, open) = finish_ln_1p_scalar::<K>(&x, k.store(out), open);
+    let mut out = k.store(out);
+    let open = finish_ln_1p_scalar::<K>(&x, &mut out, open);
     if open.count_ones() >= 2 {
         return k.load(cold_arrays(k, FinishLn1p::<false> { open }, &x, &out));
     }
-    k.load(finish_ln_1p_single::<K>(&x, out, open))
+    finish_ln_1p_single::<K>(&x, &mut out, open);
+    k.load(out)
 }
 
 #[inline(always)]
-fn finish_ln_1p_scalar<K: Simd>(x: &K::Array, mut out: K::Array, mut open: u64) -> (K::Array, u64) {
+fn finish_ln_1p_scalar<K: Simd>(x: &K::Array, out: &mut K::Array, mut open: u64) -> u64 {
     // Stage B remains scalar. Its rare undecided lanes share the
     // double-word fallback; a single lane avoids vector setup overhead.
     for (i, o) in out.as_mut().iter_mut().enumerate() {
@@ -305,16 +308,15 @@ fn finish_ln_1p_scalar<K: Simd>(x: &K::Array, mut out: K::Array, mut open: u64) 
             open &= !(1 << i);
         }
     }
-    (out, open)
+    open
 }
 
 #[inline(always)]
-fn finish_ln_1p_single<K: Simd>(x: &K::Array, mut out: K::Array, open: u64) -> K::Array {
+fn finish_ln_1p_single<K: Simd>(x: &K::Array, out: &mut K::Array, open: u64) {
     if open != 0 {
         let i = open.trailing_zeros() as usize;
         out.as_mut()[i] = super::ln_1p_reference(x.as_ref()[i]);
     }
-    out
 }
 
 #[inline(always)]
