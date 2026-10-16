@@ -39,7 +39,7 @@
 #![no_std]
 #![forbid(unsafe_code)]
 
-#[cfg(test)]
+#[cfg(any(test, feature = "std"))]
 extern crate std;
 
 pub mod double_word;

@@ -196,9 +196,57 @@ pub(crate) fn fast(op: Operation, x: f64) -> Option<(Dw, f64)> {
     Some((value, value.hi().abs() * guard(op)))
 }
 
+/// The central first stage's guard on `C(x) = Φ(x) − 1/2`: its relative
+/// error bound `3.2·2^−60`, rounded up to `2^−58` (docs/normal.md, the CDF
+/// family's central first stage; formal/normal/NormalCenterFirst.v).
+const E_CENTER_FIRST: f64 = f64::from_bits(0x3c50_0000_0000_0000);
+
+/// The CDF family's first stage on the centre, `2^−33 <= |x| <= 1/2`:
+/// `C(x) = φ(0)·x·P(x²)` with the exact square, `φ(0)·x` and `c1·x²` carried
+/// as double words and the rest of `P` in binary64, then `C` or `1/2 + C`
+/// and a rounding test. `None` sends the argument to the fast dispatch.
+#[inline]
+pub(crate) fn center_first(op: Operation, x: f64) -> Option<f64> {
+    let (ch, cl) = center_first_parts(x);
+    let e = ch.abs() * E_CENTER_FIRST;
+    let (y, w) = match op {
+        Operation::Centered => (ch, cl),
+        Operation::Cdf => {
+            // |ch| <= 0.21, so 1/2 + ch is a Fast2Sum.
+            let (u, v) = crate::eft::fast_two_sum(0.5, ch);
+            (u, v + cl)
+        }
+        _ => return None,
+    };
+    let low = y + (w - e);
+    let high = y + (w + e);
+    (low.to_bits() == high.to_bits()).then_some(low)
+}
+
+/// The central first stage's words `(ch, cl)`, also for the cross-check.
+#[inline]
+pub(crate) fn center_first_parts(x: f64) -> (f64, f64) {
+    // zh + zl = x² exactly; e1h + e1l ≈ c1·x², e2 the rest of P − 1.
+    // In D: NormalCenterFirst.center_first_poly.
+    let (zh, zl) = two_prod_d(x, x);
+    let c1 = tables::CENTER[1];
+    let (e1h, e1p) = two_prod_d(c1.0, zh);
+    let e1l = e1p + (c1.0 * zl + c1.1 * zh);
+    let t3 = tables::CENTER[3].0 + zh * center_tail(zh);
+    let e2 = (zh * zh) * (tables::CENTER[2].0 + zh * t3);
+    // dh + dl ≈ φ(0)·x; dh·e1h exactly; the cross terms in binary64.
+    // In D: NormalCenterFirst.normal_center_first_parts_ok.
+    let (dh, dp) = two_prod_d(tables::DENSITY.0, x);
+    let dl = dp + tables::DENSITY.1 * x;
+    let (ph, pp) = two_prod_d(dh, e1h);
+    let rest = dl + (pp + (dh * e1l + dl * e1h + dh * e2));
+    let (s, t) = crate::eft::fast_two_sum(dh, ph);
+    crate::eft::fast_two_sum(s, t + rest)
+}
+
 /// The CDF family's first-stage guard on the tail probability `q`: its
 /// relative error bound, rounded up to `2^−58` (docs/normal.md, the CDF
-/// family's first stage; formal/normal/NormalTailFirst.v).
+/// family's tail first stage; formal/normal/NormalTailFirst.v).
 const E_TAIL_FIRST: f64 = f64::from_bits(0x3c50_0000_0000_0000);
 /// The complements' allowance for the test's own roundings near one.
 const E_TAIL_FIRST_ONE: f64 = f64::from_bits(0x39b0_0000_0000_0000); // 2^−100
@@ -257,20 +305,39 @@ pub(crate) fn evaluate(op: Operation, x: f64) -> f64 {
     if let Some(value) = special(op, x) {
         return value;
     }
+    if x.abs() >= SMALL
+        && let Some(value) = first_decide(op, x)
+    {
+        return value;
+    }
+    fast_decide(op, x).unwrap_or_else(|| accurate::evaluate(op, x))
+}
+
+/// Try the first stages in public-dispatch order. Measurements use the same
+/// decision to count accurate-path calls after screening special values.
+#[inline]
+pub(crate) fn first_decide(op: Operation, x: f64) -> Option<f64> {
     if matches!(op, Operation::Pdf)
         && x.abs() <= 37.0
         && let Some(value) = density_first(x)
     {
-        return value;
+        return Some(value);
+    }
+    if matches!(op, Operation::Cdf | Operation::Centered)
+        && x.abs() >= SMALL
+        && x.abs() <= 0.5
+        && let Some(value) = center_first(op, x)
+    {
+        return Some(value);
     }
     if matches!(op, Operation::Cdf | Operation::Centered)
         && x.abs() > 0.5
         && x.abs() <= 36.0
         && let Some(value) = tail_first(op, x)
     {
-        return value;
+        return Some(value);
     }
-    fast_decide(op, x).unwrap_or_else(|| accurate::evaluate(op, x))
+    None
 }
 
 /// The density's first-stage bound: `stage_a_double_word`'s `0x1.7p−61`, the

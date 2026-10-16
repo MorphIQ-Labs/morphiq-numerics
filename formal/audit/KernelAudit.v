@@ -605,6 +605,9 @@ Print Assumptions NormalDensityFirst.normal_density_first_ok.
 Require Import NormalTailFirst.
 Print Assumptions NormalTailFirst.normal_tail_first_parts_ok.
 Print Assumptions NormalTailFirst.normal_tail_first_ok.
+Require Import NormalCenterFirst.
+Print Assumptions NormalCenterFirst.normal_center_first_parts_ok.
+Print Assumptions NormalCenterFirst.normal_center_first_ok.
 
 Require Import NormalDensityTiny.
 Print Assumptions NormalDensityTiny.normal_density_tiny_correct.

@@ -17,10 +17,12 @@ fi
 
 out=target/fma-check
 mkdir -p "$out"
+# std is part of two_prod_d's FMA gate. Keep it enabled in both corpora;
+# changing RUSTFLAGS alone would otherwise compare two Dekker builds.
 corpora() {
-  cargo run --locked -q -p morphiq-numerics-reference --bin crosscheck-corpus > "$out/$1.txt"
+  cargo run --locked -q -p morphiq-numerics-reference --features std --bin crosscheck-corpus > "$out/$1.txt"
   MORPHIQ_INTERNAL_CORPUS="$PWD/$out/$1-internal.txt" \
-    cargo test --locked -q -p morphiq-numerics --lib internal_crosscheck -- --ignored >/dev/null
+    cargo test --locked -q -p morphiq-numerics --features std --lib internal_crosscheck -- --ignored >/dev/null
 }
 
 corpora default
