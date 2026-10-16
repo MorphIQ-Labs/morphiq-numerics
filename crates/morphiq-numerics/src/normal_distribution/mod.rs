@@ -255,20 +255,30 @@ pub(crate) fn evaluate(op: Operation, x: f64) -> f64 {
     if let Some(value) = special(op, x) {
         return value;
     }
+    if let Some(value) = first_decide(op, x) {
+        return value;
+    }
+    fast_decide(op, x).unwrap_or_else(|| accurate::evaluate(op, x))
+}
+
+/// Try the first stages in public-dispatch order. Measurements use the same
+/// decision to count accurate-path calls after screening special values.
+#[inline]
+pub(crate) fn first_decide(op: Operation, x: f64) -> Option<f64> {
     if matches!(op, Operation::Pdf)
         && x.abs() <= 37.0
         && let Some(value) = density_first(x)
     {
-        return value;
+        return Some(value);
     }
     if matches!(op, Operation::Cdf | Operation::Centered)
         && x.abs() > 0.5
         && x.abs() <= 36.0
         && let Some(value) = tail_first(op, x)
     {
-        return value;
+        return Some(value);
     }
-    fast_decide(op, x).unwrap_or_else(|| accurate::evaluate(op, x))
+    None
 }
 
 /// The density's first-stage bound: `stage_a_double_word`'s `0x1.7p−61`, the
