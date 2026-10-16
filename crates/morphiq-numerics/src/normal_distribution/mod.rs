@@ -87,7 +87,8 @@ pub(crate) fn gaussian(x: f64) -> (Dw, i32) {
 
 #[inline]
 pub(crate) fn scaled_argument(x: f64) -> Dw {
-    dw(tables::INV_SQRT2).mul_f64(x)
+    // In D: NormalFastScaledArgument.
+    dw(tables::INV_SQRT2).mul_f64_d(x)
 }
 
 pub(crate) fn scaled_erfcx(x: f64) -> Dw {
@@ -100,7 +101,8 @@ pub(crate) fn scaled_erfcx(x: f64) -> Dw {
     // F'(z)=2z F(z)-2/sqrt(pi). The correction is evaluated before the
     // final rounding; its second-order remainder enters the composition guard.
     let derivative = (2.0 * z.hi()) * fh - tables::TWO_INV_SQRT_PI.0;
-    Dw::sum(fh, fl + z.lo() * derivative)
+    // |fh| dominates: erfcx's value against its low word and the correction.
+    Dw::fast_sum(fh, fl + z.lo() * derivative)
 }
 
 fn tail(x: f64) -> (Dw, i32) {

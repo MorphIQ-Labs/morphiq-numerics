@@ -4,14 +4,14 @@ From Coq Require Import Reals ZArith Lia Lra Psatz.
 From Flocq Require Import Core.
 From Interval Require Import Tactic.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Eft RoundingConstant.
-Require Import StageGappa ErfcxGaussianTarget NormalErfcxSensitivity NormalErfcxLinear
+Require Import StageGappa ErfcxConstants ErfcxGaussianTarget NormalErfcxSensitivity NormalErfcxLinear
   NormalErfcxFastBase NormalErfcxDerivative.
 Open Scope R_scope.
 
 Definition normal_erfcx_correction64 z d :=
   let '(h,l):=normal_erfcx_fast_base64 z in
   let derivative:=normal_erfcx_derivative64 z h in
-  two_sum64 h (fadd l (fmul d derivative)).
+  fast_two_sum64 h (fadd l (fmul d derivative)).
 
 Theorem normal_erfcx_correction_ieee z d : finite z -> finite d ->
   /4<=B z<=32 -> Rabs(B d)<=bpow radix2 (-49) ->
@@ -42,10 +42,18 @@ Proof.
   unfold bnd in Addition,Crange;rewrite Rmult_1_l in Addition,Crange.
   pose proof(rnd_err_below _ (-46)ltac:(lia)Addition)as Adding.
   rewrite <-Cvalue in Adding;change(-46-54)%Z with(-100)%Z in Adding.
-  pose proof(two_sum_ieee a (fadd b (fmul d v))Fa Fc
+  assert(Glow : /256<=gaussian_erfcx(B z)).
+  { pose proof(normal_erfcx_decreasing(B z)32 ltac:(lra))as Dc.
+    pose proof(normal_erfcx_large_lower 32 ltac:(lra))as Lw.
+    assert(/256<=inv_sqrt_pi/(2*32))by(unfold inv_sqrt_pi;interval with(i_prec 60)). lra. }
+  assert(Alow : bpow radix2 (-46)<=B a).
+  { apply Rabs_le_inv in HighError. bpow_num_all. lra. }
+  pose proof(fast_two_sum_ieee a (fadd b (fmul d v))Fa Fc
     ltac:(rewrite Rabs_pos_eq by lra;eapply Rle_trans;[exact(proj2 A)|interval with(i_prec 80)])
-    ltac:(eapply Rle_trans;[exact Crange|interval with(i_prec 80)]))as Sum.
-  destruct(two_sum64 a (fadd b (fmul d v)))as[h l].
+    ltac:(eapply Rle_trans;[exact Crange|interval with(i_prec 80)])
+    ltac:(right;left;rewrite(Rabs_pos_eq(B a))by lra;apply Rle_trans with(bpow radix2 (-46));
+      [exact Crange|exact Alow]))as Sum.
+  destruct(fast_two_sum64 a (fadd b (fmul d v)))as[h l].
   destruct Sum as[Fh [Fl [Norm Value]]].
   assert(Normalized : B h=rndF(B h+B l))by(rewrite Value;exact Norm).
   pose proof(normal_erfcx_linear_remainder(B z)(B d)Z D)as Taylor.
