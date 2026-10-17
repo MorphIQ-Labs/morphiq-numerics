@@ -74,6 +74,8 @@ pub(super) fn write(out: &mut String) {
         if (f64::from_bits(0x3de0_0000_0000_0000)..=0.5).contains(&x) {
             write_center_fast(out, x);
             write_center_fast(out, -x);
+            write_center_first(out, x);
+            write_center_first(out, -x);
         }
     }
     let lower = f64::from_bits(0x26f0_0000_0000_0000);
@@ -369,6 +371,25 @@ pub(super) fn write(out: &mut String) {
         for x in [f64::from_bits(bits), -f64::from_bits(bits)] {
             write_center_fast(out, x);
         }
+    }
+}
+
+fn write_center_first(out: &mut String, x: f64) {
+    use normal_distribution::Operation;
+    let (ch, cl) = normal_distribution::center_first_parts(x);
+    for (name, op) in [
+        ("normal_center_first_cdf", Operation::Cdf),
+        ("normal_center_first_center", Operation::Centered),
+    ] {
+        writeln!(
+            out,
+            "{name} {:016x} : {:016x} {:016x} {}",
+            x.to_bits(),
+            ch.to_bits(),
+            cl.to_bits(),
+            super::opt(normal_distribution::center_first(op, x))
+        )
+        .unwrap();
     }
 }
 

@@ -58,6 +58,14 @@ impl DoubleWord {
         Self { hi: x, lo: 0.0 }
     }
 
+    /// The exact sum `a + b` when `|a| >= |b|` or `a = 0`, by Fast2Sum: the
+    /// same words as [`sum`](Self::sum) there, in three operations.
+    #[inline]
+    pub(crate) const fn fast_sum(a: f64, b: f64) -> Self {
+        let (hi, lo) = fast_two_sum(a, b);
+        Self { hi, lo }
+    }
+
     /// The exact sum `a + b`, by [`two_sum`].
     #[must_use]
     #[inline]
@@ -152,7 +160,22 @@ impl DoubleWord {
     #[inline]
     pub const fn mul_f64(self, y: f64) -> Self {
         let (c_hi, c_lo1) = two_prod(self.hi, y);
-        let c_lo2 = self.lo * y;
+        Self::mul_f64_finish(self.lo, y, c_hi, c_lo1)
+    }
+
+    /// [`mul_f64`](Self::mul_f64) for a crate kernel whose `self.hi·y` is
+    /// proved in [`two_prod`]'s domain: the exact product by
+    /// [`crate::eft::two_prod_d`], the same words on every build.
+    #[inline]
+    pub(crate) fn mul_f64_d(self, y: f64) -> Self {
+        let (c_hi, c_lo1) = crate::eft::two_prod_d(self.hi, y);
+        Self::mul_f64_finish(self.lo, y, c_hi, c_lo1)
+    }
+
+    /// The renormalization shared by `mul_f64` and `mul_f64_d`.
+    #[inline]
+    const fn mul_f64_finish(lo: f64, y: f64, c_hi: f64, c_lo1: f64) -> Self {
+        let c_lo2 = lo * y;
         let (t_hi, t_lo1) = fast_two_sum(c_hi, c_lo2);
         let t_lo2 = t_lo1 + c_lo1;
         let (hi, lo) = fast_two_sum(t_hi, t_lo2);

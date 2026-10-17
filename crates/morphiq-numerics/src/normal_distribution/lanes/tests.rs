@@ -27,6 +27,39 @@ impl WithSimd for Compare<'_> {
             .copied()
             .filter(|x| x.is_finite() && (TINY..=37.0).contains(&x.abs()))
             .collect();
+        let central: Vec<_> = regular
+            .iter()
+            .copied()
+            .filter(|x| (SMALL..=0.5).contains(&x.abs()))
+            .collect();
+        for chunk in central.chunks_exact(K::LANES) {
+            let mut input = K::Array::default();
+            input.as_mut().copy_from_slice(chunk);
+            let (hi, lo) = center_first_parts(k, k.load(input));
+            let (hi, lo) = (k.store(hi), k.store(lo));
+            for (i, &x) in chunk.iter().enumerate() {
+                let scalar = super::super::center_first_parts(x);
+                assert_eq!(
+                    (hi.as_ref()[i].to_bits(), lo.as_ref()[i].to_bits()),
+                    (scalar.0.to_bits(), scalar.1.to_bits()),
+                    "central words at {x:e}, {}",
+                    K::NAME
+                );
+            }
+            for op in [Operation::Cdf, Operation::Centered] {
+                let (value, accepted) = center_first(k, op, k.load(input));
+                let value = k.store(value);
+                for (i, &x) in chunk.iter().enumerate() {
+                    let lane = (accepted >> i & 1 != 0).then_some(value.as_ref()[i].to_bits());
+                    assert_eq!(
+                        lane,
+                        super::super::center_first(op, x).map(f64::to_bits),
+                        "central decision {op:?} at {x:e}, {}",
+                        K::NAME
+                    );
+                }
+            }
+        }
         for chunk in regular.chunks_exact(K::LANES) {
             let mut input = K::Array::default();
             input.as_mut().copy_from_slice(chunk);
@@ -86,6 +119,16 @@ fn normal_lanes_preserve_scalar_intermediates_and_results() {
         backend.vectorize(Compare(&xs));
         for x in [
             SMALL.next_down(),
+            SMALL,
+            SMALL.next_up(),
+            0.5_f64.next_down(),
+            0.5,
+            0.5_f64.next_up(),
+            -SMALL,
+            -SMALL.next_up(),
+            -0.5_f64.next_down(),
+            -0.5,
+            -0.5_f64.next_up(),
             -SMALL.next_down(),
             -0.0,
             f64::from_bits(1),
