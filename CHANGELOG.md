@@ -10,6 +10,13 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.9](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.8...v0.0.9) - 2026-10-17
+
+### Performance
+
+- integrate certified normal stages and lane optimizations
+- *(normal)* certify finite tails and far log-CDF stages
+
 ## [0.0.8](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.7...v0.0.8) - 2026-10-15
 
 ### Added
