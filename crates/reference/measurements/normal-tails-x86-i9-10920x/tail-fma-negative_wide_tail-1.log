@@ -1,0 +1,12 @@
+
+running 1 test
+test normal_distribution::bench::normal_local_performance ... function,workload,count,scalar_ns,batch_ns,speedup,accurate_count,scalar_chain_ns,chain_overhead_ns
+pdf,negative_wide_tail,1024,1.538,0.254,6.046,0,6.929,10.338
+cdf,negative_wide_tail,1024,1.529,0.288,5.299,0,6.995,10.276
+ccdf,negative_wide_tail,1024,1.520,0.240,6.324,0,6.916,10.312
+centered,negative_wide_tail,1024,1.529,0.341,4.478,0,10.935,10.308
+log_cdf,negative_wide_tail,1024,10.828,2.195,4.932,0,20.505,10.331
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 124 filtered out; finished in 3.00s
+

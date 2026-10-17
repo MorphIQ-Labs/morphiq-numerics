@@ -6,7 +6,7 @@
 
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;
-mod stage;
+pub(crate) mod stage;
 mod stage_tables;
 pub(crate) mod stages;
 mod tables;

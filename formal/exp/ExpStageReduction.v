@@ -117,10 +117,10 @@ Definition stage_of (x : f64) : f64 * Z * Z * f64 :=
   let ni := (bits_of_b64 t - bits_of_b64 shifter)%Z in
   (n, Z.land ni 511, Z.shiftr ni 9, fsub x (fmul n st_l1)).
 
-Theorem stage_of_extended_ok x : finite x -> Rabs (B x) < 710 ->
+Theorem stage_of_wide_ok x : finite x -> Rabs (B x) < 762 ->
   let '(n, j, k, r1) := stage_of x in
-  exists ni : Z, B n = IZR ni /\ finite n /\ (Z.abs ni <= 524450)%Z /\
-    ni = (512 * k + j)%Z /\ (0 <= j < 512)%Z /\ (-1025 <= k <= 1025)%Z /\
+  exists ni : Z, B n = IZR ni /\ finite n /\ (Z.abs ni <= 562860)%Z /\
+    ni = (512 * k + j)%Z /\ (0 <= j < 512)%Z /\ (-1100 <= k <= 1100)%Z /\
     finite r1 /\ B r1 = B x - IZR ni * B st_l1 /\
     Rabs (B x - IZR ni * L) <= 0.000676902 /\ Rabs (B r1) < bpow radix2 (-10) /\
     (ni <> 0%Z -> on_grid (-63) (B r1)) /\ (ni = 0%Z -> B r1 = B x).
@@ -130,7 +130,7 @@ Proof.
   pose proof L_range as Lr.
   assert (Iv : 738.6598 <= B st_inv <= 738.6599) by (rewrite st_inv_val; split; lra).
   (* y = RN(x·INV_N) *)
-  assert (Xb : Rabs (B x * B st_inv) <= 524449).
+  assert (Xb : Rabs (B x * B st_inv) <= 562859).
   { rewrite Rabs_mult, (Rabs_pos_eq (B st_inv)) by lra. nra. }
   destruct (fmul_ok 1 20 x st_inv Fx Fi ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia)
               ltac:(unfold bnd; change (bpow radix2 20) with 1048576; lra)) as [Fy By].
@@ -152,20 +152,20 @@ Proof.
   assert (XL : Rabs (B x / L - IZR ni) <= / 2 + / 2147483648).
   { replace (B x / L - IZR ni) with (B x * (/ L - B st_inv) + (B x * B st_inv - B y) + (B y - IZR ni))
       by (unfold Rdiv; ring).
-    assert (A1 : Rabs (B x * (/ L - B st_inv)) <= 710 * / 2 ^ 42).
+    assert (A1 : Rabs (B x * (/ L - B st_inv)) <= 762 * / 2 ^ 42).
     { rewrite Rabs_mult, Rabs_minus_sym. apply Rmult_le_compat; try apply Rabs_pos; lra. }
-    assert (A2 : Rabs (B x * B st_inv - B y) <= / 9007199254740992 * 524449 + / 1000000000000).
+    assert (A2 : Rabs (B x * B st_inv - B y) <= / 9007199254740992 * 562859 + / 1000000000000).
     { rewrite Rabs_minus_sym. apply Rle_trans with (1 := Ey).
-      assert (/ 9007199254740992 * Rabs (B x * B st_inv) <= / 9007199254740992 * 524449) by lra.
+      assert (/ 9007199254740992 * Rabs (B x * B st_inv) <= / 9007199254740992 * 562859) by lra.
       pose proof (Rinv_0_lt_compat 202402253307310618352495346718917307049556649764142118356901358027430339567995346891960383701437124495187077864316811911389808737385793476867013399940738509921517424276566361364466907742093216341239767678472745068562007483424692698618103355649159556340810056512358769552333414615230502532186327508646006263307707741093494784 ltac:(lra)).
       lra. }
     assert (P42 : / 2 ^ 42 = / 4398046511104) by (simpl; lra).
     rewrite P42 in A1.
     eapply Rle_trans; [apply Rabs_triang | ]. eapply Rle_trans; [apply Rplus_le_compat_r, Rabs_triang | ]. lra. }
-  assert (Ni : (Z.abs ni <= 524450)%Z).
-  { assert (A : Rabs (B x / L) <= 524448.9).
+  assert (Ni : (Z.abs ni <= 562860)%Z).
+  { assert (A : Rabs (B x / L) <= 562859).
     { unfold Rdiv. rewrite Rabs_mult, (Rabs_pos_eq (/ L)) by (apply Rlt_le, Rinv_0_lt_compat; lra).
-      apply Rle_trans with (710 * / 0.001353803).
+      apply Rle_trans with (762 * / 0.001353803).
       - apply Rmult_le_compat; [apply Rabs_pos | apply Rlt_le, Rinv_0_lt_compat; lra | lra | ].
         apply Rinv_le_contravar; lra.
       - interval with (i_prec 64). }
@@ -173,7 +173,7 @@ Proof.
       by apply Rabs_triang.
     replace (IZR ni - B x / L + B x / L) with (IZR ni) in T by ring.
     rewrite Rabs_minus_sym in T.
-    assert (Rabs (IZR ni) <= 524450) by lra.
+    assert (Rabs (IZR ni) <= 562860) by lra.
     rewrite <- abs_IZR in H. apply le_IZR in H. lia. }
   (* n = t − SHIFTER *)
   destruct ExpReduction.shifter_value as [Bs Fs].
@@ -204,7 +204,7 @@ Proof.
   assert (P1b : Rabs (B n * B st_l1) <= 1024).
   { assert (C : 0 <= B st_l1 <= 0.001354) by (rewrite st_l1_val; split; interval with (i_prec 64)).
     rewrite Bn', Rabs_mult, <- abs_IZR. rewrite (Rabs_pos_eq (B st_l1)) by (destruct C; assumption).
-    assert (0 <= IZR (Z.abs ni) <= 524450) by (split; apply IZR_le; lia). nra. }
+    assert (0 <= IZR (Z.abs ni) <= 562860) by (split; apply IZR_le; lia). nra. }
   destruct (fmul_ok 1 10 n st_l1 Fn F1 ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia)
               ltac:(unfold bnd; change (bpow radix2 10) with 1024; lra)) as [Fm1 Bm1].
   assert (Em1 : B (fmul n st_l1) = IZR ni * B st_l1).
@@ -221,8 +221,8 @@ Proof.
     change (bpow radix2 (-10)) with (/ 1024).
     apply Rle_lt_trans with (Rabs R + Rabs (IZR ni) * Rabs (L - B st_l1)).
     - rewrite <- Rabs_mult. apply Rabs_triang.
-    - assert (Rabs (IZR ni) <= 524450) by (rewrite <- abs_IZR; apply IZR_le; lia).
-      assert (Rabs (IZR ni) * Rabs (L - B st_l1) <= 524450 * / 2199023255552)
+    - assert (Rabs (IZR ni) <= 562860) by (rewrite <- abs_IZR; apply IZR_le; lia).
+      assert (Rabs (IZR ni) * Rabs (L - B st_l1) <= 562860 * / 2199023255552)
         by (apply Rmult_le_compat; try apply Rabs_pos; assumption).
       lra. }
   (* the grids, when ni <> 0: |x| >= 2^-12 *)
@@ -252,6 +252,27 @@ Proof.
   split; [exact Bn' | split; [exact Fn | split; [exact Ni | split; [lia | split; [lia | split; [lia | ]]]]]].
   split; [exact Fr1 | split; [reflexivity | split; [exact HR | split; [exact Dr | split; [exact Gr | ]]]]].
   intros Z0. rewrite Z0, Rmult_0_l, Rminus_0_r. reflexivity.
+Qed.
+
+Theorem stage_of_extended_ok x : finite x -> Rabs (B x) < 710 ->
+  let '(n, j, k, r1) := stage_of x in
+  exists ni : Z, B n = IZR ni /\ finite n /\ (Z.abs ni <= 524450)%Z /\
+    ni = (512 * k + j)%Z /\ (0 <= j < 512)%Z /\ (-1025 <= k <= 1025)%Z /\
+    finite r1 /\ B r1 = B x - IZR ni * B st_l1 /\
+    Rabs (B x - IZR ni * L) <= 0.000676902 /\ Rabs (B r1) < bpow radix2 (-10) /\
+    (ni <> 0%Z -> on_grid (-63) (B r1)) /\ (ni = 0%Z -> B r1 = B x).
+Proof.
+  intros Fx X. pose proof(stage_of_wide_ok x Fx ltac:(lra)) as Wide.
+  destruct(stage_of x)as[[[n j]k]r].
+  destruct Wide as(ni & N & Fn & Ni & Nk & J & K & Fr & R & Error & Small & Grid & Zero).
+  assert (Bound : Rabs(IZR ni)*L<=710+0.000676902).
+  { rewrite <-(Rabs_pos_eq L)at 1 by(pose proof L_range;lra).
+    rewrite <-Rabs_mult. replace(IZR ni*L)with(B x-(B x-IZR ni*L))by ring.
+    eapply Rle_trans;[apply Rabs_triang|];rewrite Rabs_Ropp;lra. }
+  assert (Narrow : (Z.abs ni<=524450)%Z).
+  { apply le_IZR;rewrite abs_IZR. change(IZR 524450)with 524450.
+    pose proof L_range;pose proof(Rabs_pos(IZR ni));nra. }
+  exists ni;repeat split;try assumption;lia.
 Qed.
 
 Theorem stage_of_ok x : finite x -> Rabs (B x) < 704 ->
@@ -459,7 +480,7 @@ Qed.
     a low input word after the reduction. [stage_b_r_ok] below recovers the
     ordinary exponential's [2^-93] reduction bound. *)
 Theorem stage_b_r_model x n r1 (ni : Z) :
-  finite x -> finite n -> B n = IZR ni -> (Z.abs ni <= 525000)%Z -> finite r1 ->
+  finite x -> finite n -> B n = IZR ni -> (Z.abs ni <= 565000)%Z -> finite r1 ->
   B r1 = B x - IZR ni * B st_l1 -> Rabs (B x - IZR ni * L) <= 0.000677 ->
   Rabs (B r1) < bpow radix2 (-10) ->
   (ni <> 0%Z -> on_grid (-63) (B r1)) -> (ni = 0%Z -> B r1 = B x) ->
@@ -472,12 +493,12 @@ Theorem stage_b_r_model x n r1 (ni : Z) :
 Proof.
   intros Fx Fn Bn Hn Fr1 Br1 HR Hr1 G1 Z1 p2 rh rt.
   pose proof L_range as Lr.
-  assert (Ni : Rabs (IZR ni) <= 525000) by (rewrite <- abs_IZR; apply IZR_le; lia).
+  assert (Ni : Rabs (IZR ni) <= 565000) by (rewrite <- abs_IZR; apply IZR_le; lia).
   (* p2 = n·L2, exact *)
   assert (P2v : B n * B st_l2 = IZR (ni * -387466026) * bpow radix2 (-72)) by (rewrite Bn, l2_eq, mult_IZR; ring).
   assert (L2b : Rabs (B st_l2) <= / 10000000000000) by (rewrite st_l2_val; interval with (i_prec 64)).
   assert (P2b : Rabs (B n * B st_l2) <= / 1000000) .
-  { rewrite Bn, Rabs_mult. apply Rle_trans with (525000 * / 10000000000000); [ | lra].
+  { rewrite Bn, Rabs_mult. apply Rle_trans with (565000 * / 10000000000000); [ | lra].
     apply Rmult_le_compat; try apply Rabs_pos; assumption. }
   destruct (fmul16 n st_l2 Fn st_l2_finite ltac:(lra)) as [Fp2 Bp2'].
   assert (Bp2 : B p2 = B n * B st_l2).
@@ -494,7 +515,7 @@ Proof.
   assert (V0b : Rabs (B r1 - B p2) <= bpow radix2 (-10)).
   { rewrite V0. change (bpow radix2 (-10)) with (/ 1024).
     apply Rle_trans with (1 := Rabs_triang _ _). rewrite Rabs_mult.
-    assert (Rabs (IZR ni) * Rabs (L - B st_l1 - B st_l2) <= 525000 * / 10000000000000000000000)
+    assert (Rabs (IZR ni) * Rabs (L - B st_l1 - B st_l2) <= 565000 * / 10000000000000000000000)
       by (apply Rmult_le_compat; try apply Rabs_pos; assumption).
     lra. }
   destruct (fsub16 r1 p2 Fr1 Fp2 ltac:(change (bpow radix2 (-10)) with (/ 1024) in V0b; lra)) as [Fr0 Br0].
@@ -579,12 +600,12 @@ Proof.
   (* p3 and r_t *)
   assert (L3b : Rabs (B st_l3) <= / 25000000000000000000000) by (rewrite st_l3_val; interval with (i_prec 64)).
   destruct (fmul16 n st_l3 Fn st_l3_finite) as [Fp3 Bp3].
-  { rewrite Bn, Rabs_mult. apply Rle_trans with (525000 * / 25000000000000000000000); [ | lra].
+  { rewrite Bn, Rabs_mult. apply Rle_trans with (565000 * / 25000000000000000000000); [ | lra].
     apply Rmult_le_compat; try apply Rabs_pos; assumption. }
   assert (P3b : Rabs (B (fmul n st_l3)) <= 1).
   { rewrite Bp3. apply abs_round_le_generic; auto with typeclass_instances.
     - change 1 with (bpow radix2 0). apply generic_format_bpow. unfold FLT_exp, emin, prec. lia.
-    - rewrite Bn, Rabs_mult. apply Rle_trans with (525000 * / 25000000000000000000000); [ | lra].
+    - rewrite Bn, Rabs_mult. apply Rle_trans with (565000 * / 25000000000000000000000); [ | lra].
       apply Rmult_le_compat; try apply Rabs_pos; assumption. }
   destruct (fsub16 (fsub (fsub r1 rh) p2) (fmul n st_l3) Fu Fp3) as [Frt Brt].
   { rewrite Bu. replace (B r1 - B rh - B p2) with (B (fsub r1 rh) - B p2) by (rewrite Bu1; ring).

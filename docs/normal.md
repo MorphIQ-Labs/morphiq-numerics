@@ -20,8 +20,10 @@ The probability identities follow by substituting `t=x/sqrt(2)` in the
 
 ## Numerical contract
 
-A fast result is returned only when its computed error interval has identical
-binary64 endpoint encodings. The accepted result is correctly rounded,
+A fast result is returned only when its computed error bound fits one
+binary64 rounding cell. Ordinary compositions compare the rounded interval
+endpoints; the negative far tail tests the distance to the nearer midpoint.
+The accepted result is correctly rounded,
 nearest with ties to even. Otherwise the original binary64 argument enters
 an integer-significand Q256 composition. No whole-domain correct-rounding
 claim is made: there is no established worst-case separation result for these
@@ -134,6 +136,102 @@ low-word endpoints and the final additions. `NormalFastDispatch.v` joins the
 actual branch comparisons to the component acceptance theorems and the
 common Gaussian targets.
 
+### Negative far tail
+
+For `x < -37`, write `a = -x` and `u = 1/a²`. The normalized Mills integral
+`J` from the positive erfcx derivation gives
+
+```text
+ln Φ(-a) = -a²/2 - ln(a) - ln(2π)/2 + ln J(2u).
+```
+
+`NormalLogMillsIdentity.v` proves this identity. For `37 < a < 2^45`,
+the square is exact in double-word arithmetic. The existing reciprocal
+logarithm stage supplies `ln(a)`, and a degree-eight polynomial supplies `-ln J(2u)`.
+Its coefficients follow by equating coefficients in `S' = (ln S)' S`, where
+`S(u) = sum (-1)^n (2n-1)!! u^n` is the Mills asymptotic series.
+`generators/normal_constants.py` derives them with exact rational arithmetic;
+`generators/normal_log_tail.py` emits their proof encodings and evaluation
+certificate. No external approximation coefficients are used.
+
+The positive-real [erfc asymptotic remainder, DLMF 7.12.1](https://dlmf.nist.gov/7.12.i),
+is bounded by the first omitted term. `NormalLogTailApprox.v` instantiates
+the existing improper-integral remainder theorem and bounds the logarithmic
+remainder. Sollya independently certifies the logarithmic polynomial fit.
+Gappa includes reciprocal rounding, the squared reciprocal, rounded
+coefficients, and every Horner multiplication and addition.
+`NormalLogTailPolynomial.v` connects that certificate to the binary64
+operations: the correction's absolute error is at most `2^-60`.
+`NormalLogReciprocalStage.v` bounds that logarithm expansion by `2^-65`
+absolutely and proves its normalization. `NormalLogTailModerate.v` composes
+the logarithm, constant, correction and
+exact square, proving relative error at most `2^-67` before the rounding test.
+
+For `2^45 <= a < LOG_OVERFLOW`, first form `r = a * 2^-480` exactly, then
+the exact double-word product `r * (-r/2)`. The logarithmic correction has
+magnitude at most 1028, already proved in `NormalLogOverflow.v`; omitting it
+in this scaled candidate remains within relative error `2^-67`.
+`NormalLogTailSquare.v` proves the product's error-free-transform domain,
+including its smallest scaled operands. `NormalLogTailHuge.v` and
+`NormalLogTailScale.v` prove that the accepted high word can be multiplied
+by `2^480` twice, exactly, without overflow or double rounding.
+
+The normalized moderate candidate has proved relative error at most `2^-69`
+and uses the nearest-midpoint test with guard `2^-68`. The huge branch uses
+its original `2^-66` guard. The moderate bound retains the reciprocal stage’s
+absolute `2^-65` logarithm error through normalization and reconstruction.
+
+On `37 <= a < 64`, a table first stage precedes the normalized moderate
+candidate. `normal_log_table.py` generates 27 degree-seven Taylor rows for
+`ln(a) + ln(2*pi)/2 + P(1/a²)`, where `P` is the same eight-term Mills
+correction. Half-integer centers and a bit-extracted index give an exact
+residual in `[-1/2, 1/2]`. Each row is checked by Sollya and Coq to absolute
+error `3*2^-52`; `log_table.g` bounds rounded Horner evaluation by
+`9*2^-54`. The generated binary64 encodings are proved to have those values.
+`NormalLogTableCorrection.v` composes the index, reduction and row proofs.
+
+The first stage uses FastTwoSum to subtract the correction from the exact
+half-square's high word and then adds its trailing word. `NormalLogFirst.v`
+includes the Mills remainder and reconstruction, proving absolute error
+`11*2^-53`. The rounded-endpoint test uses `6*2^-52`, including its own
+rounding error. `NormalLogTailStages.v` proves that an undecided first stage
+falls through to the normalized candidate; `a = 64` uses that candidate
+directly. SIMD gathers the same coefficients and performs the same operation
+sequence, sending only unresolved lanes to the second candidate.
+An undecided input still enters the original Q256 composition.
+
+## Finite underflow bands
+
+For `37 < abs(x) < 39`, density and tail probabilities reuse the Gaussian
+and scaled-erfcx mantissas. Their reduction and evaluation proofs cover
+this wider interval. The public saturation screens run first, so only the
+finite unsaturated PDF, negative CDF, positive CCDF and positive log-CDF
+bands reach the candidate. Centered CDF and positive CDF are already
+saturated there.
+
+The candidate scales both mantissa words by `2^(k+600)`. This keeps the
+leading word normal until the final grid test. `NormalFiniteScale.v`
+bounds trailing-word underflow and proves the scaled expansion remains
+normalized. If its high word is at least `1.5 * 2^-422`, the relative
+rounding test uses guard `2^-65`; multiplication by `2^-600` is then exact.
+
+Below that split, let `c = abs(RN(h * 2^-600))`. The binary64 subnormal
+spacing is `2^-1074`, hence its half-spacing on the scaled grid is
+`2^-475`. The rounded residual `(h - c * 2^600) + l` selects `c` or its
+adjacent encoding. Acceptance requires the recomputed distance plus
+`RN(h * 2^-65 + 2^-520)` to be strictly below `2^-475`. The absolute term
+covers residual arithmetic even at zero. `NormalUnderflowCandidate.v`
+and `NormalFiniteRound.v` prove this test, including zero and the normal
+boundary; rejected inputs use Q256.
+
+For positive log-CDF, the same accepted tail magnitude rounds
+`-ln(1-q)`: `NormalFiniteLog.v` bounds its difference from `q` by `2q²`,
+with `q <= 2^-980`, inside the shared guard. Negation produces the
+negative result, including negative zero. `NormalFiniteDensity.v` and
+`NormalFiniteTail.v` compose these bounds with the evaluated mantissas,
+and `NormalFastDispatch.v` connects the accepted candidates to the
+public function targets.
+
 ## Accurate compositions
 
 Q256 evaluates the same identities from the original input. The central
@@ -158,6 +256,14 @@ proved error-free product. Saturated homogeneous vectors skip polynomial
 work. Inactive lanes are replaced by safe arguments; rejected or inactive
 lanes use the scalar path. Short or mixed two-lane batches can use scalar
 evaluation when vector setup would not amortize.
+
+Negative far-tail lanes use their own mask and both tail branches above.
+A mixed batch keeps the ordinary lanes on their vector kernel; only rejected
+far-tail lanes enter Q256. Every backend uses the scalar sequence, including
+the reciprocal and the two exact scaling multiplications. The finite
+underflow candidates use the same scalar scaling, adjacent-encoding
+selection and rounding test on every backend. Mixed chunks keep other
+eligible lanes on their own vector paths.
 
 `generators/normal_reference.py` produces independent mpmath witnesses,
 including threshold neighbors, hard rounding cases, subnormals, signed zeros

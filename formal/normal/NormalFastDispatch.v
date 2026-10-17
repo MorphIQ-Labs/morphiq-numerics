@@ -2,11 +2,13 @@
     standard-normal targets; CCDF uses the CDF at the reflected input. *)
 From Coq Require Import Reals ZArith Lia Lra Bool.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
-From Binary64 Require Import Binary64Add IEEE64 Encodings RoundingTest.
+From Binary64 Require Import Binary64Add IEEE64 IEEE64Add Encodings RoundingTest.
 Require Import StageGappa ErfcxDecision NormalComparisons
   NormalAccurateDensity NormalAccurateCentralCdf NormalCentered NormalTailAnalytic
   NormalDensityDecision NormalCenterCentral NormalCdfCentralFast NormalTailDecision
-  NormalOuterSigned NormalLogDecision NormalLogNegativeFast NormalLogPositiveFast.
+  NormalOuterSigned NormalLogDecision NormalLogNegativeFast NormalLogPositiveFast
+  NormalLogTailStages NormalLogTailHuge NormalLogOverflowConstants
+  NormalFiniteDensity NormalFiniteTail.
 Open Scope R_scope.
 
 Inductive normal_operation := NormalPdf | NormalCdf | NormalCentered | NormalLogCdf.
@@ -14,7 +16,7 @@ Definition normal_target op x := match op with
   | NormalPdf=>normal_density x | NormalCdf=>normal_cdf x
   | NormalCentered=>normal_center x | NormalLogCdf=>ln(normal_cdf x) end.
 Definition normal_thirty_seven : f64 := b64_of_bits 4630404104378646528.
-Definition normal_fast_dispatch64 op x :=
+Definition normal_ordinary_dispatch64 op x :=
   let a:=b64_abs x in
   if normal_lt normal_thirty_seven a ||
     (match op with NormalPdf=>false | _=>normal_lt a (erfcx_pow2(-450))end)
@@ -62,9 +64,9 @@ Local Opaque normal_density_fast_decide64 normal_cdf_central_decide64
   normal_center_central_decide64 normal_log_central_decide64 normal_tail_decide64
   normal_outer_signed_decide64 normal_log_negative_decide64 normal_log_positive_decide64.
 
-Theorem normal_fast_dispatch_decided op x v : finite x ->
+Theorem normal_ordinary_dispatch_decided op x v : finite x ->
   (op=NormalPdf -> bpow radix2(-33)<=Rabs(B x)) ->
-  normal_fast_dispatch64 op x=Some v -> finite v /\ B v=rndF(normal_target op (B x)).
+  normal_ordinary_dispatch64 op x=Some v -> finite v /\ B v=rndF(normal_target op (B x)).
 Proof.
   intros Fx Pdf Decision.
   assert(Fa : finite(b64_abs x))by(unfold b64_abs;destruct x;exact Fx).
@@ -74,7 +76,7 @@ Proof.
   destruct(erfcx_pow2_ok 0 ltac:(lia))as[Fone One];change(bpow radix2 0)with 1 in One.
   assert(Fzero : finite normal_zero)by reflexivity.
   assert(Zero : B normal_zero=0)by reflexivity.
-  unfold normal_fast_dispatch64 in Decision.
+  unfold normal_ordinary_dispatch64 in Decision.
   destruct(normal_lt normal_thirty_seven (b64_abs x) ||
     match op with NormalPdf=>false|_=>normal_lt(b64_abs x)(erfcx_pow2(-450))end)eqn:Screen;[discriminate|].
   apply orb_false_iff in Screen as[Range TinyScreen].
@@ -117,4 +119,103 @@ Proof.
     + apply normal_lt_false in Negative;try assumption;rewrite Zero in Negative.
       pose proof(normal_log_positive_decided(b64_abs x)v Fa ltac:(rewrite B_abs;split;lra)Decision)as Result.
       rewrite B_abs,Rabs_pos_eq,normal_positive_cdf in Result by lra;exact Result.
+Qed.
+
+(** Only negative log-CDF bypasses the ordinary composition's 37 screen. *)
+Definition normal_log_dispatch64 op x :=
+  match op with
+  | NormalLogCdf=>if normal_lt x (fneg normal_thirty_seven)then
+      let a:=b64_abs x in
+      if normal_lt a normal_log_overflow then
+        if normal_lt a (erfcx_pow2 45)then normal_log_tail_stages64 a
+        else normal_log_tail_huge_decide64 a
+      else None
+    else normal_ordinary_dispatch64 op x
+  | _=>normal_ordinary_dispatch64 op x
+  end.
+
+Theorem normal_log_dispatch_decided op x v : finite x ->
+  (op=NormalPdf -> bpow radix2(-33)<=Rabs(B x)) ->
+  normal_log_dispatch64 op x=Some v -> finite v /\ B v=rndF(normal_target op (B x)).
+Proof.
+  intros Fx Pdf Decision;destruct op;cbn[normal_log_dispatch64]in Decision.
+  1-3: eapply normal_ordinary_dispatch_decided;eauto.
+  destruct(normal_lt x (fneg normal_thirty_seven))eqn:Far.
+  2: eapply normal_ordinary_dispatch_decided;eauto.
+  destruct normal_thirty_seven_ok as[F37 V37].
+  assert(Fneg : finite(fneg normal_thirty_seven))by(unfold fneg,b64_opp;rewrite is_finite_Bopp;exact F37).
+  assert(N37 : B(fneg normal_thirty_seven)= -B normal_thirty_seven)by(apply B2R_Bopp).
+  apply normal_lt_true in Far;try assumption;rewrite N37,V37 in Far.
+  assert(Fa : finite(b64_abs x))by(unfold b64_abs;destruct x;exact Fx).
+  assert(A : 37<B(b64_abs x))by(rewrite B_abs,Rabs_left1;lra).
+  destruct normal_log_overflow_ok as[Fo _].
+  destruct(normal_lt(b64_abs x)normal_log_overflow)eqn:Finite;[|discriminate].
+  apply normal_lt_true in Finite;try assumption.
+  destruct(erfcx_pow2_ok 45 ltac:(lia))as[Fhuge Huge].
+  destruct(normal_lt(b64_abs x)(erfcx_pow2 45))eqn:Large.
+  - apply normal_lt_true in Large;try assumption;rewrite Huge in Large.
+    pose proof(normal_log_tail_stages_decided (b64_abs x) v Fa ltac:(split;lra) Decision)as Result.
+    rewrite B_abs,normal_negative_cdf in Result by lra;exact Result.
+  - apply normal_lt_false in Large;try assumption;rewrite Huge in Large.
+    pose proof(normal_log_tail_huge_decided (b64_abs x) v Fa ltac:(split;lra) Decision)as Result.
+    rewrite B_abs,normal_negative_cdf in Result by lra;exact Result.
+Qed.
+
+Definition normal_thirty_nine : f64 := b64_of_bits 4630685579355357184.
+Lemma normal_thirty_nine_ok : finite normal_thirty_nine /\ B normal_thirty_nine=39.
+Proof.
+  split;[exact(bits_finite 4630685579355357184 false 5488762045857792 (-47)eq_refl)|].
+  change(5488762045857792*bpow radix2(-47)=39);bpow_num;field.
+Qed.
+
+Definition normal_fast_dispatch64 op x :=
+  let a:=b64_abs x in
+  if normal_lt normal_thirty_seven a then
+    match op with
+    | NormalPdf=>if normal_lt a normal_thirty_nine then normal_finite_density64 a else None
+    | NormalCdf=>if normal_lt a normal_thirty_nine && normal_lt x normal_zero then normal_finite_tail64 a else None
+    | NormalCentered=>None
+    | NormalLogCdf=>if normal_lt x normal_zero then normal_log_dispatch64 op x else
+        if normal_lt a normal_thirty_nine then
+          match normal_finite_tail64 a with Some v=>Some(fneg v)|None=>None end
+        else None
+    end
+  else normal_ordinary_dispatch64 op x.
+
+Theorem normal_fast_dispatch_decided op x v : finite x ->
+  (op=NormalPdf -> bpow radix2(-33)<=Rabs(B x)) ->
+  normal_fast_dispatch64 op x=Some v -> finite v /\ B v=rndF(normal_target op (B x)).
+Proof.
+  intros Fx Pdf Decision.
+  assert(Fa : finite(b64_abs x))by(unfold b64_abs;destruct x;exact Fx).
+  destruct normal_thirty_seven_ok as[F37 V37],normal_thirty_nine_ok as[F39 V39].
+  assert(Fzero : finite normal_zero)by reflexivity.
+  assert(Zero : B normal_zero=0)by reflexivity.
+  unfold normal_fast_dispatch64 in Decision;destruct(normal_lt normal_thirty_seven(b64_abs x))eqn:Far.
+  2: eapply normal_ordinary_dispatch_decided;eauto.
+  apply normal_lt_true in Far;try assumption;rewrite V37 in Far.
+  destruct op;cbn[normal_target]in *.
+  - destruct(normal_lt(b64_abs x)normal_thirty_nine)eqn:Finite;[|discriminate].
+    apply normal_lt_true in Finite;try assumption;rewrite V39 in Finite.
+    pose proof(normal_finite_density_ieee (b64_abs x)v Fa ltac:(split;lra)Decision)as Result.
+    rewrite B_abs,normal_density_abs in Result;exact Result.
+  - destruct(normal_lt(b64_abs x)normal_thirty_nine && normal_lt x normal_zero)eqn:Eligible;[|discriminate].
+    apply andb_true_iff in Eligible as[Finite Negative].
+    apply normal_lt_true in Finite;try assumption;rewrite V39 in Finite.
+    apply normal_lt_true in Negative;try assumption;rewrite Zero in Negative.
+    pose proof(normal_finite_tail_ieee (b64_abs x)v Fa ltac:(split;lra)Decision)as Result.
+    rewrite B_abs,normal_negative_cdf in Result by lra;exact Result.
+  - discriminate.
+  - destruct(normal_lt x normal_zero)eqn:Negative.
+    + exact(normal_log_dispatch_decided NormalLogCdf x v Fx Pdf Decision).
+    + apply normal_lt_false in Negative;try assumption;rewrite Zero in Negative.
+      destruct(normal_lt(b64_abs x)normal_thirty_nine)eqn:Finite;[|discriminate].
+      apply normal_lt_true in Finite;try assumption;rewrite V39 in Finite.
+      destruct(normal_finite_tail64(b64_abs x))as[r|]eqn:Tail;[|discriminate].
+      injection Decision as <-.
+      destruct(normal_finite_log_tail_ieee (b64_abs x)r Fa ltac:(split;lra)Tail)as[Fr Round].
+      split.
+      * unfold fneg,b64_opp;rewrite is_finite_Bopp;exact Fr.
+      * unfold fneg,b64_opp;rewrite B2R_Bopp,Round,round_NE_opp_ne.
+        rewrite B_abs,Rabs_pos_eq,normal_positive_cdf by lra;ring.
 Qed.

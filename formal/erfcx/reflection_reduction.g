@@ -1,9 +1,9 @@
 # erfcx exp_dw reduction for s = RN(x*x), se = x*x-s.
-# CONDITIONAL: n is the shifter integer, |n| <= 525000, R=s-n*ln(2)/512;
+# CONDITIONAL: n is the shifter integer, |n| <= 565000, R=s-n*ln(2)/512;
 # r1=s-n*L1 and both differences forming u are exact; rh=r0+dh is
 # the shifter result with |dh| <= 2^-41. The integer/grid hypotheses are discharged by
-# ErfcxReflectionReduction.v using the shared |s|<710 reduction theorem.
-# |se| <= 2^-44 follows for |x| below the overflow boundary, s < 710.
+# ErfcxReflectionReduction.v using the shared |s|<762 reduction theorem.
+# |se| <= 2^-44 covers erfcx reflection and the normal Gaussian square up to |x|=39.
 # L2/L3 and |dL| <= 2^-129 are the shared generated exp constants.
 # The extra final rounding of rt0+se makes the bound 2^-92, not 2^-93.
 @rnd = float<ieee_64, ne>;
@@ -21,7 +21,7 @@ rt0 rnd= u - p3;
 rt rnd= rt0 + se;
 Exact = R + se;
 
-{ n in [-525000, 525000] /\ R in [-0.000677, 0.000677] /\ dL in [-1b-129, 1b-129]
+{ n in [-565000, 565000] /\ R in [-0.000677, 0.000677] /\ dL in [-1b-129, 1b-129]
   /\ se in [-1b-44, 1b-44] /\ dh in [-1b-41, 1b-41]
   -> rh + rt - Exact in [-1b-92, 1b-92] /\ rt in [-1b-40, 1b-40] /\ rh in [-0.000678, 0.000678] }
 

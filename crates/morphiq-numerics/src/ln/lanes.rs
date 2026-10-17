@@ -104,6 +104,13 @@ fn fast_value<K: Simd>(k: K, (y, e): (K::F, K::F)) -> StageH<K> {
     (s, lo, eps)
 }
 
+/// Reciprocal-stage parts for the finite moderate normal tail. The caller
+/// supplies 37 <= x <= 2^45; NormalLogReciprocalStage proves this direct use.
+#[inline(always)]
+pub(crate) fn direct_parts<K: Simd>(k: K, x: K::F) -> StageH<K> {
+    fast_value(k, (x, k.splat(0.0)))
+}
+
 /// Finish the interval test and return the mask of decided lanes.
 /// Keep this mask through the common branch: forming its complement on
 /// every batch adds measurable overhead (docs/lanes.md §7).

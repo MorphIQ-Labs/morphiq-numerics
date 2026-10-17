@@ -19,13 +19,13 @@ Proof.
   lra.
 Qed.
 
-Theorem normal_erfcx_fast_scaled_words x : finite x -> /2<=B x<=37 ->
+Theorem normal_erfcx_fast_scaled_words_extended x : finite x -> /2<=B x<=39 ->
   let '(h,l):=normal_erfcx_fast_scaled64 x in
   bpow radix2 (-9)<=B h<=1 /\ -/2^51<=B l/B h<=/2^51.
 Proof.
-  intros Fx X;pose proof(normal_erfcx_fast_scaled_ieee x Fx X)as Scaled.
+  intros Fx X;pose proof(normal_erfcx_fast_scaled_ieee_extended x Fx X)as Scaled.
   destruct(normal_erfcx_fast_scaled64 x)as[h l];destruct Scaled as[Fh [Fl [Norm [H [L Error]]]]].
-  assert(Z : /3<=B x/sqrt 2<=27)by(split;interval with(i_prec 80)).
+  assert(Z : /3<=B x/sqrt 2<=28)by(split;interval with(i_prec 80)).
   pose proof(normal_erfcx_tail_upper (B x/sqrt 2)(proj1 Z))as Target.
   pose proof(normal_erfcx_compact_lower (B x/sqrt 2)ltac:(split;lra))as Positive.
   assert(Sum : bpow radix2 (-10)<=B h+B l<=1).
@@ -46,3 +46,8 @@ Proof.
     rewrite Rmult_assoc,Rinv_l,Rmult_1_r by(pose proof(bpow_gt_0 radix2 (-9));lra);nra. }
   apply Rabs_le_inv in Bound;bpow_num_all;split;lra.
 Qed.
+
+Theorem normal_erfcx_fast_scaled_words x : finite x -> /2<=B x<=37 ->
+  let '(h,l):=normal_erfcx_fast_scaled64 x in
+  bpow radix2 (-9)<=B h<=1 /\ -/2^51<=B l/B h<=/2^51.
+Proof. intros F X;apply (normal_erfcx_fast_scaled_words_extended x F);split;lra. Qed.

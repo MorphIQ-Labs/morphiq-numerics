@@ -118,6 +118,17 @@ the fused product outside its proved domain.
 `exp`, `ln` and `ln_1p` need no `two_prod`: their products that must be
 exact are exact by construction with plain multiplications.
 
+**Scalar kernels.** The same proved-domain equality applies to
+`eft::two_prod_d`. With `std` and an x86 FMA or aarch64 NEON target, it uses
+hardware FMA for the product's residual; other builds use Dekker. The
+negative log-CDF table's half-square is in that domain by
+`NormalLogFirst.normal_log_first_square`. Public `eft::two_prod` and
+`DoubleWord` operations retain Dekker because their arguments are unrestricted.
+`scripts/check_fma.sh` compares the complete public and internal corpora
+against a Dekker build and runs the tests and digest. On x86 it disables FMA
+explicitly in the baseline; on ARM it disables `std`. The ARM test jobs and
+the x86 FMA job run this gate.
+
 The test `lane_two_prod_is_efts_two_prod` compares the lane product with
 `eft::two_prod` bit for bit: on random encodings without FMA, and on `D`, with
 zeros of both signs, with it.
