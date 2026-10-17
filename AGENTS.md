@@ -69,6 +69,7 @@ cargo build -p morphiq-numerics --locked --target thumbv7em-none-eabihf   # no_s
 cargo build -p morphiq-numerics --locked --target thumbv7em-none-eabihf --features simd
 ./scripts/check_lanes_sde.sh       # AVX-512F lanes under Intel SDE (scripts/install_sde.sh), x86-64 Linux
 ./scripts/check_fma.sh             # scalar FMA: tests, digest, identical corpora; x86-64 FMA or aarch64 NEON
+./scripts/check_lane_codegen.sh    # no AVX2/AVX-512F lane operation compiled out of line, x86-64 Linux
 ./scripts/check_advisories.sh
 ./scripts/check_generators.sh
 cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt

@@ -179,8 +179,9 @@ million uniform arguments over four ranges), and the rest continue to the
 fast composition below.
 
 The NEON, SSE2, AVX2 and AVX-512 kernels evaluate the same central-stage
-words and endpoint test. A homogeneous eligible chunk returns early only
-when every lane is decided. Otherwise the existing composition and scalar
+words and endpoint test. The vector domain check establishes eligibility
+before scalar screening and far-tail routing. A homogeneous eligible chunk
+returns early only when every lane is decided. Otherwise the existing composition and scalar
 completion own the whole chunk. This keeps partial first-stage vectors out
 of the fallback path and preserves the tiny-input dispatch. Lane tests
 compare both words and every acceptance decision with the scalar stage
