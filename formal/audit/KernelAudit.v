@@ -32,6 +32,9 @@ Print Assumptions ExpStageReduction.stage_a_r_ok.
 Print Assumptions ExpStageReduction.stage_b_r_ok.
 Print Assumptions ExpStageA.stage_a_value_ok.
 Print Assumptions ExpStageA.exp_stage_a_ok.
+Require ExpStageADw.
+Print Assumptions ExpStageADw.stage_a_at_chain.
+Print Assumptions ExpStageADw.stage_a_dw_value_ok.
 Print Assumptions ExpStageB.stage_b_value_ok.
 Print Assumptions ExpStageB.exp_stage_b_ok.
 Print Assumptions ExpStageB.screen_ok.
@@ -595,6 +598,16 @@ Print Assumptions NormalDensityFast.normal_density_fast_ieee.
 Print Assumptions NormalFastDecision.normal_interval_decide_ok.
 Print Assumptions NormalDensityDecision.normal_density_guard_bounds.
 Print Assumptions NormalDensityDecision.normal_density_fast_decided.
+
+Require Import NormalDensityFirst.
+Print Assumptions NormalDensityFirst.normal_density_first_ok.
+
+Require Import NormalTailFirst.
+Print Assumptions NormalTailFirst.normal_tail_first_parts_ok.
+Print Assumptions NormalTailFirst.normal_tail_first_ok.
+Require Import NormalCenterFirst.
+Print Assumptions NormalCenterFirst.normal_center_first_parts_ok.
+Print Assumptions NormalCenterFirst.normal_center_first_ok.
 
 Require Import NormalDensityTiny.
 Print Assumptions NormalDensityTiny.normal_density_tiny_correct.

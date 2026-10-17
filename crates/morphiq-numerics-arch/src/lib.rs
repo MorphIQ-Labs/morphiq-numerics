@@ -151,6 +151,17 @@ pub trait Simd: Copy + Send + Sync + core::fmt::Debug + sealed::Sealed + 'static
     fn not_m(self, a: Self::M) -> Self::M;
     /// Bit `i` set when lane `i` is true; the bits above `LANES` are clear.
     fn mask_bits(self, m: Self::M) -> u64;
+    /// Lane `i` is true exactly when bit `i` is set; higher bits are ignored.
+    #[inline(always)]
+    fn mask_from_bits(self, bits: u64) -> Self::M {
+        let mut lane_bits = Self::Words::default();
+        for (i, word) in lane_bits.as_mut().iter_mut().enumerate() {
+            *word = 1 << i;
+        }
+        let lane_bits = self.load_bits(lane_bits);
+        self.eq_u(self.and_u(self.splat_bits(bits), lane_bits), lane_bits)
+    }
+
     /// `a` where `m` is true, else `b`.
     fn select(self, m: Self::M, a: Self::F, b: Self::F) -> Self::F;
 

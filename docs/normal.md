@@ -71,8 +71,10 @@ lengths, accept empty slices, and return exactly the scalar bits.
 `generators/normal_constants.py` generates the double-word and Q256 constants,
 the degree-12 fast central coefficients, degree-40 accurate central
 coefficients and saturation encodings. Independent 600- and 1000-bit
-calculations must agree. The constant and threshold certificates check the
-encoded dyadics against their mathematical definitions.
+calculations must agree. `ln sqrt(2π)` is generated as a double word for the
+density's first stage and the normalized far log-CDF composition; the accurate
+paths don't use it. The constant and threshold certificates check the encoded
+dyadics against their mathematical definitions.
 
 | Least nonnegative input reaching the screen | Encoding |
 |---|---|
@@ -88,6 +90,102 @@ checks and monotonicity. PDF uses `φ(x)=2^-1075`; CDF-to-one uses
 screen separately bounds `-ln(1-q)` at the tail-zero neighbors. Negative
 log-CDF overflow includes its logarithmic correction rather than deciding
 from a rounded binary64 square.
+
+## The density's first stage
+
+For `2^-33 <= abs(x) <= 37`, the density first tries a lean stage that
+decides about 99.2% of arguments (measured over 12 million uniform arguments
+on six ranges). It writes
+
+```
+φ(x) = exp(-x²/2 - ln sqrt(2π)),
+```
+
+forms `h + l = -x²/2` exactly (`two_prod`), subtracts the generated
+`ln sqrt(2π)` double word with a TwoSum on the high words and one rounded
+addition of the low words, and evaluates exp's stage A at the resulting
+double-word argument `s + se` ([exp.md](exp.md) §5a). `|s| < 704` and
+`|se| <= 2^-42`. The argument is within `2^-95` of `-x²/2 - ln sqrt(2π)`:
+the low words' two roundings (`2^-97`, `2^-96`) and the constant's
+certified `2^-105`. Stage A's result is then within
+`23·2^-65 + 2^-92` of `φ(x)/2^k`, and the rounding test of
+[exp.md](exp.md) §7 takes `E = 1.75·2^-61`, which covers that and the
+test's own `2^-63`. A result it returns is `RN(φ(x))`
+(`NormalDensityFirst.normal_density_first_ok`); every other argument
+continues to the fast composition below, and the public model
+(`NormalPublicModel.normal_regular64`) tries the stages in the code's
+order.
+
+Because both stages return only `RN(φ(x))` when they return, the first
+stage changes no result. It removes the double-word exponential's stage B
+and the double-word multiplication by `1/sqrt(2π)` from the common path.
+
+## The CDF family's tail first stage
+
+For `1/2 < abs(x) <= 36`, CDF, CCDF (through CDF at `-x`) and the centered
+CDF first try a lean stage on the tail `q = Φ(-a)`, `a = abs(x)`, written as
+
+```
+q = exp(-a²/2) erfcx(a/sqrt(2)) / 2.
+```
+
+`exp(-a²/2)` comes from exp's stage A at the exact double word `-a²/2`
+([exp.md](exp.md) §5a) instead of stage B. The fast scaled erfcx below is
+multiplied in by one exact `two_prod` of the high words and binary64 cross
+terms, without a double-word product or renormalizing additions, and the
+`1/2` joins the power-of-two scale. The words `qh + ql` are within
+`33·2^-64` of `q` relatively (`NormalTailFirst.normal_tail_first_parts_ok`):
+stage A's `23·2^-65`, erfcx's `2^-66`, the cross terms' roundings and the
+scaling. CDF for `x < 0` tests `qh + ql` directly. CDF for `x > 0` and the
+centered CDF form `1 - q` and `±(1/2 - q)` with an exact Fast2Sum and one
+rounded subtraction. Each test takes the guard `RN(qh·2^-58)`, and the
+complements add `2^-100` to cover the test's own roundings near one. The
+test's scale follows `qh`'s binade, so the first stage is limited to
+`abs(x) <= 36`, where `q >= 2^-960`. A result it returns is the correctly
+rounded target (`NormalTailFirst.normal_tail_first_ok`); between 96% and
+99.6% of tail arguments are decided (12 million uniform arguments over three
+ranges), and the rest continue to the fast composition below.
+
+## The CDF family's central first stage
+
+For `2^-33 <= abs(x) <= 1/2`, CDF, CCDF and the centered CDF first try a
+lean stage on `C(x) = Φ(x) - 1/2`, written with the central series of the
+fast composition below as
+
+```
+C(x) = φ(0)·x·(1 + E(x²)),   E(z) = c1·z + z²·(c2 + z·(c3 + z·T(z))),
+```
+
+where `T` is the fast composition's degree-8 tail polynomial. Only three
+quantities are carried as double words: the exact square `zh + zl = x²`
+(`two_prod`), `c1·x²` (`e1h` by an exact `two_prod` of `c1`'s high word and
+`zh`, `e1l` gathering its error and the cross terms) and `φ(0)·x`
+(`dh` exact by `two_prod`, `dl` its error plus the constant's low word
+times `x`). The rest of `E` (`e2`, at most `0.0016`) is binary64: Gappa
+certifies `|e1h + e1l + e2 - E(x²)| <= 2^-60` absolutely
+(`formal/normal/center_first.g`). The product `dh·e1h` is exact
+(`two_prod`), the remaining cross terms are summed in binary64, and two
+Fast2Sums renormalize. The words `ch + cl` are within `3.2·2^-60` of `C(x)`
+relatively (`NormalCenterFirst.normal_center_first_parts_ok`): the
+certificate's `2^-60`, the roundings of the remainder and the dropped
+`dl·(e1l + e2)` (about `1.9·2^-60`), and the series' own truncation.
+
+The centered CDF tests `ch + cl` directly. CDF adds `1/2` with an exact
+Fast2Sum (`abs(ch) <= 0.21`) and one rounded addition of the low words.
+Both take the guard `RN(abs(ch)·2^-58)`. A result it returns is the
+correctly rounded target (`NormalCenterFirst.normal_center_first_ok`);
+about 99.1% of CDF and 95.5% of centered-CDF arguments are decided (16
+million uniform arguments over four ranges), and the rest continue to the
+fast composition below.
+
+The NEON, SSE2, AVX2 and AVX-512 kernels evaluate the same central-stage
+words and endpoint test. The vector domain check establishes eligibility
+before scalar screening and far-tail routing. A homogeneous eligible chunk
+returns early only when every lane is decided. Otherwise the existing composition and scalar
+completion own the whole chunk. This keeps partial first-stage vectors out
+of the fallback path and preserves the tiny-input dispatch. Lane tests
+compare both words and every acceptance decision with the scalar stage
+before checking public results.
 
 ## Fast compositions
 

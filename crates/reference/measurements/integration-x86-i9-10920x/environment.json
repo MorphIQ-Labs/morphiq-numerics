@@ -1,0 +1,39 @@
+{
+  "before_central": "472c0367",
+  "before_tails": "2f5ae140",
+  "after": "503a7eaab72ca8ef33ff43f480b588c005646b8e",
+  "cpu": 14,
+  "sibling": 2,
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.97.1\nLLVM version: 22.1.6\n",
+  "uname": [
+    "Linux",
+    "betelgeuse",
+    "7.2.10-200.fc44.x86_64",
+    "#1 SMP PREEMPT_DYNAMIC Sun Oct 11 18:11:51 UTC 2026",
+    "x86_64"
+  ],
+  "governor": "performance",
+  "note": "Other CI jobs and local formal proof build share the host; formal build restricted to CPUs 4-7. Paired variants alternate within each process.",
+  "comparisons": {
+    "central": {
+      "before": "472c0367d3e6cb15fd22809dc023f9625123f7a1",
+      "after": "503a7eaab72ca8ef33ff43f480b588c005646b8e"
+    },
+    "tails": {
+      "before": "2f5ae140b8c185c69277655f2a26480c30a673d9",
+      "after": "503a7eaab72ca8ef33ff43f480b588c005646b8e"
+    },
+    "dispatch": {
+      "before": "472c0367d3e6cb15fd22809dc023f9625123f7a1",
+      "after": "b7728d02a2247d8931a004a3308a50629c475757"
+    },
+    "final-central": {
+      "before": "472c0367d3e6cb15fd22809dc023f9625123f7a1",
+      "after": "ed639c4a2d6f1433ed859a5b1deb25b3903e1ac8"
+    },
+    "final-tails": {
+      "before": "2f5ae140b8c185c69277655f2a26480c30a673d9",
+      "after": "ed639c4a2d6f1433ed859a5b1deb25b3903e1ac8"
+    }
+  }
+}

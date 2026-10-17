@@ -1,5 +1,5 @@
 //! Local development measurements; never a timing assertion or CI speed gate.
-use super::{Operation, evaluate, fast_decide, special};
+use super::{Operation, evaluate, fast_decide, first_decide, special};
 use crate::lanes::{Kernel, map};
 use core::hint::black_box;
 use std::time::{Duration, Instant};
@@ -101,7 +101,7 @@ fn bench<G: Kernel>(name: &str, op: Operation, complement: bool, kind: &str, xs:
         if special(op, x).is_some() {
             continue;
         }
-        let decided = fast_decide(op, x).is_some();
+        let decided = first_decide(op, x).or_else(|| fast_decide(op, x)).is_some();
         if !decided {
             fallback += 1;
         }

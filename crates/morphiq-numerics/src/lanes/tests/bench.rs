@@ -46,7 +46,9 @@ use crate::exp::lanes::Exp;
 use crate::lanes::{Kernel, map};
 use crate::ln::lanes::Ln;
 use crate::normal_distribution::lanes::Normal;
-use crate::normal_distribution::{Operation, evaluate as normal, fast_decide, special};
+use crate::normal_distribution::{
+    Operation, evaluate as normal, fast_decide, first_decide, special,
+};
 use crate::random::{SplitMix64, unit_closed_open};
 
 /// The pool every slice length up to its size is cut from.
@@ -431,9 +433,12 @@ fn decided_by(op: Operation, x: f64) -> (&'static str, f64) {
     if let Some(value) = special(op, x) {
         return ("screen", value);
     }
+    if let Some(value) = first_decide(op, x) {
+        return ("first", value);
+    }
     match fast_decide(op, x) {
         Some(value) => ("fast", value),
-        // Neither decided it: `evaluate` takes the accurate path.
+        // No stage decided it: `evaluate` takes the accurate path.
         None => ("accurate", normal(op, x)),
     }
 }

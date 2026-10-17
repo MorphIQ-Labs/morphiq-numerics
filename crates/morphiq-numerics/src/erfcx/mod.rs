@@ -17,7 +17,7 @@ mod tables;
 #[cfg(test)]
 pub(crate) mod tests;
 
-use crate::eft::{fast_two_sum, two_prod, two_sum};
+use crate::eft::{fast_two_sum, two_prod_d, two_sum};
 pub(crate) use crate::exp::stage_b_double_word as exp_dw;
 use crate::exp::tables::SHIFTER;
 use crate::ulp::ulp;
@@ -217,7 +217,8 @@ pub(super) fn fast_t(x: f64) -> Option<f64> {
 
 #[inline]
 pub(crate) fn dw_mul(ah: f64, al: f64, bh: f64, bl: f64) -> (f64, f64) {
-    let (p, e) = two_prod(ah, bh);
+    // In D: ErfcxProduct.
+    let (p, e) = two_prod_d(ah, bh);
     fast_two_sum(p, e + (ah * bl + al * bh))
 }
 
@@ -226,7 +227,8 @@ pub(crate) fn dw_mul(ah: f64, al: f64, bh: f64, bl: f64) -> (f64, f64) {
 pub(crate) fn reciprocal(x: f64) -> (f64, f64) {
     // y = 1/x as a double-word: 1 − x·yh is exact (Sterbenz, after two_prod).
     let yh = 1.0 / x;
-    let (p, pe) = two_prod(x, yh);
+    // In D: ErfcxReciprocal.
+    let (p, pe) = two_prod_d(x, yh);
     let yl = ((1.0 - p) - pe) * yh;
     (yh, yl)
 }
@@ -236,7 +238,8 @@ pub(crate) fn reciprocal(x: f64) -> (f64, f64) {
 pub(crate) fn reciprocal_square(x: f64) -> (f64, f64, f64, f64) {
     let (yh, yl) = reciprocal(x);
     // t = y² as a double-word.
-    let (th, tl0) = two_prod(yh, yh);
+    // In D: ErfcxSquare.
+    let (th, tl0) = two_prod_d(yh, yh);
     let tl = tl0 + 2.0 * yh * yl;
     (yh, yl, th, tl)
 }
@@ -276,7 +279,8 @@ pub(super) fn fast_ya(x: f64) -> Option<f64> {
 pub(crate) fn quotient(x: f64) -> (f64, f64) {
     let (ch, cl) = (f(CS.0), f(CS.1));
     let q = ch / x;
-    let (p, pe) = two_prod(q, x);
+    // In D: ErfcxQuotient.
+    let (p, pe) = two_prod_d(q, x);
     let r = ((ch - p) - pe) + cl;
     let ql = r / x;
     (q, ql)
@@ -339,7 +343,8 @@ pub(super) fn fast_yb(x: f64) -> Option<f64> {
 /// Double-word erfcx for `X_OVF < x < −1/2`, as `(hi, lo, k)`.
 #[inline]
 pub(super) fn n_eval(x: f64) -> (f64, f64, i32) {
-    let (s, se) = two_prod(x, x);
+    // In D: ErfcxReflectionSquare.
+    let (s, se) = two_prod_d(x, x);
     let (yh, yl, k) = exp_dw(s, se);
     // 2·E − g = 2^(k+1)·(Y − g·2^−(k+1)); g/(2E) < 2^−105 once k > 104.
     if k > 104 {

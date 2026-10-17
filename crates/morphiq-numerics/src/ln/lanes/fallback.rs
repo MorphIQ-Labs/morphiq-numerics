@@ -26,7 +26,7 @@ pub(super) fn polynomial<K: Simd>(k: K, z: Dw<K>) -> Dw<K> {
 /// The shared reduced `ln y` and full `ln x` fast values.
 #[inline(always)]
 fn reduced<K: Simd>(k: K, x: K::F) -> Dw<K> {
-    let (y, e) = reduce(k, x, 0);
+    let (y, e) = reduce(k, x);
     let words = k.store(y);
     let (mut r, mut nh, mut nl) = (
         K::Array::default(),

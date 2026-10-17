@@ -1,0 +1,8 @@
+   Compiling morphiq-numerics v0.0.7 (/home/stephen/Development/MorphIQ-Labs/core/morphiq-numerics/crates/morphiq-numerics)
+    Finished `release` profile [optimized] target(s) in 22.34s
+  Executable unittests src/lib.rs (target/release/deps/morphiq_numerics-374045a010aa49f8)
+   Compiling morphiq-numerics v0.0.7 (/home/stephen/Development/MorphIQ-Labs/core/morphiq-numerics/crates/morphiq-numerics)
+    Finished `release` profile [optimized] target(s) in 4.38s
+   Compiling morphiq-numerics-digest v0.0.7 (/home/stephen/Development/MorphIQ-Labs/core/morphiq-numerics/crates/digest)
+   Compiling morphiq-numerics-reference v0.0.7 (/home/stephen/Development/MorphIQ-Labs/core/morphiq-numerics/crates/reference)
+    Finished `release` profile [optimized] target(s) in 1.39s

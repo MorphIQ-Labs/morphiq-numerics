@@ -111,6 +111,8 @@ pub(crate) fn value(op: Operation, x: f64) -> Q256 {
     }
 }
 
+#[cold]
+#[inline(never)]
 pub(super) fn evaluate(op: Operation, x: f64) -> f64 {
     let y = value(op, x).to_f64();
     if matches!(op, Operation::Centered) && y == 0.0 {
