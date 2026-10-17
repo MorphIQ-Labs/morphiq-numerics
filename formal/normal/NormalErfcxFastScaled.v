@@ -29,19 +29,19 @@ Qed.
 Definition normal_erfcx_fast_scaled64 x :=
   let '(h,l):=normal_fast_scaled_argument64 x in normal_erfcx_correction64 h l.
 
-Theorem normal_erfcx_fast_scaled_ieee x : finite x -> /2<=B x<=37 ->
+Theorem normal_erfcx_fast_scaled_ieee_extended x : finite x -> /2<=B x<=39 ->
   let '(h,l):=normal_erfcx_fast_scaled64 x in
   finite h /\ finite l /\ B h=rndF(B h+B l) /\
   bpow radix2 (-9)<=B h<=2 /\ Rabs(B l)<=bpow radix2 (-53) /\
   Rabs((B h+B l)-gaussian_erfcx(B x/sqrt 2))<=bpow radix2 (-66)*gaussian_erfcx(B x/sqrt 2).
 Proof.
-  intros Fx X;pose proof(normal_fast_scaled_argument_ieee x Fx X)as Argument.
+  intros Fx X;pose proof(normal_fast_scaled_argument_ieee_extended x Fx X)as Argument.
   unfold normal_erfcx_fast_scaled64;destruct(normal_fast_scaled_argument64 x)as[a b].
   destruct Argument as[Fa [Fb [Anorm [A [Bl ArgumentError]]]]].
   pose proof(normal_erfcx_correction_ieee a b Fa Fb A Bl)as Corrected.
   destruct(normal_erfcx_correction64 a b)as[h l];destruct Corrected as[Fh [Fl [Norm Correction]]].
   set(z:=B x/sqrt 2)in *.
-  assert(Z : /3<=z<=27)by(unfold z;split;interval with(i_prec 80)).
+  assert(Z : /3<=z<=28)by(unfold z;split;interval with(i_prec 80)).
   assert(Target : /256<=gaussian_erfcx z<=1).
   { split;[apply normal_erfcx_compact_lower;split;lra|apply normal_erfcx_unit_upper;lra]. }
   assert(InputError : Rabs(gaussian_erfcx(B a+B b)-gaussian_erfcx z)<=bpow radix2 (-99)*gaussian_erfcx z).
@@ -80,3 +80,10 @@ Proof.
   { replace(B h-(B h+B l))with(-B l)in Rounded by ring;rewrite Rabs_Ropp in Rounded;exact Rounded. }
   repeat split;tauto.
 Qed.
+
+Theorem normal_erfcx_fast_scaled_ieee x : finite x -> /2<=B x<=37 ->
+  let '(h,l):=normal_erfcx_fast_scaled64 x in
+  finite h /\ finite l /\ B h=rndF(B h+B l) /\
+  bpow radix2 (-9)<=B h<=2 /\ Rabs(B l)<=bpow radix2 (-53) /\
+  Rabs((B h+B l)-gaussian_erfcx(B x/sqrt 2))<=bpow radix2 (-66)*gaussian_erfcx(B x/sqrt 2).
+Proof. intros F X;apply (normal_erfcx_fast_scaled_ieee_extended x F);split;lra. Qed.

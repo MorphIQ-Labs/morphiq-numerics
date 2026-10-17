@@ -181,20 +181,56 @@ and uses the nearest-midpoint test with guard `2^-68`. The huge branch uses
 its original `2^-66` guard. The moderate bound retains the reciprocal stage’s
 absolute `2^-65` logarithm error through normalization and reconstruction.
 
-On `37 <= a <= 64`, a cheaper first stage precedes the normalized moderate
-candidate. It evaluates the same eight-term correction and reciprocal-table
-logarithm, adds their correction in binary64, uses FastTwoSum to subtract it
-from the exact square's high word, and adds the square's trailing word.
-`log_tail_first.g` certifies reconstruction error; `NormalLogFirst.v`
-composes the logarithm, constant, polynomial and square bounds to an absolute
-error at most `6 * 2^-52`. The rounded-endpoint test uses `2^-49`, including
-its own rounding error. `NormalLogTailStages.v` proves that an undecided first
-stage can fall through to the normalized candidate. SIMD performs the same
-sequence and sends only unresolved lanes to the second candidate.
-An undecided input still enters the original Q256 composition. PDF,
-negative CDF, positive CCDF and positive log-CDF retain finite unsaturated bands beyond
-37; those bands currently use Q256. Centered CDF and the positive CDF are
-already saturated there.
+On `37 <= a < 64`, a table first stage precedes the normalized moderate
+candidate. `normal_log_table.py` generates 27 degree-seven Taylor rows for
+`ln(a) + ln(2*pi)/2 + P(1/a²)`, where `P` is the same eight-term Mills
+correction. Half-integer centers and a bit-extracted index give an exact
+residual in `[-1/2, 1/2]`. Each row is checked by Sollya and Coq to absolute
+error `3*2^-52`; `log_table.g` bounds rounded Horner evaluation by
+`9*2^-54`. The generated binary64 encodings are proved to have those values.
+`NormalLogTableCorrection.v` composes the index, reduction and row proofs.
+
+The first stage uses FastTwoSum to subtract the correction from the exact
+half-square's high word and then adds its trailing word. `NormalLogFirst.v`
+includes the Mills remainder and reconstruction, proving absolute error
+`11*2^-53`. The rounded-endpoint test uses `6*2^-52`, including its own
+rounding error. `NormalLogTailStages.v` proves that an undecided first stage
+falls through to the normalized candidate; `a = 64` uses that candidate
+directly. SIMD gathers the same coefficients and performs the same operation
+sequence, sending only unresolved lanes to the second candidate.
+An undecided input still enters the original Q256 composition.
+
+## Finite underflow bands
+
+For `37 < abs(x) < 39`, density and tail probabilities reuse the Gaussian
+and scaled-erfcx mantissas. Their reduction and evaluation proofs cover
+this wider interval. The public saturation screens run first, so only the
+finite unsaturated PDF, negative CDF, positive CCDF and positive log-CDF
+bands reach the candidate. Centered CDF and positive CDF are already
+saturated there.
+
+The candidate scales both mantissa words by `2^(k+600)`. This keeps the
+leading word normal until the final grid test. `NormalFiniteScale.v`
+bounds trailing-word underflow and proves the scaled expansion remains
+normalized. If its high word is at least `1.5 * 2^-422`, the relative
+rounding test uses guard `2^-65`; multiplication by `2^-600` is then exact.
+
+Below that split, let `c = abs(RN(h * 2^-600))`. The binary64 subnormal
+spacing is `2^-1074`, hence its half-spacing on the scaled grid is
+`2^-475`. The rounded residual `(h - c * 2^600) + l` selects `c` or its
+adjacent encoding. Acceptance requires the recomputed distance plus
+`RN(h * 2^-65 + 2^-520)` to be strictly below `2^-475`. The absolute term
+covers residual arithmetic even at zero. `NormalUnderflowCandidate.v`
+and `NormalFiniteRound.v` prove this test, including zero and the normal
+boundary; rejected inputs use Q256.
+
+For positive log-CDF, the same accepted tail magnitude rounds
+`-ln(1-q)`: `NormalFiniteLog.v` bounds its difference from `q` by `2q²`,
+with `q <= 2^-980`, inside the shared guard. Negation produces the
+negative result, including negative zero. `NormalFiniteDensity.v` and
+`NormalFiniteTail.v` compose these bounds with the evaluated mantissas,
+and `NormalFastDispatch.v` connects the accepted candidates to the
+public function targets.
 
 ## Accurate compositions
 
@@ -224,7 +260,10 @@ evaluation when vector setup would not amortize.
 Negative far-tail lanes use their own mask and both tail branches above.
 A mixed batch keeps the ordinary lanes on their vector kernel; only rejected
 far-tail lanes enter Q256. Every backend uses the scalar sequence, including
-the reciprocal and the two exact scaling multiplications.
+the reciprocal and the two exact scaling multiplications. The finite
+underflow candidates use the same scalar scaling, adjacent-encoding
+selection and rounding test on every backend. Mixed chunks keep other
+eligible lanes on their own vector paths.
 
 `generators/normal_reference.py` produces independent mpmath witnesses,
 including threshold neighbors, hard rounding cases, subnormals, signed zeros

@@ -3,7 +3,7 @@
 use super::{Dw, dw, tables};
 
 const FIRST_LIMIT: f64 = 64.0;
-const FIRST_GUARD: f64 = f64::from_bits(0x3ce0_0000_0000_0000); // 2^-49
+const FIRST_GUARD: f64 = f64::from_bits(0x3cd8_0000_0000_0000); // 6*2^-52
 
 const HUGE: f64 = f64::from_bits(0x42c0_0000_0000_0000); // 2^45
 const DOWN: f64 = f64::from_bits(0x21f0_0000_0000_0000); // 2^-480
@@ -11,20 +11,22 @@ const UP: f64 = f64::from_bits(0x5df0_0000_0000_0000); // 2^480
 const MODERATE_GUARD: f64 = f64::from_bits(0x3bb0_0000_0000_0000); // 2^-68
 const GUARD: f64 = f64::from_bits(0x3bd0_0000_0000_0000); // 2^-66
 
-/// Binary64 reconstruction on 37 <= a <= 64 (NormalLogFirst.v).
+/// Certified table correction and exact half-square on 37 <= a < 64.
 #[inline]
 pub(crate) fn first_candidate(a: f64) -> (f64, f64) {
-    let r = 1.0 / a;
-    let u = r * r;
-    let mut p = tables::LOG_TAIL[7];
-    for i in (0..7).rev() {
-        p = tables::LOG_TAIL[i] + u * p;
+    #[allow(clippy::cast_possible_truncation)] // input is in [37,64)
+    let i = ((a.to_bits() >> 47) & 31) as usize - 5;
+    let center = f64::from_bits((a.to_bits() & !((1 << 47) - 1)) | (1 << 46));
+    let d = a - center;
+    let row = &super::log_first_table::C[i];
+    let mut c = row[7];
+    for j in (0..7).rev() {
+        c = row[j] + d * c;
     }
-    let (h, l, _, _) = crate::ln::stage::parts(0, a);
-    let c = (h + tables::LN_SQRT_2PI.0) + (l + (tables::LN_SQRT_2PI.1 + u * p));
-    let sq = Dw::product(a, -0.5 * a);
-    let (high, low) = crate::eft::fast_two_sum(sq.hi(), -c);
-    (high, low + sq.lo())
+    // In D: NormalLogFirst.normal_log_first_square.
+    let (sqh, sql) = crate::eft::two_prod_d(a, -0.5 * a);
+    let (high, low) = crate::eft::fast_two_sum(sqh, -c);
+    (high, low + sql)
 }
 
 #[inline]
@@ -60,7 +62,7 @@ pub(super) fn decide(a: f64) -> Option<f64> {
     if !(37.0..tables::LOG_OVERFLOW).contains(&a) {
         return None;
     }
-    if a <= FIRST_LIMIT
+    if a < FIRST_LIMIT
         && let Some(v) = first_decide(a)
     {
         return Some(v);
@@ -153,17 +155,22 @@ pub(super) mod lanes {
 
     #[inline(always)]
     fn first_candidate<K: Simd>(k: K, a: K::F) -> LaneDw<K> {
-        let r = k.div(k.splat(1.0), a);
-        let u = k.mul(r, r);
-        let mut p = k.splat(tables::LOG_TAIL[7]);
-        for i in (0..7).rev() {
-            p = k.add(k.splat(tables::LOG_TAIL[i]), k.mul(u, p));
+        let xs = k.store(a);
+        let mut centers = K::Array::default();
+        let mut coefficients: [K::Array; 8] = core::array::from_fn(|_| K::Array::default());
+        for (lane, &x) in xs.as_ref().iter().enumerate() {
+            #[allow(clippy::cast_possible_truncation)]
+            let i = ((x.to_bits() >> 47) & 31) as usize - 5;
+            centers.as_mut()[lane] = f64::from_bits((x.to_bits() & !((1 << 47) - 1)) | (1 << 46));
+            for (j, column) in coefficients.iter_mut().enumerate() {
+                column.as_mut()[lane] = super::super::log_first_table::C[i][j];
+            }
         }
-        let (h, l, _) = crate::ln::lanes::direct_parts(k, a);
-        let c = k.add(
-            k.add(h, k.splat(tables::LN_SQRT_2PI.0)),
-            k.add(l, k.add(k.splat(tables::LN_SQRT_2PI.1), k.mul(u, p))),
-        );
+        let d = k.sub(a, k.load(centers));
+        let mut c = k.load(coefficients[7]);
+        for j in (0..7).rev() {
+            c = k.add(k.load(coefficients[j]), k.mul(d, c));
+        }
         let sq = two_prod(k, a, k.mul(k.splat(-0.5), a));
         let (high, low) = fast_two_sum(k, sq.0, k.neg(c));
         (high, k.add(low, sq.1))
@@ -207,7 +214,7 @@ pub(super) mod lanes {
     /// All inputs are finite magnitudes in [37, LOG_OVERFLOW).
     #[inline(always)]
     pub(crate) fn decide<K: Simd>(k: K, a: K::F) -> (K::F, u64) {
-        let eligible = k.le(a, k.splat(FIRST_LIMIT));
+        let eligible = k.lt(a, k.splat(FIRST_LIMIT));
         if k.mask_bits(eligible) != 0 {
             let y = first_candidate(k, k.select(eligible, a, k.splat(38.0)));
             let low = k.add(y.0, k.sub(y.1, k.splat(FIRST_GUARD)));
@@ -248,7 +255,7 @@ pub(super) mod lanes {
                 input.as_mut().fill(38.0);
                 input.as_mut()[..chunk.len()].copy_from_slice(chunk);
                 let first_input = k.select(
-                    k.le(k.load(input), k.splat(FIRST_LIMIT)),
+                    k.lt(k.load(input), k.splat(FIRST_LIMIT)),
                     k.load(input),
                     k.splat(38.0),
                 );
@@ -260,7 +267,7 @@ pub(super) mod lanes {
                 let (y, scale) = candidate(k, k.load(input));
                 let (hi, lo, scale) = (k.store(y.0), k.store(y.1), k.store(scale));
                 for (i, &a) in chunk.iter().enumerate() {
-                    let fa = if a <= FIRST_LIMIT { a } else { 38.0 };
+                    let fa = if a < FIRST_LIMIT { a } else { 38.0 };
                     let (fh, fl) = super::first_candidate(fa);
                     assert_eq!(
                         (
