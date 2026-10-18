@@ -210,5 +210,10 @@ active on the host, with no exclusive machine or frequency control. These
 samples establish the measured comparisons only; they do not establish globally
 optimal code, isolated latency, sustained capacity or ARM performance.
 
+The [complete summary](evidence/log-normalize-x86-summary.md) reports all nine-round
+spreads and paired ratios, plus separate component and dependent-call diagnostics.
+The profile attributes the material subnormal-tail cost to the inherited
+exponential without changing its contract.
+
 The algorithm allocates zero bytes; caller-provided input/output storage and
 the alternative's preallocated scratch are excluded from timed setup.

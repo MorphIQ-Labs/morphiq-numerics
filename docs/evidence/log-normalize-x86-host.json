@@ -10,6 +10,9 @@
   "contention": "Other independently running numerical workloads were present. CPU14 was idle in the one-second /proc/stat selection sample; CPU2 was occupied. No host isolation or exclusive governor control was available. Results characterize this host run, not a clean capacity or fastest-available qualification.",
   "source_sha256": {
     "crates/morphiq-numerics/src/log_space/normalize.rs": "f17589b9626be1de5d05d37b7b8c715e3a38b9d2d296013ed71b023148afdceb",
-    "crates/reference/src/bin/bench-log-normalize.rs": "55191812ccb91ad2b87becd8e69052f0786f62167bce5419309dccfeb9be0539"
-  }
+    "crates/reference/src/bin/bench-log-normalize.rs": "55191812ccb91ad2b87becd8e69052f0786f62167bce5419309dccfeb9be0539",
+    "crates/reference/src/bin/profile-log-normalize.rs": "139ca96526b19ea40e5169bb2b0969701bbe0f614bf98096a0caceaf446e996a"
+  },
+  "profile": "Separate profile-log-normalize executable, nine retained rounds after warm-up; scalar then SIMD; no overlapping task builds/tests during each timed invocation.",
+  "power_thermal": "performance governor observed; frequency, package power and thermal state not controlled or recorded continuously"
 }
