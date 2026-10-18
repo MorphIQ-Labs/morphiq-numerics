@@ -5,7 +5,11 @@
   "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.97.1\nLLVM version: 22.1.6\n",
   "flags": "release profile; default target; no RUSTFLAGS; scalar then simd,std",
   "affinity": "taskset -c 14",
-  "sampling": "9 paired rounds, reversed order on alternate rounds, preallocated buffers and warmup; scalar then SIMD with no overlapping task builds/tests",
+  "sampling": "9 paired rounds, reversed order on alternate rounds, preallocated buffers and warmup; SIMD then scalar with no overlapping task builds/tests during measurement",
   "governor": "performance",
-  "contention": "Other independently running numerical workloads were present. CPU14 was idle in the one-second /proc/stat selection sample; CPU2 was occupied. No host isolation or exclusive governor control was available. Results characterize this host run, not a clean capacity or fastest-available qualification."
+  "contention": "Other independently running numerical workloads were present. CPU14 was idle in the one-second /proc/stat selection sample; CPU2 was occupied. No host isolation or exclusive governor control was available. Results characterize this host run, not a clean capacity or fastest-available qualification.",
+  "source_sha256": {
+    "crates/morphiq-numerics/src/log_space/normalize.rs": "f17589b9626be1de5d05d37b7b8c715e3a38b9d2d296013ed71b023148afdceb",
+    "crates/reference/src/bin/bench-log-normalize.rs": "55191812ccb91ad2b87becd8e69052f0786f62167bce5419309dccfeb9be0539"
+  }
 }

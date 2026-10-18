@@ -79,6 +79,24 @@ pub fn normalize_log_weights(
     x: &[f64],
     output: &mut [f64],
 ) -> Result<LogNormalization, NormalizeError> {
+    // A singleton is the exact closed form, including a signed-zero log total.
+    if let ([value], [slot]) = (x, &mut *output)
+        && value.is_finite()
+    {
+        *slot = 0.0;
+        return Ok(LogNormalization {
+            log_sum: *value,
+            max_absolute_error: 0.0,
+        });
+    }
+    if let ([a, b], [_, _]) = (x, &*output)
+        && a.is_finite()
+        && b.is_finite()
+    {
+        let (values, result) = finite_pair(*a, *b)?;
+        output.copy_from_slice(&values);
+        return Ok(result);
+    }
     if x.len() != output.len() {
         return Err(NormalizeError::LengthMismatch);
     }
@@ -131,15 +149,49 @@ pub fn normalize_log_weights(
     // 8u is the least power-of-two multiple of u dominating C/(1-Cu),
     // C = 4 + 2^-7. The 4n subnormal allowance dominates 2n/(1-Cu).
     // Both inequalities are checked in generators/log_space_bounds.py.
-    let max_absolute_error = if finite == 1 {
+    let max_absolute_error = radius(finite, largest_magnitude);
+    Ok(LogNormalization {
+        log_sum,
+        max_absolute_error,
+    })
+}
+
+// Same arithmetic as the slice path, specialized to two finite inputs. Only
+// the smaller normalized component can overflow; validate it before writing.
+fn finite_pair(a: f64, b: f64) -> Result<([f64; 2], LogNormalization), NormalizeError> {
+    let hi = usize::from(b > a);
+    let (maximum, lower) = if hi == 0 { (a, b) } else { (b, a) };
+    let (dh, dl) = crate::eft::two_sum(lower, -maximum);
+    let mut sum = super::Sum2Stream::default();
+    sum.add(crate::elementary::exp(dh), dl);
+    let tail = sum.total();
+    let correction = ln_1p(tail);
+    let low = dh - correction;
+    if !low.is_finite() {
+        return Err(NormalizeError::Unrepresentable(1 - hi));
+    }
+    let mut values = [0.0; 2];
+    values[hi] = 0.0 - correction;
+    values[1 - hi] = low;
+    Ok((
+        values,
+        LogNormalization {
+            log_sum: if tail == 0.0 {
+                maximum
+            } else {
+                maximum + correction
+            },
+            max_absolute_error: radius(2, -low),
+        },
+    ))
+}
+
+fn radius(finite: usize, largest_magnitude: f64) -> f64 {
+    if finite == 1 {
         0.0
     } else {
         let relative = (RELATIVE * largest_magnitude).next_up();
         let absolute = f64::from_bits((SUBNORMAL_FACTOR * finite) as u64);
         (relative + absolute).next_up()
-    };
-    Ok(LogNormalization {
-        log_sum,
-        max_absolute_error,
-    })
+    }
 }

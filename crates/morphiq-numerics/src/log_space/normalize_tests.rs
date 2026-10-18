@@ -183,3 +183,30 @@ fn fixed_order_normalization_matches_the_scalar_reduction_bits() {
         }
     }
 }
+
+#[test]
+fn finite_pair_specialization_preserves_slice_bits_and_failures() {
+    // Operation-sequence consistency, separate from the independent interval
+    // anchors above: padding with an exact zero forces the general slice path.
+    // SplitMix64 supplies raw bit patterns, including huge spans and subnormals.
+    let mut seed = 0x6e6f_726d_7061_6972_u64;
+    let mut word = || {
+        seed = seed.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut z = seed;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        f64::from_bits(z ^ (z >> 31))
+    };
+    for _ in 0..8192 {
+        let pair = [word(), word()];
+        let mut compact = [17.0; 2];
+        let mut padded = [17.0; 3];
+        let a = normalize_log_weights(&pair, &mut compact);
+        let b = normalize_log_weights(&[pair[0], pair[1], f64::NEG_INFINITY], &mut padded);
+        assert_eq!(a, b);
+        assert_eq!(
+            compact.map(f64::to_bits),
+            [padded[0].to_bits(), padded[1].to_bits()]
+        );
+    }
+}

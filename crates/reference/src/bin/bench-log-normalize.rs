@@ -90,8 +90,12 @@ fn run(name: &str, x: &[f64], out: &mut [f64], scratch: &mut [f64], calls: usize
 }
 
 fn main() {
+    let pairs_only = std::env::args().any(|arg| arg == "--pairs-only");
     println!("case,k,method,round,calls,elapsed_ns");
     for n in [1, 2, 3, 8, 32, 128, 1024, 65536] {
+        if pairs_only && n != 2 {
+            continue;
+        }
         for kind in ["ordinary", "zeros_tails", "common_offset"] {
             let x: Vec<_> = (0..n)
                 .map(|i| match kind {

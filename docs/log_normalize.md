@@ -79,10 +79,20 @@ output never uses `x_i − RN(m + L_hat)`: at a large common offset that rounded
 log total can lose the entire `L_hat` correction. For example, three equal
 weights near `2^1000` have normalized logs `−log(3)`, not zero.
 
-There are four passes: classify/find maximum, compensated reduction, validate
+The general slice path has four passes: classify/find maximum, compensated reduction, validate
 all normalized outputs/collect their largest magnitude, then write outputs.
 The validation pass is what makes failure atomic without O(n) temporary
 storage. For each finite entry the last two passes repeat only two subtractions.
+A finite singleton returns its exact closed form directly. Two finite entries
+use a fixed-size specialization with the same compensated reduction, correction
+and normalized-subtraction sequence. Only the smaller normalized component can
+overflow; it is checked before either output is written, and its magnitude
+dominates both returned logs for the shared radius calculation. Invalid pairs and
+pairs with structural zeros retain the general checked path. A raw-bit pair
+corpus checks sequence consistency by padding with a structural
+zero to force the general slice path; interval fixtures remain the accuracy
+anchor.
+
 The existing reduction uses transcendental work once per contributing term,
 with one final `ln_1p`. No model topology or hidden-state recursion belongs here.
 
@@ -181,17 +191,24 @@ output, failure and error contracts are retained; it is a diagnostic comparator.
 
 | Ordinary inputs | K=2 | K=32 | K=1024 | K=65536 |
 | --- | ---: | ---: | ---: | ---: |
-| Checked scalar median ns/call | 89.5 | 1,079.4 | 33,110.8 | 2,073,623.9 |
-| Scalar checked / shifted-scratch median | 1.00 | 0.94 | 0.91 | 0.90 |
-| Checked SIMD median ns/call | 91.3 | 932.1 | 26,544.2 | 1,722,644.8 |
-| SIMD checked / shifted-scratch median | 1.02 | 0.89 | 0.89 | 0.89 |
+| Checked scalar median ns/call | 70.0 | 1,060.4 | 35,194.7 | 2,181,147.9 |
+| scalar checked / shifted-scratch median | 0.82 | 0.94 | 0.93 | 0.91 |
+| Checked SIMD median ns/call | 73.1 | 1,001.5 | 28,477.5 | 1,801,965.4 |
+| SIMD checked / shifted-scratch median | 0.80 | 0.93 | 0.92 | 0.91 |
 
-Across the tested K≥3 cases, checked/scratch median ratios were 0.82–0.99
-(scalar) and 0.89–0.99 (SIMD). At K=2, checked/fused-pair ratios were
-0.95–1.01 (scalar) and 0.92–1.17 (SIMD). These measurements do not establish
-that the new function is at least as fast as every available alternative.
-Other numerical workloads were active on the host; no exclusive machine or
-frequency control was available. The samples report this run, not isolated
-latency, sustained capacity, ARM performance or a universal performance bound.
+scalar: checked/scratch median ratios span 0.18–0.99;
+checked/fused-pair ratios span 0.73–0.96.
+
+simd: checked/scratch median ratios span 0.17–0.99;
+checked/fused-pair ratios span 0.84–0.88.
+
+The fixed-size cases remove the general loop/validation overhead without
+changing numerical results. Underflow-tail workloads spend most of their time
+in the inherited exponential path; the new normalization does not weaken that
+primitive's contract to accelerate those cases. Other numerical workloads were
+active on the host, with no exclusive machine or frequency control. These
+samples establish the measured comparisons only; they do not establish globally
+optimal code, isolated latency, sustained capacity or ARM performance.
+
 The algorithm allocates zero bytes; caller-provided input/output storage and
 the alternative's preallocated scratch are excluded from timed setup.
