@@ -24,6 +24,9 @@
 //!   density, correctly rounded wherever its rounding test decides; and
 //!   `erfcx`, the scaled complementary error function, with `erfcx_slice`
 //!   for scalar-equivalent SIMD evaluation (see its assurance limits);
+//! - [`bivariate_normal`]: the bivariate normal distribution function with an
+//!   absolute error bound, and a per-correlation evaluator that reuses its
+//!   quadrature table;
 //! - [`random`]: seeded SplitMix64 and xoshiro256++ streams, with exact
 //!   unit uniforms and Box–Muller normal pairs;
 //! - [`reduce`]: sums, dot products and sums of squares in a specified order,
@@ -48,6 +51,7 @@ extern crate std;
 mod asin;
 mod asinh;
 mod atan2;
+pub mod bivariate_normal;
 pub mod double_word;
 pub mod eft;
 pub mod elementary;
