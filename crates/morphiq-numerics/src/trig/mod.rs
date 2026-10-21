@@ -322,3 +322,14 @@ pub(crate) fn reduce(x: f64) -> (u32, Q256) {
 
 #[cfg(test)]
 mod tests;
+
+/// `(sin r, cos r)` in `Q256` for `|r| <= π/4`, from `accurate`'s series, for
+/// `asin`'s Newton step (docs/asin.md §5).
+pub(crate) fn accurate_sin_cos(r: Q256) -> (Q256, Q256) {
+    accurate(r)
+}
+
+/// `π/2` in `Q256`, relative error below 2^−257.3.
+pub(crate) fn half_pi() -> Q256 {
+    Q256::new(false, HALF_PI, HALF_PI_EXPONENT)
+}
