@@ -1,8 +1,9 @@
 (* Runs the extracted Q128 and Q256 transcriptions, rounding tests, exp's
    stages, exp's fallback reduction, fast value, accurate path and
    small-argument path, ln's reduction, ln's and ln_1p's accurate values and
-   ln_1p's screens and stages H and B, and asin's reduction, series, fast
-   path, accurate path and entry (InternalCrosscheck.v) on the internal
+   ln_1p's screens and stages H and B, asin's reduction, series, fast
+   path, accurate path and entry, and asinh's fast path, exponential, accurate
+   path and entry (InternalCrosscheck.v) on the internal
    cross-check corpus and compares each result with the Rust library's.
 
    Each line is "op args : result". A value is "n e k l1 .. lk": its sign
@@ -409,6 +410,26 @@ let compute op args =
            String.concat " " (List.map show_bits
              (x_fast (z_of_u64 (hex rh)) (z_of_u64 (hex rl)) (z_of_int (int_of_string j))))
        | _ -> failwith "fast takes two words and a table index")
+  | "asinh_entry" ->
+      (match args with
+       | [x] -> show_bits (x_asinh_entry (z_of_u64 (hex x)))
+       | _ -> failwith "asinh_entry takes one word")
+  | "asinh_fast" ->
+      (match args with
+       | [x] ->
+           let (words, decided) = x_asinh_fast (z_of_u64 (hex x)) in
+           String.concat " " (List.map show_bits words @ [show_opt decided])
+       | _ -> failwith "asinh_fast takes one word")
+  | "asinh_exp" ->
+      let ((n, e, l), _) = value args in
+      let (((n, e), l), k) = x_asinh_exp n e l in
+      show (n, e, l) ^ " " ^ string_of_int (int_of_z k)
+  | "asinh_accurate" ->
+      (match args with
+       | [x; yh; yl] ->
+           let ((n, e), l) = x_asinh_accurate (z_of_u64 (hex x)) (z_of_u64 (hex yh)) (z_of_u64 (hex yl)) in
+           show (n, e, l)
+       | _ -> failwith "asinh_accurate takes three words")
   | "asin_entry" ->
       (match args with
        | [x] -> show_bits (x_asin_entry (z_of_u64 (hex x)))
