@@ -351,7 +351,7 @@ def identity_check():
         t2, t3, t4 = -rr * Y * eta * eta / c0, -s0 * sigma / (c0 * Y), ea * mx / (c0 * Y)
         assert (y1 - Y) / Y == -eta * kk + (t2 + t3 + t4) * (1 + kk) + eb * (1 + eta), 'direct identity'
         # Complement: yf - Ax over Ax.
-        Dt, fs = r('0.00001', '0.78'), r('0.9', '1')
+        Dt, fs = r('0.00001', '0.78'), r('0.89', '1')
         H, eH, ec = r('1.5707963', '1.5707964'), sym(Fraction(1, 2**257)), sym(Fraction(1, 2**254))
         d0 = Dt * (1 + eta)
         s0 = d0 * fs
@@ -392,14 +392,15 @@ def newton_certificates():
 # (formal/trig/accurate_sin.g, accurate_cos.g, whose reduction term is zero here);
 # e, Q256::recip's c y = 1 + e (formal/trig/recip_3.g); m, a Q256 product's
 # truncation, [-2^-255, 0]; ea and eb, a Q256 sum's error, 2^-254 of its larger
-# operand (docs/sin_cos.md, section 5). The Taylor remainder is the mean value
-# theorem's: rr is half the sine (or cosine) at the intermediate point, at most
-# 1/2. Written by generators/asin_certificates.py.
+# operand (docs/sin_cos.md, section 5). The Taylor remainder, the argument ranges
+# and sin t/t >= 0.89 are proved in Coq in formal/asin/AsinFacts.v
+# (taylor_sin, taylor_cos, quarter_pi_ranges, sin_ratio, sin_split_range,
+# cos_split_range, y_lower, d_lower). Written by generators/asin_certificates.py.
 """
     direct = rf"""# The accurate path's Newton step for x <= SPLIT (docs/asin.md, section 5):
 #   y1 = y0 + (x - sin y0)/cos y0
 # in Q256 from y0 = Y (1 + eta), Y = asin x in [2^-26, pi/4), against Y, relative.
-#   x = sin Y = s0 + c0 d + R, d = Y - y0, R = -rr d^2   (Taylor, rr in [0, 1/2])
+#   x = sin Y = s0 + c0 d + R, d = Y - y0, R = -rr d^2   (Taylor, rr in [-2^-60, 0.5000001], formal/asin/AsinFacts.v)
 #   S = s0 (1 + sigma); rho = (x - S) + ea mx; ri = (1 + e)/(c0 (1 + gamma))
 #   q = (rho ri)(1 + m); y1 = (y0 + q) + eb y0
 # so (y1 - Y)/Y = -eta kk + (t2 + t3 + t4)(1 + kk) + eb (1 + eta) with
@@ -421,7 +422,7 @@ t3 = -s0 * sigma / (c0 * Y);
 t4 = ea * mx / (c0 * Y);
 
 {{ Y in [1b-26, 0.7854] /\ eta in [-1b-62, 1b-62] /\ s0 in [0, 0.7072] /\ c0 in [0.7071, 1]
-  /\ rr in [0, 0.5000001] /\ sigma in [-{sin_claim}, {sin_claim}] /\ gamma in [-{cos_claim}, {cos_claim}]
+  /\ rr in [-1b-60, 0.5000001] /\ sigma in [-{sin_claim}, {sin_claim}] /\ gamma in [-{cos_claim}, {cos_claim}]
   /\ ea in [-1b-254, 1b-254] /\ mx in [0, 0.7072] /\ e in [-{recip}, {recip}] /\ m in [-1b-255, 0]
   /\ eb in [-1b-254, 1b-254]
   -> (y1 - Y) / Y in [-1b-124, 1b-124] }}
@@ -432,8 +433,8 @@ t4 = ea * mx / (c0 * Y);
 #   d1 = d0 + (cos d0 - x)/sin d0, result pi/2 - d1
 # in Q256 from d0 = D (1 + eta), D = acos x in [2^-27, pi/4), against Ax = pi/2 - D,
 # relative. The start is the fast path's delta, accurate relative to D.
-#   x = cos D = c0 - s0 d - R', d = D - d0, R' = rr d^2   (Taylor, rr in [0, 1/2])
-#   s0 = sin d0 = d0 fs, fs in [0.9, 1] (sin t/t >= 0.9 for t <= pi/4)
+#   x = cos D = c0 - s0 d - R', d = D - d0, R' = rr d^2   (Taylor, rr in [-2^-60, 0.5000001], formal/asin/AsinFacts.v)
+#   s0 = sin d0 = d0 fs, fs in [0.89, 1] (sin t/t >= 0.9 for t <= pi/4)
 #   C = c0 (1 + gamma); rho = (C - x) + ea mx; ri = (1 + e)/(s0 (1 + sigma))
 #   q = (rho ri)(1 + m); d1 = (d0 + q) + eb d0; yf = (H (1 + eH) - d1) + ec H
 # so d1 - D = D (u1 + (u2 + u3 + u4)(1 + kk) + u5) with kk = (1 + e)(1 + m)/(1 + sigma) - 1,
@@ -458,8 +459,8 @@ u3 = c0 * gamma / (Dt * Dt * (1 + eta) * fs);
 u4 = ea * mx / (Dt * Dt * (1 + eta) * fs);
 u5 = eb * (1 + eta);
 
-{{ Dt in [1b-27, 0.7854] /\ eta in [-1b-62, 1b-62] /\ fs in [0.9, 1] /\ c0 in [0.7071, 1]
-  /\ rr in [0, 0.5000001] /\ sigma in [-{sin_claim}, {sin_claim}] /\ gamma in [-{cos_claim}, {cos_claim}]
+{{ Dt in [1b-27, 0.7854] /\ eta in [-1b-62, 1b-62] /\ fs in [0.89, 1] /\ c0 in [0.7071, 1]
+  /\ rr in [-1b-60, 0.5000001] /\ sigma in [-{sin_claim}, {sin_claim}] /\ gamma in [-{cos_claim}, {cos_claim}]
   /\ ea in [-1b-254, 1b-254] /\ mx in [0, 1.0001] /\ e in [-{recip}, {recip}] /\ m in [-1b-255, 0]
   /\ eb in [-1b-254, 1b-254] /\ ec in [-1b-254, 1b-254] /\ eH in [-1b-257, 1b-257]
   /\ H in [1.570796326794896619, 1.570796326794896620]

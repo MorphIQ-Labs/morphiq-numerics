@@ -16,9 +16,10 @@ below claims more than the named artifact does.
 | Specification, special values and the `asin x = x` threshold (§1) | done; threshold by oracle bisection and §1's argument |
 | Fast path: 45 segments, the series, the complement (§3, §4) | **certified** (Gappa): relative error below `2^-63.5` |
 | Rounding test at `ε₁ = 2^-62` (§6) | sound given the fast bound, as [ln] §5 |
-| Facts outside Gappa (§4, "Not covered by a certificate") | tested, not proved |
+| Remaining facts outside Gappa (§4 and §5, "Not covered") | tested or stated, not proved |
 | Accurate path: Newton step in `Q256` (§5) | **certified** (Gappa): relative error below `2^-124.8`, given the facts §5 lists |
 | Correct rounding on `[0x1.7137449123ef6p−26, 1)` (§6) | follows from the two bounds and [CM]'s list; **not machine-checked end to end**: the Rust is not extracted or compared against the certified operation sequence |
+| The Taylor remainders, the argument ranges, `sin t/t` (§5) | **proved in Coq** (`formal/asin/AsinFacts.v`) |
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§7) | **done** (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
 | Mutation witnesses | not done |
 | ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `asin_slice` | not done |
@@ -161,13 +162,30 @@ else is below `2^-144`. The hypotheses are named in the certificates:
 - `Q256`'s contract: a product truncated by at most `2^-255`, a sum within `2^-254` of its
   larger operand (§5 of [sin_cos], proved in Coq in `formal/q`).
 
-**Not covered by a certificate** (stated, not proved here):
-- the Taylor remainder: `sin Y = sin y₀ + cos y₀·d − ½ sin ξ·d²` and
-  `cos D = cos d₀ − sin d₀·d − ½ cos ξ·d²` for some `ξ` between the points (the mean
-  value theorem), with `rr = ½ sin ξ` or `½ cos ξ` in `[0, ½]`;
-- the argument ranges (computed with `mpmath` at 200 bits): `y₀ ≤ π/4` (`asin SPLIT = π/4 − 8.9·10⁻¹⁷`
-  against a start error of at most `2^-62·π/4 = 1.7·10⁻¹⁹`), `δ₀ ≤ π/4` (`acos` of the least `x > SPLIT`
-  is `π/4 − 6.8·10⁻¹⁷`), `Y ≥ 2^-26`, `D ≥ 2^-27`, `sin t/t ≥ 0.9` for `t ≤ π/4`;
+**Proved in Coq, outside the certificates** (`formal/asin/AsinFacts.v`, built and axiom-audited by
+the formal lane, `check_formal.sh` step 6). The Taylor remainder uses no mean value theorem:
+`sin(y₀ + d) = sin y₀ cos d + cos y₀ sin d`, with `0 ≤ 1 − cos d ≤ d²/2` and `|sin d − d| ≤ |d|³/6`
+from the standard library's alternating Taylor bounds (`sin_bound`, `cos_bound`).
+- `taylor_sin`, `taylor_cos`: for `y₀` (or `d₀`) in `[0, π/4]` and `|d| ≤ 2^-61`,
+  `sin(y₀ + d) = sin y₀ + cos y₀·d − rr·d²` and `cos(d₀ + d) = cos d₀ − sin d₀·d − rr·d²` with
+  `rr` in the certificates' range `[−2^-60, 0.5000001]`;
+- `sin_split_range`, `cos_split_range`: `sin Y ≤ SPLIT` gives `Y ≤ π/4 − 8·10⁻¹⁷`, and
+  `cos D ≥ SPLIT⁺` gives `D ≤ π/4 − 6·10⁻¹⁷`, so the Newton step's start stays in `[0, π/4]`
+  (a start error is at most `2^-62·π/4 = 1.7·10⁻¹⁹`);
+- `y_lower` (`Y ≥ 2^-26`), `d_lower` (`D ≥ 2^-27` for `x ≤ 1 − 2^-53`), `sin_ratio`
+  (`sin t ≥ 0.89 t` on `(0, π/4]`) and `quarter_pi_ranges` (`cos y₀ ≥ 0.7071`, `sin y₀ ≤ 0.70711`).
+They are stated as the certificates' hypotheses; the formal lane does not machine-link a certificate
+to the lemma it assumes (the transcription of the Rust, which would, is not written).
+
+**Not covered by a certificate or a Coq lemma** (stated, not proved here):
+- `asin(zv)/asin(w) − 1 ≤ 1.1·(zv/w − 1)` in the complement (a derivative bound:
+  `(w/asin w)/√(1 − w²) ≤ 1.055` for `w ≤ 0.3827`);
+- `i = RN_int(64·z_hi)` keeps `|t| ≤ 0.0078126`, and `i ≤ 45` on the direct branch, `i ≤ 24` on the
+  complement (only the fixture's multiples-of-1/64 and crossover cases exercise it);
+- the bound on `G(t_hi + t_lo) − G(t_hi)` uses the mean value theorem with `sup|G′|` summed from the
+  coefficients in exact rational arithmetic (`generators/asin_certificates.py`);
+- the widened `A` range of each segment comes from `mpmath` interval arithmetic.
+
 The rewrite hints' algebra, which Gappa takes on trust, is proved in Coq by the formal
 lane (each hint a lemma proved by `field`, `formal/gappa/Hints.v`); the generator also checks every
 hint in exact rational arithmetic at random points, so a slip fails generation before it fails
@@ -201,11 +219,12 @@ shared with `sin`. The certified fast bound is below `2^-63.5`.
 | `generators/asin_poly.sollya` (Sollya 8.0) | the polynomials and their bounds, in `generators/asin_poly.out` |
 | `generators/asin_constants.py` | `src/asin/tables.rs`: the table, the polynomials, `π/2`; spot-checks each segment's polynomial against `mpmath` at 400 points |
 | `generators/asin_certificates.py` | writes every certificate in `formal/asin` (96) |
+| `formal/asin/AsinFacts.v` (Coq 8.15, Interval) | §5's Taylor remainders, argument ranges and `sin t/t` |
 | `formal/asin/*` (Gappa 1.4.1, at 400 bits) | §4's evaluations, compositions, series, square root and complement; §5's two Newton steps |
 | `generators/asin_reference.py` | the fixture: the 40 hardest arguments of [CM], the threshold and its neighbours, special values, multiples of 1/64, the crossover, arguments next to 1, random arguments |
 
 The binding `formal/asin/binding.sha256` covers this document, the Sollya script
-and output, the generated tables, every certificate and the source `asin/mod.rs`.
+and output, the generated tables, every certificate, `AsinFacts.v` and the source `asin/mod.rs`.
 
 **Checked by:**
 - `crates/reference/tests/asin.rs`: 5,970 cases, bit for bit.
