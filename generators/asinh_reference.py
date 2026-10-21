@@ -144,8 +144,10 @@ def random_cases():
         x = from_bits(b)
         cases.append(('random, every binade', -x if next(words) & 1 else x))
     for _ in range(1500):
-        e = -7.0 + 35.0 * unit()
-        cases.append(('random, [2^-7, 2^28]', 2.0 ** e))
+        # An integer power of two (exact) times a significand in [1, 2): a
+        # non-integer power would depend on the platform's libm.
+        k = -7 + next(words) % 35
+        cases.append(('random, [2^-7, 2^28]', 2.0 ** k * (1 + unit())))
     for _ in range(800):
         cases.append(('random, around 1', 0.25 + 3.75 * unit()))
     for _ in range(800):
