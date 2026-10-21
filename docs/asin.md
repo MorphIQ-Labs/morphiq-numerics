@@ -28,7 +28,7 @@ below claims more than the named artifact does.
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§7) | **done** (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
 | Mutation witnesses | **done** (§7, decision on cargo-mutants): 135 mutants of `asin/mod.rs` and `asin/lanes.rs`, 117 caught, 16 unviable, 1 timed out (counted as detected), 1 equivalent |
 | ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `asin_slice` | **done** (`asin/lanes.rs`, [lanes.md](lanes.md)): bit-identical to `asin` on every cascade over the fixture, thresholds, `k/64` shifter edges, the complement, and random encodings; run on NEON, and on x86-64 SSE2 under Rosetta; AVX-512F is CI's SDE job |
-| Same-host performance against the best alternatives | not measured |
+| Same-host performance against the best alternatives | measured on NEON only: 1.10–1.16× over the scalar loop ([measurements](../crates/reference/measurements/asin-asinh-atan2-m1pro/README.md)); native x86 not measured |
 
 ## Sources
 

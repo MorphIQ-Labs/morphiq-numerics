@@ -18,9 +18,9 @@ and every bound is a Gappa certificate in `formal/atan2`.
 | Correct rounding (§6) | wherever the test decides, and on every pair of [CM]'s list; **not** claimed over the whole domain (§6) |
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§7) | done by the formal lane (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
 | Coq transcription of the Rust and its comparison with it | not done |
-| ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `atan2_slice` | not done |
+| ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `atan2_slice` | **done** (`atan2/lanes.rs`, [lanes.md](lanes.md)): bit-identical to `atan2` on every backend over the fixture's pairs, every pair of special values, ratios at every scale, the segment boundaries and random encodings; run on NEON, and on x86-64 SSE2 under Rosetta; AVX-512F is CI's SDE job |
 | Mutation witnesses | not done |
-| Same-host performance against the best alternatives | not measured |
+| Same-host performance against the best alternatives | measured on NEON only: 1.05–1.64× over the scalar loop ([measurements](../crates/reference/measurements/asin-asinh-atan2-m1pro/README.md)); native x86 not measured |
 
 ## Sources
 

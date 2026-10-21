@@ -12,8 +12,9 @@
 use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::elementary::{
-    asin, asin_slice, asinh, asinh_slice, cos, exp, exp_slice, exp2, exp2_slice, expm1,
-    expm1_slice, ln, ln_1p, ln_1p_slice, ln_slice, log2, log10, sin, sincos, sqrt, tan,
+    asin, asin_slice, asinh, asinh_slice, atan2, atan2_slice, cos, exp, exp_slice, exp2,
+    exp2_slice, expm1, expm1_slice, ln, ln_1p, ln_1p_slice, ln_slice, log2, log10, sin, sincos,
+    sqrt, tan,
 };
 use morphiq_numerics::interval::{FiniteInterval, IntervalError};
 use morphiq_numerics::log_space::{
@@ -637,6 +638,68 @@ pub fn corpus_digest() -> [u8; 32] {
         r.f64(asinh(16.0 * unit - 8.0));
     }
 
+    r.label("atan2");
+    // Every pair of special values, then pairs across the quadrants: ratios in
+    // [0, 1] with either argument the larger, the segment boundaries k/64 and
+    // their neighbours, equal magnitudes, extreme ratios and random encodings.
+    let specials = [
+        0x7ff8_0000_0000_0000_u64,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        1,
+        0x8000_0000_0000_0001,
+        0x3ff0_0000_0000_0000,
+        0xbff0_0000_0000_0000,
+        0x0010_0000_0000_0000,
+        0x7fef_ffff_ffff_ffff,
+        0xffef_ffff_ffff_ffff,
+    ];
+    for y in specials {
+        for x in specials {
+            r.f64(atan2(f64::from_bits(y), f64::from_bits(x)));
+        }
+    }
+    for _ in 0..10_000 {
+        let word = words.next_word();
+        #[allow(clippy::cast_precision_loss)] // a 53-bit integer
+        let unit = (words.next_word() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+        let scale = f64::from_bits(((words.next_word() % 800 + 612) << 52) | (word >> 12));
+        let (sy, sx) = (
+            if word & 1 == 1 { -1.0 } else { 1.0 },
+            if word & 2 == 2 { -1.0 } else { 1.0 },
+        );
+        if word & 4 == 4 {
+            r.f64(atan2(sy * unit * scale, sx * scale));
+        } else {
+            r.f64(atan2(sy * scale, sx * unit * scale));
+        }
+    }
+    for k in 0..=64_u64 {
+        let edge = k as f64 / 64.0;
+        for step in 0..3_u64 {
+            let t = f64::from_bits(edge.to_bits() + step).max(f64::from_bits(1));
+            r.f64(atan2(t, 1.0));
+            r.f64(atan2(-t, -1.0));
+            r.f64(atan2(1.0, t));
+            r.f64(atan2(1.0, -t));
+        }
+    }
+    for _ in 0..5_000 {
+        let (y, x) = (words.next_word(), words.next_word());
+        r.f64(atan2(f64::from_bits(y), f64::from_bits(x)));
+    }
+    for exponent in 0..1_100_u64 {
+        let word = words.next_word();
+        let (y, x) = (
+            f64::from_bits(((1023 - exponent.min(1022)) << 52) | (word >> 12)),
+            1.0 + (word & 0xff) as f64,
+        );
+        r.f64(atan2(y, x));
+        r.f64(atan2(-y, -x));
+    }
+
     r.label("sqrt");
     // Every encoding (both signs, subnormals, infinities and NaNs), then
     // positive arguments in every binade.
@@ -918,6 +981,34 @@ pub fn corpus_digest() -> [u8; 32] {
         0x7fef_ffff_ffff_ffff,
     ];
     batched_section(&mut r, &mut words, asinh_slice, &asinh_edges, (-8.0, 8.0));
+
+    r.label("atan2_slice");
+    {
+        let (mut y, mut x, mut out) = ([0.0; 17], [0.0; 17], [0.0; 17]);
+        let edges = [
+            0x7ff8_0000_0000_0000,
+            0x7ff0_0000_0000_0000,
+            0,
+            1 << 63,
+            0x3ff0_0000_0000_0000,
+            1,
+            0x7fef_ffff_ffff_ffff,
+        ];
+        let mut i = 0;
+        for _ in 0..1_000 {
+            for len in 1..=17 {
+                for j in 0..len {
+                    y[j] = batched_input(&mut words, &edges, i, -2.0, 2.0);
+                    x[j] = batched_input(&mut words, &edges, i + 1, -2.0, 2.0);
+                    i += 3;
+                }
+                atan2_slice(&y[..len], &x[..len], &mut out[..len]);
+                for &v in &out[..len] {
+                    r.f64(v);
+                }
+            }
+        }
+    }
 
     r.label("exp2_slice");
     let exp2_edges = [
