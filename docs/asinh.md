@@ -16,7 +16,7 @@ constants are generated and every bound is a Gappa certificate in
 | Accurate path: two Newton steps for `sinh y = x` in `Q256` (§4) | **certified** (Gappa): relative error below `2^-216`, given the facts §4 lists |
 | Correct rounding on `(0x1.7137449123ef6p−26, ∞)` (§5) | follows from the two bounds and [CM]'s list; the Rust is **not** machine-checked end to end |
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§6) | done by the formal lane (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
-| Coq transcription of the Rust and its comparison with it | not done |
+| Coq transcription of the Rust (`formal/asinh/AsinhKernel.v`) compared with it bit for bit (§6) | **done**: fast path, rounding decision, exponential, accurate path (before rounding) and entry, 13,030 corpus cases; four planted faults (a series coefficient, the root's correction, Newton's residual sign, the large form's correction) each give mismatches. Proofs that it meets §3 and §4's bounds are not written |
 | ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `asinh_slice` | **done** (`asinh/lanes.rs`, [lanes.md](lanes.md)): bit-identical to `asinh` on every cascade over the fixture, thresholds, region edges and random encodings; run on NEON and on x86-64 SSE2 under Rosetta; AVX-512F is CI's SDE job |
 | Mutation witnesses | not done |
 | Same-host performance against the best alternatives | not measured |
@@ -123,7 +123,8 @@ is complete and the stated facts of §4 hold, and exactly `x` below.
 | Artifact | Establishes |
 |---|---|
 | `generators/asinh_poly.sollya` (Sollya 8.0) | the series polynomial and its bound, in `generators/asinh_poly.out` |
-| `generators/asinh_constants.py` | `src/asinh/tables.rs`: the polynomial, `ln 2` as a double-word, `Q256` `ln 2` and the series' steps |
+| `generators/asinh_constants.py` | `src/asinh/tables.rs`: the polynomial, `ln 2` as a double-word, `Q256` `ln 2` and the series' steps; and `formal/asinh/AsinhTables.v`, the same constants for the transcription |
+| `formal/asinh/AsinhKernel.v`, `AsinhTables.v` (Coq 8.15) | the transcription of `asinh/mod.rs` (with `ln`'s proved fast value, `formal/ln/LnFastValue.v`) and its constants; extracted by `formal/extraction/InternalCrosscheck.v` and run against `src/internal_crosscheck/asinh.rs`'s corpus by `check_formal.sh` step 7 |
 | `generators/asinh_certificates.py` | writes every certificate in `formal/asinh` (53) |
 | `formal/asinh/*` (Gappa 1.4.1, at 400 bits) | §3's series, root, logarithm and large form; §4's exponential levels, reduction and two Newton steps |
 | `generators/asinh_reference.py` | the fixture: the 40 hardest arguments of [CM], the threshold and its neighbours, special values, the regions' edges, random arguments |

@@ -24,6 +24,7 @@ import mpmath
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'crates/morphiq-numerics/src/asinh/tables.rs'
+OUTPUT_COQ = ROOT / 'formal/asinh/AsinhTables.v'
 POLY = ROOT / 'generators/asinh_poly.out'
 PREC = 700
 # |r| <= ln2/2 plus the slack of rounding k = RN(y / ln 2) in binary64.
@@ -135,14 +136,44 @@ def generate():
     return '\n'.join(lines) + '\n'
 
 
+def generate_coq():
+    d = derive()
+    word = lambda x: f'0x{to_bits(x):016x}'  # noqa: E731
+    limb = lambda x: f'0x{x:016x}'  # noqa: E731
+    m, e, _ = d['ln2_q']
+    limbs = lambda m: '; '.join(limb((m >> (64 * i)) & ((1 << 64) - 1)) for i in range(4))  # noqa: E731
+    lines = [
+        "(** Constants of asinh's transcription, written by generators/asinh_constants.py; do",
+        '    not edit. docs/asinh.md gives the derivation. Binary64 values are encodings; a',
+        '    Q256 value is its limbs, least significant first, and an exponent. *)',
+        'From Coq Require Import ZArith List.',
+        'Import ListNotations.',
+        'Open Scope Z_scope.',
+        '',
+        '(** The series below 2^-7 (src/asinh/tables.rs POLY0). *)',
+        f'Definition asinh_poly0 : list Z := [{"; ".join(word(c) for c in d["poly0"])}].',
+        f'Definition asinh_ln2 : Z * Z := ({word(d["ln2"][0])}, {word(d["ln2"][1])}).',
+        f'Definition asinh_inv_ln2 : Z := {word(d["inv_ln2"])}.',
+        '(** ln 2 in Q256: limbs and exponent (src/asinh/tables.rs LN2_Q256). *)',
+        f'Definition asinh_ln2_q256 : list Z * Z := ([{limbs(m)}], {e}).',
+        "(** 1/n, n = 1..N, in Q256 (src/asinh/tables.rs EXP_STEPS). *)",
+        'Definition asinh_exp_steps : list (list Z * Z) := [',
+        ';\n'.join(f'  ([{limbs(sm)}], {se})' for sm, se, _ in d['steps']),
+        '].',
+    ]
+    return '\n'.join(lines) + '\n'
+
+
 def main():
-    data = generate()
+    outputs = {OUTPUT: generate(), OUTPUT_COQ: generate_coq()}
     if '--check' in sys.argv[1:]:
-        if OUTPUT.read_text() != data:
-            sys.exit(f'{OUTPUT} differs from a fresh generation')
+        for path, data in outputs.items():
+            if path.read_text() != data:
+                sys.exit(f'{path} differs from a fresh generation')
         return
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(data)
+    for path, data in outputs.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(data)
 
 
 if __name__ == '__main__':

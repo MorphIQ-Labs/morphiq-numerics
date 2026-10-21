@@ -137,3 +137,25 @@ fn recip(c: Q256) -> Q256 {
     let top = c.top();
     c.mul_pow2(-top).recip().mul_pow2(-top)
 }
+
+/// The fast path's double-word at `x` in `(ASINH_IS_X, ∞)` and the rounding
+/// test's decision, for the internal cross-check.
+#[cfg(test)]
+pub(crate) fn crosscheck_fast(x: f64) -> (DoubleWord, Option<f64>) {
+    let y = fast(x);
+    (y, decide_with(y, EPS))
+}
+
+/// The accurate path's exponential at `y`, as `(m, k)` with `e^y = m 2^k`, for
+/// the internal cross-check.
+#[cfg(test)]
+pub(crate) fn crosscheck_exp(y: Q256) -> (Q256, i32) {
+    exp(y)
+}
+
+/// The accurate path's `Q256` value at `x` from the fast value `y`, before
+/// rounding, for the internal cross-check.
+#[cfg(test)]
+pub(crate) fn crosscheck_accurate(x: f64, y: DoubleWord) -> Q256 {
+    accurate_value(x, y)
+}
