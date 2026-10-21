@@ -114,3 +114,60 @@ fn the_forms_meet_at_equal_magnitudes_and_the_axes() {
     assert_eq!(atan2(1e300, -1e-300), HALF_PI_F64);
     assert_eq!(atan2(1e-300, -1e300), PI_F64);
 }
+
+#[test]
+fn the_power_of_two_helpers_are_exact() {
+    // pow2 and scale on every exponent they serve; `exponent` on every binade,
+    // subnormals included.
+    for e in -1000..=1000 {
+        assert_eq!(
+            pow2(e),
+            f64::from_bits(((1023 + i64::from(e)) as u64) << 52),
+            "2^{e}"
+        );
+    }
+    for k in -1074..=1023 {
+        let x = f64::from_bits(((1023_i64 + i64::from(k.max(-1022))) as u64) << 52);
+        assert_eq!(exponent(x), k.max(-1022), "{x:e}");
+        if k < -1022 {
+            let subnormal = f64::from_bits(1 << (k + 1074));
+            assert_eq!(exponent(subnormal), k, "{subnormal:e}");
+            assert_eq!(exponent(f64::from_bits((1 << (k + 1074)) | 1)), k);
+        }
+    }
+    for k in -1000..=1000 {
+        assert_eq!(
+            scale(1.0, k),
+            pow2(-k.clamp(-1000, 1000)),
+            "scale by 2^-{k}"
+        );
+        assert_eq!(scale(3.0, k), 3.0 * pow2(-k), "scale of 3 by 2^-{k}");
+    }
+}
+
+#[test]
+fn the_fast_value_is_within_its_certified_bound_of_the_accurate_value() {
+    use crate::test_exact::Exact;
+    // §3: the angle's double-word within 2^-63 (the forms add a little: 2^-62),
+    // against the accurate path's Q256 value, which is within 2^-190 of atan2.
+    for (n, d) in pairs(0x6174_616e_325f_6163, 6_000) {
+        for (index, form) in [
+            Form::Phi,
+            Form::HalfPiMinus,
+            Form::PiMinus,
+            Form::HalfPiPlus,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let (y, phi) = fast(n, d, form);
+            let fast_value = Exact::of_f64(y.hi()).add(&Exact::of_f64(y.lo()));
+            let reference = Exact::of_q256(accurate_value(n, d, form, phi));
+            let shift = if index == 0 { 63 } else { 62 };
+            assert!(
+                fast_value.within(&reference, 1, shift),
+                "{n:e}/{d:e}, form {index}"
+            );
+        }
+    }
+}
