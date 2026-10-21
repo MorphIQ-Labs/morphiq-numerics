@@ -20,8 +20,9 @@ below claims more than the named artifact does.
 | Accurate path: Newton step in `Q256` (§5) | **certified** (Gappa): relative error below `2^-124.8`, given the facts §5 lists |
 | Correct rounding on `[0x1.7137449123ef6p−26, 1)` (§6) | follows from the two bounds and [CM]'s list; **not machine-checked end to end**: the Coq transcription of the Rust is compared with it on a corpus but its bounds are not proved (next row) |
 | Coq transcription of the Rust (`formal/asin/AsinKernel.v`) compared with it bit for bit (§7) | **done**: reduction, series, fast path, rounding decision, accurate path (before rounding) and entry, 19,532 corpus cases |
+| Proof that the transcription's series branch evaluates as `series_tail.g` models (`AsinSeriesSmall.v`: `series_small_eval`) | **proved in Coq**: `B h + B l = (zh + zl + Tx (1 + ec))(1 + ea)`, `Tx = zh³ P(zh²)` exact, `|ec| ≤ 2^-51`, `|ea| ≤ 2^-104`; the step to `asin z` (Sollya's bound on `P`, the series of `asin`) is `series_compose.g`'s hypotheses, stated not proved |
 | Proof that the transcription's complement reduction meets `sqrt.g` (`AsinSqrtStep.v`: `reduced_complement`) | **proved in Coq**, applying the generated certificate theorem |
-| Proofs that the rest of the transcription meets §4 and §5's bounds (the series, the segments, the fast path's composition, the decision, the accurate path), applying the certificates | **not written** |
+| Proofs that the rest of the transcription meets §4 and §5's bounds (the 45 segments, the fast path's composition, the decision, the direct branch's call, the accurate path), applying the certificates | **not written** |
 | The Taylor remainders, the argument ranges, `sin t/t` (§5) | **proved in Coq** (`formal/asin/AsinFacts.v`) |
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§7) | **done** (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
 | Mutation witnesses | not done |
@@ -127,7 +128,7 @@ Below `x = 0x1.7137449123ef6p−26` the answer is `x` (§1).
 |---|---|
 | `formal/asin/eval_<kk>.g` (45) | the binary64 tail, Horner chain included, is within `4·T²·2^-52·sup\|G_k\|` of the exact polynomial's value after `p_hi` (at most `2^-64.0` absolute; the proven bound is within `2^1.6` of the claim) |
 | `formal/asin/compose_<kk>.g` (45) | the fast result is within `2^-63.5` (`k = 45`) to `2^-64.8` (`k = 9`) of `asin(a + t)`, relative |
-| `formal/asin/series_tail.g`, `series_compose.g` | the series' cubic term within `2^-49`; the fast result within `2^-65.2` of `asin z` |
+| `formal/asin/series_tail.g`, `series_compose.g` | on `z` in `[2^-28, 0.0078126]`: the series' cubic term within `2^-51`; the fast result within `2^-66.5` of `asin z`, given `rc ≤ 1.1·10⁻⁵` and `eps ≤ 2^-50`, the sum of the tail's `2^-51`, Sollya's `2^-54(1 + 2^-23)` and `3.1·2^-53` for `zl` and the rounding of `zh²` (the generator asserts that sum) |
 | `formal/asin/sqrt.g` | `z` within `2^-103` of `w` |
 | `formal/asin/complement.g` | the complement's result within `2^-63.6` of `asin x` |
 
@@ -226,6 +227,7 @@ shared with `sin`. The certified fast bound is below `2^-63.5`.
 | `generators/asin_certificates.py` | writes every certificate in `formal/asin` (96) |
 | `formal/asin/AsinKernel.v`, `AsinTables.v` (Coq 8.15) | the transcription of `asin/mod.rs` and its generated constants; extracted by `formal/extraction/InternalCrosscheck.v` and run against `src/internal_crosscheck/asin.rs`'s corpus by `check_formal.sh` step 7 |
 | `formal/asin/AsinSqrtStep.v` (Coq 8.15) | `reduced_complement`: for `x` in `[SPLIT⁺, 1 − 2^-53]`, `asin_reduced x` takes the complement branch and returns a double-word within `2^-103` of `sqrt((1 − x)/2)`, relatively; it applies `asin_sqrt.l1` (the generated proof of `sqrt.g`), after showing `1 − x`, the halving, `two_prod`, the two subtractions, the doubling, the division and `two_sum` behave as the certificate's rounding model |
+| `formal/asin/AsinSeriesSmall.v` (Coq 8.15) | `series_small_eval`: for a binary64 double-word `(zh, zl)` with `zh` in `[2^-28, 2^-7]`, `zh = RN(zh + zl)` and `\|zl\| ≤ zh/2`, `asin_series` takes the series branch (`index_zero`: the shifter index is 0, by `ExpReduction.shifter_round`) and returns `(h, l)` finite with the evaluation above, from `series_tail.g`'s generated proof (applied at its real variable, with the nine rounded operations' ranges) and `add_f64_ieee` |
 | `formal/asin/AsinFacts.v` (Coq 8.15, Interval) | §5's Taylor remainders, argument ranges and `sin t/t` |
 | `formal/asin/*` (Gappa 1.4.1, at 400 bits) | §4's evaluations, compositions, series, square root and complement; §5's two Newton steps |
 | `generators/asin_reference.py` | the fixture: the 40 hardest arguments of [CM], the threshold and its neighbours, special values, multiples of 1/64, the crossover, arguments next to 1, random arguments |
