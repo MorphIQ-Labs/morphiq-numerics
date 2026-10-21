@@ -16,7 +16,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 failed=0
-for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig formal/normal formal/asin; do
+for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig formal/normal formal/asin formal/asinh; do
   f=${dir#formal/}
   binding="$dir/binding.sha256"
   # Normal compositions share the end-to-end proof manifest.
