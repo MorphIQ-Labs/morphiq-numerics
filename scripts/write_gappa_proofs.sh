@@ -13,7 +13,7 @@ fi
 out=$1
 cd "$(dirname "$0")/.."
 
-for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig formal/erfcx formal/normal formal/asin formal/asinh; do
+for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig formal/erfcx formal/normal formal/asin formal/asinh formal/atan2; do
   f=${dir#formal/}
   mkdir -p "$out/$f"
   # Reusing an output directory must not retain proofs of removed certificates.
