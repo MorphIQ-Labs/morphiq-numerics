@@ -42,13 +42,14 @@ kept (`bench-batched-run1.md` to `run3.md`, the new functions' rows).
   lane. `asin` now computes each only where some lane needs it (commit
   `perf(asin): skip unneeded work in the lane kernel`); `asinh` and `atan2` were
   written that way. The speed-ups above are after the fix.
-- **The software square root dominates.** The complement (`asin`, 179 ns) and the
+- **The software square root dominates (before the hardware path).** These figures were taken before `exact::sqrt` and the fused `two_prod_d` replaced the integer root and Dekker's product in these kernels ([sqrt.md](../../../../docs/sqrt.md)); they have not been re-measured and the speed-ups above predate that change.
+  The finding itself: The complement (`asin`, 179 ns) and the
   logarithmic region (`asinh`, 194 ns) spend most of their time in
   `crate::sqrt::sqrt`, the integer digit-by-digit square root: the crate is `no_std`
   and by design reaches no platform `sqrt` ([sqrt.md](../../../../docs/sqrt.md)). A
-  hardware square root is correctly rounded and so bit-identical, and would cut
-  those regions several-fold in the scalar function and the lanes alike, but it
-  changes that design decision; it is recorded here, not made.
+  hardware square root is correctly rounded and so bit-identical; `exact::sqrt` now
+  uses it where the target has one, which should cut those regions several-fold in
+  the scalar functions and the lanes alike. That is the expectation, not a measurement.
 - **The series regions barely gain** (`asin` 1.10×, `asinh` 1.01–1.05×): the work
   is a few multiplies per element and two lanes cannot beat that by much on this
   host. A wider backend would.
