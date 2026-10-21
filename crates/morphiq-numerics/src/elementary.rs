@@ -109,3 +109,11 @@ batched!(
     /// lanes; a lane the screen or the test doesn't settle calls [`asin`].
     asin_slice, asin, crate::asin::lanes::Asin
 );
+
+batched!(
+    /// [`asinh`] of every element of `x`, written to `out`, bit for bit.
+    /// With `simd`, the series, the logarithm of `x + √(x² + 1)`, the large
+    /// form and the rounding test run in lanes; a lane the screen or the test
+    /// doesn't settle calls [`asinh`].
+    asinh_slice, asinh, crate::asinh::lanes::Asinh
+);

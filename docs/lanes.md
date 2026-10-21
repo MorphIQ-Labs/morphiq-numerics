@@ -1,6 +1,6 @@
 # Batched functions and lane evaluation
 
-`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice, asin_slice}` apply
+`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice, asin_slice, asinh_slice}` apply
 [`exp`](exp.md), [`exp2`](exp2.md), [`expm1`](expm1.md), [`ln` and `ln_1p`](ln.md) to every element of a slice. The
 lane kernels are `crates/morphiq-numerics/src/lanes/`, `exp/lanes.rs`, `exp2/lanes.rs`, `expm1/lanes.rs` and
 `ln/lanes.rs`; the SIMD backends are the `morphiq-numerics-arch` crate
@@ -287,6 +287,18 @@ A lane the screen or the test doesn't settle calls `asin` itself, from the
 start. Every operation is the scalar operation in the scalar order, with
 `two_prod` as §2 states, on its domain: the arguments are `s` (at least
 `2^-27`), `t_hi` (zero or at least `2^-900`: `docs/asin.md` §4) and `2`.
+
+## `asinh`
+
+`asinh_slice` (`asinh/lanes.rs`) runs `asinh`'s fast path in lanes: the screen
+(a NaN, `±0`, `±∞` and `|x|` up to the threshold are the scalar function's own
+results), the series below `2^-7`, the logarithm of `x + √(x² + 1)` (the exact
+square, the double-word `u`, `√u` and its Newton correction, `v`, then `ln`'s
+double-word fast value through the shared fallback of §5 and `RN(v_lo/v_hi)`),
+the large form `ln x + ln 2 + 1/(4x²)` from `2^28`, and the rounding test at
+`EPS = 2^-63(1 + 2^-50)`. Each region runs only if some live lane is in it and
+is selected by mask. `√u` is the scalar `sqrt`, per lane. A lane the screen or
+the test doesn't settle calls `asinh` itself.
 
 ## 6. Checked by
 
