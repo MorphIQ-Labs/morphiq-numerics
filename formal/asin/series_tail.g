@@ -30,4 +30,3 @@ Tx = zh * zh * zh * P;
   { Tx <> 0, zh <> 0, P <> 0, a3 <> 0, ps <> 0 };
 (a3 - zh * zh * zh) / (zh * zh * zh) -> (1 + (uh - zh * zh) / (zh * zh)) * (1 + (a3 - zh * uh) / (zh * uh)) - 1
   { zh <> 0, uh <> 0 };
-(ps - P) / P -> (1 + (p2 - P2) / P2 * (zh * zh * P2 / P)) * (1 + (ps - (q0 + uh * p2)) / (q0 + uh * p2)) - 1 { P <> 0, P2 <> 0 };

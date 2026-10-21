@@ -39,4 +39,4 @@ t4 = ea * mx / (c0 * Y);
   /\ eb in [-1b-254, 1b-254]
   -> (y1 - Y) / Y in [-1b-124, 1b-124] }
 
-(y1 - Y) / Y -> -eta * kk + (t2 + t3 + t4) * (1 + kk) + eb * (1 + eta) { Y <> 0, c0 <> 0 };
+(y1 - Y) / Y -> -eta * kk + (t2 + t3 + t4) * (1 + kk) + eb * (1 + eta) { Y <> 0, c0 <> 0, 1 + gamma <> 0 };

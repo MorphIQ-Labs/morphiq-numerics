@@ -20,4 +20,4 @@ zv = s + sl;
 
 { w_ in [1b-27, 0.3827] -> (zv - w) / w in [-1b-103, 1b-103] }
 
-(zv - w) / w -> ((s - w) * (s - w) / s2 + (rr1 - (u - ph)) / s2 + (r2 - (rr1 - pl)) / s2 + (sl - r2 / s2)) / w { w <> 0 };
+(zv - w) / w -> ((s - w) * (s - w) / s2 + (rr1 - (u - ph)) / s2 + (r2 - (rr1 - pl)) / s2 + (sl - r2 / s2)) / w { w <> 0, s <> 0 };

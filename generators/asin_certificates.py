@@ -231,7 +231,6 @@ Tx = zh * zh * zh * P;
   {{ Tx <> 0, zh <> 0, P <> 0, a3 <> 0, ps <> 0 }};
 (a3 - zh * zh * zh) / (zh * zh * zh) -> (1 + (uh - zh * zh) / (zh * zh)) * (1 + (a3 - zh * uh) / (zh * uh)) - 1
   {{ zh <> 0, uh <> 0 }};
-(ps - P) / P -> (1 + (p2 - P2) / P2 * (zh * zh * P2 / P)) * (1 + (ps - (q0 + uh * p2)) / (q0 + uh * p2)) - 1 {{ P <> 0, P2 <> 0 }};
 """
 
 
@@ -256,7 +255,7 @@ F = (z * (1 + rc * (1 + eps))) * (1 + ea);
 {{ z in [1b-26, {T_LIT}] /\ rc in [0, 13b-23] /\ eps in [-1b-49, 1b-49] /\ ea in [-1b-104, 1b-104]
   -> (F - A) / A in [-{claim}, {claim}] }}
 
-(F - A) / A -> (rc * eps * (1 + ea)) / (1 + rc) + ea * (1 + rc * (1 + eps)) / (1 + rc) {{ z <> 0 }};
+(F - A) / A -> (rc * eps + (1 + rc * (1 + eps)) * ea) / (1 + rc) {{ z <> 0, 1 + rc <> 0 }};
 """, up(rc * ec * (1 + DW_ADD_F) + DW_ADD_F)
 
 
@@ -284,7 +283,7 @@ zv = s + sl;
 
 {{ w_ in [1b-27, 0.3827] -> (zv - w) / w in [-1b-103, 1b-103] }}
 
-(zv - w) / w -> ((s - w) * (s - w) / s2 + (rr1 - (u - ph)) / s2 + (r2 - (rr1 - pl)) / s2 + (sl - r2 / s2)) / w {{ w <> 0 }};
+(zv - w) / w -> ((s - w) * (s - w) / s2 + (rr1 - (u - ph)) / s2 + (r2 - (rr1 - pl)) / s2 + (sl - r2 / s2)) / w {{ w <> 0, s <> 0 }};
 """
 
 
@@ -368,6 +367,14 @@ def identity_check():
         u3, u4 = c0 * gamma / (Dt * Dt * (1 + eta) * fs), ea * mx / (Dt * Dt * (1 + eta) * fs)
         u5 = eb * (1 + eta)
         assert (yf - Ax) / Ax == ((H * eH + ec * H) - Dt * (u1 + (u2 + u3 + u4) * (1 + kk) + u5)) / Ax, 'complement identity'
+        # The series' composition and the square root's correction.
+        z, rc, eps, ea2 = r('0.00001', '0.0078'), r('0', '0.00001'), sym(Fraction(1, 2**49)), sym(Fraction(1, 2**104))
+        A, F = z * (1 + rc), (z * (1 + rc * (1 + eps))) * (1 + ea2)
+        assert (F - A) / A == (rc * eps + (1 + rc * (1 + eps)) * ea2) / (1 + rc), 'series identity'
+        w, s_, ph, rr1, r2_, sl = r('0.00001', '0.38'), r('0.00001', '0.38'), r('0', '0.1'), r('0', '0.1'), r('0', '0.1'), r('0', '0.1')
+        u, pl, s2 = w * w, s_ * s_ - ph, 2 * s_
+        zv = s_ + sl
+        assert (zv - w) / w == ((s_ - w) * (s_ - w) / s2 + (rr1 - (u - ph)) / s2 + (r2_ - (rr1 - pl)) / s2 + (sl - r2_ / s2)) / w, 'sqrt identity'
 
 
 def newton_certificates():
@@ -419,7 +426,7 @@ t4 = ea * mx / (c0 * Y);
   /\ eb in [-1b-254, 1b-254]
   -> (y1 - Y) / Y in [-1b-124, 1b-124] }}
 
-(y1 - Y) / Y -> -eta * kk + (t2 + t3 + t4) * (1 + kk) + eb * (1 + eta) {{ Y <> 0, c0 <> 0 }};
+(y1 - Y) / Y -> -eta * kk + (t2 + t3 + t4) * (1 + kk) + eb * (1 + eta) {{ Y <> 0, c0 <> 0, 1 + gamma <> 0 }};
 """
     complement = rf"""# The accurate path's Newton step for x > SPLIT (docs/asin.md, section 5):
 #   d1 = d0 + (cos d0 - x)/sin d0, result pi/2 - d1
@@ -458,7 +465,7 @@ u5 = eb * (1 + eta);
   /\ H in [1.570796326794896619, 1.570796326794896620]
   -> (yf - Ax) / Ax in [-1b-124, 1b-124] }}
 
-(yf - Ax) / Ax -> ((H * eH + ec * H) - Dt * (u1 + (u2 + u3 + u4) * (1 + kk) + u5)) / Ax {{ Ax <> 0, Dt <> 0, fs <> 0 }};
+(yf - Ax) / Ax -> ((H * eH + ec * H) - Dt * (u1 + (u2 + u3 + u4) * (1 + kk) + u5)) / Ax {{ Ax <> 0, Dt <> 0, fs <> 0, 1 + eta <> 0, 1 + sigma <> 0 }};
 """
     return {'newton_direct.g': direct, 'newton_complement.g': complement}
 

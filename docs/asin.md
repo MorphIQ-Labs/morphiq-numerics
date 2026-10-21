@@ -19,7 +19,8 @@ below claims more than the named artifact does.
 | Facts outside Gappa (§4, "Not covered by a certificate") | tested, not proved |
 | Accurate path: Newton step in `Q256` (§5) | **certified** (Gappa): relative error below `2^-124.8`, given the facts §5 lists |
 | Correct rounding on `[0x1.7137449123ef6p−26, 1)` (§6) | follows from the two bounds and [CM]'s list; **not machine-checked end to end**: the Rust is not extracted or compared against the certified operation sequence |
-| Coq re-proof of the certificates; mutation witnesses | not done |
+| Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§7) | **done** (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
+| Mutation witnesses | not done |
 | ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `asin_slice` | not done |
 | Same-host performance against the best alternatives | not measured |
 
@@ -167,8 +168,10 @@ else is below `2^-144`. The hypotheses are named in the certificates:
 - the argument ranges (computed with `mpmath` at 200 bits): `y₀ ≤ π/4` (`asin SPLIT = π/4 − 8.9·10⁻¹⁷`
   against a start error of at most `2^-62·π/4 = 1.7·10⁻¹⁹`), `δ₀ ≤ π/4` (`acos` of the least `x > SPLIT`
   is `π/4 − 6.8·10⁻¹⁷`), `Y ≥ 2^-26`, `D ≥ 2^-27`, `sin t/t ≥ 0.9` for `t ≤ π/4`;
-- the rewrite hints' algebra, which Gappa takes on trust: checked in exact rational
-  arithmetic at 200 random points per branch by `generators/asin_certificates.py`.
+The rewrite hints' algebra, which Gappa takes on trust, is proved in Coq by the formal
+lane (each hint a lemma proved by `field`, `formal/gappa/Hints.v`); the generator also checks every
+hint in exact rational arithmetic at random points, so a slip fails generation before it fails
+the lane.
 
 ## 6. Rounding test and claims
 
@@ -208,5 +211,8 @@ and output, the generated tables, every certificate and the source `asin/mod.rs`
 - `crates/reference/tests/asin.rs`: 5,970 cases, bit for bit.
 - `src/asin/tests.rs`: special values, oddness, the branch boundary, and 200,000
   random arguments on which every fast-path decision equals the accurate path's result.
+- The formal lane's Coq proof of each certificate (`check_formal.sh` step 5): 96 proofs, each hint
+  proved, the global axioms those theorems rest on equal to `formal/axioms.expected`'s classical-real set.
+  It found one wrong hint (`series_compose.g`), now fixed, and missing side conditions on four more.
 - A negative control was run by hand on eight certificates (one of each kind): shrinking the claimed
   bound makes Gappa exit non-zero. It is not a gate.
