@@ -18,6 +18,7 @@ use morphiq_numerics_arch::{Scalar, Simd, WithSimd};
 
 use super::{Kernel, chunks, run, two_prod};
 use crate::asin::lanes::Asin;
+use crate::asinh::lanes::Asinh;
 use crate::exp::lanes::Exp;
 use crate::exp2::lanes::Exp2;
 use crate::expm1::lanes::Expm1;
@@ -276,6 +277,29 @@ pub(crate) fn asin_corpus() -> Vec<f64> {
     v
 }
 
+pub(crate) fn asinh_corpus() -> Vec<f64> {
+    let mut rng = SplitMix64::new(0x6c61_6e65_5f61_7368);
+    let n = cases();
+    let mut v = fixture_values(include_str!("../../../reference/fixtures/asinh.json"));
+    v.extend(specials());
+    // docs/asinh.md's thresholds and region edges, with neighbours.
+    v.extend(with_neighbours(&[
+        f64::from_bits(0x3e57_1374_4912_3ef6),
+        f64::from_bits(0x3f80_0000_0000_0000),
+        f64::from_bits(0x41b0_0000_0000_0000),
+        f64::MAX,
+    ]));
+    for _ in 0..n {
+        // Every binade, both signs, and bits at random.
+        v.push(binade(&mut rng, -30, 1023));
+        v.push(f64::from_bits(rng.next_u64()));
+        // The logarithmic region.
+        v.push(binade(&mut rng, -7, 27).abs());
+        v.push(unit(&mut rng) * 8.0 - 4.0);
+    }
+    v
+}
+
 /// Runs `G`'s lane kernel on backend `k`, through `k.vectorize` as the
 /// library does, and requires the scalar function's bits on every element.
 struct Check<'a, G> {
@@ -500,6 +524,7 @@ fn every_lanes_cascade_returns_the_scalar_bits() {
     check_cascades::<Ln>("ln", &short(ln_corpus()));
     check_cascades::<Ln1p>("ln_1p", &short(ln_1p_corpus()));
     check_cascades::<Asin>("asin", &short(asin_corpus()));
+    check_cascades::<Asinh>("asinh", &short(asinh_corpus()));
 }
 
 fn check_all<G: Kernel>(name: &str, xs: &[f64]) {
@@ -528,6 +553,11 @@ fn asin_lanes_return_asins_bits_on_every_backend() {
 }
 
 #[test]
+fn asinh_lanes_return_asinhs_bits_on_every_backend() {
+    check_all::<Asinh>("asinh", &asinh_corpus());
+}
+
+#[test]
 fn ln_1p_lanes_return_ln_1ps_bits_on_every_backend() {
     check_all::<Ln1p>("ln_1p", &ln_1p_corpus());
 }
@@ -543,7 +573,13 @@ fn batched_entry_points_return_the_scalar_bits() {
         Vec<f64>,
     );
     let short = |v: Vec<f64>| -> Vec<f64> { v.into_iter().step_by(7).take(4_000).collect() };
-    let entries: [Entry; 6] = [
+    let entries: [Entry; 7] = [
+        (
+            "asinh_slice",
+            crate::elementary::asinh_slice,
+            crate::asinh::asinh,
+            short(asinh_corpus()),
+        ),
         (
             "asin_slice",
             crate::elementary::asin_slice,

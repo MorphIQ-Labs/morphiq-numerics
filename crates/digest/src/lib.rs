@@ -12,8 +12,8 @@
 use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::elementary::{
-    asin, asin_slice, cos, exp, exp_slice, exp2, exp2_slice, expm1, expm1_slice, ln, ln_1p,
-    ln_1p_slice, ln_slice, log2, log10, sin, sincos, sqrt, tan,
+    asin, asin_slice, asinh, asinh_slice, cos, exp, exp_slice, exp2, exp2_slice, expm1,
+    expm1_slice, ln, ln_1p, ln_1p_slice, ln_slice, log2, log10, sin, sincos, sqrt, tan,
 };
 use morphiq_numerics::interval::{FiniteInterval, IntervalError};
 use morphiq_numerics::log_space::{
@@ -599,6 +599,44 @@ pub fn corpus_digest() -> [u8; 32] {
         }
     }
 
+    r.label("asinh");
+    // Special values, docs/asinh.md's threshold and region edges with their
+    // neighbours, the largest finite, then 10,000 arguments over every binade
+    // from 2^-30 to 2^1023, both signs, and 5,000 in [-8, 8].
+    for bits in [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        1,
+        0x3e57_1374_4912_3ef5,
+        0x3e57_1374_4912_3ef6,
+        0x3e57_1374_4912_3ef7,
+        0x3f7f_ffff_ffff_ffff,
+        0x3f80_0000_0000_0000,
+        0x3f80_0000_0000_0001,
+        0x41af_ffff_ffff_ffff,
+        0x41b0_0000_0000_0000,
+        0x41b0_0000_0000_0001,
+        0x7fef_ffff_ffff_ffff,
+    ] {
+        r.f64(asinh(f64::from_bits(bits)));
+        r.f64(asinh(-f64::from_bits(bits)));
+    }
+    for _ in 0..10_000 {
+        let word = words.next_word();
+        let biased = 993 + words.next_word() % 1031;
+        r.f64(asinh(f64::from_bits(
+            (word & (1 << 63)) | (biased << 52) | (word >> 12),
+        )));
+    }
+    for _ in 0..5_000 {
+        #[allow(clippy::cast_precision_loss)] // a 53-bit integer
+        let unit = (words.next_word() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+        r.f64(asinh(16.0 * unit - 8.0));
+    }
+
     r.label("sqrt");
     // Every encoding (both signs, subnormals, infinities and NaNs), then
     // positive arguments in every binade.
@@ -865,6 +903,21 @@ pub fn corpus_digest() -> [u8; 32] {
         0x3fef_ffff_ffff_ffff,
     ];
     batched_section(&mut r, &mut words, asin_slice, &asin_edges, (-1.1, 1.1));
+
+    r.label("asinh_slice");
+    let asinh_edges = [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        0x3e57_1374_4912_3ef6,
+        0x3e57_1374_4912_3ef7,
+        0x3f80_0000_0000_0000,
+        0x41b0_0000_0000_0000,
+        0x7fef_ffff_ffff_ffff,
+    ];
+    batched_section(&mut r, &mut words, asinh_slice, &asinh_edges, (-8.0, 8.0));
 
     r.label("exp2_slice");
     let exp2_edges = [
