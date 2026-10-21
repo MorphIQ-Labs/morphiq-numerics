@@ -16,9 +16,10 @@ pub(crate) mod bench;
 
 use morphiq_numerics_arch::{Scalar, Simd, WithSimd};
 
-use super::{Kernel, chunks, run, two_prod};
+use super::{Kernel, Kernel2, chunks, run, run2, two_prod};
 use crate::asin::lanes::Asin;
 use crate::asinh::lanes::Asinh;
+use crate::atan2::lanes::Atan2;
 use crate::exp::lanes::Exp;
 use crate::exp2::lanes::Exp2;
 use crate::expm1::lanes::Expm1;
@@ -701,4 +702,146 @@ fn expm1_lanes_return_scalar_bits_on_every_backend() {
 fn erfcx_lanes_all_backends_and_cascades() {
     let xs = crate::erfcx::tests::corpus();
     check_cascades::<crate::erfcx::lanes::Erfcx>("erfcx", &xs);
+}
+
+/// Pairs `(y, x)` for `atan2`: the reference fixture's, every pair of special
+/// values, ratios across the unit interval at every scale, the segment and
+/// form boundaries, and random encodings.
+pub(crate) fn atan2_corpus() -> (Vec<f64>, Vec<f64>) {
+    let mut rng = SplitMix64::new(0x6c61_6e65_5f61_7432);
+    let n = cases();
+    let fixture = include_str!("../../../reference/fixtures/atan2.json");
+    let words = fixture_pairs(fixture);
+    let (mut ys, mut xs): (Vec<f64>, Vec<f64>) = words.into_iter().unzip();
+    let special = specials();
+    for &y in &special {
+        for &x in &special {
+            ys.push(y);
+            xs.push(x);
+        }
+    }
+    for _ in 0..n {
+        let scale = binade(&mut rng, -400, 400).abs();
+        let t = unit(&mut rng);
+        let sy = if rng.next_u64() & 1 == 1 { -1.0 } else { 1.0 };
+        let sx = if rng.next_u64() & 1 == 1 { -1.0 } else { 1.0 };
+        ys.push(sy * t * scale);
+        xs.push(sx * scale);
+        ys.push(sy * scale);
+        xs.push(sx * t * scale);
+        // A ratio of a segment boundary k/64, give or take.
+        let k = (rng.next_u64() % 65) as f64 / 64.0;
+        ys.push(sy * f64::from_bits(k.to_bits().wrapping_add(rng.next_u64() % 5)) * scale);
+        xs.push(sx * scale);
+        ys.push(f64::from_bits(rng.next_u64()));
+        xs.push(f64::from_bits(rng.next_u64()));
+        // Extreme ratios.
+        ys.push(binade(&mut rng, -1022, 1023));
+        xs.push(binade(&mut rng, -1022, 1023));
+        ys.push(f64::from_bits(rng.next_u64() % (1 << 52)));
+        xs.push(binade(&mut rng, -10, 10));
+    }
+    (ys, xs)
+}
+
+/// Every pair `"y": "...", "x": "..."` of a fixture, as binary64 numbers.
+fn fixture_pairs(fixture: &str) -> Vec<(f64, f64)> {
+    let words: Vec<f64> = fixture_values(fixture);
+    // Entries are y, x, result in order.
+    words.chunks_exact(3).map(|c| (c[0], c[1])).collect()
+}
+
+/// Runs `G`'s lane kernel on backend `k` over paired arguments and requires the
+/// scalar function's bits on every element, for the whole corpus and for
+/// slices of every length from 0 to 17.
+struct Check2<'a, G> {
+    name: &'a str,
+    ys: &'a [f64],
+    xs: &'a [f64],
+    kernel: core::marker::PhantomData<G>,
+}
+
+impl<G: Kernel2> WithSimd for Check2<'_, G> {
+    type Output = ();
+    #[inline(always)]
+    fn with<K: Simd>(self, k: K) {
+        let mut out = std::vec![0.0; self.xs.len()];
+        run2::<G, K>(k, self.ys, self.xs, &mut out);
+        let mut mismatches = 0_usize;
+        for ((&y, &x), &r) in self.ys.iter().zip(self.xs).zip(&out) {
+            let want = G::scalar(y, x);
+            if want.to_bits() != r.to_bits() && !(want.is_nan() && r.is_nan()) {
+                if mismatches < 10 {
+                    std::eprintln!(
+                        "{} on {}: ({y:e}, {x:e}) gives {r:e}, scalar {want:e}",
+                        self.name,
+                        K::NAME
+                    );
+                }
+                mismatches += 1;
+            }
+        }
+        assert_eq!(mismatches, 0, "{} on {}: mismatches", self.name, K::NAME);
+        for len in 0..=17 {
+            for start in 0..8.min(self.xs.len().saturating_sub(len)) {
+                let (ys, xs) = (&self.ys[start..start + len], &self.xs[start..start + len]);
+                let mut out = std::vec![0.0; len];
+                run2::<G, K>(k, ys, xs, &mut out);
+                for ((&y, &x), &r) in ys.iter().zip(xs).zip(&out) {
+                    let want = G::scalar(y, x);
+                    assert!(
+                        want.to_bits() == r.to_bits() || (want.is_nan() && r.is_nan()),
+                        "{} on {}",
+                        self.name,
+                        K::NAME
+                    );
+                }
+            }
+        }
+        std::eprintln!(
+            "{} on {}: {} pairs bit-identical",
+            self.name,
+            K::NAME,
+            self.xs.len()
+        );
+    }
+}
+
+#[test]
+fn atan2_lanes_return_atan2s_bits_on_every_backend() {
+    let (ys, xs) = atan2_corpus();
+    for backend in backends() {
+        backend.vectorize(Check2::<Atan2> {
+            name: "atan2",
+            ys: &ys,
+            xs: &xs,
+            kernel: core::marker::PhantomData,
+        });
+    }
+}
+
+/// The public paired entry point, on the dispatched backend, for every length
+/// up to 17 and a long slice, and its length check.
+#[test]
+fn atan2_slice_returns_the_scalar_bits() {
+    let (ys, xs) = atan2_corpus();
+    let (ys, xs): (Vec<f64>, Vec<f64>) = ys.into_iter().zip(xs).step_by(7).take(4_000).unzip();
+    for len in (0..=17).chain([xs.len()]) {
+        let (y, x) = (&ys[..len], &xs[..len]);
+        let mut out = std::vec![f64::NAN; len];
+        crate::elementary::atan2_slice(y, x, &mut out);
+        for ((&y, &x), &r) in y.iter().zip(x).zip(&out) {
+            let want = crate::atan2::atan2(y, x);
+            assert!(
+                want.to_bits() == r.to_bits() || (want.is_nan() && r.is_nan()),
+                "atan2_slice({y:e}, {x:e})"
+            );
+        }
+    }
+}
+
+#[test]
+#[should_panic(expected = "atan2_slice: slices of different lengths")]
+fn atan2_slice_rejects_slices_of_different_lengths() {
+    crate::elementary::atan2_slice(&[1.0, 2.0], &[1.0, 2.0], &mut [0.0]);
 }

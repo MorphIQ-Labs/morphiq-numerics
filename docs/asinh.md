@@ -19,7 +19,7 @@ constants are generated and every bound is a Gappa certificate in
 | Coq transcription of the Rust and its comparison with it | not done |
 | ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `asinh_slice` | **done** (`asinh/lanes.rs`, [lanes.md](lanes.md)): bit-identical to `asinh` on every cascade over the fixture, thresholds, region edges and random encodings; run on NEON and on x86-64 SSE2 under Rosetta; AVX-512F is CI's SDE job |
 | Mutation witnesses | not done |
-| Same-host performance against the best alternatives | not measured |
+| Same-host performance against the best alternatives | measured on NEON only: 1.01–1.66× over the scalar loop ([measurements](../crates/reference/measurements/asin-asinh-atan2-m1pro/README.md)); native x86 not measured |
 
 ## Sources
 

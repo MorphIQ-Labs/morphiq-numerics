@@ -89,6 +89,10 @@ fn the_fast_path_never_decides_against_the_accurate_path() {
             }
         }
     }
+    std::eprintln!(
+        "atan2: {undecided} of {} pairs reach the accurate path",
+        count * 4
+    );
     // §6: the test sends about one argument in 2^8.4 to the accurate path.
     assert!(
         undecided * 100 < count * 4,
