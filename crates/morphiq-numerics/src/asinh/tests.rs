@@ -86,16 +86,16 @@ fn the_regions_agree_where_they_meet() {
 }
 
 #[test]
-fn the_accurate_path_agrees_with_the_fast_value() {
-    // The Newton step moves the fast value by its error, 2^-63 relatively.
+fn the_fast_value_is_within_its_certified_bound_of_the_accurate_value() {
+    use crate::test_exact::Exact;
+    // §3: the series within 2^-66.4 (series_compose.g), the other forms within
+    // 2^-63 (log.g, large.g), each against the accurate path's Q256 value, which
+    // is within 2^-216 of asinh.
     for x in arguments(0x6173_696e_685f_6163, 20_000) {
         let y = fast(x);
-        let fast_value = y.hi() + y.lo();
-        let accurate_value = accurate_value(x, y).to_f64();
-        assert!(
-            (fast_value - accurate_value).abs()
-                <= accurate_value * f64::from_bits(0x3c10_0000_0000_0000),
-            "x = {x:e}"
-        );
+        let fast_value = Exact::of_f64(y.hi()).add(&Exact::of_f64(y.lo()));
+        let reference = Exact::of_q256(accurate_value(x, y));
+        let shift = if x < TWO_M7 { 66 } else { 63 };
+        assert!(fast_value.within(&reference, 1, shift), "x = {x:e}");
     }
 }
