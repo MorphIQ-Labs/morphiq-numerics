@@ -11,10 +11,10 @@ mod tables;
 mod tests;
 
 use crate::double_word::DoubleWord;
-use crate::eft::two_prod;
+use crate::eft::two_prod_d;
+use crate::exact::sqrt;
 use crate::ln::{Reduced, decide_with};
 use crate::q256::Q256;
-use crate::sqrt::sqrt;
 use tables::{EXP_STEPS, INV_LN2, LN2, LN2_Q256, POLY0};
 
 /// `asinh x = x` for every `|x|` up to this (§1): `0x1.7137449123ef6p−26`, the
@@ -69,11 +69,12 @@ fn series(x: f64) -> DoubleWord {
 /// `ln(x + √(x² + 1))`, `2^−7 ≤ x < 2^28` (§3): `v = x + s`, `s = √(x² + 1)`
 /// as double-words, then `ln v_hi + RN(v_lo/v_hi)`.
 fn logarithm(x: f64) -> DoubleWord {
-    let (square, square_error) = two_prod(x, x);
+    // x >= 2^-7: x² is inside two_prod_d's domain.
+    let (square, square_error) = two_prod_d(x, x);
     // u = 1 + x² to double-word accuracy.
     let u = DoubleWord::sum(1.0, square).add_f64(square_error);
     let root = sqrt(u.hi());
-    let (root_square, root_square_error) = two_prod(root, root);
+    let (root_square, root_square_error) = two_prod_d(root, root);
     // u − root² up to a rounding of order 2^−106·u; its Newton correction.
     let residual = ((u.hi() - root_square) - root_square_error) + u.lo();
     let s = DoubleWord::sum(root, residual / (2.0 * root));

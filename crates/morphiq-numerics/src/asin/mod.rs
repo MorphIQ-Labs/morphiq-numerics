@@ -11,10 +11,10 @@ mod tables;
 mod tests;
 
 use crate::double_word::DoubleWord;
-use crate::eft::two_prod;
+use crate::eft::two_prod_d;
+use crate::exact::sqrt;
 use crate::ln::decide_with;
 use crate::q256::Q256;
-use crate::sqrt::sqrt;
 use crate::trig::{accurate_sin_cos, half_pi};
 use tables::{HALF_PI, POLY0, SEGMENTS};
 
@@ -76,7 +76,8 @@ impl Reduced {
         // exact (1 − x)/2.
         let u = (1.0 - x) * 0.5;
         let s = sqrt(u);
-        let (square, square_error) = two_prod(s, s);
+        // s >= 2^-27, so s² is inside two_prod_d's domain.
+        let (square, square_error) = two_prod_d(s, s);
         // u − s² exactly, up to a rounding of order 2^−106·u; s_lo is its
         // Newton correction to the square root.
         let residual = (u - square) - square_error;
@@ -94,7 +95,7 @@ impl Reduced {
                 (y, y)
             }
             Self::Complement { z, .. } => {
-                let delta = series(z).mul_f64(2.0);
+                let delta = series(z).mul_f64_d(2.0);
                 (DoubleWord::sum(HALF_PI.0, HALF_PI.1).sub(delta), delta)
             }
         }
@@ -156,7 +157,8 @@ fn series(z: DoubleWord) -> DoubleWord {
                                 + t_hi
                                     * (g4 + t_hi * (g5 + t_hi * (g6 + t_hi * (g7 + t_hi * g8)))))));
     // asin(a + t) = asin a + c₁·t + t²·G(t), with c₁·t's leading product exact.
-    let (p_hi, p_lo) = two_prod(t_hi, c_hi);
+    // t_hi is zero or at least 2^-900 and c_hi at least 1 (docs/asin.md §4).
+    let (p_hi, p_lo) = two_prod_d(t_hi, c_hi);
     let tail = p_lo + (t_hi * c_lo + t_lo * c_hi) + (t_hi * t_hi) * g;
     DoubleWord::sum(y_hi, y_lo).add(DoubleWord::fast_sum(p_hi, tail))
 }

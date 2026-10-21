@@ -30,6 +30,31 @@ the root in integer arithmetic.
 4. **Range.** `√(2^−1074) = 2^−537` and `√(2^1024) = 2^512`, so the result is
    always normal and finite.
 
+## Hardware
+
+The integer derivation above is the reference and the whole implementation of the
+public `sqrt`, which is a `const fn`. Inside the crate, kernels that take a square
+root of a finite nonnegative number (`asin`'s complement, `asinh`'s logarithmic
+form, and their lanes) call `exact::sqrt`, which is the hardware instruction when
+`std` is on and the target has one (x86-64 `sqrtsd`, aarch64 `fsqrt`, WebAssembly
+`f64.sqrt`), and this module otherwise.
+
+This costs the determinism claim nothing, and the rule is general: IEEE 754
+requires `squareRoot` (§5.4.1), `fusedMultiplyAdd` and the other operations of §5
+to be correctly rounded, so every conforming implementation returns the same bits.
+Only the transcendental functions differ between platforms, and those the crate
+never takes from one. An operation the standard fixes may therefore run on
+hardware where the build has it, with the integer or error-free-transform
+implementation as the reference and the fallback; one the standard does not fix may
+not. A NaN's sign and payload are not fixed by the standard, so the hardware path
+is for arguments that are never NaN.
+
+Checked by `exact::tests`, which compares the hardware root with the integer one
+on 800,000 encodings (every binade, the neighbourhood of exact squares, subnormals,
+infinity), and by the determinism digest, whose value is the same with and without
+the hardware path on aarch64 and x86-64
+([determinism.md](determinism.md)).
+
 ## Proof
 
 The derivation is machine-checked in Coq (`formal/binary64`, run by

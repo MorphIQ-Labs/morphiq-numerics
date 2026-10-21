@@ -9,10 +9,10 @@ use morphiq_numerics_arch::Simd;
 
 use super::tables::{HALF_PI, POLY0, SEGMENTS};
 use super::{ASIN_IS_X, EPS, SHIFTER, SPLIT, asin};
+use crate::exact::sqrt;
 use crate::lanes::{
     Dw, Kernel, add_dw, add_f64, decide_relative, fast_two_sum, lanes_mask, two_prod, two_sum,
 };
-use crate::sqrt::sqrt;
 
 /// `asin` as a lane kernel.
 pub(crate) struct Asin;

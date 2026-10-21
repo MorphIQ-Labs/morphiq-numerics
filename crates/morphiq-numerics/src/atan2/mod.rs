@@ -11,7 +11,7 @@ mod tables;
 mod tests;
 
 use crate::double_word::DoubleWord;
-use crate::eft::two_prod;
+use crate::eft::two_prod_d;
 use crate::ln::decide_with;
 use crate::q256::Q256;
 use crate::trig::{accurate_sin_cos, half_pi};
@@ -167,7 +167,8 @@ fn fast(n: f64, d: f64, form: Form) -> (DoubleWord, DoubleWord) {
     let e = exponent(d);
     let (ns, ds) = (scale(n, e), scale(d, e));
     let q = ns / ds;
-    let (p, p_error) = two_prod(q, ds);
+    // q ds is within 2^-53 of n' >= 2^-900: inside two_prod_d's domain.
+    let (p, p_error) = two_prod_d(q, ds);
     // n' − p is exact by Sterbenz's lemma; its remainder is the quotient's error.
     let residual = (ns - p) - p_error;
     let t = DoubleWord::fast_sum(q, residual / ds);
@@ -177,7 +178,7 @@ fn fast(n: f64, d: f64, form: Form) -> (DoubleWord, DoubleWord) {
         Form::Phi => phi,
         Form::HalfPiMinus => half_pi.sub(phi),
         Form::HalfPiPlus => half_pi.add(phi),
-        Form::PiMinus => half_pi.mul_f64(2.0).sub(phi),
+        Form::PiMinus => half_pi.mul_f64_d(2.0).sub(phi),
     };
     (y, phi)
 }
@@ -209,7 +210,7 @@ fn series(t: DoubleWord) -> DoubleWord {
                                 + s_hi
                                     * (g4 + s_hi * (g5 + s_hi * (g6 + s_hi * (g7 + s_hi * g8)))))));
     // atan(a + s) = atan a + c₁·s + s²·G(s), with c₁·s's leading product exact.
-    let (p_hi, p_lo) = two_prod(s_hi, c_hi);
+    let (p_hi, p_lo) = two_prod_d(s_hi, c_hi);
     let tail = p_lo + (s_hi * c_lo + s_lo * c_hi) + (s_hi * s_hi) * g;
     DoubleWord::sum(y_hi, y_lo).add(DoubleWord::fast_sum(p_hi, tail))
 }

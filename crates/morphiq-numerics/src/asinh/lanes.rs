@@ -9,9 +9,9 @@ use morphiq_numerics_arch::Simd;
 
 use super::tables::{LN2, POLY0};
 use super::{ASINH_IS_X, EPS, TWO_28, TWO_M7, asinh};
+use crate::exact::sqrt;
 use crate::lanes::{Dw, Kernel, add_dw, add_f64, decide_relative, lanes_mask, two_prod, two_sum};
 use crate::ln::lanes::fallback;
-use crate::sqrt::sqrt;
 
 /// `asinh` as a lane kernel.
 pub(crate) struct Asinh;

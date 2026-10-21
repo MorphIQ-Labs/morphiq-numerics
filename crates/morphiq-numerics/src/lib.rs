@@ -49,6 +49,7 @@ pub mod double_word;
 pub mod eft;
 pub mod elementary;
 mod erfcx;
+mod exact;
 mod exp;
 mod exp2;
 mod expm1;
