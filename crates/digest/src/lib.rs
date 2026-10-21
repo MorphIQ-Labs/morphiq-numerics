@@ -17,7 +17,8 @@ use morphiq_numerics::elementary::{
 };
 use morphiq_numerics::interval::{FiniteInterval, IntervalError};
 use morphiq_numerics::log_space::{
-    log_diff_exp, log_sum_exp, log_sum_exp_and_normalize, log_sum_exp_pairs,
+    NormalizeError, log_diff_exp, log_sum_exp, log_sum_exp_and_normalize, log_sum_exp_pairs,
+    normalize_log_weights,
 };
 use morphiq_numerics::normal::{
     erfcx, erfcx_slice, log_norm_cdf, log_norm_cdf_slice, log_norm_pdf, norm_ccdf, norm_ccdf_slice,
@@ -897,7 +898,73 @@ pub fn corpus_digest() -> [u8; 32] {
     interval_section(&mut r, &mut words);
     normal_distribution_section(&mut r, &mut words);
 
+    // Append the new surface after the existing corpus so no older input
+    // stream changes. Independent inputs also keep future extension local.
+    log_normalization_section(&mut r);
+
     r.0.finalize().into()
+}
+
+fn log_normalization_record(r: &mut Recorder, x: &[f64], output: &mut [f64]) {
+    match normalize_log_weights(x, output) {
+        Ok(value) => {
+            r.u64(0);
+            r.f64(value.log_sum());
+            r.f64(value.max_absolute_error());
+        }
+        Err(error) => {
+            let (code, index) = match error {
+                NormalizeError::LengthMismatch => (1, 0),
+                NormalizeError::ZeroMass => (2, 0),
+                NormalizeError::InvalidWeight(i) => (3, i),
+                NormalizeError::TooManyFiniteTerms => (4, 0),
+                NormalizeError::Unrepresentable(i) => (5, i),
+            };
+            r.u64(code);
+            r.u64(index as u64);
+        }
+    }
+    for &p in output.iter() {
+        r.f64(p);
+    }
+}
+
+fn log_normalization_section(r: &mut Recorder) {
+    r.label("normalize_log_weights");
+    let mut out = [42.0; 65];
+    for x in [
+        &[][..],
+        &[f64::NEG_INFINITY],
+        &[-0.0],
+        &[f64::MAX],
+        &[0.0, 0.0, 0.0],
+        &[f64::MAX, f64::MAX],
+        &[0.0, -800.0, f64::NEG_INFINITY],
+        &[0.0, f64::NAN],
+        &[f64::INFINITY, 0.0],
+        &[-f64::MAX, f64::MAX],
+        &[f64::MAX, -f64::MAX],
+        &[0.0, f64::from_bits(1), -f64::from_bits(1)],
+    ] {
+        out.fill(42.0);
+        log_normalization_record(r, x, &mut out[..x.len()]);
+    }
+    log_normalization_record(r, &[0.0], &mut out[..2]);
+    let mut words = Words::new(0x6e6f_726d_5f6c_6f67);
+    for n in [1, 2, 3, 7, 8, 31, 32, 33, 64, 65] {
+        for _ in 0..32 {
+            let mut x = [0.0; 65];
+            for v in &mut x[..n] {
+                *v = match words.next_word() % 16 {
+                    0 => f64::NEG_INFINITY,
+                    1 => -745.5,
+                    _ => normal_in(&mut words, -8, 10),
+                };
+            }
+            out.fill(42.0);
+            log_normalization_record(r, &x[..n], &mut out[..n]);
+        }
+    }
 }
 
 /// `N` pairs for the `log_sum_exp_pairs` section: one element of each a

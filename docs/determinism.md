@@ -41,6 +41,7 @@ functions unnoticed.
 | `exp2_slice`, `expm1_slice` | 1,000 slices of each length from 1 to 17, mixing special values, screen edges, random encodings, and arguments in `[−1076, 1025)` or `[−38, 710)`; an additional `expm1_slice_small` section samples `[−1/32, 1/32)` | every output element, scalar and SIMD builds alike |
 
 | `finite_interval` | every pair of 16 edge values, then random encodings, 4,096 iterations | constructors, membership, negation, absolute value, maximum, every checked arithmetic/elementary operation; endpoint bits or typed error codes |
+| `normalize_log_weights` | empty/zero mass, singleton support, signed zero, equal maximum offsets, subnormal shifts, underflow tails, invalid/unrepresentable inputs, shape mismatch; 32 slices of each length 1, 2, 3, 7, 8, 31, 32, 33, 64, 65 | normalized logs, log total, returned error radius, typed refusal code/index and untouched output on failure |
 
 ## Where it is checked
 

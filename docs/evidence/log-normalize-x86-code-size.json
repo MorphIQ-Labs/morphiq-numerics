@@ -1,0 +1,11 @@
+{
+  "command": "nm -S --size-sort target/release/profile-log-normalize; size target/release/profile-log-normalize",
+  "build": "release, simd,std; default target; rustc 1.97.1",
+  "binary_sha256": "5b204535c5c976585e9e6ad6b8bb5d3650ecabd13af7a4d6281385708119a824",
+  "symbols": [
+    "0000000000028670 00000000000005a5 t _RNvNtCsbz2IVj9mhiR_16morphiq_numerics9log_space5terms",
+    "0000000000028fb0 000000000000060b T _RNvNtNtCsbz2IVj9mhiR_16morphiq_numerics9log_space9normalize21normalize_log_weights"
+  ],
+  "size": "   text\t   data\t    bss\t    dec\t    hex\tfilename\n 421006\t  13560\t   1608\t 436174\t  6a7ce\t/home/stephen/Development/MorphIQ-Labs/core/morphiq-numerics/target/release/profile-log-normalize\n",
+  "limits": "Symbol sizes exclude called elementary routines, runtime/backend dispatch and benchmark/std machinery; they are not total incremental library footprint. Fixed-size normalization and radius helpers are inlined."
+}
