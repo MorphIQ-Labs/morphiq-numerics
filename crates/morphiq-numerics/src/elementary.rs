@@ -101,3 +101,10 @@ batched!(
     /// lanes; undecided lanes call [`expm1`].
     expm1_slice, expm1, crate::expm1::lanes::Expm1
 );
+
+batched!(
+    /// [`asin`] of every element of `x`, written to `out`, bit for bit.
+    /// With `simd`, the reduction, the series and the rounding test run in
+    /// lanes; a lane the screen or the test doesn't settle calls [`asin`].
+    asin_slice, asin, crate::asin::lanes::Asin
+);

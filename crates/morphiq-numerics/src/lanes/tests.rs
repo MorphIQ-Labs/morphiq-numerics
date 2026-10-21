@@ -17,6 +17,7 @@ pub(crate) mod bench;
 use morphiq_numerics_arch::{Scalar, Simd, WithSimd};
 
 use super::{Kernel, chunks, run, two_prod};
+use crate::asin::lanes::Asin;
 use crate::exp::lanes::Exp;
 use crate::exp2::lanes::Exp2;
 use crate::expm1::lanes::Expm1;
@@ -245,6 +246,36 @@ pub(crate) fn ln_1p_corpus() -> Vec<f64> {
     v
 }
 
+pub(crate) fn asin_corpus() -> Vec<f64> {
+    let mut rng = SplitMix64::new(0x6c61_6e65_5f61_7369);
+    let n = cases();
+    let mut v = fixture_values(include_str!("../../../reference/fixtures/asin.json"));
+    v.extend(specials());
+    // docs/asin.md's thresholds: asin x = x below ASIN_IS_X, the complement
+    // above SPLIT, the shifter's index edges (k + 1/2)/64, and the endpoints.
+    v.extend(with_neighbours(&[
+        f64::from_bits(0x3e57_1374_4912_3ef6),
+        f64::from_bits(0x3fe6_a09e_667f_3bcc),
+        f64::from_bits(0x3f80_0000_0000_0000),
+        1.0 - f64::EPSILON / 2.0,
+    ]));
+    for k in 0..=64_u32 {
+        let edge = (f64::from(k) + 0.5) / 64.0;
+        v.extend(with_neighbours(&[edge, f64::from(k) / 64.0]));
+    }
+    for _ in 0..n {
+        // The whole domain, and a little past it.
+        v.push(2.2 * unit(&mut rng) - 1.1);
+        // The complement branch, and within 2^-20 of 1.
+        v.push(0.7 + 0.3 * unit(&mut rng));
+        v.push(1.0 - unit(&mut rng) * f64::from_bits(0x3eb0_0000_0000_0000));
+        // Every binade near zero, both signs, and bits at random.
+        v.push(binade(&mut rng, -60, 0));
+        v.push(f64::from_bits(rng.next_u64()));
+    }
+    v
+}
+
 /// Runs `G`'s lane kernel on backend `k`, through `k.vectorize` as the
 /// library does, and requires the scalar function's bits on every element.
 struct Check<'a, G> {
@@ -468,6 +499,7 @@ fn every_lanes_cascade_returns_the_scalar_bits() {
     check_cascades::<Expm1>("expm1", &short(expm1_corpus()));
     check_cascades::<Ln>("ln", &short(ln_corpus()));
     check_cascades::<Ln1p>("ln_1p", &short(ln_1p_corpus()));
+    check_cascades::<Asin>("asin", &short(asin_corpus()));
 }
 
 fn check_all<G: Kernel>(name: &str, xs: &[f64]) {
@@ -491,6 +523,11 @@ fn ln_lanes_return_lns_bits_on_every_backend() {
 }
 
 #[test]
+fn asin_lanes_return_asins_bits_on_every_backend() {
+    check_all::<Asin>("asin", &asin_corpus());
+}
+
+#[test]
 fn ln_1p_lanes_return_ln_1ps_bits_on_every_backend() {
     check_all::<Ln1p>("ln_1p", &ln_1p_corpus());
 }
@@ -506,7 +543,13 @@ fn batched_entry_points_return_the_scalar_bits() {
         Vec<f64>,
     );
     let short = |v: Vec<f64>| -> Vec<f64> { v.into_iter().step_by(7).take(4_000).collect() };
-    let entries: [Entry; 5] = [
+    let entries: [Entry; 6] = [
+        (
+            "asin_slice",
+            crate::elementary::asin_slice,
+            crate::asin::asin,
+            short(asin_corpus()),
+        ),
         (
             "exp2_slice",
             crate::elementary::exp2_slice,

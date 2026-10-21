@@ -1,6 +1,6 @@
 # Batched functions and lane evaluation
 
-`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice}` apply
+`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice, asin_slice}` apply
 [`exp`](exp.md), [`exp2`](exp2.md), [`expm1`](expm1.md), [`ln` and `ln_1p`](ln.md) to every element of a slice. The
 lane kernels are `crates/morphiq-numerics/src/lanes/`, `exp/lanes.rs`, `exp2/lanes.rs`, `expm1/lanes.rs` and
 `ln/lanes.rs`; the SIMD backends are the `morphiq-numerics-arch` crate
@@ -271,6 +271,22 @@ including accepted and rejected cases. Separate tests repeat actual
 undecided arguments across lanes and mix them with decided and special
 arguments. The scalar fallback and public-entry proofs are in `docs/ln.md`;
 intermediate-word tests and the cross-target digest check lane equivalence.
+
+## `asin`
+
+`asin_slice` (`asin/lanes.rs`) runs `asin`'s whole fast path in lanes: the
+screen (a NaN, `|x| ≥ 1` and `|x| < ASIN_IS_X` are the scalar function's own
+results), `Reduced::of` (the complement's `u = (1 − x)/2`, `s = √u`, the
+`two_prod` residual and `two_sum`), `series` (the shifter index, the small
+series and the 45-segment table branch, both computed on every lane and
+selected by whether the index is zero), `Reduced::fast` (`2·series` as
+`mul_f64` rounds it, then `π/2 − δ`) and the rounding test at
+`EPS = 2^-62(1 + 2^-50)`. Table rows are read a lane at a time, as `ln`'s
+are. `√u` is the scalar `sqrt`, per lane, exactly as `Reduced::of` calls it.
+A lane the screen or the test doesn't settle calls `asin` itself, from the
+start. Every operation is the scalar operation in the scalar order, with
+`two_prod` as §2 states, on its domain: the arguments are `s` (at least
+`2^-27`), `t_hi` (zero or at least `2^-900`: `docs/asin.md` §4) and `2`.
 
 ## 6. Checked by
 
