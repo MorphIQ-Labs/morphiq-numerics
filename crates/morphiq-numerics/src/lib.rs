@@ -42,6 +42,7 @@
 #[cfg(any(test, feature = "std"))]
 extern crate std;
 
+mod asin;
 pub mod double_word;
 pub mod eft;
 pub mod elementary;
