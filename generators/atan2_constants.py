@@ -31,6 +31,7 @@ import mpmath
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'crates/morphiq-numerics/src/atan2/tables.rs'
+OUTPUT_COQ = ROOT / 'formal/atan2/Atan2Tables.v'
 POLY = ROOT / 'generators/atan2_poly.out'
 PREC = 600
 T = mpmath.mpf('0.0078126')  # |t| <= 1/128, widened for z's double-word error
@@ -131,8 +132,30 @@ def generate():
     return '\n'.join(lines) + '\n'
 
 
+def generate_coq():
+    d = derive()
+    word = lambda x: f'0x{to_bits(x):016x}'  # noqa: E731
+    lines = [
+        "(** Constants of atan2's transcription, written by generators/atan2_constants.py; do",
+        '    not edit. docs/atan2.md gives the derivation. Binary64 values are encodings. *)',
+        'From Coq Require Import ZArith List.',
+        'Import ListNotations.',
+        'Open Scope Z_scope.',
+        '',
+        '(** The series below 1/128 (src/atan2/tables.rs POLY0). *)',
+        f'Definition atan2_poly0 : list Z := [{"; ".join(word(c) for c in d["poly0"])}].',
+        '(** [atan(a).hi, atan(a).lo, c1.hi, c1.lo, g0, ..., g8] for a = k/64, k = 1..64 at',
+        '    index k - 1 (src/atan2/tables.rs SEGMENTS). *)',
+        'Definition atan2_segments : list (list Z) := [',
+        ';\n'.join(f'  [{"; ".join(word(x) for x in row)}]' for row in d['rows']),
+        '].',
+        f'Definition atan2_half_pi : Z * Z := ({word(d["half_pi"][0])}, {word(d["half_pi"][1])}).',
+    ]
+    return '\n'.join(lines) + '\n'
+
+
 def main():
-    outputs = {OUTPUT: generate()}
+    outputs = {OUTPUT: generate(), OUTPUT_COQ: generate_coq()}
     if '--check' in sys.argv[1:]:
         for path, data in outputs.items():
             if path.read_text() != data:

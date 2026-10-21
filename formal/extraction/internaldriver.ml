@@ -3,7 +3,7 @@
    small-argument path, ln's reduction, ln's and ln_1p's accurate values and
    ln_1p's screens and stages H and B, asin's reduction, series, fast
    path, accurate path and entry, and asinh's fast path, exponential, accurate
-   path and entry (InternalCrosscheck.v) on the internal
+   path and entry, and atan2's entry, fast path and accurate path (InternalCrosscheck.v) on the internal
    cross-check corpus and compares each result with the Rust library's.
 
    Each line is "op args : result". A value is "n e k l1 .. lk": its sign
@@ -410,6 +410,23 @@ let compute op args =
            String.concat " " (List.map show_bits
              (x_fast (z_of_u64 (hex rh)) (z_of_u64 (hex rl)) (z_of_int (int_of_string j))))
        | _ -> failwith "fast takes two words and a table index")
+  | "atan2_entry" ->
+      (match args with
+       | [y; x] -> show_bits (x_atan2_entry (z_of_u64 (hex y)) (z_of_u64 (hex x)))
+       | _ -> failwith "atan2_entry takes two words")
+  | "atan2_fast" ->
+      (match args with
+       | [n; d; f] ->
+           let (words, decided) = x_atan2_fast (z_of_u64 (hex n)) (z_of_u64 (hex d)) (z_of_int (int_of_string f)) in
+           String.concat " " (List.map show_bits words @ [show_opt decided])
+       | _ -> failwith "atan2_fast takes two words and a form")
+  | "atan2_accurate" ->
+      (match args with
+       | [n; d; f; ph; pl] ->
+           let ((n, e), l) = x_atan2_accurate (z_of_u64 (hex n)) (z_of_u64 (hex d)) (z_of_int (int_of_string f))
+             (z_of_u64 (hex ph)) (z_of_u64 (hex pl)) in
+           show (n, e, l)
+       | _ -> failwith "atan2_accurate takes two words, a form and two words")
   | "asinh_entry" ->
       (match args with
        | [x] -> show_bits (x_asinh_entry (z_of_u64 (hex x)))

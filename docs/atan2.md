@@ -17,7 +17,7 @@ and every bound is a Gappa certificate in `formal/atan2`.
 | Accurate path: one cubic Newton step in `Q256` (§5) | **certified** (Gappa): relative error below `2^-190.6`, given the facts §5 lists |
 | Correct rounding (§6) | wherever the test decides, and on every pair of [CM]'s list; **not** claimed over the whole domain (§6) |
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§7) | done by the formal lane (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
-| Coq transcription of the Rust and its comparison with it | not done |
+| Coq transcription of the Rust (`formal/atan2/Atan2Kernel.v`) compared with it bit for bit (§7) | **done**: the entry (special values, forms, tiny ratios), the fast path and its decision at every form, the accurate path (before rounding), 11,477 corpus cases; five planted faults (a series coefficient, the scale, the subnormal midpoint's exponent, Newton's numerator sign, the doubling of `π/2`) each give mismatches. Proofs that it meets §3 and §5's bounds are not written |
 | ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `atan2_slice` | **done** (`atan2/lanes.rs`, [lanes.md](lanes.md)): bit-identical to `atan2` on every backend over the fixture's pairs, every pair of special values, ratios at every scale, the segment boundaries and random encodings; run on NEON, and on x86-64 SSE2 under Rosetta; AVX-512F is CI's SDE job |
 | Mutation witnesses | not done |
 | Same-host performance against the best alternatives | measured on NEON only: 1.05–1.64× over the scalar loop ([measurements](../crates/reference/measurements/asin-asinh-atan2-m1pro/README.md)); native x86 not measured |
@@ -149,7 +149,8 @@ result is rounded once.
 | Artifact | Establishes |
 |---|---|
 | `generators/atan2_poly.sollya` (Sollya 8.0) | the series and the 64 segments' polynomials and bounds, in `generators/atan2_poly.out` |
-| `generators/atan2_constants.py` | `src/atan2/tables.rs`: the polynomials, the table, `π/2` |
+| `generators/atan2_constants.py` | `src/atan2/tables.rs`: the polynomials, the table, `π/2`; and `formal/atan2/Atan2Tables.v`, the same constants for the transcription |
+| `formal/atan2/Atan2Kernel.v`, `Atan2Tables.v` (Coq 8.15) | the transcription of `atan2/mod.rs` (with trig's `Q256` sine and cosine through `formal/asin/AsinKernel.v`) and its constants; extracted by `formal/extraction/InternalCrosscheck.v` and run against `src/internal_crosscheck/atan2.rs`'s corpus by `check_formal.sh` step 7 |
 | `generators/atan2_certificates.py` | writes every certificate in `formal/atan2` (135) |
 | `formal/atan2/*` (Gappa 1.4.1, at 400 bits) | §3's ratio and forms, §4's evaluations and compositions and series, §5's step |
 | `generators/atan2_reference.py` | the fixture: the 40 hardest pairs of [CM], every pair of special values, the subnormal midpoints, the segment and ratio boundaries, random pairs |

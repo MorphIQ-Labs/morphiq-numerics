@@ -245,3 +245,34 @@ fn recip(c: Q256) -> Q256 {
     let top = c.top();
     c.mul_pow2(-top).recip().mul_pow2(-top)
 }
+
+/// The form with index `i` in `Phi`, `HalfPiMinus`, `PiMinus`, `HalfPiPlus`
+/// order, for the internal cross-check.
+#[cfg(test)]
+fn form_by_index(i: usize) -> Form {
+    [
+        Form::Phi,
+        Form::HalfPiMinus,
+        Form::PiMinus,
+        Form::HalfPiPlus,
+    ][i]
+}
+
+/// The fast path at `n ≤ d` with `n/d ≥ 2^-900`: the angle's double-word, `φ`
+/// and the rounding test's decision, for the internal cross-check.
+#[cfg(test)]
+pub(crate) fn crosscheck_fast(
+    n: f64,
+    d: f64,
+    form: usize,
+) -> (DoubleWord, DoubleWord, Option<f64>) {
+    let (y, phi) = fast(n, d, form_by_index(form));
+    (y, phi, decide_with(y, EPS))
+}
+
+/// The accurate path's `Q256` value from `φ`, before rounding, for the internal
+/// cross-check.
+#[cfg(test)]
+pub(crate) fn crosscheck_accurate(n: f64, d: f64, form: usize, phi: DoubleWord) -> Q256 {
+    accurate_value(n, d, form_by_index(form), phi)
+}

@@ -87,7 +87,7 @@ cd "$(dirname "$0")/.."
 sha256sum --check --quiet formal/binding.sha256
 
 if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v formal/binary64/*.v formal/extraction/*.v formal/q/*.v \
-    formal/exp/*.v formal/ln/*.v formal/erfcx/*.v formal/normal/*.v formal/asin/*.v formal/asinh/*.v formal/gappa/*.v "$proofs"/*/*.v; then
+    formal/exp/*.v formal/ln/*.v formal/erfcx/*.v formal/normal/*.v formal/asin/*.v formal/asinh/*.v formal/atan2/*.v formal/gappa/*.v "$proofs"/*/*.v; then
   echo "a proof admits a goal" >&2
   exit 1
 fi
@@ -136,7 +136,7 @@ for proof in "$proofs"/*/*.v; do
   fi
   printf 'Require %s.\nPrint Assumptions %s.l1.\n' "$module" "$module" >> "$src/gappa/CertificateAudit.v"
 done
-cp formal/exp/*.v formal/ln/*.v formal/erfcx/*.v formal/normal/*.v formal/asin/*.v formal/asinh/*.v formal/audit/KernelAudit.v "$src/gappa/"
+cp formal/exp/*.v formal/ln/*.v formal/erfcx/*.v formal/normal/*.v formal/asin/*.v formal/asinh/*.v formal/atan2/*.v formal/audit/KernelAudit.v "$src/gappa/"
 # Everything but the audits and the extraction, which are compiled below. The
 # mappings are those each directory's proofs are written against.
 (cd "$src" && {
