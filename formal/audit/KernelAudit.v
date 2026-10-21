@@ -734,3 +734,6 @@ Print Assumptions AsinFacts.quarter_pi_ranges.
 Require AsinSqrtStep.
 Print Assumptions AsinSqrtStep.u_exact.
 Print Assumptions AsinSqrtStep.reduced_complement.
+Require AsinSeriesSmall.
+Print Assumptions AsinSeriesSmall.index_zero.
+Print Assumptions AsinSeriesSmall.series_small_eval.

@@ -203,7 +203,7 @@ def series_tail_certificate(values):
     exactly (section 4), relative: written like trig's tails."""
     q = [values[f'p00{j}'] for j in range(4)]
     return f"""# The series' cubic term (docs/asin.md, section 4): with zh a binary64,
-# 2^-26 <= zh <= {T_LIT},
+# 2^-28 <= zh <= {T_LIT},
 #   u = RN(zh^2), p = q0 + u (q1 + u (q2 + u q3)), tail = RN(RN(zh u) p)
 # against zh^3 P(zh^2), P the same polynomial evaluated exactly. All four
 # coefficients are positive, so every operation is a relative one. Written by
@@ -225,7 +225,7 @@ P2 = q1 + zh * zh * P3;
 P = q0 + zh * zh * P2;
 Tx = zh * zh * zh * P;
 
-{{ zh_ in [1b-26, {T_LIT}] -> (tail - Tx) / Tx in [-1b-49, 1b-49] }}
+{{ zh_ in [1b-28, {T_LIT}] -> (tail - Tx) / Tx in [-1b-51, 1b-51] }}
 
 (tail - Tx) / Tx -> (1 + (a3 - zh * zh * zh) / (zh * zh * zh)) * (1 + (ps - P) / P) * (1 + (tail - a3 * ps) / (a3 * ps)) - 1
   {{ Tx <> 0, zh <> 0, P <> 0, a3 <> 0, ps <> 0 }};
@@ -236,27 +236,32 @@ Tx = zh * zh * zh * P;
 
 def series_compose_certificate(values):
     """The series' fast result against asin z (section 4), relative."""
-    rel_poly = hex_fraction(values['v000']) + Fraction(1, 2**280)
-    ec = Fraction(1, 2**49)  # series_tail.g, plus P's Sollya error 2^-54 and z_lo's 3 2^-53
-    rc = Fraction(13, 10**6)  # (asin z - z)/z <= z^2/5 over z <= T
-    claim = up(rc * ec * (1 + DW_ADD_F) + DW_ADD_F)
+    rc = Fraction(11, 10**6)  # (asin z - z)/z <= z^2/6 (1 + z^2) <= 1.02e-5 on z <= T
+    # eps, the relative gap between the computed cubic term and asin z - z:
+    # the tail's 2^-51 (series_tail.g), Sollya's 2^-54 (1 + 2^-23) for the polynomial
+    # (asin_poly.out), and zl and the rounding of zh^2 inside z^3 P(z^2): 3.1 2^-53.
+    eps = Fraction(1, 2**50)
+    parts = Fraction(1, 2**51) + Fraction(1, 2**54) * (1 + Fraction(1, 2**23)) + Fraction(31, 10) * Fraction(1, 2**53)
+    assert parts <= eps, 'the series eps pieces exceed 2^-50'
+    claim = up(rc * eps * (1 + DW_ADD_F) + DW_ADD_F)
     return rf"""# The series' fast result (docs/asin.md, section 4): F = (z + c)(1 + ea) with
 # z = zh + zl exactly, c = RN(RN(zh u) p), against A = asin z = z (1 + rc),
-# relative. rc = (asin z - z)/z <= z^2/5 <= 1.3e-6 on z <= {T_LIT}; c differs from
-# the series' cubic term by the relative eps, at most 2^-49: the tail's 2^-49
-# (formal/asin/series_tail.g, widened to include Sollya's 2^-54 for the
-# polynomial, in asin_poly.out, and zl's 3 2^-53 in zh^3 against z^3).
+# relative. rc = (asin z - z)/z <= z^2/6 (1 + z^2) <= 1.1e-5 on z <= {T_LIT}; c
+# differs from A - z by the relative eps, at most 2^-50: the tail's 2^-51
+# (formal/asin/series_tail.g), Sollya's 2^-54 (1 + 2^-23) for the polynomial
+# (asin_poly.out) and 3.1 2^-53 for zl and the rounding of zh^2 inside z^3 P(z^2);
+# generators/asin_certificates.py asserts their sum is at most 2^-50.
 # ea: add_f64, 2u^2 (docs/double-word.md). Written by
 # generators/asin_certificates.py.
 
 A = z * (1 + rc);
 F = (z * (1 + rc * (1 + eps))) * (1 + ea);
 
-{{ z in [1b-26, {T_LIT}] /\ rc in [0, 13b-23] /\ eps in [-1b-49, 1b-49] /\ ea in [-1b-104, 1b-104]
+{{ z in [1b-28, {T_LIT}] /\ rc in [0, 1.1e-5] /\ eps in [-1b-50, 1b-50] /\ ea in [-1b-104, 1b-104]
   -> (F - A) / A in [-{claim}, {claim}] }}
 
 (F - A) / A -> (rc * eps + (1 + rc * (1 + eps)) * ea) / (1 + rc) {{ z <> 0, 1 + rc <> 0 }};
-""", up(rc * ec * (1 + DW_ADD_F) + DW_ADD_F)
+""", claim
 
 
 def sqrt_certificate():
