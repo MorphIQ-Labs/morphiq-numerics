@@ -267,5 +267,15 @@ fn sin_is_correctly_rounded_at_every_small_normal_pair_angle() {
         m += 1;
     }
     std::eprintln!("small sin angles: {checked} checked, {accurate_needed} by the accurate path");
-    assert_eq!(checked, 70_041_414);
+    assert_eq!(checked, 54_637_168);
+}
+
+#[test]
+fn sin_is_x_exactly_up_to_its_threshold() {
+    let x = super::SIN_IS_X;
+    let above = f64::from_bits(x.to_bits() + 1);
+    for (v, rounds_to_v) in [(x, true), (above, false)] {
+        let (s, _) = accurate(Reduced::of(v).r);
+        assert_eq!(s.to_f64() == v, rounds_to_v, "{v:e}");
+    }
 }
