@@ -98,18 +98,22 @@ impl Reduced {
         }
     }
 
-    /// The accurate path (§5): one Newton step in `Q256` from `start`, then
-    /// rounding.
+    /// The accurate path (§5): [`Self::accurate_value`] rounded.
     #[cold]
     #[inline(never)]
     fn accurate(self, start: DoubleWord) -> f64 {
+        self.accurate_value(start).to_f64()
+    }
+
+    /// One Newton step in `Q256` from `start` (§5), before rounding.
+    fn accurate_value(self, start: DoubleWord) -> Q256 {
         let start = Q256::from_f64(start.hi()).add(Q256::from_f64(start.lo()));
         match self {
             Self::Direct { x } => {
                 // y₁ = y₀ + (x − sin y₀)/cos y₀.
                 let (sin, cos) = accurate_sin_cos(start);
                 let residual = Q256::from_f64(x).add(sin.neg());
-                start.add(residual.mul(cos.recip())).to_f64()
+                start.add(residual.mul(cos.recip()))
             }
             Self::Complement { x, .. } => {
                 // δ solves cos δ = x: δ₁ = δ₀ + (cos δ₀ − x)/sin δ₀, and the
@@ -117,7 +121,7 @@ impl Reduced {
                 let (sin, cos) = accurate_sin_cos(start);
                 let residual = cos.add(Q256::from_f64(-x));
                 let delta = start.add(residual.mul(sin.recip()));
-                half_pi().add(delta.neg()).to_f64()
+                half_pi().add(delta.neg())
             }
         }
     }
@@ -153,4 +157,52 @@ fn series(z: DoubleWord) -> DoubleWord {
     let (p_hi, p_lo) = two_prod(t_hi, c_hi);
     let tail = p_lo + (t_hi * c_lo + t_lo * c_hi) + (t_hi * t_hi) * g;
     DoubleWord::sum(y_hi, y_lo).add(DoubleWord::fast_sum(p_hi, tail))
+}
+
+/// The reduction's branch and double-word, for the internal cross-check:
+/// `true` with `z = (x, 0)` on the direct branch, `false` with the
+/// complement's `z` (`x` in `[ASIN_IS_X, 1)`).
+#[cfg(test)]
+pub(crate) fn crosscheck_reduced(x: f64) -> (bool, f64, f64) {
+    match Reduced::of(x) {
+        Reduced::Direct { x } => (true, x, 0.0),
+        Reduced::Complement { z, .. } => (false, z.hi(), z.lo()),
+    }
+}
+
+/// `series` at the double-word `z`, for the internal cross-check.
+#[cfg(test)]
+pub(crate) fn crosscheck_series(z: DoubleWord) -> DoubleWord {
+    series(z)
+}
+
+/// The fast path at `x` in `[ASIN_IS_X, 1)`: its result, the start of the
+/// Newton step and the rounding test's decision, for the internal cross-check.
+#[cfg(test)]
+pub(crate) fn crosscheck_fast(x: f64) -> (DoubleWord, DoubleWord, Option<f64>) {
+    let (y, start) = Reduced::of(x).fast();
+    (y, start, decide_with(y, EPS))
+}
+
+/// The accurate path's `Q256` value at `x` in `[ASIN_IS_X, 1)` from `start`,
+/// before rounding, for the internal cross-check: rounded to binary64 the
+/// Newton step's correction, about `2^-63` relative, is invisible.
+#[cfg(test)]
+pub(crate) fn crosscheck_accurate(x: f64, start: DoubleWord) -> Q256 {
+    Reduced::of(x).accurate_value(start)
+}
+
+/// `(sin, cos)` in `Q256` at `start`, as the accurate path computes them, for
+/// the internal cross-check.
+#[cfg(test)]
+pub(crate) fn crosscheck_sin_cos(start: DoubleWord) -> (Q256, Q256) {
+    accurate_sin_cos(Q256::from_f64(start.hi()).add(Q256::from_f64(start.lo())))
+}
+
+/// `Q256::recip`, which the accurate path uses, for the internal cross-check:
+/// its third Newton step, below `2^-255` relative to the result, is invisible
+/// through the accurate path's value.
+#[cfg(test)]
+pub(crate) fn crosscheck_recip(x: Q256) -> Q256 {
+    x.recip()
 }
