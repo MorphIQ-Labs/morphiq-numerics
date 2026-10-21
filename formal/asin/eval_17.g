@@ -2,7 +2,8 @@
 # (the reduced argument t = th + tl, |tl| <= 2^-53 T), ph + pl = th c_hi exactly
 # (two_prod), and the rounded tail
 #   tail = s1 + n, s1 = pl + (th c_lo + tl c_hi), n = RN(th^2) g, g = Horner(th),
-# against the exact value of (c_hi + c_lo) t + t^2 G(t) after ph. dg bounds
+# against the exact value of (c_hi + c_lo) t + t^2 G(t) after ph, and the Horner
+# value hh0 within [-2, 2] (the fast sum's exactness needs it). dg bounds
 # G(th + tl) - G(th) by the mean value theorem with sup|G'| from the
 # coefficients, in exact rational arithmetic. Written by
 # generators/asin_certificates.py.
@@ -59,8 +60,8 @@ tail rnd= s1 + n;
 tt = th + tl;
 Vx = pl + c_lo * th + c_hi * tl + c_lo * tl + tt * tt * (HH0 + dg);
 
-{ th_ in [-0.0078126, 0.0078126] /\ tl_ in [-8.7e-19, 8.7e-19] /\ dg in [-766b-75, 766b-75]
-  -> tail - Vx in [-621b-76, 621b-76] }
+{ th_ in [-0.0078126, 0.0078126] /\ tl_ in [-8.7e-19, 8.7e-19] /\ dg in [-957b-72, 957b-72]
+  -> tail - Vx in [-621b-76, 621b-76] /\ hh0 in [-2, 2] }
 
 hh7 - HH7 -> (hh7 - (g7 + q7)) + (q7 - th * g8);
 hh6 - HH6 -> (hh6 - (g6 + q6)) + (q6 - th * hh7) + th * (hh7 - HH7);
