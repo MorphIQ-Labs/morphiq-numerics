@@ -27,7 +27,7 @@ below claims more than the named artifact does.
 | The Taylor remainders, the argument ranges, `sin t/t` (§5) | **proved in Coq** (`formal/asin/AsinFacts.v`) |
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§7) | **done** (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
 | Mutation witnesses | not done |
-| ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `asin_slice` | not done |
+| ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `asin_slice` | **done** (`asin/lanes.rs`, [lanes.md](lanes.md)): bit-identical to `asin` on every cascade over the fixture, thresholds, `k/64` shifter edges, the complement, and random encodings; run on NEON, and on x86-64 SSE2 under Rosetta; AVX-512F is CI's SDE job |
 | Same-host performance against the best alternatives | not measured |
 
 ## Sources
