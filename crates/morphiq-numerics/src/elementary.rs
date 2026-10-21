@@ -17,6 +17,7 @@
 //! which changes speed, never a result.
 
 pub use crate::asin::asin;
+pub use crate::asinh::asinh;
 pub use crate::exp::exp;
 pub use crate::exp2::exp2;
 pub use crate::expm1::expm1;

@@ -43,6 +43,7 @@
 extern crate std;
 
 mod asin;
+mod asinh;
 pub mod double_word;
 pub mod eft;
 pub mod elementary;
