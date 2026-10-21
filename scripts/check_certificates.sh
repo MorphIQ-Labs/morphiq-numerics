@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # The certificates lane: Sollya approximation bounds and Gappa rounding-error
 # bounds, bound to the sources they describe. For each function directory
-# formal/<f> (exp, ln, exp2, log2, expm1, trig):
+# formal/<f> (exp, ln, exp2, log2, expm1, trig, asin):
 #
 #   1. formal/<f>/binding.sha256 matches: a change to the derivation, the
 #      generated constants or a certificate fails until the certificates are
@@ -16,7 +16,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 failed=0
-for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig formal/normal; do
+for dir in formal/exp formal/ln formal/exp2 formal/log2 formal/expm1 formal/trig formal/normal formal/asin; do
   f=${dir#formal/}
   binding="$dir/binding.sha256"
   # Normal compositions share the end-to-end proof manifest.
