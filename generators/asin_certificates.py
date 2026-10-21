@@ -314,6 +314,155 @@ y = (H * (1 + eH) - D * (1 + es) * (1 + eF)) * (1 + ea);
 """, Fraction(int(claim.split('b-')[0]), 2 ** int(claim.split('b-')[1]))
 
 
+def trig_claim(name, pattern):
+    """A bound certified in formal/trig, read from the certificate itself."""
+    import re
+    text = (ROOT / 'formal/trig' / name).read_text()
+    m = re.search(pattern, text)
+    assert m, f'{name}: no {pattern}'
+    return m.group(1)
+
+
+def identity_check():
+    """The Newton certificates' rewrite hints are algebra Gappa takes on trust
+    (the formal lane proves them in Coq): check them here in exact rational
+    arithmetic at random points, so a slip fails generation."""
+    import random
+    rng = random.Random(0x6173696e)
+
+    def r(lo, hi):
+        return Fraction(rng.randrange(10**6, 10**9), 10**9) * (Fraction(hi) - Fraction(lo)) + Fraction(lo)
+
+    def sym(b):
+        return r(-b, b)
+
+    for _ in range(200):
+        # Direct: y1 - Y over Y.
+        Y, eta = r('0.00001', '0.78'), sym(Fraction(1, 2**62))
+        s0, c0, rr = r('0.1', '0.7'), r('0.7072', '1'), r('0.1', '0.5')
+        sigma, gamma, ea, mx = sym(Fraction(1, 2**198)), sym(Fraction(1, 2**198)), sym(Fraction(1, 2**254)), r('0.1', '0.7')
+        e, m, eb = sym(Fraction(650, 2**262)), -r(0, Fraction(1, 2**255)), sym(Fraction(1, 2**254))
+        y0 = Y * (1 + eta)
+        d = Y - y0
+        x = s0 + c0 * d - rr * d * d
+        rho = (x - s0 * (1 + sigma)) + ea * mx
+        q = (rho * (1 + e) / (c0 * (1 + gamma))) * (1 + m)
+        y1 = (y0 + q) + eb * y0
+        kk = (1 + e) * (1 + m) / (1 + gamma) - 1
+        t2, t3, t4 = -rr * Y * eta * eta / c0, -s0 * sigma / (c0 * Y), ea * mx / (c0 * Y)
+        assert (y1 - Y) / Y == -eta * kk + (t2 + t3 + t4) * (1 + kk) + eb * (1 + eta), 'direct identity'
+        # Complement: yf - Ax over Ax.
+        Dt, fs = r('0.00001', '0.78'), r('0.9', '1')
+        H, eH, ec = r('1.5707963', '1.5707964'), sym(Fraction(1, 2**257)), sym(Fraction(1, 2**254))
+        d0 = Dt * (1 + eta)
+        s0 = d0 * fs
+        d = Dt - d0
+        x = c0 - s0 * d - rr * d * d
+        rho = (c0 * (1 + gamma) - x) + ea * mx
+        q = (rho * (1 + e) / (s0 * (1 + sigma))) * (1 + m)
+        d1 = (d0 + q) + eb * d0
+        yf = (H * (1 + eH) - d1) + ec * H
+        Ax = H - Dt
+        kk = (1 + e) * (1 + m) / (1 + sigma) - 1
+        u1, u2 = -eta * kk, rr * eta * eta / ((1 + eta) * fs)
+        u3, u4 = c0 * gamma / (Dt * Dt * (1 + eta) * fs), ea * mx / (Dt * Dt * (1 + eta) * fs)
+        u5 = eb * (1 + eta)
+        assert (yf - Ax) / Ax == ((H * eH + ec * H) - Dt * (u1 + (u2 + u3 + u4) * (1 + kk) + u5)) / Ax, 'complement identity'
+
+
+def newton_certificates():
+    """The accurate path's Newton step in Q256 (docs/asin.md, section 5)."""
+    sin_claim = trig_claim('accurate_sin.g', r'Y - 1 in \[-(1b-\d+),')
+    cos_claim = trig_claim('accurate_cos.g', r'Y - 1 in \[-(1b-\d+),')
+    recip = trig_claim('recip_3.g', r'P - 1 in \[-(\d+b-\d+),')
+    assert sin_claim == cos_claim == '1b-198', (sin_claim, cos_claim)
+    identity_check()
+    common = f"""# Hypotheses certified elsewhere or exact: eta, the start's relative error, is at
+# most eps1 = 2^-62 (the fast path's bound, formal/asin/compose_*.g and
+# complement.g, asserted by generators/asin_certificates.py; the start is
+# y_hi + y_lo added in Q256, which errs by at most 2^-254 more); sigma and gamma,
+# sin's and cos's relative errors at an exact argument, {sin_claim}
+# (formal/trig/accurate_sin.g, accurate_cos.g, whose reduction term is zero here);
+# e, Q256::recip's c y = 1 + e (formal/trig/recip_3.g); m, a Q256 product's
+# truncation, [-2^-255, 0]; ea and eb, a Q256 sum's error, 2^-254 of its larger
+# operand (docs/sin_cos.md, section 5). The Taylor remainder is the mean value
+# theorem's: rr is half the sine (or cosine) at the intermediate point, at most
+# 1/2. Written by generators/asin_certificates.py.
+"""
+    direct = rf"""# The accurate path's Newton step for x <= SPLIT (docs/asin.md, section 5):
+#   y1 = y0 + (x - sin y0)/cos y0
+# in Q256 from y0 = Y (1 + eta), Y = asin x in [2^-26, pi/4), against Y, relative.
+#   x = sin Y = s0 + c0 d + R, d = Y - y0, R = -rr d^2   (Taylor, rr in [0, 1/2])
+#   S = s0 (1 + sigma); rho = (x - S) + ea mx; ri = (1 + e)/(c0 (1 + gamma))
+#   q = (rho ri)(1 + m); y1 = (y0 + q) + eb y0
+# so (y1 - Y)/Y = -eta kk + (t2 + t3 + t4)(1 + kk) + eb (1 + eta) with
+# kk = (1 + e)(1 + m)/(1 + gamma) - 1 and t2 = R/(c0 Y), t3 = -s0 sigma/(c0 Y),
+# t4 = ea mx/(c0 Y): the quadratic term t2 dominates.
+{common}
+y0 = Y * (1 + eta);
+d = Y - y0;
+R = -rr * d * d;
+x = s0 + c0 * d + R;
+S = s0 * (1 + sigma);
+rho = (x - S) + ea * mx;
+ri = (1 + e) / (c0 * (1 + gamma));
+q = (rho * ri) * (1 + m);
+y1 = (y0 + q) + eb * y0;
+kk = (1 + e) * (1 + m) / (1 + gamma) - 1;
+t2 = -rr * Y * eta * eta / c0;
+t3 = -s0 * sigma / (c0 * Y);
+t4 = ea * mx / (c0 * Y);
+
+{{ Y in [1b-26, 0.7854] /\ eta in [-1b-62, 1b-62] /\ s0 in [0, 0.7072] /\ c0 in [0.7071, 1]
+  /\ rr in [0, 0.5000001] /\ sigma in [-{sin_claim}, {sin_claim}] /\ gamma in [-{cos_claim}, {cos_claim}]
+  /\ ea in [-1b-254, 1b-254] /\ mx in [0, 0.7072] /\ e in [-{recip}, {recip}] /\ m in [-1b-255, 0]
+  /\ eb in [-1b-254, 1b-254]
+  -> (y1 - Y) / Y in [-1b-124, 1b-124] }}
+
+(y1 - Y) / Y -> -eta * kk + (t2 + t3 + t4) * (1 + kk) + eb * (1 + eta) {{ Y <> 0, c0 <> 0 }};
+"""
+    complement = rf"""# The accurate path's Newton step for x > SPLIT (docs/asin.md, section 5):
+#   d1 = d0 + (cos d0 - x)/sin d0, result pi/2 - d1
+# in Q256 from d0 = D (1 + eta), D = acos x in [2^-27, pi/4), against Ax = pi/2 - D,
+# relative. The start is the fast path's delta, accurate relative to D.
+#   x = cos D = c0 - s0 d - R', d = D - d0, R' = rr d^2   (Taylor, rr in [0, 1/2])
+#   s0 = sin d0 = d0 fs, fs in [0.9, 1] (sin t/t >= 0.9 for t <= pi/4)
+#   C = c0 (1 + gamma); rho = (C - x) + ea mx; ri = (1 + e)/(s0 (1 + sigma))
+#   q = (rho ri)(1 + m); d1 = (d0 + q) + eb d0; yf = (H (1 + eH) - d1) + ec H
+# so d1 - D = D (u1 + (u2 + u3 + u4)(1 + kk) + u5) with kk = (1 + e)(1 + m)/(1 + sigma) - 1,
+# u1 = -eta kk, u2 = rr eta^2/((1 + eta) fs), u3 = c0 gamma/(D^2 (1 + eta) fs),
+# u4 = ea mx/(D^2 (1 + eta) fs), u5 = eb (1 + eta). H is pi/2 in Q256 (relative
+# error 2^-257.3); ec is the final sum's error.
+{common}
+d0 = Dt * (1 + eta);
+s0 = d0 * fs;
+d = Dt - d0;
+x = c0 - s0 * d - rr * d * d;
+rho = (c0 * (1 + gamma) - x) + ea * mx;
+ri = (1 + e) / (s0 * (1 + sigma));
+q = (rho * ri) * (1 + m);
+d1 = (d0 + q) + eb * d0;
+yf = (H * (1 + eH) - d1) + ec * H;
+Ax = H - Dt;
+kk = (1 + e) * (1 + m) / (1 + sigma) - 1;
+u1 = -eta * kk;
+u2 = rr * eta * eta / ((1 + eta) * fs);
+u3 = c0 * gamma / (Dt * Dt * (1 + eta) * fs);
+u4 = ea * mx / (Dt * Dt * (1 + eta) * fs);
+u5 = eb * (1 + eta);
+
+{{ Dt in [1b-27, 0.7854] /\ eta in [-1b-62, 1b-62] /\ fs in [0.9, 1] /\ c0 in [0.7071, 1]
+  /\ rr in [0, 0.5000001] /\ sigma in [-{sin_claim}, {sin_claim}] /\ gamma in [-{cos_claim}, {cos_claim}]
+  /\ ea in [-1b-254, 1b-254] /\ mx in [0, 1.0001] /\ e in [-{recip}, {recip}] /\ m in [-1b-255, 0]
+  /\ eb in [-1b-254, 1b-254] /\ ec in [-1b-254, 1b-254] /\ eH in [-1b-257, 1b-257]
+  /\ H in [1.570796326794896619, 1.570796326794896620]
+  -> (yf - Ax) / Ax in [-1b-124, 1b-124] }}
+
+(yf - Ax) / Ax -> ((H * eH + ec * H) - Dt * (u1 + (u2 + u3 + u4) * (1 + kk) + u5)) / Ax {{ Ax <> 0, Dt <> 0, fs <> 0 }};
+"""
+    return {'newton_direct.g': direct, 'newton_complement.g': complement}
+
+
 def derive():
     return asin_constants.derive()
 
@@ -343,6 +492,7 @@ def generate():
         + [claims[k] for k in range(1, 25)])
     text, y_claim = complement_certificate(z_claim, '1b-103')
     out['complement.g'] = text
+    out.update(newton_certificates())
     worst = max(worst, y_claim)
     assert worst <= FAST, f'fast path bound 2^{math.log2(worst):.2f} exceeds 2^-62'
     return out, worst

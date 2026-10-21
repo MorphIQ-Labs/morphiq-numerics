@@ -4,7 +4,7 @@
 - a complement reduction above `√½`;
 - a table-driven double-word fast path;
 - the rounding test;
-- an accurate path: one Newton step in `Q256`.
+- an accurate path: one Newton step in `Q256`, from the fast path's result.
 
 This document states what each check establishes and what it does not. Nothing
 below claims more than the named artifact does.
@@ -17,9 +17,9 @@ below claims more than the named artifact does.
 | Fast path: 45 segments, the series, the complement (§3, §4) | **certified** (Gappa): relative error below `2^-63.5` |
 | Rounding test at `ε₁ = 2^-62` (§6) | sound given the fast bound, as [ln] §5 |
 | Facts outside Gappa (§4, "Not covered by a certificate") | tested, not proved |
-| Accurate path: Newton step in `Q256` (§5) | **bound not yet derived or certified**; tested only |
-| Correct rounding over the whole domain (§6) | **not claimed as proved**: 5,970 oracle cases and 200,000 fast-versus-accurate agreements |
-| Coq binding, mutation witnesses | not done |
+| Accurate path: Newton step in `Q256` (§5) | **certified** (Gappa): relative error below `2^-124.8`, given the facts §5 lists |
+| Correct rounding on `[0x1.7137449123ef6p−26, 1)` (§6) | follows from the two bounds and [CM]'s list; **not machine-checked end to end**: the Rust is not extracted or compared against the certified operation sequence |
+| Coq re-proof of the certificates; mutation witnesses | not done |
 | ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `asin_slice` | not done |
 | Same-host performance against the best alternatives | not measured |
 
@@ -149,11 +149,26 @@ about `2^-66·sup G`.
   `½·tan(ξ)·e₀²` (direct) or `½·cot(ξ)·e₀²` (complement). With
   `e₀ ≤ 2^-63.5·y₀` that is below `2^-126`, against the `2^-113` needed (§2).
 
-**This bound is derived above but not certified.** The composition of the
-series' `2^-198`, `Q256`'s rounding, `recip` and the step is not written as a
-Gappa certificate, and the Coq binding of the transcription is not done. Until
-it is, the accurate path's `2^-113` is a design target that the tests below
-support but do not prove.
+**Certified** (Gappa 1.4.1, `-Eprecision=400`): `formal/asin/newton_direct.g` and
+`newton_complement.g` prove a relative error below `2^-124.8` for each branch (`2^-124.849` and
+`2^-124.848` proven; the files claim `2^-124`). The quadratic term dominates; everything
+else is below `2^-144`. The hypotheses are named in the certificates:
+- the start's relative error `η ≤ 2^-62` (§4, asserted by the generator);
+- `sin` and `cos` at an exact argument within `2^-198` (`formal/trig/accurate_sin.g`,
+  `accurate_cos.g`, whose reduction term is zero here), and `Q256::recip`'s `650·2^-262`
+  (`formal/trig/recip_3.g`), read from those files by the generator;
+- `Q256`'s contract: a product truncated by at most `2^-255`, a sum within `2^-254` of its
+  larger operand (§5 of [sin_cos], proved in Coq in `formal/q`).
+
+**Not covered by a certificate** (stated, not proved here):
+- the Taylor remainder: `sin Y = sin y₀ + cos y₀·d − ½ sin ξ·d²` and
+  `cos D = cos d₀ − sin d₀·d − ½ cos ξ·d²` for some `ξ` between the points (the mean
+  value theorem), with `rr = ½ sin ξ` or `½ cos ξ` in `[0, ½]`;
+- the argument ranges (computed with `mpmath` at 200 bits): `y₀ ≤ π/4` (`asin SPLIT = π/4 − 8.9·10⁻¹⁷`
+  against a start error of at most `2^-62·π/4 = 1.7·10⁻¹⁹`), `δ₀ ≤ π/4` (`acos` of the least `x > SPLIT`
+  is `π/4 − 6.8·10⁻¹⁷`), `Y ≥ 2^-26`, `D ≥ 2^-27`, `sin t/t ≥ 0.9` for `t ≤ π/4`;
+- the rewrite hints' algebra, which Gappa takes on trust: checked in exact rational
+  arithmetic at 200 random points per branch by `generators/asin_certificates.py`.
 
 ## 6. Rounding test and claims
 
@@ -163,9 +178,16 @@ shared with `sin`. The certified fast bound is below `2^-63.5`.
   accurate path (the exact rate is not yet measured).
 
 **Claims:**
-- **Proved:** the fast path's result is within `2^-63.5` of `asin x`, relative (§4).
-- **Not proved:** that `asin` returns the correctly rounded value on every
-  argument. It depends on the accurate path's bound (§5) and on [CM]'s list (§2).
+- **Certified:** the fast path's result is within `2^-63.5` of `asin x`, relative (§4), and
+  the accurate path's within `2^-124.8` (§5).
+- **Correct rounding** on `[0x1.7137449123ef6p−26, 1)` follows: the test accepts `y_hi` only
+  when the fast bound places the true value in `y_hi`'s rounding cell; otherwise the
+  accurate value, `2^-124.8·2^53 = 2^-71.8` ulp from `asin x`, is closer than the nearest midpoint
+  can be (`2^-58.6` ulp, §2), so rounding it gives `RN(asin x)`. This rests on [CM]'s
+  list being complete (a published result, §2) and on the facts §5 lists.
+- **Not established:** that the Rust computes the certified operation sequence. Unlike the
+  `Q256` arithmetic, `asin/mod.rs` is bound by hash but has no Coq transcription compared
+  with it; the check is the fixture and the fast-versus-accurate agreement test below.
 - **Tested:** the fixture's 5,970 cases match bit for bit, including the 40
   hardest of [CM].
 
@@ -175,8 +197,8 @@ shared with `sin`. The certified fast bound is below `2^-63.5`.
 |---|---|
 | `generators/asin_poly.sollya` (Sollya 8.0) | the polynomials and their bounds, in `generators/asin_poly.out` |
 | `generators/asin_constants.py` | `src/asin/tables.rs`: the table, the polynomials, `π/2`; spot-checks each segment's polynomial against `mpmath` at 400 points |
-| `generators/asin_certificates.py` | writes every certificate in `formal/asin` (94) |
-| `formal/asin/*` (Gappa 1.4.1, at 400 bits) | §4's evaluations, compositions, series, square root and complement |
+| `generators/asin_certificates.py` | writes every certificate in `formal/asin` (96) |
+| `formal/asin/*` (Gappa 1.4.1, at 400 bits) | §4's evaluations, compositions, series, square root and complement; §5's two Newton steps |
 | `generators/asin_reference.py` | the fixture: the 40 hardest arguments of [CM], the threshold and its neighbours, special values, multiples of 1/64, the crossover, arguments next to 1, random arguments |
 
 The binding `formal/asin/binding.sha256` covers this document, the Sollya script
@@ -186,5 +208,5 @@ and output, the generated tables, every certificate and the source `asin/mod.rs`
 - `crates/reference/tests/asin.rs`: 5,970 cases, bit for bit.
 - `src/asin/tests.rs`: special values, oddness, the branch boundary, and 200,000
   random arguments on which every fast-path decision equals the accurate path's result.
-- A negative control was run by hand on six certificates (one of each kind): shrinking the claimed
+- A negative control was run by hand on eight certificates (one of each kind): shrinking the claimed
   bound makes Gappa exit non-zero. It is not a gate.
