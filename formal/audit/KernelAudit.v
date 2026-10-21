@@ -731,3 +731,6 @@ Print Assumptions AsinFacts.y_lower.
 Print Assumptions AsinFacts.d_lower.
 Print Assumptions AsinFacts.sin_ratio.
 Print Assumptions AsinFacts.quarter_pi_ranges.
+Require AsinSqrtStep.
+Print Assumptions AsinSqrtStep.u_exact.
+Print Assumptions AsinSqrtStep.reduced_complement.

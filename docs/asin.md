@@ -20,7 +20,8 @@ below claims more than the named artifact does.
 | Accurate path: Newton step in `Q256` (§5) | **certified** (Gappa): relative error below `2^-124.8`, given the facts §5 lists |
 | Correct rounding on `[0x1.7137449123ef6p−26, 1)` (§6) | follows from the two bounds and [CM]'s list; **not machine-checked end to end**: the Coq transcription of the Rust is compared with it on a corpus but its bounds are not proved (next row) |
 | Coq transcription of the Rust (`formal/asin/AsinKernel.v`) compared with it bit for bit (§7) | **done**: reduction, series, fast path, rounding decision, accurate path (before rounding) and entry, 19,532 corpus cases |
-| Proofs that the transcription meets §4 and §5's bounds, applying the certificates | **not written** |
+| Proof that the transcription's complement reduction meets `sqrt.g` (`AsinSqrtStep.v`: `reduced_complement`) | **proved in Coq**, applying the generated certificate theorem |
+| Proofs that the rest of the transcription meets §4 and §5's bounds (the series, the segments, the fast path's composition, the decision, the accurate path), applying the certificates | **not written** |
 | The Taylor remainders, the argument ranges, `sin t/t` (§5) | **proved in Coq** (`formal/asin/AsinFacts.v`) |
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§7) | **done** (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
 | Mutation witnesses | not done |
@@ -224,6 +225,7 @@ shared with `sin`. The certified fast bound is below `2^-63.5`.
 | `generators/asin_constants.py` | `src/asin/tables.rs`: the table, the polynomials, `π/2`; spot-checks each segment's polynomial against `mpmath` at 400 points |
 | `generators/asin_certificates.py` | writes every certificate in `formal/asin` (96) |
 | `formal/asin/AsinKernel.v`, `AsinTables.v` (Coq 8.15) | the transcription of `asin/mod.rs` and its generated constants; extracted by `formal/extraction/InternalCrosscheck.v` and run against `src/internal_crosscheck/asin.rs`'s corpus by `check_formal.sh` step 7 |
+| `formal/asin/AsinSqrtStep.v` (Coq 8.15) | `reduced_complement`: for `x` in `[SPLIT⁺, 1 − 2^-53]`, `asin_reduced x` takes the complement branch and returns a double-word within `2^-103` of `sqrt((1 − x)/2)`, relatively; it applies `asin_sqrt.l1` (the generated proof of `sqrt.g`), after showing `1 − x`, the halving, `two_prod`, the two subtractions, the doubling, the division and `two_sum` behave as the certificate's rounding model |
 | `formal/asin/AsinFacts.v` (Coq 8.15, Interval) | §5's Taylor remainders, argument ranges and `sin t/t` |
 | `formal/asin/*` (Gappa 1.4.1, at 400 bits) | §4's evaluations, compositions, series, square root and complement; §5's two Newton steps |
 | `generators/asin_reference.py` | the fixture: the 40 hardest arguments of [CM], the threshold and its neighbours, special values, multiples of 1/64, the crossover, arguments next to 1, random arguments |
