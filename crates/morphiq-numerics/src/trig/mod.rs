@@ -18,7 +18,7 @@ use tables::{COS_STEPS, POLY_C, POLY_S, SIN_STEPS, TABLE};
 const QUARTER_PI: f64 = f64::from_bits(0x3fe9_21fb_5444_2d18);
 /// The largest `x` with `RN(sin x) = x` (§1; the reference fixture's threshold
 /// "largest x with sin(x) = x", Lefèvre and Muller's Table 2, `1.4422·2^−26`).
-const SIN_IS_X: f64 = f64::from_bits(0x3e47_1374_4912_3ef6);
+const SIN_IS_X: f64 = f64::from_bits(0x3e57_1374_4912_3ef6);
 /// `cos x` for `|x| < 2^−25` (§1): the largest `|x|` with
 /// `RN(cos x) = 1 − k·2^−53`, `k = 0..3`; beyond the last, `1 − 4·2^−53`.
 const COS_STEPS_SMALL: [f64; 4] = [
