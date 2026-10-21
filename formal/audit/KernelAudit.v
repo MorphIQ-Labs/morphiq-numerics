@@ -737,3 +737,8 @@ Print Assumptions AsinSqrtStep.reduced_complement.
 Require AsinSeriesSmall.
 Print Assumptions AsinSeriesSmall.index_zero.
 Print Assumptions AsinSeriesSmall.series_small_eval.
+Require AsinSegment.
+Print Assumptions AsinSegment.segment_eval.
+Print Assumptions AsinSegment.series_segment.
+Require AsinSegments.
+Print Assumptions AsinSegments.segok_all.

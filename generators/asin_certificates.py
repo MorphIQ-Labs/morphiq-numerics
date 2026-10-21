@@ -16,6 +16,9 @@ used) or derived here in exact rational arithmetic, widened by at least 1%
 - series.g: the series below 1/128 against asin z, relative.
 - sqrt.g and complement.g: the complement's z = sqrt((1 - x)/2) as a
   double-word, and pi/2 - 2 asin(z) against asin x, relative.
+- AsinSegments.v: for each segment, its evaluation certificate applied over the
+  table's own words, and the numeric facts the Coq proof of the table branch
+  (formal/asin/AsinSegment.v) takes as hypotheses.
 
 With --check, fails if the committed certificates differ from a fresh
 generation. Needs mpmath (generators/requirements.txt).
@@ -35,7 +38,7 @@ DIR = ROOT / 'formal/asin'
 T_LIT = '0.0078126'
 T = Fraction(78126, 10_000_000)
 U = Fraction(1, 2**53)
-TL = Fraction(87, 10**20) / 10  # |tl| <= 2^-53 T < 8.7e-19 (tl is t_lo, normalized)
+TL = Fraction(87, 10**20)  # |tl| <= 2^-53 T < 8.7e-19 (tl is t_lo, normalized)
 DW_ADD = '776b-114'      # add and sub: 3u^2/(1 - 4u), widened (docs/double-word.md)
 DW_ADD_F = Fraction(776, 2**114)
 DW_ACC = Fraction(1, 2**107)  # the tables' double-words, relative (asin_constants.py)
@@ -102,7 +105,8 @@ def eval_certificate(k, row, bound):
         '# (the reduced argument t = th + tl, |tl| <= 2^-53 T), ph + pl = th c_hi exactly',
         '# (two_prod), and the rounded tail',
         '#   tail = s1 + n, s1 = pl + (th c_lo + tl c_hi), n = RN(th^2) g, g = Horner(th),',
-        '# against the exact value of (c_hi + c_lo) t + t^2 G(t) after ph. dg bounds',
+        '# against the exact value of (c_hi + c_lo) t + t^2 G(t) after ph, and the Horner',
+        '# value hh0 within [-2, 2] (the fast sum\'s exactness needs it). dg bounds',
         '# G(th + tl) - G(th) by the mean value theorem with sup|G\'| from the',
         '# coefficients, in exact rational arithmetic. Written by',
         '# generators/asin_certificates.py.',
@@ -134,7 +138,7 @@ def eval_certificate(k, row, bound):
         'Vx = pl + c_lo * th + c_hi * tl + c_lo * tl + tt * tt * (HH0 + dg);',
         '',
         f'{{ th_ in [-{T_LIT}, {T_LIT}] /\\ tl_ in [-8.7e-19, 8.7e-19] /\\ dg in [-{up(dg)}, {up(dg)}]',
-        f'  -> tail - Vx in [-{bound}, {bound}] }}',
+        f'  -> tail - Vx in [-{bound}, {bound}] /\\ hh0 in [-2, 2] }}',
         '',
     ]
     for i in range(7, -1, -1):
@@ -476,6 +480,100 @@ u5 = eb * (1 + eta);
     return {'newton_direct.g': direct, 'newton_complement.g': complement}
 
 
+def split_lit(text):
+    """`NbE` as (N, -E) with N odd, which is how Gappa normalizes a literal."""
+    n, e = text.split('b-')
+    n, e = int(n), -int(e)
+    while n % 2 == 0:
+        n, e = n // 2, e + 1
+    return n, e
+
+
+def word_data(x):
+    """A binary64 table word as its bits and (sign, m, k, M, d, E): the decoded
+    mantissa m and exponent -k, and the value M 2^E with M odd and E = -k + d."""
+    bits = asin_constants.to_bits(x)
+    exp, frac_bits = (bits >> 52) & 0x7ff, bits & ((1 << 52) - 1)
+    assert 0 < exp and 1075 - exp > 0, hex(bits)
+    m, k = (1 << 52) | frac_bits, 1075 - exp
+    d = (m & -m).bit_length() - 1
+    sign = bits >> 63
+    return bits, bool(sign), m, k, (-1 if sign else 1) * (m >> d), d, -k + d
+
+
+def segments_coq(rows, evals):
+    """formal/asin/AsinSegments.v: for each segment, its evaluation certificate
+    applied over its table coefficients and the facts `SegOkRow` states about
+    them, then the dispatcher over k."""
+    out = [
+        "(** Segment-by-segment facts of asin's tables, written by",
+        '    generators/asin_certificates.py; do not edit. For each segment k, the',
+        '    certificate formal/asin/eval_<kk>.g applied over the table words of',
+        '    src/asin/tables.rs, and the numeric facts [SegOkRow] states. *)',
+        'From Coq Require Import Reals ZArith Lia Lra Psatz List.',
+        'From Flocq Require Import Core.',
+        'From Gappa Require Import Gappa_library.',
+        'From Interval Require Import Tactic.',
+        'Require Import StageGappa AsinTables AsinKernel AsinSegment.',
+        *[f'Require asin_eval_{k:02d}.' for k in range(1, 46)],
+        'Import ListNotations.',
+        'Open Scope R_scope.',
+        '',
+    ]
+    dispatch = []
+    for k in range(1, 46):
+        row = rows[k - 1]
+        bound, dgb = evals[k]
+        bn, be = split_lit(bound)
+        dn, de = split_lit(dgb)
+        words = [word_data(x) for x in row]
+        real = [f'(IZR ({w[4]}) * bpow radix2 ({w[6]}))' for w in words]
+        bound_r = f'(IZR {bound.split("b-")[0]} * bpow radix2 (-{bound.split("b-")[1]}))'
+        dgb_r = f'(IZR {dgb.split("b-")[0]} * bpow radix2 (-{dgb.split("b-")[1]}))'
+        # EvalCert's coefficient order: c_hi, c_lo, g0 .. g8.
+        out += [
+            f'Lemma evalcert_{k:02d} : EvalCert {" ".join(real[2:])} {bound_r} {dgb_r}.',
+            'Proof.',
+            '  unfold EvalCert. intros th_ tl_ dg Th Tl Dg. split.',
+            f'  - apply (rabs_bnd _ {bn} ({-bn}) ({be})); [reflexivity | bpow_num; lra | ].',
+            f'    gappa_goal (asin_eval_{k:02d}.l1 th_ tl_ dg).',
+            '  - apply (rabs_bnd _ 1 (-1) 1); [reflexivity | bpow_num; lra | ].',
+            f'    gappa_goal (asin_eval_{k:02d}.l1 th_ tl_ dg).',
+            'Qed.',
+            '',
+            f'Lemma segok_{k:02d} : SegOkRow [{"; ".join(f"(0x{w[0]:016x})%Z" for w in words)}] {bound_r}.',
+            'Proof.',
+            '  unfold SegOkRow. cbn [nth].',
+        ]
+        for j, w in enumerate(words):
+            bits, sign, m, kk, M, d, E = w
+            out.append(f'  destruct (word_ok_intro (0x{bits:016x})%Z {"true" if sign else "false"} {m}%positive {kk}%nat'
+                       f' ({M})%Z {d}%Z ({E})%Z eq_refl eq_refl ltac:(lia) eq_refl) as [F{j} V{j}].')
+        out += [
+            f'  refine (segok_from_values {" ".join(["_"] * 28)}',
+            f'    {" ".join(f"F{j}" for j in range(13))} {" ".join(f"V{j}" for j in range(13))}',
+            f'    _ _ _ _ _ _ _ _ _ _ _ _ _ evalcert_{k:02d} _ _).',
+            '  all: seg_numeric.',
+            'Qed.',
+            '',
+        ]
+        dispatch.append((k, bound_r))
+    cases = ' \\/ '.join(f'k = {k}%Z' for k in range(1, 46))
+    pattern = ' | '.join('E' for _ in range(45))
+    out += [
+        'Lemma segok_all (k : Z) : (1 <= k <= 45)%Z ->',
+        '  exists bound, SegOkRow (nth (Z.to_nat (k - 1)) asin_segments []) bound /\\ bound <= bpow radix2 (-63).',
+        'Proof.',
+        '  intros Hk.',
+        f'  assert (Hc : {cases}) by lia.',
+        '  repeat (destruct Hc as [E | Hc]; [subst k; first ' + '[' + ' | '.join(
+            f'(exists {b}; split; [exact segok_{kk:02d} | bpow_num; interval with (i_prec 60)])' for kk, b in dispatch) + '] | ]).',
+        '  subst k. ' + 'exists ' + dispatch[-1][1] + '; split; [exact segok_45 | bpow_num; interval with (i_prec 60)].',
+        'Qed.',
+    ]
+    return '\n'.join(out) + '\n'
+
+
 def derive():
     return asin_constants.derive()
 
@@ -485,15 +583,18 @@ def generate():
     out = {}
     worst = Fraction(0)
     claims = {}
+    evals = {}
     for k in range(1, asin_constants.SEGMENTS + 1):
         row = d['rows'][k - 1]
         bound = eval_bound(row)
-        text, _ = eval_certificate(k, row, bound)
+        text, dg = eval_certificate(k, row, bound)
         out[f'eval_{k:02d}.g'] = text
+        evals[k] = (bound, up(dg))
         text, claim = compose_certificate(k, row, d, bound)
         out[f'compose_{k:02d}.g'] = text
         claims[k] = claim
         worst = max(worst, claim)
+    out['AsinSegments.v'] = segments_coq(d['rows'], evals)
     values = d['values']
     out['series_tail.g'] = series_tail_certificate(values)
     text, series_claim = series_compose_certificate(values)
@@ -521,7 +622,7 @@ def main():
         return
     for name, text in files.items():
         (DIR / name).write_text(text)
-    print(f'{len(files)} certificates; worst segment bound 2^{math.log2(worst):.2f}')
+    print(f'{len(files) - 1} certificates; worst segment bound 2^{math.log2(worst):.2f}')
 
 
 if __name__ == '__main__':
