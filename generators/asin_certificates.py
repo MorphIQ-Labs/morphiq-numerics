@@ -231,7 +231,6 @@ Tx = zh * zh * zh * P;
   {{ Tx <> 0, zh <> 0, P <> 0, a3 <> 0, ps <> 0 }};
 (a3 - zh * zh * zh) / (zh * zh * zh) -> (1 + (uh - zh * zh) / (zh * zh)) * (1 + (a3 - zh * uh) / (zh * uh)) - 1
   {{ zh <> 0, uh <> 0 }};
-(ps - P) / P -> (1 + (p2 - P2) / P2 * (zh * zh * P2 / P)) * (1 + (ps - (q0 + uh * p2)) / (q0 + uh * p2)) - 1 {{ P <> 0, P2 <> 0 }};
 """
 
 
@@ -256,7 +255,7 @@ F = (z * (1 + rc * (1 + eps))) * (1 + ea);
 {{ z in [1b-26, {T_LIT}] /\ rc in [0, 13b-23] /\ eps in [-1b-49, 1b-49] /\ ea in [-1b-104, 1b-104]
   -> (F - A) / A in [-{claim}, {claim}] }}
 
-(F - A) / A -> (rc * eps * (1 + ea)) / (1 + rc) + ea * (1 + rc * (1 + eps)) / (1 + rc) {{ z <> 0 }};
+(F - A) / A -> (rc * eps + (1 + rc * (1 + eps)) * ea) / (1 + rc) {{ z <> 0, 1 + rc <> 0 }};
 """, up(rc * ec * (1 + DW_ADD_F) + DW_ADD_F)
 
 
@@ -284,7 +283,7 @@ zv = s + sl;
 
 {{ w_ in [1b-27, 0.3827] -> (zv - w) / w in [-1b-103, 1b-103] }}
 
-(zv - w) / w -> ((s - w) * (s - w) / s2 + (rr1 - (u - ph)) / s2 + (r2 - (rr1 - pl)) / s2 + (sl - r2 / s2)) / w {{ w <> 0 }};
+(zv - w) / w -> ((s - w) * (s - w) / s2 + (rr1 - (u - ph)) / s2 + (r2 - (rr1 - pl)) / s2 + (sl - r2 / s2)) / w {{ w <> 0, s <> 0 }};
 """
 
 
@@ -352,7 +351,7 @@ def identity_check():
         t2, t3, t4 = -rr * Y * eta * eta / c0, -s0 * sigma / (c0 * Y), ea * mx / (c0 * Y)
         assert (y1 - Y) / Y == -eta * kk + (t2 + t3 + t4) * (1 + kk) + eb * (1 + eta), 'direct identity'
         # Complement: yf - Ax over Ax.
-        Dt, fs = r('0.00001', '0.78'), r('0.9', '1')
+        Dt, fs = r('0.00001', '0.78'), r('0.89', '1')
         H, eH, ec = r('1.5707963', '1.5707964'), sym(Fraction(1, 2**257)), sym(Fraction(1, 2**254))
         d0 = Dt * (1 + eta)
         s0 = d0 * fs
@@ -368,6 +367,14 @@ def identity_check():
         u3, u4 = c0 * gamma / (Dt * Dt * (1 + eta) * fs), ea * mx / (Dt * Dt * (1 + eta) * fs)
         u5 = eb * (1 + eta)
         assert (yf - Ax) / Ax == ((H * eH + ec * H) - Dt * (u1 + (u2 + u3 + u4) * (1 + kk) + u5)) / Ax, 'complement identity'
+        # The series' composition and the square root's correction.
+        z, rc, eps, ea2 = r('0.00001', '0.0078'), r('0', '0.00001'), sym(Fraction(1, 2**49)), sym(Fraction(1, 2**104))
+        A, F = z * (1 + rc), (z * (1 + rc * (1 + eps))) * (1 + ea2)
+        assert (F - A) / A == (rc * eps + (1 + rc * (1 + eps)) * ea2) / (1 + rc), 'series identity'
+        w, s_, ph, rr1, r2_, sl = r('0.00001', '0.38'), r('0.00001', '0.38'), r('0', '0.1'), r('0', '0.1'), r('0', '0.1'), r('0', '0.1')
+        u, pl, s2 = w * w, s_ * s_ - ph, 2 * s_
+        zv = s_ + sl
+        assert (zv - w) / w == ((s_ - w) * (s_ - w) / s2 + (rr1 - (u - ph)) / s2 + (r2_ - (rr1 - pl)) / s2 + (sl - r2_ / s2)) / w, 'sqrt identity'
 
 
 def newton_certificates():
@@ -385,14 +392,15 @@ def newton_certificates():
 # (formal/trig/accurate_sin.g, accurate_cos.g, whose reduction term is zero here);
 # e, Q256::recip's c y = 1 + e (formal/trig/recip_3.g); m, a Q256 product's
 # truncation, [-2^-255, 0]; ea and eb, a Q256 sum's error, 2^-254 of its larger
-# operand (docs/sin_cos.md, section 5). The Taylor remainder is the mean value
-# theorem's: rr is half the sine (or cosine) at the intermediate point, at most
-# 1/2. Written by generators/asin_certificates.py.
+# operand (docs/sin_cos.md, section 5). The Taylor remainder, the argument ranges
+# and sin t/t >= 0.89 are proved in Coq in formal/asin/AsinFacts.v
+# (taylor_sin, taylor_cos, quarter_pi_ranges, sin_ratio, sin_split_range,
+# cos_split_range, y_lower, d_lower). Written by generators/asin_certificates.py.
 """
     direct = rf"""# The accurate path's Newton step for x <= SPLIT (docs/asin.md, section 5):
 #   y1 = y0 + (x - sin y0)/cos y0
 # in Q256 from y0 = Y (1 + eta), Y = asin x in [2^-26, pi/4), against Y, relative.
-#   x = sin Y = s0 + c0 d + R, d = Y - y0, R = -rr d^2   (Taylor, rr in [0, 1/2])
+#   x = sin Y = s0 + c0 d + R, d = Y - y0, R = -rr d^2   (Taylor, rr in [-2^-60, 0.5000001], formal/asin/AsinFacts.v)
 #   S = s0 (1 + sigma); rho = (x - S) + ea mx; ri = (1 + e)/(c0 (1 + gamma))
 #   q = (rho ri)(1 + m); y1 = (y0 + q) + eb y0
 # so (y1 - Y)/Y = -eta kk + (t2 + t3 + t4)(1 + kk) + eb (1 + eta) with
@@ -414,19 +422,19 @@ t3 = -s0 * sigma / (c0 * Y);
 t4 = ea * mx / (c0 * Y);
 
 {{ Y in [1b-26, 0.7854] /\ eta in [-1b-62, 1b-62] /\ s0 in [0, 0.7072] /\ c0 in [0.7071, 1]
-  /\ rr in [0, 0.5000001] /\ sigma in [-{sin_claim}, {sin_claim}] /\ gamma in [-{cos_claim}, {cos_claim}]
+  /\ rr in [-1b-60, 0.5000001] /\ sigma in [-{sin_claim}, {sin_claim}] /\ gamma in [-{cos_claim}, {cos_claim}]
   /\ ea in [-1b-254, 1b-254] /\ mx in [0, 0.7072] /\ e in [-{recip}, {recip}] /\ m in [-1b-255, 0]
   /\ eb in [-1b-254, 1b-254]
   -> (y1 - Y) / Y in [-1b-124, 1b-124] }}
 
-(y1 - Y) / Y -> -eta * kk + (t2 + t3 + t4) * (1 + kk) + eb * (1 + eta) {{ Y <> 0, c0 <> 0 }};
+(y1 - Y) / Y -> -eta * kk + (t2 + t3 + t4) * (1 + kk) + eb * (1 + eta) {{ Y <> 0, c0 <> 0, 1 + gamma <> 0 }};
 """
     complement = rf"""# The accurate path's Newton step for x > SPLIT (docs/asin.md, section 5):
 #   d1 = d0 + (cos d0 - x)/sin d0, result pi/2 - d1
 # in Q256 from d0 = D (1 + eta), D = acos x in [2^-27, pi/4), against Ax = pi/2 - D,
 # relative. The start is the fast path's delta, accurate relative to D.
-#   x = cos D = c0 - s0 d - R', d = D - d0, R' = rr d^2   (Taylor, rr in [0, 1/2])
-#   s0 = sin d0 = d0 fs, fs in [0.9, 1] (sin t/t >= 0.9 for t <= pi/4)
+#   x = cos D = c0 - s0 d - R', d = D - d0, R' = rr d^2   (Taylor, rr in [-2^-60, 0.5000001], formal/asin/AsinFacts.v)
+#   s0 = sin d0 = d0 fs, fs in [0.89, 1] (sin t/t >= 0.9 for t <= pi/4)
 #   C = c0 (1 + gamma); rho = (C - x) + ea mx; ri = (1 + e)/(s0 (1 + sigma))
 #   q = (rho ri)(1 + m); d1 = (d0 + q) + eb d0; yf = (H (1 + eH) - d1) + ec H
 # so d1 - D = D (u1 + (u2 + u3 + u4)(1 + kk) + u5) with kk = (1 + e)(1 + m)/(1 + sigma) - 1,
@@ -451,14 +459,14 @@ u3 = c0 * gamma / (Dt * Dt * (1 + eta) * fs);
 u4 = ea * mx / (Dt * Dt * (1 + eta) * fs);
 u5 = eb * (1 + eta);
 
-{{ Dt in [1b-27, 0.7854] /\ eta in [-1b-62, 1b-62] /\ fs in [0.9, 1] /\ c0 in [0.7071, 1]
-  /\ rr in [0, 0.5000001] /\ sigma in [-{sin_claim}, {sin_claim}] /\ gamma in [-{cos_claim}, {cos_claim}]
+{{ Dt in [1b-27, 0.7854] /\ eta in [-1b-62, 1b-62] /\ fs in [0.89, 1] /\ c0 in [0.7071, 1]
+  /\ rr in [-1b-60, 0.5000001] /\ sigma in [-{sin_claim}, {sin_claim}] /\ gamma in [-{cos_claim}, {cos_claim}]
   /\ ea in [-1b-254, 1b-254] /\ mx in [0, 1.0001] /\ e in [-{recip}, {recip}] /\ m in [-1b-255, 0]
   /\ eb in [-1b-254, 1b-254] /\ ec in [-1b-254, 1b-254] /\ eH in [-1b-257, 1b-257]
   /\ H in [1.570796326794896619, 1.570796326794896620]
   -> (yf - Ax) / Ax in [-1b-124, 1b-124] }}
 
-(yf - Ax) / Ax -> ((H * eH + ec * H) - Dt * (u1 + (u2 + u3 + u4) * (1 + kk) + u5)) / Ax {{ Ax <> 0, Dt <> 0, fs <> 0 }};
+(yf - Ax) / Ax -> ((H * eH + ec * H) - Dt * (u1 + (u2 + u3 + u4) * (1 + kk) + u5)) / Ax {{ Ax <> 0, Dt <> 0, fs <> 0, 1 + eta <> 0, 1 + sigma <> 0 }};
 """
     return {'newton_direct.g': direct, 'newton_complement.g': complement}
 

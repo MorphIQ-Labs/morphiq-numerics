@@ -14,7 +14,9 @@
 #      builds with each rewriting hint proved as a lemma by
 #      formal/gappa/Hints.v, so no hypothesis is left; and each final theorem's
 #      global axioms are among formal/axioms.expected.
-#   6. The kernels' transcriptions and proofs (formal/exp/*.v, formal/ln/*.v),
+#   6. The kernels' transcriptions and proofs (formal/exp/*.v, formal/ln/*.v) and
+#      asin's analytic facts (formal/asin/AsinFacts.v: the Taylor remainders, the
+#      argument ranges, sin t / t),
 #      which apply the certificates' theorems, build (formal/exp/ExpStageTables.v
 #      checks exp's 512-entry table by one reflective computation); and the global axioms the
 #      theorems in formal/audit/KernelAudit.v rest on are among
@@ -83,7 +85,7 @@ cd "$(dirname "$0")/.."
 sha256sum --check --quiet formal/binding.sha256
 
 if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v formal/binary64/*.v formal/extraction/*.v formal/q/*.v \
-    formal/exp/*.v formal/ln/*.v formal/erfcx/*.v formal/normal/*.v formal/gappa/*.v "$proofs"/*/*.v; then
+    formal/exp/*.v formal/ln/*.v formal/erfcx/*.v formal/normal/*.v formal/asin/*.v formal/gappa/*.v "$proofs"/*/*.v; then
   echo "a proof admits a goal" >&2
   exit 1
 fi
@@ -132,7 +134,7 @@ for proof in "$proofs"/*/*.v; do
   fi
   printf 'Require %s.\nPrint Assumptions %s.l1.\n' "$module" "$module" >> "$src/gappa/CertificateAudit.v"
 done
-cp formal/exp/*.v formal/ln/*.v formal/erfcx/*.v formal/normal/*.v formal/audit/KernelAudit.v "$src/gappa/"
+cp formal/exp/*.v formal/ln/*.v formal/erfcx/*.v formal/normal/*.v formal/asin/*.v formal/audit/KernelAudit.v "$src/gappa/"
 # Everything but the audits and the extraction, which are compiled below. The
 # mappings are those each directory's proofs are written against.
 (cd "$src" && {

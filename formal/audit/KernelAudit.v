@@ -722,3 +722,12 @@ Print Assumptions NormalFiniteTail.normal_finite_log_tail_ieee.
 Require Import NormalLogFirst NormalLogTailStages.
 Print Assumptions NormalLogFirst.normal_log_first_decided.
 Print Assumptions NormalLogTailStages.normal_log_tail_stages_decided.
+Require AsinFacts.
+Print Assumptions AsinFacts.taylor_sin.
+Print Assumptions AsinFacts.taylor_cos.
+Print Assumptions AsinFacts.sin_split_range.
+Print Assumptions AsinFacts.cos_split_range.
+Print Assumptions AsinFacts.y_lower.
+Print Assumptions AsinFacts.d_lower.
+Print Assumptions AsinFacts.sin_ratio.
+Print Assumptions AsinFacts.quarter_pi_ranges.
