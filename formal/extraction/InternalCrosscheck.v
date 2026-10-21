@@ -5,7 +5,8 @@
     (formal/exp/ExpReduction.v, ExpFast.v, ExpAccurate.v, ExpSmall.v), ln's
     reduction and accurate paths (formal/ln/LnReduction.v, LnAccurate.v), and
     ln_1p's screens and stages H and B (formal/ln/Ln1pScreen.v, Ln1pStageH.v,
-    Ln1pStageB.v), extracted to OCaml
+    Ln1pStageB.v), and asin's reduction, series, fast path, accurate path and
+    entry (formal/asin/AsinKernel.v), extracted to OCaml
     so formal/extraction/internaldriver.ml can run them on the internal
     cross-check corpus and compare with the Rust code bit for bit. A value
     travels as its sign, its exponent and its significand's 64-bit limbs, least
@@ -381,5 +382,25 @@ Definition x_erfcx_tail_unscaled_fast x :=
  | Some y => Some (bits_of_b64 y) | None => None
  end.
 
-Extraction "internalcrosscheck.ml" x_normal_entry_pdf x_normal_entry_cdf x_normal_entry_ccdf x_normal_entry_center x_normal_entry_log x_normal_log_positive x_normal_log_negative x_normal_outer_cdf x_normal_outer_center_positive x_normal_outer_center_negative x_normal_tail_fast x_normal_fast_scaled_argument x_normal_erfcx_fast_scaled x_normal_log_central x_normal_center_central x_normal_cdf_central x_normal_center_fast x_normal_center_shape x_normal_center_tail x_normal_center_small x_normal_density_fast x_normal_density_first x_normal_tail_first_cdf x_normal_tail_first_center x_normal_center_first_cdf x_normal_center_first_center x_normal_accurate_outer_cdf x_normal_accurate_outer_center x_normal_accurate_log_positive x_normal_accurate_log_central x_normal_accurate_log_negative x_normal_log_complement x_normal_logarithm x_normal_erfcx_positive x_normal_accurate_tail x_normal_erfcx_extended_table x_normal_erfcx_small_table x_normal_scaled_argument x_normal_accurate_tail_asym x_normal_erfcx_asym x_normal_accurate_gaussian x_normal_accurate_density x_normal_accurate_center x_normal_accurate_central_cdf x_normal_gaussian x_erfcx_entry x_erfcx_accurate_negative x_erfcx_accurate_taylor x_erfcx_accurate_exp x_erfcx_accurate_tail x_erfcx_table_fast x_erfcx_tail_scaled_fast x_erfcx_tail_subnormal_fast x_erfcx_middle_fast x_erfcx_tail_unscaled_fast x_erfcx_reflection_fast x_erfcx_reflection_value x_erfcx_reflection_square x_erfcx_reflection_exp x_erfcx_table_value x_erfcx_table_reduce x_erfcx_table_leading x_erfcx_table_split x_erfcx_tail x_erfcx_tail_correction x_erfcx_quotient x_erfcx_scaled_quotient x_erfcx_middle x_erfcx_product x_erfcx_reciprocal_correction x_erfcx_reciprocal_square x_erfcx_reciprocal x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64 x_normal_log_first x_normal_finite_density x_normal_finite_tail x_normal_log_far_tail
+(* asin begin: asin's transcription (formal/asin/AsinKernel.v) *)
+Require AsinKernel.
+Definition x_asin_entry x := bits_of_b64 (AsinKernel.asin_entry (b64_of_bits x)).
+Definition x_asin_reduced x :=
+  let '(d, (zh, zl)) := AsinKernel.asin_reduced (b64_of_bits x) in
+  (d, map bits_of_b64 [zh; zl]).
+Definition x_asin_series zh zl :=
+  let '(h, l) := AsinKernel.asin_series (b64_of_bits zh) (b64_of_bits zl) in
+  map bits_of_b64 [h; l].
+Definition x_asin_fast x :=
+  let '((yh, yl), (sh, sl)) := AsinKernel.asin_fast (AsinKernel.asin_reduced (b64_of_bits x)) in
+  (map bits_of_b64 [yh; yl; sh; sl], opt_bits (AsinKernel.asin_decide (yh, yl))).
+Definition x_asin_accurate d x sh sl :=
+  q256_out (AsinKernel.asin_accurate_value d (b64_of_bits x) (b64_of_bits sh, b64_of_bits sl)).
+Definition x_asin_sincos sh sl :=
+  let '(s, c) := AsinKernel.q_sin_cos (AsinKernel.asin_start (b64_of_bits sh, b64_of_bits sl)) in
+  (q256_out s, q256_out c).
+Definition x_asin_recip n e l := q256_out (AsinKernel.q_recip (q256_in n e l)).
+(* asin end *)
+
+Extraction "internalcrosscheck.ml" x_asin_entry x_asin_reduced x_asin_series x_asin_fast x_asin_accurate x_asin_sincos x_asin_recip x_normal_entry_pdf x_normal_entry_cdf x_normal_entry_ccdf x_normal_entry_center x_normal_entry_log x_normal_log_positive x_normal_log_negative x_normal_outer_cdf x_normal_outer_center_positive x_normal_outer_center_negative x_normal_tail_fast x_normal_fast_scaled_argument x_normal_erfcx_fast_scaled x_normal_log_central x_normal_center_central x_normal_cdf_central x_normal_center_fast x_normal_center_shape x_normal_center_tail x_normal_center_small x_normal_density_fast x_normal_density_first x_normal_tail_first_cdf x_normal_tail_first_center x_normal_center_first_cdf x_normal_center_first_center x_normal_accurate_outer_cdf x_normal_accurate_outer_center x_normal_accurate_log_positive x_normal_accurate_log_central x_normal_accurate_log_negative x_normal_log_complement x_normal_logarithm x_normal_erfcx_positive x_normal_accurate_tail x_normal_erfcx_extended_table x_normal_erfcx_small_table x_normal_scaled_argument x_normal_accurate_tail_asym x_normal_erfcx_asym x_normal_accurate_gaussian x_normal_accurate_density x_normal_accurate_center x_normal_accurate_central_cdf x_normal_gaussian x_erfcx_entry x_erfcx_accurate_negative x_erfcx_accurate_taylor x_erfcx_accurate_exp x_erfcx_accurate_tail x_erfcx_table_fast x_erfcx_tail_scaled_fast x_erfcx_tail_subnormal_fast x_erfcx_middle_fast x_erfcx_tail_unscaled_fast x_erfcx_reflection_fast x_erfcx_reflection_value x_erfcx_reflection_square x_erfcx_reflection_exp x_erfcx_table_value x_erfcx_table_reduce x_erfcx_table_leading x_erfcx_table_split x_erfcx_tail x_erfcx_tail_correction x_erfcx_quotient x_erfcx_scaled_quotient x_erfcx_middle x_erfcx_product x_erfcx_reciprocal_correction x_erfcx_reciprocal_square x_erfcx_reciprocal x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64 x_normal_log_first x_normal_finite_density x_normal_finite_tail x_normal_log_far_tail
   x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs x_q256_top x_q256_mul_pow2.

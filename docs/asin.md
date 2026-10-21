@@ -18,7 +18,9 @@ below claims more than the named artifact does.
 | Rounding test at `ε₁ = 2^-62` (§6) | sound given the fast bound, as [ln] §5 |
 | Remaining facts outside Gappa (§4 and §5, "Not covered") | tested or stated, not proved |
 | Accurate path: Newton step in `Q256` (§5) | **certified** (Gappa): relative error below `2^-124.8`, given the facts §5 lists |
-| Correct rounding on `[0x1.7137449123ef6p−26, 1)` (§6) | follows from the two bounds and [CM]'s list; **not machine-checked end to end**: the Rust is not extracted or compared against the certified operation sequence |
+| Correct rounding on `[0x1.7137449123ef6p−26, 1)` (§6) | follows from the two bounds and [CM]'s list; **not machine-checked end to end**: the Coq transcription of the Rust is compared with it on a corpus but its bounds are not proved (next row) |
+| Coq transcription of the Rust (`formal/asin/AsinKernel.v`) compared with it bit for bit (§7) | **done**: reduction, series, fast path, rounding decision, accurate path (before rounding) and entry, 19,532 corpus cases |
+| Proofs that the transcription meets §4 and §5's bounds, applying the certificates | **not written** |
 | The Taylor remainders, the argument ranges, `sin t/t` (§5) | **proved in Coq** (`formal/asin/AsinFacts.v`) |
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§7) | **done** (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
 | Mutation witnesses | not done |
@@ -175,7 +177,7 @@ from the standard library's alternating Taylor bounds (`sin_bound`, `cos_bound`)
 - `y_lower` (`Y ≥ 2^-26`), `d_lower` (`D ≥ 2^-27` for `x ≤ 1 − 2^-53`), `sin_ratio`
   (`sin t ≥ 0.89 t` on `(0, π/4]`) and `quarter_pi_ranges` (`cos y₀ ≥ 0.7071`, `sin y₀ ≤ 0.70711`).
 They are stated as the certificates' hypotheses; the formal lane does not machine-link a certificate
-to the lemma it assumes (the transcription of the Rust, which would, is not written).
+to the lemma it assumes (the proofs about the Rust's transcription, which would, are not written).
 
 **Not covered by a certificate or a Coq lemma** (stated, not proved here):
 - `asin(zv)/asin(w) − 1 ≤ 1.1·(zv/w − 1)` in the complement (a derivative bound:
@@ -206,9 +208,11 @@ shared with `sin`. The certified fast bound is below `2^-63.5`.
   accurate value, `2^-124.8·2^53 = 2^-71.8` ulp from `asin x`, is closer than the nearest midpoint
   can be (`2^-58.6` ulp, §2), so rounding it gives `RN(asin x)`. This rests on [CM]'s
   list being complete (a published result, §2) and on the facts §5 lists.
-- **Not established:** that the Rust computes the certified operation sequence. Unlike the
-  `Q256` arithmetic, `asin/mod.rs` is bound by hash but has no Coq transcription compared
-  with it; the check is the fixture and the fast-versus-accurate agreement test below.
+- **Not established:** that the Rust computes the certified operation sequence, as a theorem.
+  `formal/asin/AsinKernel.v` transcribes `asin/mod.rs` operation for operation and the formal lane
+  runs it against the Rust on 19,532 corpus cases, so a difference in an operation, its order or a
+  table word shows (§7); the proof that the transcription meets the certified bounds, which would
+  also machine-link each certificate to the lemma it assumes, is not written.
 - **Tested:** the fixture's 5,970 cases match bit for bit, including the 40
   hardest of [CM].
 
@@ -219,6 +223,7 @@ shared with `sin`. The certified fast bound is below `2^-63.5`.
 | `generators/asin_poly.sollya` (Sollya 8.0) | the polynomials and their bounds, in `generators/asin_poly.out` |
 | `generators/asin_constants.py` | `src/asin/tables.rs`: the table, the polynomials, `π/2`; spot-checks each segment's polynomial against `mpmath` at 400 points |
 | `generators/asin_certificates.py` | writes every certificate in `formal/asin` (96) |
+| `formal/asin/AsinKernel.v`, `AsinTables.v` (Coq 8.15) | the transcription of `asin/mod.rs` and its generated constants; extracted by `formal/extraction/InternalCrosscheck.v` and run against `src/internal_crosscheck/asin.rs`'s corpus by `check_formal.sh` step 7 |
 | `formal/asin/AsinFacts.v` (Coq 8.15, Interval) | §5's Taylor remainders, argument ranges and `sin t/t` |
 | `formal/asin/*` (Gappa 1.4.1, at 400 bits) | §4's evaluations, compositions, series, square root and complement; §5's two Newton steps |
 | `generators/asin_reference.py` | the fixture: the 40 hardest arguments of [CM], the threshold and its neighbours, special values, multiples of 1/64, the crossover, arguments next to 1, random arguments |
@@ -227,6 +232,16 @@ The binding `formal/asin/binding.sha256` covers this document, the Sollya script
 and output, the generated tables, every certificate, `AsinFacts.v` and the source `asin/mod.rs`.
 
 **Checked by:**
+- `check_formal.sh` step 7: the extracted transcription reproduces the Rust bit for bit on 19,532 cases
+  (the entry, the reduction, the series, the fast path with its decision, the accurate path's `Q256`
+  value before rounding, and `sin`/`cos` and `Q256::recip` each on its own: through the rounded result the
+  Newton correction, about `2^-63` relative, and through the `Q256` value `recip`'s third step are invisible).
+- Mutation testing of the comparison (by hand, in a local harness, not a gate): eleven planted faults in the
+  transcription, namely the reduction's operation order, a table coefficient (`g0`, `g1`), the rounding-test
+  constant, both Newton residual signs, the cosine series' steps, the series' order, `recip`'s Newton steps,
+  the `Q256` value of `π/2`, and a Horner coefficient, each give 113 to 9,197 mismatches. One does not: a
+  high-order table bit (`g8`'s bit 30) is absorbed by the binary64 Horner chain and changes no output, so only
+  the generator's replay (`asin_constants.py --check`) guards the table's low-order words.
 - `crates/reference/tests/asin.rs`: 5,970 cases, bit for bit.
 - `src/asin/tests.rs`: special values, oddness, the branch boundary, and 200,000
   random arguments on which every fast-path decision equals the accurate path's result.
