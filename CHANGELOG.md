@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.10](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.9...v0.0.10) - 2026-10-21
+
+### Added
+
+- *(log-space)* add checked log-weight normalization ([#197](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/197))
+
 ## [0.0.9](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.8...v0.0.9) - 2026-10-17
 
 ### Performance
