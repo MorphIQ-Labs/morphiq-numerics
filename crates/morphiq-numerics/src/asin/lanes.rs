@@ -25,12 +25,18 @@ pub(crate) struct Asin;
 #[inline(always)]
 fn reduce<K: Simd>(k: K, a: K::F, comp: K::M) -> Dw<K> {
     let u = k.mul(k.sub(k.splat(1.0), a), k.splat(0.5));
-    let s = if k.mask_bits(comp) == 0 {
+    let comp_bits = k.mask_bits(comp);
+    let s = if comp_bits == 0 {
         k.splat(1.0)
     } else {
+        // The root only on the complement's lanes; the others carry 1.
         let mut roots = k.store(u);
-        for r in roots.as_mut() {
-            *r = sqrt(*r);
+        for (lane, r) in roots.as_mut().iter_mut().enumerate() {
+            *r = if comp_bits >> lane & 1 == 1 {
+                sqrt(*r)
+            } else {
+                1.0
+            };
         }
         k.load(roots)
     };
@@ -50,20 +56,28 @@ fn series<K: Simd>(k: K, (z_hi, z_lo): Dw<K>) -> Dw<K> {
     );
     // i is an integer, so i == 0 exactly when i < 1/2.
     let below = k.lt(i, k.splat(0.5));
-    // The series below 1/128.
-    let z2 = k.mul(z_hi, z_hi);
-    let [p0, p1, p2, p3] = POLY0;
-    let p = k.add(
-        k.splat(p0),
-        k.mul(
-            z2,
-            k.add(
-                k.splat(p1),
-                k.mul(z2, k.add(k.splat(p2), k.mul(z2, k.splat(p3)))),
+    let below_bits = k.mask_bits(below);
+    // The series below 1/128, only if some lane is there.
+    let small = if below_bits == 0 {
+        (z_hi, z_lo)
+    } else {
+        let z2 = k.mul(z_hi, z_hi);
+        let [p0, p1, p2, p3] = POLY0;
+        let p = k.add(
+            k.splat(p0),
+            k.mul(
+                z2,
+                k.add(
+                    k.splat(p1),
+                    k.mul(z2, k.add(k.splat(p2), k.mul(z2, k.splat(p3)))),
+                ),
             ),
-        ),
-    );
-    let small = add_f64(k, (z_hi, z_lo), k.mul(k.mul(z_hi, z2), p));
+        );
+        add_f64(k, (z_hi, z_lo), k.mul(k.mul(z_hi, z2), p))
+    };
+    if below_bits == lanes_mask::<K>() {
+        return small;
+    }
     // The table rows, a lane at a time; a lane with i = 0 reads row 1 and is
     // discarded.
     let mut rows = [K::Array::default(); 13];
@@ -104,6 +118,9 @@ fn series<K: Simd>(k: K, (z_hi, z_lo): Dw<K>) -> Dw<K> {
 #[inline(always)]
 fn fast<K: Simd>(k: K, z: Dw<K>, comp: K::M) -> Dw<K> {
     let s = series(k, z);
+    if k.mask_bits(comp) == 0 {
+        return s;
+    }
     // delta = series(z) * 2, as DoubleWord::mul_f64 rounds it.
     let (c_hi, c_lo1) = two_prod(k, s.0, k.splat(2.0));
     let (t_hi, t_lo1) = fast_two_sum(k, c_hi, k.mul(s.1, k.splat(2.0)));
