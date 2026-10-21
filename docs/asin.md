@@ -26,7 +26,7 @@ below claims more than the named artifact does.
 | Proofs that the rest of the transcription meets §4 and §5's bounds (the fast path's composition, the decision, the direct branch's call, the accurate path), applying the certificates | **not written** |
 | The Taylor remainders, the argument ranges, `sin t/t` (§5) | **proved in Coq** (`formal/asin/AsinFacts.v`) |
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§7) | **done** (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
-| Mutation witnesses | not done |
+| Mutation witnesses | **done** (§7, decision on cargo-mutants): 135 mutants of `asin/mod.rs` and `asin/lanes.rs`, 117 caught, 16 unviable, 1 timed out (counted as detected), 1 equivalent |
 | ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `asin_slice` | **done** (`asin/lanes.rs`, [lanes.md](lanes.md)): bit-identical to `asin` on every cascade over the fixture, thresholds, `k/64` shifter edges, the complement, and random encodings; run on NEON, and on x86-64 SSE2 under Rosetta; AVX-512F is CI's SDE job |
 | Same-host performance against the best alternatives | not measured |
 
@@ -256,3 +256,9 @@ and output, the generated tables, every certificate, `AsinFacts.v` and the sourc
   It found one wrong hint (`series_compose.g`), now fixed, and missing side conditions on four more.
 - A negative control was run by hand on eight certificates (one of each kind): shrinking the claimed
   bound makes Gappa exit non-zero. It is not a gate.
+- **Mutation.** cargo-mutants 27.1.0 over `asin/mod.rs` and `asin/lanes.rs`, built with the `simd`
+  feature and run against `asin`'s unit tests, the reference fixture, the determinism digest and the lane
+  suites, generates 135 mutants. 117 are caught by a failing test, 16 do not compile, and one (`replace *
+  with / in series`) makes the tests run past their timeout, which also detects it. One is equivalent:
+  `decided >> i & 1` against `decided << i & 1` in the lane kernel's fallback loop sends every lane after the
+  first through the scalar `asin`, which returns the same bits, so only the speed differs.
