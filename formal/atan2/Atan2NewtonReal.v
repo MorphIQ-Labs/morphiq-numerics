@@ -9,6 +9,7 @@ Open Scope R_scope.
 
 Definition tauA : R := / 100000000000000000000000000000000000000000000000000000000000.
 Definition etaA : R := / 9223372036854775808 * 1.0001.
+Definition bndN : R := 4 * / 10000000000000000000000000000000000000000000000000000000000.
 Definition bnd190 : R := / 1569275433846670190958947355801916604025588861116008628224.
 
 Lemma tauA_facts : 0 < tauA <= / 1000000.
@@ -48,7 +49,7 @@ Proof.
   apply (Rmult_le_reg_r d); [exact Hd | ]. rewrite Rmult_assoc, Rinv_l by lra. lra.
 Qed.
 
-Theorem newton_atan_real n d t Y r s c w sn cs sg gm d1 d2 d3 d4 d6 e g1 g4 g5 p1 p2 nuh dh rih Ph phi1 :
+Theorem newton_atan_P n d t Y r s c w sn cs sg gm d1 d2 d3 d4 d6 e g1 g4 p1 p2 nuh dh rih Ph :
   0 < d -> 0 < t -> t <= 1 -> n = t * d ->
   0.78 * t <= Y -> Y <= t -> Y <= 0.7854 ->
   Rabs (Y - r) <= etaA * Y ->
@@ -61,10 +62,9 @@ Theorem newton_atan_real n d t Y r s c w sn cs sg gm d1 d2 d3 d4 d6 e g1 g4 g5 p
   dh = (d * cs * (1 + d3) + n * sn * (1 + d4)) + g4 -> Rabs d3 <= tauA -> Rabs d4 <= tauA -> Rabs g4 <= tauA * d ->
   dh * rih = 1 + e -> Rabs e <= tauA ->
   Ph = nuh * rih * (1 + d6) -> Rabs d6 <= tauA ->
-  phi1 = (r + Ph) + g5 -> Rabs g5 <= tauA * Y ->
-  Rabs (phi1 - Y) <= bnd190 * Y.
+  Rabs (Ph - w) <= 7.7 * tauA * t.
 Proof.
-  intros Hd Ht Ht1 Hn HYl HYh HY7 Hr Hs0 Hs1 Hc0 Hc1 Hex Dpos Hcub Hw Hsn Hsg Hcs Hgm Hp1 Hd1 Hp2 Hd2 Hnu Hg1 Hdh Hd3 Hd4 Hg4 Hrih He HPh Hd6 Hphi Hg5.
+  intros Hd Ht Ht1 Hn HYl HYh HY7 Hr Hs0 Hs1 Hc0 Hc1 Hex Dpos Hcub Hw Hsn Hsg Hcs Hgm Hp1 Hd1 Hp2 Hd2 Hnu Hg1 Hdh Hd3 Hd4 Hg4 Hrih He HPh Hd6.
   destruct tauA_facts as [T0 T1].
   assert (Hdne : d <> 0) by lra.
   (* the numerator and denominator against the exact ones *)
@@ -151,27 +151,64 @@ Proof.
     assert (0 <= Rabs (Ph - w)) by apply Rabs_pos.
     assert (0 <= tauA * t) by nra.
     nra. }
+  exact HPw.
+Qed.
+
+Theorem newton_atan_final n d t Y r s c w sn cs sg gm d1 d2 d3 d4 d6 e g1 g4 g5 p1 p2 nuh dh rih Ph phi1 :
+  0 < d -> 0 < t -> t <= 1 -> n = t * d ->
+  0.78 * t <= Y -> Y <= t -> Y <= 0.7854 ->
+  Rabs (Y - r) <= etaA * Y ->
+  0 <= s -> s <= 1.0001 * t -> 0.7 <= c -> c <= 1 ->
+  t * c - s = w * (c + t * s) -> 0 < c + t * s ->
+  Rabs (Y - r - w) <= Rabs w * Rabs w * Rabs w / 3 -> Rabs w <= 1.0001 * Rabs (Y - r) ->
+  sn = s * (1 + sg) -> Rabs sg <= tauA -> cs = c * (1 + gm) -> Rabs gm <= tauA ->
+  p1 = n * cs * (1 + d1) -> Rabs d1 <= tauA -> p2 = d * sn * (1 + d2) -> Rabs d2 <= tauA ->
+  nuh = (p1 + - p2) + g1 -> Rabs g1 <= tauA * n ->
+  dh = (d * cs * (1 + d3) + n * sn * (1 + d4)) + g4 -> Rabs d3 <= tauA -> Rabs d4 <= tauA -> Rabs g4 <= tauA * d ->
+  dh * rih = 1 + e -> Rabs e <= tauA ->
+  Ph = nuh * rih * (1 + d6) -> Rabs d6 <= tauA ->
+  Rabs (Ph - w) <= 7.7 * tauA * t ->
+  phi1 = (r + Ph) + g5 -> Rabs g5 <= tauA * Y ->
+  Rabs (phi1 - Y) <= bndN * Y.
+Proof.
+  intros Hd Ht Ht1 Hn HYl HYh HY7 Hr Hs0 Hs1 Hc0 Hc1 Hex Dpos Hcub Hw Hsn Hsg Hcs Hgm Hp1 Hd1 Hp2 Hd2 Hnu Hg1 Hdh Hd3 Hd4 Hg4 Hrih He HPh Hd6 HPw Hphi Hg5.
+  destruct tauA_facts as [T0 T1].
+  assert (Hyr : Rabs (Y - r) <= etaA * t).
+  { apply Rle_trans with (1 := Hr). apply Rmult_le_compat_l; [unfold etaA; lra | exact HYh]. }
+  assert (Hwt : Rabs w <= 1.0001 * etaA * t).
+  { assert (0 < etaA) by (unfold etaA; lra). apply Rle_trans with (1 := Hw). nra. }
   (* assemble *)
+  assert (HYp : 0 < Y) by lra. assert (Heta0 : 0 < etaA) by (unfold etaA; lra).
   assert (Hfin : phi1 - Y = (Ph - w) + (r + w - Y) + g5) by (rewrite Hphi; ring).
   assert (Hcub' : Rabs (r + w - Y) <= Rabs w * Rabs w * Rabs w / 3).
   { replace (r + w - Y) with (- (Y - r - w)) by ring. rewrite Rabs_Ropp. exact Hcub. }
-  assert (Hw3 : Rabs w * Rabs w * Rabs w / 3 <= (1.0001 * etaA * Y / 0.78) * (1.0001 * etaA * Y / 0.78) * (1.0001 * etaA * Y / 0.78) / 3).
+  assert (Hw3 : Rabs w * Rabs w * Rabs w / 3 <= (1.0001 * etaA * Y) * (1.0001 * etaA * Y) * (1.0001 * etaA * Y) / 3).
   { assert (Hwy : Rabs w <= 1.0001 * etaA * Y / 0.78) by (apply Rle_trans with (1.0001 * etaA * t); [exact Hwt | nra]).
     assert (0 <= Rabs w) by apply Rabs_pos.
-    assert (0 <= 1.0001 * etaA * Y / 0.78) by (unfold etaA; nra).
+    assert (0 <= 1.0001 * etaA * Y / 0.78) by (apply Rmult_le_pos; [apply Rmult_le_pos; [lra | lra] | lra] ; fail || (unfold Rdiv; apply Rmult_le_pos; [apply Rmult_le_pos; nra | lra])).
     apply Rmult_le_compat_r; [lra | ]. apply Rmult_le_compat; [nra | assumption | | ]; try nra. }
   rewrite Hfin.
   apply Rle_trans with (Rabs ((Ph - w) + (r + w - Y)) + Rabs g5); [apply Rabs_triang | ].
   assert (Rabs ((Ph - w) + (r + w - Y)) <= Rabs (Ph - w) + Rabs (r + w - Y)) by apply Rabs_triang.
-  unfold bnd190.
-  assert (HYp : 0 < Y) by lra.
-  assert (Hc3 : (1.0001 * etaA * Y / 0.78) * (1.0001 * etaA * Y / 0.78) * (1.0001 * etaA * Y / 0.78) / 3 <= (1.0001 * etaA / 0.78) * (1.0001 * etaA / 0.78) * (1.0001 * etaA / 0.78) / 3 * 0.6169 * Y).
+  assert (Hc3 : (1.0001 * etaA * Y) * (1.0001 * etaA * Y) * (1.0001 * etaA * Y) / 3 <= (1.0001 * etaA) * (1.0001 * etaA) * (1.0001 * etaA) / 3 * 0.6169 * Y).
   { assert (Y * Y <= 0.6169) by nra.
     assert (Y * Y * Y <= 0.6169 * Y) by nra.
-    assert (0 <= (1.0001 * etaA / 0.78) * (1.0001 * etaA / 0.78) * (1.0001 * etaA / 0.78) / 3) by (unfold etaA; apply Rmult_le_pos; [repeat apply Rmult_le_pos; lra | lra]).
+    assert (HK0 : 0 < 1.0001 * etaA / 0.78) by (unfold Rdiv; apply Rmult_lt_0_compat; [apply Rmult_lt_0_compat; lra | lra]).
+    assert (Hcube : forall k, 0 < k -> 0 <= k * k * k / 3) by (intros k Hk; assert (0 < k * k) by nra; assert (0 < k * k * k) by nra; lra).
+    pose proof (Hcube _ HK0).
     nra. }
-  assert (Hnum : 7.7 * tauA / 0.78 + (1.0001 * etaA / 0.78) * (1.0001 * etaA / 0.78) * (1.0001 * etaA / 0.78) / 3 * 0.6169 + tauA <= / 1569275433846670190958947355801916604025588861116008628224)
-    by (unfold tauA, etaA; interval with (i_prec 300)).
+  assert (Hnum : 7.7 * tauA / 0.78 + (1.0001 * etaA) * (1.0001 * etaA) * (1.0001 * etaA) / 3 * 0.6169 + tauA <= bndN)
+    by (unfold tauA, etaA, bndN; interval with (i_prec 300)).
   assert (Htt : 7.7 * tauA * t <= 7.7 * tauA / 0.78 * Y) by (assert (t <= Y / 0.78) by lra; nra).
-  nra.
+  assert (Hmul : (7.7 * tauA / 0.78 + (1.0001 * etaA) * (1.0001 * etaA) * (1.0001 * etaA) / 3 * 0.6169 + tauA) * Y <= bndN * Y)
+    by (apply Rmult_le_compat_r; [lra | exact Hnum]).
+  assert (Hc3' : (1.0001 * etaA * Y) * (1.0001 * etaA * Y) * (1.0001 * etaA * Y) / 3 <= (1.0001 * etaA) * (1.0001 * etaA) * (1.0001 * etaA) / 3 * 0.6169 * Y).
+  { exact Hc3. }
+  assert (Hg5' : Rabs g5 <= tauA * Y) by exact Hg5.
+  assert (Hlast : Rabs (Ph - w) + Rabs (r + w - Y) + Rabs g5 <= bndN * Y).
+  { apply Rle_trans with (7.7 * tauA * t + (1.0001 * etaA * Y) * (1.0001 * etaA * Y) * (1.0001 * etaA * Y) / 3 + tauA * Y).
+    - apply Rplus_le_compat; [apply Rplus_le_compat | exact Hg5']; [exact HPw | apply Rle_trans with (1 := Hcub'); exact Hw3].
+    - apply Rle_trans with ((7.7 * tauA / 0.78 + (1.0001 * etaA) * (1.0001 * etaA) * (1.0001 * etaA) / 3 * 0.6169 + tauA) * Y); [ | exact Hmul].
+      nra. }
+  lra.
 Qed.
