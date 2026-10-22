@@ -19,7 +19,7 @@ and every bound is a Gappa certificate in `formal/atan2`.
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§7) | done by the formal lane (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
 | Coq transcription of the Rust (`formal/atan2/Atan2Kernel.v`) compared with it bit for bit (§7) | **done**: the entry (special values, forms, tiny ratios), the fast path and its decision at every form, the accurate path (before rounding), 11,477 corpus cases; five planted faults (a series coefficient, the scale, the subnormal midpoint's exponent, Newton's numerator sign, the doubling of `π/2`) each give mismatches. Proofs that it meets §3 and §5's bounds are not written |
 | ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `atan2_slice` | **done** (`atan2/lanes.rs`, [lanes.md](lanes.md)): bit-identical to `atan2` on every backend over the fixture's pairs, every pair of special values, ratios at every scale, the segment boundaries and random encodings; run on NEON, and on x86-64 SSE2 under Rosetta; AVX-512F is CI's SDE job |
-| Mutation witnesses | not done |
+| Mutation witnesses | **done** (§7): 215 mutants of `atan2/mod.rs` and `atan2/lanes.rs`, 194 caught, 10 unviable, 6 timed out (detected), 5 equivalent |
 | Same-host performance against the best alternatives | measured on NEON only: 1.05–1.64× over the scalar loop ([measurements](../crates/reference/measurements/asin-asinh-atan2-m1pro/README.md)); native x86 not measured |
 
 ## Sources
@@ -164,3 +164,14 @@ Tests:
   constants, and 60,000 random pairs on which every fast-path decision equals the
   accurate path's result for all four forms.
 - The formal lane's Coq proof of each certificate (`check_formal.sh` step 5).
+- **Mutation.** cargo-mutants 27.1.0 over `atan2/mod.rs` and `atan2/lanes.rs`, built with the `simd`
+  feature and run against `atan2`'s unit tests, the reference fixture, the determinism digest and the
+  lane suites, generates 215 mutants: 194 are caught by a failing test, 10 do not compile and 6 run
+  past the timeout, which also detects them. Five are equivalent:
+  - `>` against `>=` where `|y|` and `|x|` are compared (twice) and `<` against `<=` at the ratio `2^-900`:
+    at equality both forms (or both paths) are valid and return the same value;
+  - `(j - 1) / 2` against `j / 2` in `tiny_phi`: `j` is odd, so integer division gives the same quotient;
+  - `|` against `^` in `odd_part`: the bit being set is not in the fraction field.
+  A first run left the power-of-two helpers' and the table's tail-sum mutants alive; they were invisible to
+  results (scale invariance; an error below the rounding test's margin), and `the_power_of_two_helpers_are_exact`
+  and `the_fast_value_is_within_its_certified_bound_of_the_accurate_value` now kill them.
