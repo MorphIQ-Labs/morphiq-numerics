@@ -104,3 +104,24 @@ Proof.
           lra. }
     lra.
 Qed.
+
+Lemma arcsinh_opp x : arcsinh (- x) = - arcsinh x.
+Proof.
+  assert (E : - x = sinh (- arcsinh x)).
+  { unfold sinh. rewrite exp_Ropp, Ropp_involutive. 
+    assert (H : sinh (arcsinh x) = x) by apply sinh_arcsinh. unfold sinh in H.
+    rewrite exp_Ropp in H. lra. }
+  rewrite E, arcsinh_sinh. reflexivity.
+Qed.
+
+(** Below the threshold, in either sign, [arcsinh b] rounds to [b]. *)
+Lemma small_signed b : fmtF b -> Rabs b <= ThrT -> rndF (arcsinh b) = b.
+Proof.
+  intros Fb H. destruct thr_facts as [_ [_ [Tp _]]].
+  destruct (Rtotal_order b 0) as [Hn | [Hz | Hp]].
+  - assert (Hnb : fmtF (- b)) by (apply generic_format_opp; exact Fb).
+    pose proof (small_round_below (- b) Hnb ltac:(lra) ltac:(rewrite Rabs_left in H by lra; lra)) as R.
+    replace b with (- (- b)) at 1 by ring. rewrite arcsinh_opp. rewrite round_NE_opp_ne. rewrite R. ring.
+  - rewrite Hz, arcsinh_0. apply round_0. exact _.
+  - apply small_round_below; [exact Fb | exact Hp | rewrite Rabs_pos_eq in H by lra; exact H].
+Qed.
