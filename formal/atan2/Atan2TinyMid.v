@@ -87,3 +87,78 @@ Proof.
       { apply mag_le_bpow; [lra | ]. rewrite Rabs_pos_eq by lra. exact H. }
       unfold c. rewrite Hcmax. rewrite Z.max_r by lia. reflexivity.
 Qed.
+
+(** The quotient of two positive binary64 numbers is a midpoint, or relatively far from it. *)
+Theorem gap_rel nv dv mn en md ed mu c :
+  0 < nv -> 0 < dv -> Z.odd mn = true -> (0 < mn < 2 ^ 53)%Z -> nv = IZR mn * bpow radix2 en ->
+  (0 < md < 2 ^ 53)%Z -> dv = IZR md * bpow radix2 ed ->
+  (0 <= mu < 2 ^ 53)%Z -> 
+  nv / dv = IZR (2 * mu + 1) * bpow radix2 c \/
+  nv / dv * bpow radix2 (-108) <= Rabs (nv / dv - IZR (2 * mu + 1) * bpow radix2 c).
+Proof.
+  intros Pn Pd Omn [Hmn0 Hmn1] Hn [Hmd0 Hmd1] Hd [Hmu0 Hmu1].
+  set (mid := IZR (2 * mu + 1) * bpow radix2 c).
+  set (t := nv / dv).
+  assert (Hd0 : dv <> 0) by lra.
+  destruct (Req_dec (nv - mid * dv) 0) as [Z0 | NZ].
+  - left. unfold t. apply (Rmult_eq_reg_r dv); [ | exact Hd0]. field_simplify; [ | exact Hd0]. lra.
+  - right.
+    assert (Gn : on_grid en nv) by (exists mn; exact Hn).
+    assert (Gm : on_grid (c + ed) (mid * dv)).
+    { exists ((2 * mu + 1) * md)%Z. unfold mid. rewrite Hd, mult_IZR, bpow_plus. ring. }
+    assert (Gx : on_grid (Z.min en (c + ed)) (nv - mid * dv)).
+    { apply grid_minus; [apply (grid_le en); [apply Z.le_min_l | exact Gn] | apply (grid_le (c + ed)); [apply Z.le_min_r | exact Gm]]. }
+    pose proof (grid_nonzero _ _ Gx NZ) as Hx.
+    assert (Hdiff : nv / dv - mid = (nv - mid * dv) / dv) by (field; exact Hd0).
+    assert (Habs : bpow radix2 (Z.min en (c + ed)) / dv <= Rabs (t - mid)).
+    { unfold t. rewrite Hdiff. unfold Rdiv. rewrite Rabs_mult, Rabs_Rinv by exact Hd0. rewrite (Rabs_pos_eq dv) by lra.
+      apply Rmult_le_compat_r; [apply Rlt_le, Rinv_0_lt_compat; lra | exact Hx]. }
+    assert (Hn53 : nv < bpow radix2 53 * bpow radix2 en).
+    { rewrite Hn. apply Rmult_lt_compat_r; [apply bpow_gt_0 | ]. rewrite <- izr_pow2 by lia. apply IZR_lt. lia. }
+    assert (Hd53 : dv < bpow radix2 53 * bpow radix2 ed).
+    { rewrite Hd. apply Rmult_lt_compat_r; [apply bpow_gt_0 | ]. rewrite <- izr_pow2 by lia. apply IZR_lt. lia. }
+    assert (Hm54 : mid < bpow radix2 54 * bpow radix2 c).
+    { unfold mid. apply Rmult_lt_compat_r; [apply bpow_gt_0 | ]. rewrite <- izr_pow2 by lia. apply IZR_lt. lia. }
+    assert (Hbp : bpow radix2 (-108) <= bpow radix2 (-53) /\ bpow radix2 (-108) <= bpow radix2 (-107) /\ bpow radix2 (-53) * bpow radix2 53 = 1).
+    { split; [apply bpow_le; lia | split; [apply bpow_le; lia | rewrite <- bpow_plus; reflexivity]]. }
+    destruct Hbp as [B1 [B2 B3]].
+    destruct (Z.le_ge_cases en (c + ed)) as [Hle | Hge].
+    + rewrite Z.min_l in Habs by lia.
+      (* 2^en > nv 2^-53 *)
+      assert (Hq : t * bpow radix2 (-53) <= bpow radix2 en / dv).
+      { assert (H1 : nv * bpow radix2 (-53) <= bpow radix2 en).
+        { apply (Rmult_le_reg_r (bpow radix2 53)); [apply bpow_gt_0 | ]. rewrite Rmult_assoc, B3. lra. }
+        unfold t. replace (nv / dv * bpow radix2 (-53)) with ((nv * bpow radix2 (-53)) / dv) by (field; exact Hd0).
+        unfold Rdiv. apply Rmult_le_compat_r; [left; apply Rinv_0_lt_compat; lra | exact H1]. }
+      assert (Ht : t * bpow radix2 (-108) <= t * bpow radix2 (-53)).
+      { assert (0 < t) by (unfold t; apply Rdiv_lt_0_compat; lra). apply Rmult_le_compat_l; lra. }
+      lra.
+    + rewrite Z.min_r in Habs by lia.
+      assert (Hb54 : bpow radix2 (-54) * bpow radix2 54 = 1) by (rewrite <- bpow_plus; reflexivity).
+      assert (Hg : mid * dv * bpow radix2 (-107) <= bpow radix2 (c + ed)).
+      { rewrite bpow_plus.
+        assert (E1 : bpow radix2 (-54) * mid <= bpow radix2 c).
+        { apply (Rmult_le_reg_l (bpow radix2 54)); [apply bpow_gt_0 | ]. rewrite <- Rmult_assoc, (Rmult_comm (bpow radix2 54)), Hb54. lra. }
+        assert (E2 : bpow radix2 (-53) * dv <= bpow radix2 ed).
+        { apply (Rmult_le_reg_l (bpow radix2 53)); [apply bpow_gt_0 | ]. rewrite <- Rmult_assoc, (Rmult_comm (bpow radix2 53)), B3. lra. }
+        assert (Hp : bpow radix2 (-107) = bpow radix2 (-54) * bpow radix2 (-53)) by (rewrite <- bpow_plus; reflexivity).
+        pose proof (bpow_ge_0 radix2 (-54)). pose proof (bpow_ge_0 radix2 (-53)). pose proof (bpow_gt_0 radix2 c). pose proof (bpow_gt_0 radix2 ed).
+        assert (0 < mid) by (unfold mid; apply Rmult_lt_0_compat; [apply IZR_lt; lia | apply bpow_gt_0]).
+        rewrite Hp. replace (mid * dv * (bpow radix2 (-54) * bpow radix2 (-53))) with ((bpow radix2 (-54) * mid) * (bpow radix2 (-53) * dv)) by ring.
+        apply Rmult_le_compat; [apply Rmult_le_pos; lra | apply Rmult_le_pos; lra | exact E1 | exact E2]. }
+      assert (Hq : mid * bpow radix2 (-107) <= Rabs (t - mid)).
+      { apply Rle_trans with (bpow radix2 (c + ed) / dv); [ | exact Habs].
+        apply (Rmult_le_reg_r dv); [lra | ]. replace (bpow radix2 (c + ed) / dv * dv) with (bpow radix2 (c + ed)) by (field; exact Hd0). nra. }
+      assert (Pm : 0 < mid) by (unfold mid; apply Rmult_lt_0_compat; [apply IZR_lt; lia | apply bpow_gt_0]).
+      assert (Pt : 0 < t) by (unfold t; apply Rdiv_lt_0_compat; lra).
+      destruct (Rle_dec t (2 * mid)) as [Hle2 | Hgt2].
+      * assert (t * bpow radix2 (-108) <= 2 * mid * bpow radix2 (-108)) by (apply Rmult_le_compat_r; [apply bpow_ge_0 | exact Hle2]).
+        assert (2 * mid * bpow radix2 (-108) <= mid * bpow radix2 (-107)).
+        { replace (bpow radix2 (-107)) with (2 * bpow radix2 (-108)) by (replace (-107)%Z with (-108 + 1)%Z by reflexivity; rewrite bpow_plus; change (bpow radix2 1) with 2; ring). lra. }
+        lra.
+      * assert (Hh : t / 2 <= Rabs (t - mid)).
+        { apply Rle_trans with (t - mid); [lra | apply Rle_abs]. }
+        assert (t * bpow radix2 (-108) <= t / 2).
+        { assert (bpow radix2 (-108) <= / 2) by (apply Rle_trans with (bpow radix2 (-1)); [apply bpow_le; lia | change (bpow radix2 (-1)) with (/ 2); lra]). nra. }
+        lra.
+Qed.
