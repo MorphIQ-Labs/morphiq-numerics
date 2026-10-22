@@ -142,3 +142,69 @@ Proof.
   - rewrite Qe. apply Rmult_lt_0_compat; [exact Pm | exact Ha].
   - rewrite Qei. apply Rmult_lt_0_compat; [exact Pr | apply Rinv_0_lt_compat; exact Ha].
 Qed.
+
+(** The algebra of the computed step: [finv] is within [1.2 rho + 714 U] of [yv + u]. *)
+Lemma newton_alg (C S xv sq cq Rc rrv prv finv yv u rho U eps d3 : R) :
+  1 <= C -> xv - S = C * u -> Rabs u <= 0.0000011 ->
+  Rabs (sq - S) <= rho * C -> Rabs (cq - C) <= rho * C -> 0 < rho <= 1e-60 -> 0 < U <= rho ->
+  Rabs (cq * Rc - 1) <= eps -> 0 <= eps <= rho / 1000 ->
+  Rabs (rrv - (xv - sq)) <= 1.01 * U * C ->
+  prv = rrv * Rc * (1 + d3) -> Rabs d3 <= U ->
+  Rabs (finv - (yv + prv)) <= U * 712 ->
+  Rabs (finv - (yv + u)) <= 1.2 * rho + 714 * U.
+Proof.
+  intros HC Hx Hu Hs Hc [Hr0 Hr1] [HU0 HU1] He [He0 He1] Hrr Hprv Hd3 Hfin.
+  pose proof Hc as Hs0. rewrite Rabs_minus_sym in Hs0. pose proof Hc as Hcabs.
+  assert (HCp : 0 < C) by lra.
+  set (w := rrv - C * u).
+  assert (Hw : Rabs w <= (1.01 * rho + 1.01 * U) * C).
+  { assert (E : w = (rrv - (xv - sq)) + (S - sq)) by (unfold w; lra).
+    rewrite E. apply Rle_trans with (Rabs (rrv - (xv - sq)) + Rabs (S - sq)); [apply Rabs_triang | ].
+    rewrite Rabs_minus_sym in Hs. nra. }
+  set (theta := Rc * C - 1).
+  assert (Hcq : cq >= C * (1 - rho)).
+  { apply Rabs_le_inv in Hc. destruct Hc as [Hc1 Hc2]. nra. }
+  assert (Hcqp : 0.5 <= cq) by nra.
+  assert (Hth : Rabs theta <= 1.002 * rho).
+  { assert (E : theta = (cq * Rc - 1) * (C / cq) + (C / cq - 1)).
+    { unfold theta. field. lra. }
+    assert (Hr : C / cq <= 1.0001).
+    { apply (Rmult_le_reg_r cq); [lra | ]. unfold Rdiv. rewrite Rmult_assoc, Rinv_l by lra. nra. }
+    assert (Hr2 : Rabs (C / cq - 1) <= 1.0001 * rho).
+    { assert (E2 : C / cq - 1 = (C - cq) / cq) by (field; lra).
+      rewrite E2, Rabs_div' by lra. rewrite (Rabs_pos_eq cq) by lra.
+      assert (Hcc : Rabs (C - cq) <= rho * C) by exact Hs0.
+      assert (HC2 : C <= 1.0001 * cq) by nra.
+      apply (Rmult_le_reg_r cq); [lra | ]. unfold Rdiv. rewrite Rmult_assoc, Rinv_l by lra. rewrite Rmult_1_r.
+      assert (rho * C <= rho * (1.0001 * cq)) by (apply Rmult_le_compat_l; lra). nra. }
+    rewrite E. 
+    apply Rle_trans with (Rabs ((cq * Rc - 1) * (C / cq)) + Rabs (C / cq - 1)); [apply Rabs_triang | ].
+    rewrite Rabs_mult, (Rabs_pos_eq (C / cq)) by (apply Rmult_le_pos; [lra | apply Rlt_le, Rinv_0_lt_compat; lra]).
+    assert (Rabs (cq * Rc - 1) * (C / cq) <= (rho / 1000) * 1.0001) by (apply Rmult_le_compat; [apply Rabs_pos | apply Rmult_le_pos; [lra | apply Rlt_le, Rinv_0_lt_compat; lra] | lra | exact Hr]).
+    lra. }
+  set (P := (1 + theta) * (1 + d3)).
+  assert (Hprv2 : prv = (u + w / C) * P).
+  { rewrite Hprv. unfold P, theta, w. field. lra. }
+  apply Rabs_le_inv in Hth. destruct Hth as [Ht1 Ht2].
+  pose proof Hd3 as Hd3c. apply Rabs_le_inv in Hd3c. destruct Hd3c as [Hd1 Hd2].
+  assert (HP : Rabs (P - 1) <= 2.01 * rho).
+  { assert (E : P - 1 = theta + d3 + theta * d3) by (unfold P; ring).
+    assert (Hp1 : Rabs (theta * d3) <= 1.002e-60 * 1e-60).
+    { rewrite Rabs_mult. apply Rmult_le_compat; [apply Rabs_pos | apply Rabs_pos | apply Rabs_le; lra | apply Rabs_le; lra]. }
+    rewrite E. apply Rabs_le_inv in Hp1. destruct Hp1 as [Hq1 Hq2].
+    apply Rabs_le. split; nra. }
+  assert (HPa : Rabs P <= 1.0001) by (apply Rabs_le_inv in HP; apply Rabs_le; split; nra).
+  assert (Hwc : Rabs (w / C) <= 1.01 * rho + 1.01 * U).
+  { rewrite Rabs_div' by lra. rewrite (Rabs_pos_eq C) by lra.
+    apply (Rmult_le_reg_r C); [lra | ]. unfold Rdiv. rewrite Rmult_assoc, Rinv_l by lra. rewrite Rmult_1_r. lra. }
+  assert (Hpu : Rabs (prv - u) <= 1.011 * rho + 1.011 * U).
+  { assert (E : prv - u = (w / C) * P + u * (P - 1)) by (rewrite Hprv2; ring).
+    rewrite E. apply Rle_trans with (Rabs ((w / C) * P) + Rabs (u * (P - 1))); [apply Rabs_triang | ].
+    rewrite !Rabs_mult.
+    assert (Rabs (w / C) * Rabs P <= (1.01 * rho + 1.01 * U) * 1.0001) by (apply Rmult_le_compat; [apply Rabs_pos | apply Rabs_pos | exact Hwc | exact HPa]).
+    assert (Rabs u * Rabs (P - 1) <= 0.0000011 * (2.01 * rho)) by (apply Rmult_le_compat; [apply Rabs_pos | apply Rabs_pos | exact Hu | exact HP]).
+    lra. }
+  apply Rle_trans with (Rabs (finv - (yv + prv)) + Rabs (prv - u)).
+  - replace (finv - (yv + u)) with ((finv - (yv + prv)) + (prv - u)) by ring. apply Rabs_triang.
+  - lra.
+Qed.
