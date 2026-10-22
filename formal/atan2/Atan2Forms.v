@@ -136,3 +136,49 @@ Proof.
   assert (Hc0 : / 100000000000000000000000000000000 <= / 4611686018427387904 * 0.01 * Z) by nra.
   apply Rabs_le. split; nra.
 Qed.
+
+Lemma rndF_le_pow e v : v <= bpow radix2 e -> (-1074 <= e)%Z -> rndF v <= bpow radix2 e.
+Proof. intros H He. apply round_le_generic; [exact _ | exact _ | apply fmt_bpow; exact He | exact H]. Qed.
+
+Lemma neg_dw ph pl : finite ph -> finite pl -> B ph = rndF (B ph + B pl) ->
+  finite (fneg ph) /\ finite (fneg pl) /\ B (fneg ph) = rndF (B (fneg ph) + B (fneg pl)).
+Proof.
+  intros Fh Fl D. destruct (fneg_val ph Fh) as [F1 V1]. destruct (fneg_val pl Fl) as [F2 V2].
+  split; [exact F1 | split; [exact F2 | ]]. rewrite V1, V2.
+  replace (- B ph + - B pl) with (- (B ph + B pl)) by ring. rewrite round_NE_opp_ne, <- D. reflexivity.
+Qed.
+
+(** One form: a normalized double-word [x] near the constant [K], plus or minus [phi]. *)
+Lemma form_step s xh xl yh yl phi phihat K eF : (s = 1 \/ s = -1) ->
+  finite xh -> finite xl -> finite yh -> finite yl ->
+  B xh = rndF (B xh + B xl) -> B yh = rndF (B yh + B yl) ->
+  1 <= B xh <= 4 -> Rabs (B xl) <= bpow radix2 (-52) * B xh ->
+  Rabs (B yh) <= 99 / 100 * B xh -> Rabs (B yl) <= bpow radix2 (-52) * B xh ->
+  B yh + B yl = s * phihat ->
+  1.5707 <= K -> 0 < phi <= 0.7854 -> Rabs (B xh + B xl - K) <= / 100000000000000000000000000000000 ->
+  Rabs (phihat - phi) <= eF * phi -> 0 <= eF <= / 9223372036854775808 * 1.0001 ->
+  0.78 <= K + s * phi -> K + s * phi <= 3.15 ->
+  exists zh zl, add64 xh xl yh yl = (zh, zl) /\ finite zh /\ finite zl /\ B zh = rndF (B zh + B zl) /\
+    bpow radix2 (-905) <= B zh /\ B zh <= 4 /\
+    Rabs (B zh + B zl - (K + s * phi)) <= bpow radix2 (-62) * (K + s * phi).
+Proof.
+  intros Hs Fxh Fxl Fyh Fyl Dx Dy Hx Hxl Hyh Hyl Hy HK Hphi HC Hph HeF HZ1 HZ2.
+  destruct (dw_add_ok xh xl yh yl Fxh Fxl Fyh Fyl Dx Dy Hx Hxl Hyh Hyl) as [zh [zl [Ea [Fzh [Fzl [Dz [Err Hsum]]]]]]].
+  exists zh, zl. split; [exact Ea | ]. split; [exact Fzh | ]. split; [exact Fzl | ]. split; [exact Dz | ].
+  set (C := B xh + B xl) in *.
+  assert (HS : C + (B yh + B yl) = C + s * phihat) by (rewrite Hy; reflexivity).
+  rewrite HS in Err, Hsum.
+  assert (Spos : 0 < C + s * phihat) by (destruct Hx as [X1 X2]; lra).
+  assert (HN : Rabs (B zh + B zl - (K + s * phi)) <= bpow radix2 (-62) * (K + s * phi)).
+  { apply (form_num K s C phi phihat (B zh + B zl) eF); try assumption. }
+  split; [ | split; [ | exact HN]].
+  - rewrite Dz. apply rndF_bpow_le with (e := (-905)%Z); [lia | ].
+    apply Rle_trans with (bpow radix2 (-10)); [apply bpow_le; lia | ].
+    apply Rabs_le_inv in HN as [N1 N2]. assert (bpow radix2 (-10) <= 0.01) by (bpow_num; interval with (i_prec 60)). 
+    assert (b62 : bpow radix2 (-62) <= 1 / 1000) by (apply Rle_trans with (bpow radix2 (-10)); [apply bpow_le; lia | bpow_num; interval with (i_prec 60)]).
+    nra.
+  - rewrite Dz. replace 4 with (bpow radix2 2) by (change (bpow radix2 2) with 4; reflexivity).
+    apply rndF_le_pow; [ | lia]. apply Rabs_le_inv in HN as [N1 N2].
+    assert (b62 : bpow radix2 (-62) <= 1 / 1000) by (apply Rle_trans with (bpow radix2 (-10)); [apply bpow_le; lia | bpow_num; interval with (i_prec 60)]).
+    change (bpow radix2 2) with 4. nra.
+Qed.
