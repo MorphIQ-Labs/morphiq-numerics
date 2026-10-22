@@ -3,7 +3,7 @@
 //! Endpoint operations use round-to-nearest and then one outward neighbour.
 //! These are enclosing intervals, not claims of tightest directed rounding.
 
-use crate::elementary::{exp, ln, sqrt};
+use crate::elementary::{exp, ln};
 
 /// A finite closed interval with ordered endpoints.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -199,7 +199,10 @@ impl FiniteInterval {
         if self.lower < 0.0 {
             return Err(IntervalError::Domain);
         }
-        let result = outward(sqrt(self.lower), sqrt(self.upper))?;
+        let result = outward(
+            crate::exact::sqrt(self.lower),
+            crate::exact::sqrt(self.upper),
+        )?;
         Ok(Self {
             lower: result.lower.max(0.0),
             upper: result.upper,

@@ -36,6 +36,8 @@ use std::fmt::Write as _;
 use std::string::String;
 
 mod asin;
+mod asinh;
+mod atan2;
 mod normal;
 
 fn q128(q: Q128) -> String {
@@ -251,6 +253,8 @@ fn internal_crosscheck_corpus() {
     let mut out = String::new();
     normal::write(&mut out);
     asin::write(&mut out);
+    asinh::write(&mut out);
+    atan2::write(&mut out);
     q256_exponent_corpus(&mut out);
     erfcx_accurate_tail_corpus(&mut out);
     erfcx_accurate_exponential_corpus(&mut out);

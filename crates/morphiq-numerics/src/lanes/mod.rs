@@ -117,6 +117,106 @@ fn whole_chunks<G: Kernel, K: Simd>(k: K, xs: &[f64], out: &mut [f64]) -> usize 
     covered
 }
 
+/// A binary function evaluated on lanes: its scalar form, and its fast path on
+/// one backend's lanes for paired arguments, which returns the scalar
+/// function's bits on every lane.
+pub(crate) trait Kernel2 {
+    /// The scalar function.
+    fn scalar(y: f64, x: f64) -> f64;
+    /// `scalar` on every lane of the pairs `(y, x)`.
+    fn lanes<K: Simd>(k: K, y: K::Array, x: K::Array) -> K::Array;
+}
+
+/// `out[i] = G::scalar(ys[i], xs[i])` for every `i`, through the same cascade
+/// of backends as [`map`].
+pub(crate) fn map2<G: Kernel2>(ys: &[f64], xs: &[f64], out: &mut [f64]) {
+    #[cfg(any(
+        all(target_arch = "x86_64", target_feature = "sse2"),
+        all(target_arch = "aarch64", target_feature = "neon")
+    ))]
+    let mut done = 0;
+    #[cfg(not(any(
+        all(target_arch = "x86_64", target_feature = "sse2"),
+        all(target_arch = "aarch64", target_feature = "neon")
+    )))]
+    let done = chunks2::<G, _>(morphiq_numerics_arch::Scalar::new(), ys, xs, out);
+    #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
+    {
+        use morphiq_numerics_arch::{Avx2, Avx512, Sse2};
+        if ys.len() - done >= Avx512::LANES
+            && let Some(k) = Avx512::try_new()
+        {
+            done += chunks2::<G, _>(k, &ys[done..], &xs[done..], &mut out[done..]);
+        }
+        if ys.len() - done >= Avx2::LANES
+            && let Some(k) = Avx2::try_new()
+        {
+            done += chunks2::<G, _>(k, &ys[done..], &xs[done..], &mut out[done..]);
+        }
+        if ys.len() - done >= Sse2::LANES {
+            done += chunks2::<G, _>(Sse2::new(), &ys[done..], &xs[done..], &mut out[done..]);
+        }
+    }
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        use morphiq_numerics_arch::Neon;
+        if ys.len() >= Neon::LANES {
+            done += chunks2::<G, _>(Neon::new(), ys, xs, out);
+        }
+    }
+    for ((o, &y), &x) in out[done..].iter_mut().zip(&ys[done..]).zip(&xs[done..]) {
+        *o = G::scalar(y, x);
+    }
+}
+
+/// `G`'s lanes on every whole chunk of backend `k`'s width at the start of the
+/// pairs, inside `k`'s feature-enabled wrapper; returns how many pairs that
+/// covered.
+pub(crate) fn chunks2<G: Kernel2, K: Simd>(k: K, ys: &[f64], xs: &[f64], out: &mut [f64]) -> usize {
+    k.vectorize(Chunks2::<G> {
+        ys,
+        xs,
+        out,
+        kernel: PhantomData,
+    })
+}
+
+struct Chunks2<'a, G> {
+    ys: &'a [f64],
+    xs: &'a [f64],
+    out: &'a mut [f64],
+    kernel: PhantomData<G>,
+}
+
+impl<G: Kernel2> WithSimd for Chunks2<'_, G> {
+    type Output = usize;
+    #[inline(always)]
+    fn with<K: Simd>(self, k: K) -> usize {
+        whole_chunks2::<G, K>(k, self.ys, self.xs, self.out)
+    }
+}
+
+/// [`whole_chunks`] for paired arguments.
+#[inline(always)]
+fn whole_chunks2<G: Kernel2, K: Simd>(k: K, ys: &[f64], xs: &[f64], out: &mut [f64]) -> usize {
+    debug_assert!(ys.len() == xs.len() && xs.len() == out.len());
+    if K::LANES == 1 {
+        return 0;
+    }
+    let chunks = ys.chunks_exact(K::LANES);
+    let covered = ys.len() - chunks.remainder().len();
+    for ((y, x), o) in chunks
+        .zip(xs.chunks_exact(K::LANES))
+        .zip(out.chunks_exact_mut(K::LANES))
+    {
+        let (mut ay, mut ax) = (K::Array::default(), K::Array::default());
+        ay.as_mut().copy_from_slice(y);
+        ax.as_mut().copy_from_slice(x);
+        o.copy_from_slice(G::lanes(k, ay, ax).as_ref());
+    }
+    covered
+}
+
 /// A kernel's uncommon path, kept out of the common chunk's code.
 pub(crate) trait Cold {
     /// The path on `s`'s lanes, from the chunk's arguments `x` and the
@@ -181,6 +281,16 @@ pub(crate) fn run<G: Kernel, K: Simd>(k: K, xs: &[f64], out: &mut [f64]) {
     let done = whole_chunks::<G, K>(k, xs, out);
     for (o, &x) in out[done..].iter_mut().zip(&xs[done..]) {
         *o = G::scalar(x);
+    }
+}
+
+/// [`run`] for paired arguments.
+#[cfg(test)]
+#[inline(always)]
+pub(crate) fn run2<G: Kernel2, K: Simd>(k: K, ys: &[f64], xs: &[f64], out: &mut [f64]) {
+    let done = whole_chunks2::<G, K>(k, ys, xs, out);
+    for ((o, &y), &x) in out[done..].iter_mut().zip(&ys[done..]).zip(&xs[done..]) {
+        *o = G::scalar(y, x);
     }
 }
 
