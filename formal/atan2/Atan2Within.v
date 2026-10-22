@@ -22,9 +22,10 @@ Proof.
   assert (D : derive_pt f c (pr c) = / (1 + c ^ 2) - 1).
   { apply derive_pt_eq_0.
     exact (derivable_pt_lim_minus atan id c (/ (1 + c ^ 2)) 1 (derivable_pt_lim_atan c) (derivable_pt_lim_id c)). }
-  unfold f in E. rewrite D in E. rewrite E.
-  assert (1 + c * c > 0) by nra.
-  field_simp; [ring | nra].
+  rewrite D in E. unfold f in E. rewrite E.
+  assert (Hc3 : 1 + c * c <> 0) by nra.
+  replace (c ^ 2) with (c * c) by ring.
+  apply Rmult_eq_compat_r. field. exact Hc3.
 Qed.
 
 (** [|(atan b - atan a) - (b - a)| <= b^2 (b - a)] for [0 <= a <= b]. *)
@@ -90,11 +91,73 @@ Proof.
   intros [H0 H1].
   assert (Hr : 0 <= x <= 1) by lra.
   rewrite atan_eq_ps_atan by (split; assumption).
-  unfold ps_atan. destruct (in_int x) as [h | h]; [ | exfalso; apply h; lra].
+  unfold ps_atan. destruct (Ratan.in_int x) as [h | h]; [ | exfalso; apply h; lra].
   destruct (ps_atan_exists_1 x h) as [l Hl].
   pose proof (alternated_series_ineq (Ratan_seq x) l 2 (Ratan_seq_decreasing x Hr) (Ratan_seq_converging x Hr) Hl) as [A B].
-  cbn [sum_f_R0 tg_alt Ratan_seq] in A, B.
-  simpl in A, B.
-  assert (x ^ 9 <= x ^ 7) by (apply pow_le_pow_r_inv_or_dummy; lra).
-  admit.
-Admitted.
+  unfold tg_alt, Ratan_seq in A, B. simpl in A, B.
+  assert (Hxx : 0 < x * x < 1) by nra.
+  assert (P7 : 0 <= x * x * x * x * x * x * x) by (repeat apply Rmult_le_pos; lra).
+  assert (P9 : x * x * x * x * x * x * x * x * x <= x * x * x * x * x * x * x) by nra.
+  assert (P11 : x * x * x * x * x * x * x * x * x * x * x <= x * x * x * x * x * x * x * x * x) by nra.
+  assert (P9p : 0 <= x * x * x * x * x * x * x * x * x) by (repeat apply Rmult_le_pos; lra).
+  apply Rabs_le. split; nra.
+Qed.
+
+(** The series branch's polynomial against [atan]: relative to the cubic term, on
+    [[2^-17, 0.0078126]] by interval arithmetic. *)
+Lemma approx_series_mid z : / 131072 <= z <= 0.0078126 ->
+  Rabs (atan z - (z - z * z * z * aQ (z * z))) <= 17 / 50 / 18014398509481984 * (z * z * z).
+Proof.
+  intros H. unfold aQ, aq0, aq1, aq2, aq3. bpow_num. apply Rabs_le. split.
+  - assert (G : 0 <= 17 / 50 / 18014398509481984 * (z * z * z) + (atan z - (z - z * z * z * (/ 18014398509481984 * 6004799503160661 - z * z * (/ 36028797018963968 * 7205759403705275 - z * z * (/ 36028797018963968 * 5146968125827051 - z * z * (/ 72057594037927936 * 7952018364870011))))))).
+    { interval with (i_bisect z, i_taylor z, i_prec 240, i_degree 14, i_depth 60). }
+    lra.
+  - assert (G : 0 <= 17 / 50 / 18014398509481984 * (z * z * z) - (atan z - (z - z * z * z * (/ 18014398509481984 * 6004799503160661 - z * z * (/ 36028797018963968 * 7205759403705275 - z * z * (/ 36028797018963968 * 5146968125827051 - z * z * (/ 72057594037927936 * 7952018364870011))))))).
+    { interval with (i_bisect z, i_taylor z, i_prec 240, i_degree 14, i_depth 60). }
+    lra.
+Qed.
+
+(** The same below [2^-17], from [atan]'s Taylor series and the polynomial's
+    leading coefficients: [q0 = (2^54 - 1)/(3 2^54)] and [q1] within [2^-54] of [1/5]. *)
+Lemma approx_series_small z : bpow radix2 (-100) <= z <= / 131072 ->
+  Rabs (atan z - (z - z * z * z * aQ (z * z))) <= 17 / 50 / 18014398509481984 * (z * z * z).
+Proof.
+  intros [L U]. pose proof (bpow_gt_0 radix2 (-100)) as P.
+  assert (Hz : 0 < z < 1) by (split; lra).
+  pose proof (atan_taylor z Hz) as T.
+  destruct aq_facts as [[A0 A1] [[B0 B1] [[C0 C1] [D0 D1]]]].
+  assert (D0e : aq0 = 1 / 3 - 1 / 54043195528445952) by (unfold aq0; bpow_num; lra).
+  assert (D1e : 1 / 5 - 1 / 300000000000 <= aq1 <= 1 / 5) by (unfold aq1; bpow_num; split; interval with (i_prec 120)).
+  assert (W0 : 0 <= (z * z)) by (nra).
+  assert (W1 : (z * z) <= / 17179869184) by (nra).
+  assert (WW : (z * z) * (z * z) <= / 295147905179352825856) by (pose proof (Rmult_le_compat (z * z) (/ 17179869184) (z * z) (/ 17179869184) W0 W0 W1 W1); lra).
+  assert (Z3 : 0 <= z * z * z) by (apply Rmult_le_pos; [apply Rmult_le_pos | ]; lra).
+  assert (Id : atan z - (z - z * z * z * aQ (z * z))
+    = (atan z - (z - z * z * z / 3 + z * z * z * z * z / 5))
+      + z * z * z * ((aq0 - 1 / 3) - (z * z) * (aq1 - 1 / 5) + (z * z) * (z * z) * (aq2 - (z * z) * aq3))) by (unfold aQ; field).
+  rewrite Id.
+  assert (HK : Rabs ((aq0 - 1 / 3) - (z * z) * (aq1 - 1 / 5) + (z * z) * (z * z) * (aq2 - (z * z) * aq3)) <= 0.3334 / 18014398509481984).
+  { apply Rabs_le. assert (0 <= (z * z) * (1 / 300000000000)) by nra.
+    assert ((z * z) * (1 / 300000000000) <= 1 / 295147905179352825856 * 10) by nra.
+    assert (Hww : 0 <= (z * z) * (z * z)) by nra.
+    assert (Hf0 : 0 <= aq2 - (z * z) * aq3) by nra.
+    assert (Hf1 : aq2 - (z * z) * aq3 <= 1) by nra.
+    assert (Hp0 : 0 <= (z * z) * (z * z) * (aq2 - (z * z) * aq3)) by (apply Rmult_le_pos; assumption).
+    pose proof (Rmult_le_compat_l ((z * z) * (z * z)) _ _ Hww Hf1) as Hp1.
+    split; nra. }
+  assert (HE : Rabs (atan z - (z - z * z * z / 3 + z * z * z * z * z / 5)) <= z * z * z * ((z * z) * (z * z)) / 7).
+  { apply Rle_trans with (1 := T). apply Req_le. field. }
+  apply Rle_trans with (Rabs (atan z - (z - z * z * z / 3 + z * z * z * z * z / 5)) + Rabs (z * z * z * ((aq0 - 1 / 3) - (z * z) * (aq1 - 1 / 5) + (z * z) * (z * z) * (aq2 - (z * z) * aq3)))); [apply Rabs_triang | ].
+  rewrite Rabs_mult, (Rabs_pos_eq (z * z * z)) by exact Z3.
+  assert (z * z * z * Rabs ((aq0 - 1 / 3) - (z * z) * (aq1 - 1 / 5) + (z * z) * (z * z) * (aq2 - (z * z) * aq3)) <= z * z * z * (0.3334 / 18014398509481984)) by (apply Rmult_le_compat_l; [exact Z3 | exact HK]).
+  assert (z * z * z * ((z * z) * (z * z)) / 7 <= z * z * z * (0.0001 / 18014398509481984)) by nra.
+  nra.
+Qed.
+
+Lemma approx_series_a z : bpow radix2 (-100) <= z <= 0.0078126 ->
+  Rabs (atan z - (z - z * z * z * aQ (z * z))) <= 17 / 50 / 18014398509481984 * (z * z * z).
+Proof.
+  intros [L U]. destruct (Rle_dec z (/ 131072)) as [S | B].
+  - apply approx_series_small; split; assumption.
+  - apply approx_series_mid; split; lra.
+Qed.
