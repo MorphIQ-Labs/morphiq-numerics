@@ -58,3 +58,45 @@ Proof.
   - apply Rabs_le. split; interval with (i_prec 500).
   - split; interval with (i_prec 500).
 Qed.
+
+Lemma inv_ln2_val : finite (aw asinh_inv_ln2) /\ Rabs (B (aw asinh_inv_ln2) - / ln 2) <= / 5000000000000000 /\ 1.44 <= B (aw asinh_inv_ln2) <= 1.45.
+Proof.
+  destruct (word_ok_intro (0x3ff71547652b82fe)%Z false 6497320848556798%positive 52%nat (3248660424278399)%Z 1%Z (-51)%Z
+    eq_refl eq_refl ltac:(lia) eq_refl) as [F V].
+  unfold asinh_inv_ln2. split; [exact F | ]. rewrite V. bpow_num.
+  split; [ | split]; interval with (i_prec 100).
+Qed.
+
+(** [|exp u - 1| <= 2 |u|] for [|u| <= 1/2]. *)
+Lemma exp_near1 u : Rabs u <= / 2 -> Rabs (exp u - 1) <= 2 * Rabs u.
+Proof.
+  intros H. apply Rabs_le_inv in H. destruct H as [H1 H2].
+  pose proof (exp_pos u) as P.
+  assert (L : 1 + u <= exp u).
+  { destruct (Req_dec u 0) as [-> | N]; [rewrite exp_0; lra | pose proof (exp_ineq1 u N); lra]. }
+  assert (L' : 1 + - u <= exp (- u)).
+  { destruct (Req_dec u 0) as [-> | N]; [rewrite Ropp_0, exp_0; lra | pose proof (exp_ineq1 (- u) ltac:(lra)); lra]. }
+  destruct (Rle_lt_dec 0 u) as [Hp | Hn].
+  - assert (E : exp u = / exp (- u)) by (rewrite exp_Ropp, Rinv_involutive; [reflexivity | apply Rgt_not_eq, P]).
+    assert (U : exp u <= / (1 - u)) by (rewrite E; apply Rinv_le_contravar; lra).
+    assert (U2 : / (1 - u) <= 1 + 2 * u).
+    { apply (Rmult_le_reg_l (1 - u)); [lra | ]. rewrite Rinv_r by lra. nra. }
+    rewrite (Rabs_pos_eq u) by lra. apply Rabs_le. split; lra.
+  - assert (U : exp u <= 1) by (rewrite <- exp_0; apply Rlt_le, exp_increasing; lra).
+    rewrite (Rabs_left u) by lra. apply Rabs_le. split; lra.
+Qed.
+
+(** [exp] is [3]-Lipschitz on [[-0.35, 0.35]]. *)
+Lemma exp_lip a b : Rabs a <= 0.35 -> Rabs b <= 0.35 -> Rabs (a - b) <= / 2 -> Rabs (exp a - exp b) <= 3 * Rabs (a - b).
+Proof.
+  intros Ha Hb Hd.
+  pose proof (exp_near1 (a - b) Hd) as N.
+  assert (E : exp a - exp b = exp b * (exp (a - b) - 1)).
+  { assert (E1 : exp b * exp (a - b) = exp a) by (rewrite <- exp_plus; f_equal; ring).
+    rewrite Rmult_minus_distr_l, Rmult_1_r, E1. reflexivity. }
+  rewrite E, Rabs_mult, (Rabs_pos_eq (exp b)) by apply Rlt_le, exp_pos.
+  assert (Eb : exp b <= 1.5).
+  { apply Rabs_le_inv in Hb. destruct Hb as [Hb1 Hb2]. destruct (Rle_lt_or_eq_dec b 0.35 Hb2) as [Hlt | Heq]; [apply Rle_trans with (exp 0.35); [apply Rlt_le, exp_increasing; exact Hlt | interval with (i_prec 60)] | rewrite Heq; interval with (i_prec 60)]. }
+  pose proof (Rabs_pos (exp (a - b) - 1)). 
+  apply Rle_trans with (1.5 * (2 * Rabs (a - b))); [apply Rmult_le_compat; try apply Rlt_le, exp_pos; try lra; exact N | lra].
+Qed.
