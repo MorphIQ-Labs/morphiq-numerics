@@ -4,7 +4,95 @@
 From Coq Require Import Reals ZArith Lia Lra Psatz.
 From Flocq Require Import Core Relative IEEE754.Binary IEEE754.Bits.
 From Binary64 Require Import Binary64Add IEEE64 RoundingGaps RoundingCore RoundingTest.
+From Binary64 Require Import IEEE64Add IEEE64Mul.
 Open Scope R_scope.
+
+Lemma ziv_pos_a (h l eps e1 Z g : R) :
+  F64 h -> bpow radix2 (-905) <= h ->
+  h = RNE (h + l) ->
+  g <= ulp radix2 fexp64 h -> g <= h - pred radix2 fexp64 h ->
+  bpow radix2 (-80) <= e1 <= bpow radix2 (-60) -> e1 * (1 + bpow radix2 (-50)) <= eps <= 1 ->
+  Rabs (Z - (h + l)) <= e1 * Rabs Z ->
+  Rabs l + RNE (eps * h) < g / 2 ->
+  RNE Z = h.
+Proof.
+  intros Fh Hlo Hdw G1 G2 [E80 E1] [Ee Ee1] HZ Ht.
+  assert (E0 : 0 < e1) by (pose proof (bpow_gt_0 radix2 (-80)); lra).
+  assert (P60 : bpow radix2 (-60) = / 1152921504606846976) by reflexivity.
+  assert (P50 : bpow radix2 (-50) = / 1125899906842624) by reflexivity.
+  assert (P53 : bpow radix2 (-53) = / 9007199254740992) by reflexivity.
+  assert (P52 : bpow radix2 (-52) = / 4503599627370496) by reflexivity.
+  assert (Hpos : 0 < h) by (pose proof (bpow_gt_0 radix2 (-905)); lra).
+  (* |l| <= 2^-52 h: h = RN(h + l) with h + l normal *)
+  assert (Hl : Rabs l <= bpow radix2 (-52) * h).
+  { destruct (Rle_or_lt (bpow radix2 (-1022)) (Rabs (h + l))) as [N | S].
+    - pose proof (rnd_rel (h + l) N) as R. rewrite <- Hdw in R.
+      replace (h - (h + l)) with (- l) in R by ring. rewrite Rabs_Ropp in R.
+      assert (Tr : Rabs (h + l) <= h + Rabs l) by (pose proof (Rabs_triang h l) as T; rewrite (Rabs_pos_eq h) in T by lra; lra).
+      rewrite P53 in R. rewrite P52. nra.
+    - (* h + l tiny would round to a tiny h, contradicting h >= 2^-905 *)
+      exfalso. assert (RNE (h + l) <= bpow radix2 (-1022)).
+      { apply round_le_generic; auto with typeclass_instances.
+        - apply generic_format_FLT_bpow; [reflexivity | lia].
+        - apply Rabs_lt_inv in S. lra. }
+      assert (bpow radix2 (-1022) < bpow radix2 (-905)) by (apply bpow_lt; lia). lra. }
+  (* |Z - (h + l)| <= e1 (1 + 2^-51) h *)
+  assert (HZ2 : Rabs (Z - (h + l)) <= e1 * (1 + bpow radix2 (-51)) * h).
+  { set (D := Rabs (Z - (h + l))). set (Y := Rabs (h + l)).
+    assert (Zt : Rabs Z <= Y + D).
+    { unfold Y, D. replace Z with ((h + l) + (Z - (h + l))) at 1 by ring. apply Rabs_triang. }
+    assert (Tr : Y <= h + Rabs l) by (unfold Y; pose proof (Rabs_triang h l) as T; rewrite (Rabs_pos_eq h) in T by lra; lra).
+    assert (P51 : bpow radix2 (-51) = / 2251799813685248) by reflexivity.
+    rewrite P51. rewrite P52 in Hl. rewrite P60 in E1.
+    assert (D0 : 0 <= D) by apply Rabs_pos.
+    (* D <= e1 (Y + D) <= e1 h (1 + 2^-52) + 2^-60 D *)
+    assert (S1 : D <= e1 * Y + e1 * D).
+    { apply Rle_trans with (1 := HZ). rewrite <- Rmult_plus_distr_l. apply Rmult_le_compat_l; lra. }
+    assert (S2 : e1 * Y <= (e1 * h) * (1 + / 4503599627370496)).
+    { replace ((e1 * h) * (1 + / 4503599627370496)) with (e1 * (h * (1 + / 4503599627370496))) by ring.
+      apply Rmult_le_compat_l; lra. }
+    assert (S3 : e1 * D <= / 1152921504606846976 * D) by (apply Rmult_le_compat_r; lra).
+    assert (X0 : 0 <= e1 * h) by nra.
+    replace (e1 * (1 + / 2251799813685248) * h) with ((e1 * h) * (1 + / 2251799813685248)) by ring.
+    lra. }
+  (* RN(eps h) >= eps h (1 - 2^-53) >= e1 (1 + 2^-51) h *)
+  assert (Hr : e1 * (1 + bpow radix2 (-51)) * h <= RNE (eps * h)).
+  { assert (P50' : 0 < bpow radix2 (-50)) by apply bpow_gt_0.
+    assert (Le : e1 <= eps) by nra.
+    assert (N : bpow radix2 (-1022) <= Rabs (eps * h)).
+    { rewrite Rabs_pos_eq by (apply Rmult_le_pos; lra).
+      assert (B : bpow radix2 (-1022) <= bpow radix2 (-80) * bpow radix2 (-905))
+        by (rewrite <- bpow_plus; apply bpow_le; lia).
+      pose proof (bpow_gt_0 radix2 (-80)). pose proof (bpow_gt_0 radix2 (-905)).
+      apply Rle_trans with (1 := B). apply Rmult_le_compat; lra. }
+    pose proof (rnd_rel (eps * h) N) as R. apply Rabs_le_inv in R.
+    rewrite Rabs_pos_eq in R by nra.
+    assert (P51 : bpow radix2 (-51) = / 2251799813685248) by reflexivity.
+    rewrite P51. rewrite P53 in R. rewrite P50 in Ee. nra. }
+  assert (Hclose : Rabs (Z - h) < g / 2).
+  { replace (Z - h) with ((Z - (h + l)) + l) by ring.
+    apply Rle_lt_trans with (Rabs (Z - (h + l)) + Rabs l); [apply Rabs_triang | lra]. }
+  apply round_within with g; assumption || lra.
+Qed.
+
+Lemma lo_bound_a h l : bpow radix2 (-905) <= Rabs h -> h = rndF (h + l) ->
+  Rabs l <= bpow radix2 (-52) * Rabs h.
+Proof.
+  intros Hh Hdw.
+  destruct (Rle_or_lt (bpow radix2 (-1022)) (Rabs (h + l))) as [N | S].
+  - pose proof (rnd_rel (h + l) N) as R. rewrite RNE_rndF, <- Hdw in R.
+    replace (h - (h + l)) with (- l) in R by ring. rewrite Rabs_Ropp in R.
+    assert (T : Rabs (h + l) <= Rabs h + Rabs l) by apply Rabs_triang.
+    assert (P53 : bpow radix2 (-53) = / 9007199254740992) by reflexivity.
+    assert (P52 : bpow radix2 (-52) = / 4503599627370496) by reflexivity.
+    rewrite P53 in R. rewrite P52. pose proof (Rabs_pos l). pose proof (Rabs_pos h). nra.
+  - exfalso. assert (Rabs (rndF (h + l)) <= bpow radix2 (-1022)).
+    { rewrite <- round_NE_abs; auto with typeclass_instances.
+      apply round_le_generic; auto with typeclass_instances.
+      - apply generic_format_FLT_bpow; [reflexivity | unfold emin; lia].
+      - lra. }
+    rewrite <- Hdw in H. assert (bpow radix2 (-1022) < bpow radix2 (-905)) by (apply bpow_lt; lia). lra.
+Qed.
 
 Theorem decide_with_bounded_ok_a hi lo eps (Z e1 : R) v :
   finite hi -> finite lo -> finite eps ->
@@ -40,9 +128,9 @@ Proof.
   assert (U2 : bpow radix2 ex <= h * bpow radix2 (-52)).
   { rewrite <- Ulp. replace (-52)%Z with (1 - 53)%Z by reflexivity. rewrite <- (Rabs_pos_eq h) at 2 by lra.
     apply ulp_FLT_le. rewrite Rabs_pos_eq by lra. apply Rle_trans with (2 := Hlo). apply bpow_le. lia. }
-  assert (Ex : (-953 <= ex <= 971)%Z).
+  assert (Ex : (-958 <= ex <= 971)%Z).
   { split.
-    - cut (-954 < ex)%Z; [lia | ]. apply (lt_bpow radix2). apply Rle_lt_trans with (2 := U1).
+    - cut (-959 < ex)%Z; [lia | ]. apply (lt_bpow radix2). apply Rle_lt_trans with (2 := U1).
       apply Rle_trans with (bpow radix2 (-905) * bpow radix2 (-53)).
       + rewrite <- bpow_plus. apply bpow_le. lia.
       + apply Rmult_le_compat_r; [apply bpow_ge_0 | lra].
@@ -106,7 +194,7 @@ Proof.
   assert (Bp : bnd 1 1020 (B eps * B (b64_abs hi))).
   { unfold bnd. rewrite Bm. fold h. rewrite Rabs_pos_eq by nra. rewrite Rmult_1_l. exact Hprod. }
   destruct (fmul_ok 1 1020 eps (b64_abs hi) Feps Fm ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia) Bp) as [Fp BpV].
-  pose proof (lo_bound (B hi) (B lo) Hlo Hdw) as Lb. fold h in Lb.
+  pose proof (lo_bound_a (B hi) (B lo) Hlo Hdw) as Lb. fold h in Lb.
   assert (Ba : bnd 2 1020 (B (b64_abs lo) + B (fmul eps (b64_abs hi)))).
   { replace 2%Z with (1 + 1)%Z by reflexivity. apply bnd_plus.
     - unfold bnd. rewrite B_abs, Rabs_Rabsolu, Rmult_1_l. apply Rle_trans with (1 := Lb).
@@ -138,14 +226,14 @@ Proof.
       rewrite E. change (RNE (- (B hi + B lo))) with (round radix2 fexp64 ZnearestE (- (B hi + B lo))).
       rewrite round_NE_opp. change (round radix2 fexp64 ZnearestE (B hi + B lo)) with (rndF (B hi + B lo)).
       rewrite <- Hdw, Hn. ring. }
-    pose proof (ziv_pos h (- B lo) (B eps) e1 (- Z) (bpow radix2 eg) Fh Hlo Hdw' Gu Gp He1 Heps
+    pose proof (ziv_pos_a h (- B lo) (B eps) e1 (- Z) (bpow radix2 eg) Fh Hlo Hdw' Gu Gp He1 Heps
                   ltac:(rewrite Rabs_Ropp; replace (- Z - (h + - B lo)) with (- (Z - (B hi + B lo))) by (rewrite Hn; ring); rewrite Rabs_Ropp; exact HZ)
                   ltac:(rewrite Rabs_Ropp; rewrite <- RNE_rndF in Ex2; exact Ex2)) as R.
     rewrite Hn. change rndF with (round radix2 fexp64 ZnearestE).
     replace Z with (- - Z) by ring. rewrite round_NE_opp. f_equal. exact R.
   - assert (Hp : B hi = h) by (unfold h; rewrite Rabs_pos_eq; [reflexivity | unfold hi; simpl; apply F2R_ge_0; simpl; lia]).
     rewrite Hp in Hdw, HZ |- *. rewrite <- RNE_rndF in Hdw, Ex2 |- *.
-    apply (ziv_pos h (B lo) (B eps) e1 Z (bpow radix2 eg)); assumption.
+    apply (ziv_pos_a h (B lo) (B eps) e1 Z (bpow radix2 eg)); assumption.
 Qed.
 
 Theorem decide_with_ok_a hi lo eps (Z e1 : R) v :
