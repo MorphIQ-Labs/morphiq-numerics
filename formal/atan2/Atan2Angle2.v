@@ -35,7 +35,7 @@ Definition body_certified (n d : f64) (f : form) : Prop :=
   atan2_cmp_is (fdiv n d) atan2_tiny Lt = true \/ atan2_decide (fst (atan2_fast n d f)) <> None.
 
 Theorem angle_core n d f : finite n -> finite d -> 0 < B n -> B n <= B d ->
-  finite (angle_body n d f) /\
+  finite (angle_body n d f) /\ 0 <= B (angle_body n d f) /\
   Rabs (B (angle_body n d f) - form_value f (atan (B n / B d))) <= (/ 2 + bpow radix2 (-137)) * ulpF (B (angle_body n d f)) /\
   (body_certified n d f -> B (angle_body n d f) = rndF (form_value f (atan (B n / B d)))) /\
   (Stable190 (form_value f (atan (B n / B d))) -> B (angle_body n d f) = rndF (form_value f (atan (B n / B d)))).
@@ -67,7 +67,10 @@ Proof.
       - destruct pi_rn as [F _]. destruct atan2_pi_val as [F2 _]. split; [exact F | ]. symmetry. apply pi_minus_rn. split; lra.
       - destruct half_pi_rn_a as [F _]. split; [exact F | ]. symmetry. apply half_pi_plus_rn. split; lra. }
     destruct Hcor as [Fm Bm]. set (M := tiny_body n d q f) in *.
-    refine (conj Fm (conj _ (conj (fun _ => Bm) (fun _ => Bm)))).
+    assert (Hnn : 0 <= B M).
+    { rewrite Bm. apply round_ge_generic; [exact _ | exact _ | apply generic_format_0 | ].
+      pose proof pi_gt_3 as P3. destruct f; cbn [form_value]; lra. }
+    refine (conj Fm (conj Hnn (conj _ (conj (fun _ => Bm) (fun _ => Bm))))).
     pose proof (half_ulp_rn (form_value f (atan t))) as Hh. rewrite <- Bm in Hh.
     pose proof (ulp_ge_0 radix2 (FLT_exp (-1074) 53) (B M)) as Hu0. pose proof (bpow_gt_0 radix2 (-137)).
     assert (Hpp : 0 <= bpow radix2 (-137) * ulpF (B M)) by (apply Rmult_le_pos; [apply bpow_ge_0 | exact Hu0]).
@@ -81,8 +84,8 @@ Proof.
     { destruct (Rlt_le_dec (B n / B d) (bpow radix2 (-901))) as [L | G]; [exfalso | exact G].
       pose proof (rndF_le_bpow (-901) (B n / B d) ltac:(lia) (Rlt_le _ _ L)) as H. rewrite <- Bq in H.
       assert (bpow radix2 (-901) < bpow radix2 (-900)) by (apply bpow_lt; lia). lra. }
-    destruct (atan2_main_ok n d f Fn Fd Pn Hnd Hq) as [F [Ub [Dec St]]].
-    refine (conj F (conj Ub (conj _ St))).
+    destruct (atan2_main_ok n d f Fn Fd Pn Hnd Hq) as [F [Nn [Ub [Dec St]]]].
+    refine (conj F (conj Nn (conj Ub (conj _ St)))).
     intros [Tiny | Dd]; [change (fdiv n d) with q in Tiny; rewrite Hc in Tiny; discriminate Tiny | exact (Dec Dd)].
 Qed.
 
@@ -90,7 +93,7 @@ Definition angle_certified (a b : f64) (neg : bool) : Prop :=
   body_certified (if atan2_cmp_is a b Gt then b else a) (if atan2_cmp_is a b Gt then a else b) (angle_form (atan2_cmp_is a b Gt) neg).
 
 Theorem angle_ok a b neg : finite a -> finite b -> 0 < B a -> 0 < B b ->
-  finite (atan2_angle a b neg) /\
+  finite (atan2_angle a b neg) /\ 0 <= B (atan2_angle a b neg) /\
   Rabs (B (atan2_angle a b neg) - angle_real (B a) (B b) neg) <= (/ 2 + bpow radix2 (-137)) * ulpF (B (atan2_angle a b neg)) /\
   (angle_certified a b neg -> B (atan2_angle a b neg) = rndF (angle_real (B a) (B b) neg)) /\
   (Stable190 (angle_real (B a) (B b) neg) -> B (atan2_angle a b neg) = rndF (angle_real (B a) (B b) neg)).
@@ -99,16 +102,16 @@ Proof.
   destruct (atan2_cmp_is a b Gt) eqn:Hs.
   - assert (Hgt : B b < B a).
     { pose proof (proj1 (cmp_val a b Gt Fa Fb) Hs) as H. apply Rcompare_Gt_inv in H. exact H. }
-    destruct (angle_core b a (angle_form true neg) Fb Fa Pb ltac:(lra)) as [F [Ub [Cert St]]].
+    destruct (angle_core b a (angle_form true neg) Fb Fa Pb ltac:(lra)) as [F [Nn [Ub [Cert St]]]].
     assert (Z : form_value (angle_form true neg) (atan (B b / B a)) = angle_real (B a) (B b) neg).
     { unfold angle_real. destruct (Rle_dec (B a) (B b)) as [L | G]; [lra | ]. destruct neg; reflexivity. }
-    rewrite Z in Ub, Cert, St. exact (conj F (conj Ub (conj Cert St))).
+    rewrite Z in Ub, Cert, St. exact (conj F (conj Nn (conj Ub (conj Cert St)))).
   - assert (Hle : B a <= B b).
     { destruct (Rle_dec (B a) (B b)) as [L | G]; [exact L | exfalso].
       assert (Hcc : atan2_cmp_is a b Gt = true) by (apply (proj2 (cmp_val a b Gt Fa Fb)); apply Rcompare_Gt; lra).
       rewrite Hs in Hcc. discriminate Hcc. }
-    destruct (angle_core a b (angle_form false neg) Fa Fb Pa Hle) as [F [Ub [Cert St]]].
+    destruct (angle_core a b (angle_form false neg) Fa Fb Pa Hle) as [F [Nn [Ub [Cert St]]]].
     assert (Z : form_value (angle_form false neg) (atan (B a / B b)) = angle_real (B a) (B b) neg).
     { unfold angle_real. destruct (Rle_dec (B a) (B b)) as [L | G]; [ | lra]. destruct neg; reflexivity. }
-    rewrite Z in Ub, Cert, St. exact (conj F (conj Ub (conj Cert St))).
+    rewrite Z in Ub, Cert, St. exact (conj F (conj Nn (conj Ub (conj Cert St)))).
 Qed.

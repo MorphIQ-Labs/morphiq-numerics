@@ -34,7 +34,7 @@ Proof. unfold bndM. bpow_num. interval with (i_prec 200). Qed.
 
 (** The correctly rounded value of a [Q256] value close to [Z] is within [(1/2 + 2^-137)] ulp of [Z]. *)
 Lemma accurate_ulp q Z : Q256Real.valid q -> Rabs (qval q - Z) <= bndM * Z -> 0 < Z -> Z <= 4 ->
-  finite (Q256.to_f64 q) /\ B (Q256.to_f64 q) = rndF (qval q) /\
+  finite (Q256.to_f64 q) /\ B (Q256.to_f64 q) = rndF (qval q) /\ 0 <= B (Q256.to_f64 q) /\
   Rabs (B (Q256.to_f64 q) - Z) <= (/ 2 + bpow radix2 (-137)) * ulpF (B (Q256.to_f64 q)) /\
   (Stable190 Z -> B (Q256.to_f64 q) = rndF Z).
 Proof.
@@ -50,7 +50,8 @@ Proof.
     rewrite Rabs_pos_eq by exact Hge.
     apply Rle_lt_trans with 8; [exact Hle | ]. change 8 with (bpow radix2 3). apply bpow_lt; lia. }
   destruct (q_to_float_round q Vq Hr) as [Fq Bq].
-  refine (conj Fq (conj Bq (conj _ _))).
+  refine (conj Fq (conj Bq (conj _ (conj _ _)))).
+  - rewrite Bq. apply round_ge_generic; [exact _ | exact _ | apply generic_format_0 | lra].
   - rewrite Bq. set (v := qval q) in *. set (R := rndF v) in *.
     pose proof (error_le_half_ulp_round radix2 (FLT_exp (-1074) 53) ne v) as Hh. change (round radix2 (FLT_exp (-1074) 53) (Znearest ne) v) with R in Hh.
     pose proof (ulp_FLT_gt radix2 (-1074) 53 R) as Hu.
@@ -93,7 +94,7 @@ Proof.
 Qed.
 
 Theorem atan2_main_ok n d f : finite n -> finite d -> 0 < B n -> B n <= B d -> bpow radix2 (-901) <= B n / B d ->
-  finite (atan2_main n d f) /\
+  finite (atan2_main n d f) /\ 0 <= B (atan2_main n d f) /\
   Rabs (B (atan2_main n d f) - form_value f (atan (B n / B d))) <=
     (/ 2 + bpow radix2 (-137)) * ulpF (B (atan2_main n d f)) /\
   (atan2_decide (fst (atan2_fast n d f)) <> None -> B (atan2_main n d f) = rndF (form_value f (atan (B n / B d)))) /\
@@ -127,7 +128,7 @@ Proof.
     { pose proof (half_ulp_rn Z) as Hh. rewrite Hr in Hh.
       pose proof (ulp_ge_0 radix2 (FLT_exp (-1074) 53) (B yh)) as Hu0. pose proof (bpow_gt_0 radix2 (-137)).
       apply Rle_trans with (1 := Hh). nra. }
-    refine (conj Fyh (conj Hb (conj _ _))).
+    refine (conj Fyh (conj (Rlt_le _ _ Hpos) (conj Hb (conj _ _)))).
     + intros _. symmetry. exact Hr.
     + intros _. symmetry. exact Hr.
   - (* accurate *)
@@ -135,7 +136,7 @@ Proof.
     fold t in Eq. fold Z in Eq.
     assert (Eq' : Rabs (qval (atan2_accurate_value n d f (ph, pl)) - Z) <= bndM * Z).
     { exact Eq. }
-    destruct (accurate_ulp _ Z Vq Eq' Z0 Z4) as [Fq [Bq [Ub St]]].
-    refine (conj Fq (conj Ub (conj _ St))).
+    destruct (accurate_ulp _ Z Vq Eq' Z0 Z4) as [Fq [Bq [Nn [Ub St]]]].
+    refine (conj Fq (conj Nn (conj Ub (conj _ St)))).
     intros Hc. exfalso. apply Hc. cbn [fst]. exact Hd.
 Qed.
