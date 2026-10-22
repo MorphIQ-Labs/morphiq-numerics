@@ -84,9 +84,9 @@ Open Scope R_scope.
     POLY0's, to [3/16 2^-54 z^3] on [[2^-28, 0.0078126]] (the relative accuracy of
     Sollya's fit and the series' truncation, which [series_compose.g] budgets as
     [2^-54 (1 + 2^-23)] of [asin z - z >= z^3/6]). *)
-Lemma approx_series z : / 2 ^ 28 <= z <= 0.0078126 ->
+Lemma approx_series z : / 268435456 <= z <= 0.0078126 ->
   Rabs (asin z - (z + z * z * z * (q0r + z * z * (q1r + z * z * (q2r + z * z * q3r)))))
-    <= 3 / 16 / 2 ^ 54 * (z * z * z).
+    <= 3 / 16 / 18014398509481984 * (z * z * z).
 Proof.
   intros Hz. unfold q0r, q1r, q2r, q3r. bpow_num.
   apply asin_within; [ interval | | | | ].

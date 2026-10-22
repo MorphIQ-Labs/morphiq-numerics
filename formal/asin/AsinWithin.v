@@ -91,3 +91,66 @@ Proof.
   { rewrite sin_minus, sin_PI2, cos_PI2, cos_2a_sin, Hs. lra. }
   rewrite <- Hy. pose proof (asin_nonneg w ltac:(lra)). rewrite asin_sin; [reflexivity | split; lra].
 Qed.
+
+(** [asin] over a short interval: the mean value theorem with
+    [asin' = 1/sqrt (1 - x^2)]. *)
+Lemma asin_step a b : 0 <= a -> a < b -> b <= 0.0079 ->
+  exists xi, a <= xi <= b /\ asin b - asin a = (b - a) * (1 / sqrt (1 - xi * xi)).
+Proof.
+  intros Ha Hab Hb.
+  assert (Hd : forall c, a <= c <= b -> derivable_pt_lim asin c (1 / sqrt (1 - c * c))).
+  { intros c Hc. assert (Hr : -1 < c < 1) by lra.
+    pose proof (derive_pt_asin c Hr) as E.
+    apply (derive_pt_eq_1 asin c _ (derivable_pt_asin c Hr)). rewrite E. unfold Rsqr. reflexivity. }
+  destruct (MVT_cor2 asin (fun c => 1 / sqrt (1 - c * c)) a b Hab Hd) as [xi [E Hxi]].
+  exists xi. cbv beta in E. split; [split; lra | rewrite E; ring].
+Qed.
+
+(** [1/sqrt (1 - s) - 1 <= 0.5003 s] for [0 <= s <= 0.0004]. *)
+Lemma inv_sqrt_small s : 0 <= s <= 0.0004 -> 1 <= 1 / sqrt (1 - s) <= 1 + 0.5003 * s.
+Proof.
+  intros [H0 H1].
+  assert (P : 0 < sqrt (1 - s)) by (apply sqrt_lt_R0; lra).
+  assert (U : sqrt (1 - s) <= 1) by (pose proof (sqrt_le_1_alt (1 - s) 1 ltac:(lra)) as U0; rewrite sqrt_1 in U0; exact U0).
+  assert (Lo : 1 - 0.5001 * s <= sqrt (1 - s)).
+  { rewrite <- (sqrt_Rsqr (1 - 0.5001 * s)) by lra. apply sqrt_le_1_alt. unfold Rsqr. nra. }
+  split.
+  - rewrite <- (Rinv_1) at 1. apply Rle_trans with (1 / 1); [lra | ]. unfold Rdiv. rewrite Rmult_1_l, Rmult_1_l.
+    apply Rinv_le_contravar; lra.
+  - unfold Rdiv. rewrite Rmult_1_l. apply Rle_trans with (/ (1 - 0.5001 * s)).
+    + apply Rinv_le_contravar; lra.
+    + apply Rmult_le_reg_r with (1 - 0.5001 * s); [lra | ]. rewrite Rinv_l by lra. nra.
+Qed.
+
+(** [asin] over [[a, b]] within [[0, 0.0079]]: its increment is the interval's
+    length, up to [0.5003 b^2] relatively. *)
+Lemma asin_gap a b : 0 <= a -> a < b -> b <= 0.0079 ->
+  b - a <= asin b - asin a <= (b - a) * (1 + 0.5003 * (b * b)).
+Proof.
+  intros Ha Hab Hb.
+  destruct (asin_step a b Ha Hab Hb) as [xi [Hxi E]].
+  assert (Hs : 0 <= xi * xi <= 0.0004) by (split; nra).
+  pose proof (inv_sqrt_small (xi * xi) Hs) as [G1 G2].
+  assert (Hxb : xi * xi <= b * b) by nra.
+  rewrite E. set (g := 1 / sqrt (1 - xi * xi)) in *.
+  split; nra.
+Qed.
+
+(** A double-word's low part shifts [asin] by itself, to relative [x^2/2]:
+    [|asin (x + d) - asin x - d| <= 0.51 x^2 |d|] for [|d| <= 2^-52 x]. *)
+Lemma asin_shift x d : / 268435456 <= x <= 0.0078126 -> Rabs d <= / 4503599627370496 * x ->
+  Rabs (asin (x + d) - asin x - d) <= 0.51 * (x * x) * Rabs d.
+Proof.
+  intros [Hx0 Hx1] Hd.
+  assert (Hdl : Rabs d <= 0.0000001 * x).
+  { apply Rle_trans with (/ 4503599627370496 * x); [exact Hd | ]. nra. }
+  assert (Hxp : 0 < x) by (assert (0 < / 268435456) by (apply Rinv_0_lt_compat; lra); lra).
+  pose proof (Rabs_pos d) as Hp. pose proof Hdl as Hdl0. apply Rabs_le_inv in Hdl.
+  assert (Hx2 : (x + Rabs d) * (x + Rabs d) <= 1.0001 * (x * x)) by nra.
+  destruct (Rtotal_order d 0) as [Hneg | [Hz | Hpos]].
+  - destruct (asin_gap (x + d) x ltac:(lra) ltac:(lra) ltac:(lra)) as [G1 G2].
+    rewrite (Rabs_left d Hneg) in *. apply Rabs_le. split; nra.
+  - subst d. rewrite Rplus_0_r. replace (asin x - asin x - 0) with 0 by ring. rewrite Rabs_R0. nra.
+  - destruct (asin_gap x (x + d) ltac:(lra) ltac:(lra) ltac:(lra)) as [G1 G2].
+    rewrite (Rabs_right d) in * by lra. apply Rabs_le. split; nra.
+Qed.

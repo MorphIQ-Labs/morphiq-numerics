@@ -82,6 +82,29 @@ def hex_fraction(text):
     return Fraction(int(whole + fraction, 16)) * Fraction(2) ** (int(exponent) - 4 * len(fraction))
 
 
+def intro_pattern(names):
+    """The Coq pattern [a [b [c d]]] for a right-nested conjunction."""
+    r = names[-1]
+    for n in reversed(names[:-1]):
+        r = f'[{n} {r}]'
+    return r
+
+
+def approx_budget(k, values):
+    """Segment k's absolute approximation budget E (docs/asin.md, section 4):
+    Sollya's supnorm plus the Taylor remainder for the polynomial, and the
+    tables' double-word error for asin(a) and c1, as compose_<kk>.g takes them,
+    rounded up to a 24-bit mantissa. Returns (E, n, shift) with E = n 2^-shift."""
+    a = mpmath.mpf(k) / 64
+    asin_a = frac(mpmath.asin(a))
+    c1 = frac(1 / mpmath.sqrt(1 - a * a))
+    e_poly = T * T * (hex_fraction(values[f'u{k:02d}0']) + hex_fraction(values[f'r{k:02d}0']))
+    e = e_poly + DW_ACC * asin_a + DW_ACC * c1 * T
+    shift = 24 - math.floor(math.log2(e)) - 1
+    n = math.ceil(e * 2 ** shift)
+    return Fraction(n, 2 ** shift), n, shift
+
+
 def asin_bounds(k):
     """Rigorous lower and upper bounds of asin on [a - T, a + T], a = k/64,
     from mpmath interval arithmetic (asin v = atan2(v, sqrt(1 - v^2)))."""
@@ -501,7 +524,7 @@ def word_data(x):
     return bits, bool(sign), m, k, (-1 if sign else 1) * (m >> d), d, -k + d
 
 
-def segments_coq(rows, evals):
+def segments_coq(rows, evals, values):
     """formal/asin/AsinSegments.v: for each segment, its evaluation certificate
     applied over its table coefficients and the facts `SegOkRow` states about
     them, then the dispatcher over k."""
@@ -513,11 +536,19 @@ def segments_coq(rows, evals):
         'From Coq Require Import Reals ZArith Lia Lra Psatz List.',
         'From Flocq Require Import Core.',
         'From Gappa Require Import Gappa_library.',
+        'From Binary64 Require Import Binary64Add IEEE64 Grid.',
         'From Interval Require Import Tactic.',
-        'Require Import StageGappa AsinTables AsinKernel AsinSegment.',
+        'Require Import Ln1pLemmas StageGappa AsinTables AsinKernel AsinSegment AsinApprox AsinWithin.',
         *[f'Require asin_eval_{k:02d}.' for k in range(1, 46)],
         'Import ListNotations.',
         'Open Scope R_scope.',
+        '',
+        '(** The double-word addition\'s rounding is far below every budget here. *)',
+        'Lemma ea_dw_small : 0 <= 3 * bpow radix2 (- prec) ^ 2 / (1 - 4 * bpow radix2 (- prec)) <= / 1000000000000000000000000000000.',
+        'Proof.',
+        '  replace (- prec)%Z with (-53)%Z by reflexivity. bpow_num.',
+        '  split; [interval with (i_prec 120) | interval with (i_prec 160)].',
+        'Qed.',
         '',
     ]
     dispatch = []
@@ -552,8 +583,50 @@ def segments_coq(rows, evals):
         out += [
             f'  refine (segok_from_values {" ".join(["_"] * 28)}',
             f'    {" ".join(f"F{j}" for j in range(13))} {" ".join(f"V{j}" for j in range(13))}',
-            f'    _ _ _ _ _ _ _ _ _ _ _ _ _ evalcert_{k:02d} _ _).',
+            f'    _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ evalcert_{k:02d} _ _).',
             '  all: seg_numeric.',
+            'Qed.',
+            '',
+        ]
+        e_budget, e_n, e_shift = approx_budget(k, values)
+        b_frac = Fraction(int(bound.split('b-')[0]), 2 ** int(bound.split('b-')[1]))
+        e_a = 3 * U * U / (1 - 4 * U)
+        a_min = Fraction(k, 64) - T
+        assert ((e_budget + b_frac) * (1 + e_a) + e_a * a_min) * 2 ** 63 <= a_min, f'segment {k}: 2^-63 fast bound fails'
+        row_list = '[' + '; '.join(f'(0x{w[0]:016x})%Z' for w in words) + ']'
+        tt = f'((B zh - IZR {k} / 64) + B zl)'
+        kk2 = f'{k:02d}'
+        out += [
+            f'Lemma row_{kk2} : nth (Z.to_nat ({k}%Z - 1)) asin_segments [] = {row_list}.',
+            'Proof. reflexivity. Qed.',
+            '',
+            f'Lemma fast_{kk2} zh zl : finite zh -> finite zl -> / 128 <= B zh -> B zh <= 0.7072 ->',
+            f'  Znearest ne (B zh * 64) = {k}%Z -> Rabs (B zl) <= bpow radix2 (-53) -> on_grid (-211) (B zl) ->',
+            '  exists h l, asin_series zh zl = (h, l) /\\ finite h /\\ finite l /\\ B h = rndF (B h + B l) /\\',
+            f'    Rabs (B h + B l - asin (IZR {k} / 64 + {tt})) <= bpow radix2 (-63) * asin (IZR {k} / 64 + {tt}).',
+            'Proof.',
+            '  intros Fz Fl L U Hn Hl Hg.',
+            f'  pose proof (series_segment zh zl {k}%Z {bound_r} ltac:(lia) Fz Fl L U Hn Hl Hg segok_{kk2}) as SS.',
+            f'  cbv zeta in SS. rewrite row_{kk2} in SS. cbn [nth] in SS.',
+            '  destruct SS as ' + intro_pattern(['h', 'l', 'Hs', 'Fh', "Fl'", 'Nrm', 'Ht', 'e1', 'ea', 'E1', 'Eea', 'Eq']) + '.',
+            "  exists h, l. split; [exact Hs | split; [exact Fh | split; [exact Fl' | split; [exact Nrm | ]]]].",
+        ]
+        for j, w in enumerate(words):
+            bits, sign, m, kk, M, d, E = w
+            out.append(f'  destruct (word_ok_intro (0x{bits:016x})%Z {"true" if sign else "false"} {m}%positive {kk}%nat'
+                       f' ({M})%Z {d}%Z ({E})%Z eq_refl eq_refl ltac:(lia) eq_refl) as [F{j} V{j}].')
+        out += [
+            '  unfold seg_poly in Eq.',
+            f'  pose proof (approx_{kk2} _ _ _ _ _ _ _ _ _ _ _ _ _ {tt} {" ".join(f"V{j}" for j in range(13))} Ht) as AP.',
+            f'  change (IZR {k}) with ({k} : R) in *.',
+            '  apply Rabs_le_inv in Ht as Hti.',
+            f'  assert (HAm : {k} / 64 - 0.0078126 <= asin ({k} / 64 + {tt})).',
+            f'  {{ apply Rle_trans with ({k} / 64 + {tt}); [lra | apply asin_ge; split; lra]. }}',
+            '  destruct ea_dw_small as [Ea0 Ea1].',
+            '  rewrite Eq.',
+            f'  refine (fast_compose _ _ e1 ea (IZR {e_n} * bpow radix2 (-{e_shift})) {bound_r} _ ({k} / 64 - 0.0078126) _ AP E1 Eea HAm _ Ea0 _).',
+            '  - lra.',
+            '  - bpow_num. replace (- prec)%Z with (-53)%Z by reflexivity. bpow_num. clear - Fz. interval with (i_prec 200).',
             'Qed.',
             '',
         ]
@@ -569,6 +642,21 @@ def segments_coq(rows, evals):
         '  repeat (destruct Hc as [E | Hc]; [subst k; first ' + '[' + ' | '.join(
             f'(exists {b}; split; [exact segok_{kk:02d} | bpow_num; interval with (i_prec 60)])' for kk, b in dispatch) + '] | ]).',
         '  subst k. ' + 'exists ' + dispatch[-1][1] + '; split; [exact segok_45 | bpow_num; interval with (i_prec 60)].',
+        'Qed.',
+        '',
+        '(** The table branch: [k = round (64 zh)] in [1..45], the tail [zl] a double-word low part',
+        '    on the [2^-211] grid. *)',
+        'Theorem fast_table (k : Z) zh zl : (1 <= k <= 45)%Z -> finite zh -> finite zl -> / 128 <= B zh -> B zh <= 0.7072 ->',
+        '  Znearest ne (B zh * 64) = k -> Rabs (B zl) <= bpow radix2 (-53) -> on_grid (-211) (B zl) ->',
+        '  exists h l, asin_series zh zl = (h, l) /\\ finite h /\\ finite l /\\ B h = rndF (B h + B l) /\\',
+        '    Rabs (B h + B l - asin (IZR k / 64 + ((B zh - IZR k / 64) + B zl)))',
+        '      <= bpow radix2 (-63) * asin (IZR k / 64 + ((B zh - IZR k / 64) + B zl)).',
+        'Proof.',
+        '  intros Hk Fz Fl L U Hn Hl Hg.',
+        f'  assert (Hc : {cases}) by lia.',
+        '  repeat (destruct Hc as [E | Hc]; [rewrite E in Hn; rewrite E; first ' + '[' + ' | '.join(
+            f'exact (fast_{kk:02d} zh zl Fz Fl L U Hn Hl Hg)' for kk, _ in dispatch) + '] | ]).',
+        '  rewrite Hc in Hn. rewrite Hc. exact (fast_45 zh zl Fz Fl L U Hn Hl Hg).',
         'Qed.',
     ]
     return '\n'.join(out) + '\n'
@@ -594,7 +682,7 @@ def generate():
         out[f'compose_{k:02d}.g'] = text
         claims[k] = claim
         worst = max(worst, claim)
-    out['AsinSegments.v'] = segments_coq(d['rows'], evals)
+    out['AsinSegments.v'] = segments_coq(d['rows'], evals, d['values'])
     values = d['values']
     out['series_tail.g'] = series_tail_certificate(values)
     text, series_claim = series_compose_certificate(values)

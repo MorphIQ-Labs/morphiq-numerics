@@ -216,6 +216,7 @@ Proof. change (-2)%Z with (Zneg 2). rewrite bpow_neg. reflexivity. Qed.
     [2^-103] relatively. *)
 Theorem reduced_complement x : finite x -> SPLIT_UP_R <= B x -> B x <= 1 - / 9007199254740992 ->
   exists zh zl, asin_reduced x = (false, (zh, zl)) /\ finite zh /\ finite zl /\
+    B zh = rndF (B zh + B zl) /\ on_grid (-211) (B zl) /\
     Rabs (B zh + B zl - sqrt ((1 - B x) / 2)) <= / 2 ^ 103 * sqrt ((1 - B x) / 2).
 Proof.
   intros Fx L U.
@@ -294,7 +295,53 @@ Proof.
   { apply Rle_trans with (bpow radix2 (-1)); [exact SA | apply bpow_le; lia]. }
   assert (TS := two_sum_ieee s (fdiv (fsub (fsub u sq) se) (fmul asin_two s)) Fs Fsl SB SLa).
   destruct (two_sum64 s (fdiv (fsub (fsub u sq) se) (fmul asin_two s))) as [zh zl] eqn:Ez.
-  cbv beta iota in TS. destruct TS as [Fzh [Fzl [_ Ezsum]]].
+  cbv beta iota in TS. destruct TS as [Fzh [Fzl [Ezh Ezsum]]].
+  (* [zl] is a multiple of [2^-211]: [s] is a multiple of [2^-79], [u - s^2] of
+     [2^-158], and a nonzero [s_lo] is at least [2^-158] in magnitude. *)
+  assert (Hgrid : on_grid (-211) (B zl)).
+  { pose proof Esq as Esq2. pose proof Esum as Esum2. change (B s) with S in Esq2, Esum2.
+    assert (Gs : on_grid (-79) S).
+    { assert (Hr : bpow radix2 (-27) <= Rabs (B s)) by (change (B s) with S; rewrite Rabs_pos_eq by lra; rewrite bp27; exact SL).
+      destruct (grid_fmt_bound (FLT_exp emin prec) (-27) (B s) ltac:(intros e; unfold FLT_exp, emin, prec; lia) (B_fmt s)
+        (or_intror Hr)) as [k Hk].
+      exists k. replace (-79)%Z with (-27 - 52)%Z by reflexivity. exact Hk. }
+    assert (Gu : on_grid (-106) (B u)).
+    { assert (Hr : bpow radix2 (-54) <= Rabs (B u)) by (rewrite Eu, Rabs_pos_eq by lra; rewrite bp54; lra).
+      destruct (grid_fmt_bound (FLT_exp emin prec) (-54) (B u) ltac:(intros e; unfold FLT_exp, emin, prec; lia) (B_fmt u)
+        (or_intror Hr)) as [k Hk].
+      exists k. replace (-106)%Z with (-54 - 52)%Z by reflexivity. exact Hk. }
+    assert (Gss : on_grid (-158) (S * S)).
+    { replace (-158)%Z with (-79 + -79)%Z by reflexivity. exact (grid_mult _ _ _ _ Gs Gs). }
+    assert (Gsq : on_grid (-158) (B sq)) by (rewrite Esq2; exact (grid_round _ _ _ _ Gss)).
+    assert (Gse : on_grid (-158) (B se)).
+    { replace (B se) with (S * S - B sq) by lra. exact (grid_minus _ _ _ Gss Gsq). }
+    assert (Gu' : on_grid (-158) (B u)) by (apply (grid_le (-106)); [lia | exact Gu]).
+    assert (Gr1 : on_grid (-158) (B (fsub u sq))).
+    { rewrite Err1. exact (grid_round _ _ _ _ (grid_minus _ _ _ Gu' Gsq)). }
+    assert (Gr2 : on_grid (-158) (B (fsub (fsub u sq) se))).
+    { rewrite Er2. exact (grid_round _ _ _ _ (grid_minus _ _ _ Gr1 Gse)). }
+    assert (Gsl : on_grid (-210) (B (fdiv (fsub (fsub u sq) se) (fmul asin_two s)))).
+    { rewrite Esl. rewrite Es2.
+      destruct (Req_dec (B (fsub (fsub u sq) se)) 0) as [Z0 | NZ].
+      - rewrite Z0. unfold Rdiv. rewrite Rmult_0_l. rewrite round_0 by exact _. apply grid_0.
+      - pose proof (grid_nonzero _ _ Gr2 NZ) as Hr.
+        assert (Hqq : bpow radix2 (-158) <= Rabs (B (fsub (fsub u sq) se) / (2 * S))).
+        { unfold Rdiv. rewrite Rabs_mult, (Rabs_Rinv (2 * S)) by lra. rewrite (Rabs_pos_eq (2 * S)) by lra.
+          assert (Hi : / 1 <= / (2 * S)) by (apply Rinv_le_contravar; lra). rewrite Rinv_1 in Hi.
+          pose proof (Rabs_pos (B (fsub (fsub u sq) se))). nra. }
+        assert (Hr2 : bpow radix2 (-158) <= Rabs (rn (B (fsub (fsub u sq) se) / (2 * S)))).
+        { rewrite <- round_NE_abs by exact _. apply round_ge_generic; [exact _ | exact _ | apply fmt_bpow; lia | exact Hqq]. }
+        destruct (grid_fmt_bound (FLT_exp emin prec) (-158)
+          (rn (B (fsub (fsub u sq) se) / (2 * S)))
+          ltac:(intros e; unfold FLT_exp, emin, prec; lia) (generic_format_round _ _ _ _)
+          (or_intror Hr2)) as [k Hk].
+        exists k. replace (-210)%Z with (-158 - 52)%Z by reflexivity. exact Hk. }
+    assert (Gsum : on_grid (-210) (B s + B (fdiv (fsub (fsub u sq) se) (fmul asin_two s)))).
+    { apply grid_plus; [apply (grid_le (-79)); [lia | exact Gs] | exact Gsl]. }
+    assert (Gzh : on_grid (-210) (B zh)) by (rewrite Ezh; exact (grid_round _ _ _ _ Gsum)).
+    assert (Hzl : B zl = (B s + B (fdiv (fsub (fsub u sq) se) (fmul asin_two s))) - B zh) by lra.
+    apply (grid_le (-210)); [lia | ]. rewrite Hzl. exact (grid_minus _ _ _ Gsum Gzh). }
+  assert (Hround : B zh = rndF (B zh + B zl)) by (rewrite Ezsum; exact Ezh).
   exists zh, zl. cbv beta iota zeta. repeat split; try reflexivity; try assumption.
   (* the certificate *)
   assert (W1' : / 2 ^ 27 <= w) by (assert (2 ^ 27 = 134217728) by (simpl; ring); rewrite H; exact W1).

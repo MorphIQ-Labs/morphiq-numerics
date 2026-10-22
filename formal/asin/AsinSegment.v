@@ -5,7 +5,7 @@ From Flocq Require Import Core Mult_error Sterbenz IEEE754.Binary IEEE754.Bits.
 From Gappa Require Import Gappa_library.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Mul IEEE64Eft Grid Encodings RoundingCore.
 From Interval Require Import Tactic.
-Require Import StageGappa AsinTables AsinKernel AsinSqrtStep AsinSeriesSmall ExpReduction.
+Require Import StageGappa AsinTables AsinKernel AsinSqrtStep AsinNormal AsinSeriesSmall ExpReduction.
 Import ListNotations.
 Open Scope R_scope.
 
@@ -603,15 +603,19 @@ Theorem segment_eval th tl c0 c1 cH cL g0 g1 g2 g3 g4 g5 g6 g7 g8 (bound dgb : R
   Rabs (B g3) <= bpow radix2 11 -> Rabs (B g4) <= bpow radix2 11 -> Rabs (B g5) <= bpow radix2 11 ->
   Rabs (B g6) <= bpow radix2 11 -> Rabs (B g7) <= bpow radix2 11 -> Rabs (B g8) <= bpow radix2 11 ->
   Rabs (B c0) <= 2 -> Rabs (B c1) <= 2 ->
+  bpow radix2 (-7) <= B c0 -> Rabs (B c1) <= bpow radix2 (-52) * B c0 ->
   EvalCert (B cH) (B cL) (B g0) (B g1) (B g2) (B g3) (B g4) (B g5) (B g6) (B g7) (B g8) bound dgb ->
   sl 0.0078126 (seg_poly g0 g1 g2 g3 g4 g5 g6 g7 g8) * 8.7e-19 <= dgb ->
   let t := B th + B tl in
-  Rabs ((B cH + B cL) * t + t * t * pl (seg_poly g0 g1 g2 g3 g4 g5 g6 g7 g8) t) + bound < B c0 + B c1 ->
+  Rabs ((B cH + B cL) * t + t * t * pl (seg_poly g0 g1 g2 g3 g4 g5 g6 g7 g8) t) + bound < 49 / 50 * (B c0 + B c1) ->
   exists h l, seg_result th tl c0 c1 cH cL g0 g1 g2 g3 g4 g5 g6 g7 g8 = (h, l) /\ finite h /\ finite l /\
+    B h = rndF (B h + B l) /\
     exists e1 ea, Rabs e1 <= bound /\ Rabs ea <= 3 * bpow radix2 (- prec) ^ 2 / (1 - 4 * bpow radix2 (- prec)) /\
     B h + B l = (B c0 + B c1 + ((B cH + B cL) * t + t * t * pl (seg_poly g0 g1 g2 g3 g4 g5 g6 g7 g8) t) + e1) * (1 + ea).
 Proof.
-  intros Ft Fl F0 F1 FH FL Fg0 Fg1 Fg2 Fg3 Fg4 Fg5 Fg6 Fg7 Fg8 Th Tn Tl1 Tl2 Tt H1 CL G0 G1 G2 G3 G4 G5 G6 G7 G8 C0 C1 EC Hdg t HS.
+  intros Ft Fl F0 F1 FH FL Fg0 Fg1 Fg2 Fg3 Fg4 Fg5 Fg6 Fg7 Fg8 Th Tn Tl1 Tl2 Tt H1 CL G0 G1 G2 G3 G4 G5 G6 G7 G8 C0 C1 Lc0 Lc1 EC Hdg t HS.
+  pose proof (Rabs_le_inv _ _ Lc1) as [Lca Lcb]. rewrite bm52 in Lca, Lcb.
+  assert (Hc01 : 0 < B c0 + B c1) by (pose proof (bpow_gt_0 radix2 (-7)); lra).
   assert (T6 : Rabs (B th) <= bpow radix2 (-6)) by (rewrite bm6; lra).
   assert (Dg0 : 0 <= dgb) by (pose proof (sl_nonneg 0.0078126 (seg_poly g0 g1 g2 g3 g4 g5 g6 g7 g8) ltac:(lra)); nra).
   destruct (horner_chain th g0 g1 g2 g3 g4 g5 g6 g7 g8 Ft Fg0 Fg1 Fg2 Fg3 Fg4 Fg5 Fg6 Fg7 Fg8 T6 G0 G1 G2 G3 G4 G5 G6 G7 G8)
@@ -687,9 +691,50 @@ Proof.
   clearbody Fx Vv.
   assert (HS' : B yh + B yl + (B vh + B vl) = B c0 + B c1 + Fx + (B tl_ - Vv)) by (rewrite Eys, Evs, <- HF; ring).
   assert (Hne : B yh + B yl + (B vh + B vl) <> 0) by (rewrite HS'; lra).
+  (* the result is a double-word number: the sizes [add64_normalized] asks for *)
+  assert (b78 : bpow radix2 (-7) = 2 * bpow radix2 (-8)).
+  { replace (-7)%Z with (-8 + 1)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 1) with 2. ring. }
+  pose proof (bpow_gt_0 radix2 (-8)) as P8.
+  assert (c01lo : bpow radix2 (-8) <= B c0 + B c1) by lra.
+  assert (Hyh8 : bpow radix2 (-8) <= B yh).
+  { rewrite Eyh. apply round_ge_generic; [exact _ | exact _ | apply fmt_bpow; lia | exact c01lo]. }
+  assert (P53n : bpow radix2 (-53) = / 9007199254740992) by exact bp53.
+  assert (Hn1 : bpow radix2 (-1022) <= Rabs (B c0 + B c1)).
+  { rewrite Rabs_pos_eq by lra. apply Rle_trans with (bpow radix2 (-8)); [apply bpow_le; lia | exact c01lo]. }
+  pose proof (rnd_rel_f _ Hn1) as R1. rewrite <- Eyh in R1. rewrite (Rabs_pos_eq (B c0 + B c1)) in R1 by lra.
+  rewrite P53n in R1. pose proof R1 as R1'. apply Rabs_le_inv in R1' as [R1a R1b].
+  assert (Hyl52 : Rabs (B yl) <= bpow radix2 (-52) * B yh).
+  { rewrite bm52. apply Rabs_le. split; lra. }
+  assert (HvS : Rabs (B ph + B tl_) <= 49 / 50 * (B c0 + B c1)).
+  { replace (B ph + B tl_) with (Fx + (B tl_ - Vv)) by lra.
+    apply Rle_trans with (Rabs Fx + Rabs (B tl_ - Vv)); [apply Rabs_triang | lra]. }
+  assert (Htiny : bpow radix2 (-1075) <= bpow radix2 (-8) * / 1000000000000000000000).
+  { assert (Ht1 : bpow radix2 (-1075) <= bpow radix2 (-100)) by (apply bpow_le; lia).
+    assert (Ht2 : bpow radix2 (-100) = bpow radix2 (-8) * bpow radix2 (-92)).
+    { replace (-100)%Z with (-8 + -92)%Z by reflexivity. rewrite bpow_plus. reflexivity. }
+    assert (Ht3 : bpow radix2 (-92) <= / 1000000000000000000000) by (bpow_num; apply Rinv_le_contravar; [lra | interval with (i_prec 100)]).
+    nra. }
+  pose proof (rnd_err_abs (B ph + B tl_)) as R2. rewrite <- Evh in R2. rewrite P53n in R2.
+  assert (Hvl52 : Rabs (B vl) <= bpow radix2 (-52) * B yh).
+  { rewrite bm52. replace (B vl) with ((B ph + B tl_) - B vh) by lra. rewrite Rabs_minus_sym.
+    apply Rle_trans with (1 := R2). pose proof (Rabs_pos (B ph + B tl_)).
+    assert (Htiny' : bpow radix2 (-1075) <= B yh * / 1000000000000000000000) by nra.
+    lra. }
+  assert (Hvh99 : Rabs (B vh) <= 99 / 100 * B yh).
+  { assert (Hvv : B vh = (B ph + B tl_) + - B vl) by lra.
+    pose proof (Rabs_triang (B ph + B tl_) (- B vl)) as Tr. rewrite <- Hvv in Tr. rewrite Rabs_Ropp in Tr.
+    rewrite bm52 in Hvl52.
+    apply Rabs_le_inv in HvS as [HvSa HvSb]. pose proof (Rabs_pos (B ph + B tl_)).
+    assert (HS2 : Rabs (B ph + B tl_) <= 49 / 50 * (B c0 + B c1)) by (apply Rabs_le; split; assumption).
+    lra. }
+  assert (Hyh900 : B yh <= bpow radix2 900).
+  { apply Rle_trans with (bpow radix2 3); [rewrite b3; lra | apply bpow_le; lia]. }
+  pose proof (add64_normalized yh yl vh vl Fyh Fyl Fvh Fvl
+    (Rle_trans _ _ _ (bpow_le radix2 (-900) (-8) ltac:(lia)) Hyh8) Hyh900 Hyl52 Hvl52 Hvh99) as NORM.
   pose proof (add_ieee yh yl vh vl Fyh Fyl Hyh Fvh Fvl Hvh (big8 (B yh) ltac:(lra)) (big8 (B yl) Byl') (big8 (B vh) ltac:(lra)) (big8 (B vl) ltac:(lra)) Hne) as AD.
   destruct (add64 yh yl vh vl) as [zh zl] eqn:Ea. destruct AD as [Fzh [Fzl Err]].
-  exists zh, zl. split; [ | split; [exact Fzh | split; [exact Fzl | ]]].
+  try cbv iota in NORM. destruct NORM as [_ [_ Nrm]].
+  exists zh, zl. split; [ | split; [exact Fzh | split; [exact Fzl | split; [exact Nrm | ]]]].
   - unfold seg_result. cbv zeta. rewrite Eprod, Ey. fold tl_. rewrite Efs. exact Ea.
   - exists (B tl_ - Vv), ((B zh + B zl - (B yh + B yl + (B vh + B vl))) / (B yh + B yl + (B vh + B vl))).
     split; [exact Eb | split; [exact Err | ]].
@@ -702,13 +747,14 @@ Definition SegOk (c0 c1 cH cL g0 g1 g2 g3 g4 g5 g6 g7 g8 : f64) (bound : R) : Pr
   finite c0 /\ finite c1 /\ finite cH /\ finite cL /\ finite g0 /\ finite g1 /\ finite g2 /\ finite g3 /\
   finite g4 /\ finite g5 /\ finite g6 /\ finite g7 /\ finite g8 /\
   Rabs (B c0) <= 2 /\ Rabs (B c1) <= 2 /\ (1 <= B cH <= 2) /\ Rabs (B cL) <= bpow radix2 (-50) /\
+  bpow radix2 (-7) <= B c0 /\ Rabs (B c1) <= bpow radix2 (-52) * B c0 /\
   Rabs (B g0) <= bpow radix2 11 /\ Rabs (B g1) <= bpow radix2 11 /\ Rabs (B g2) <= bpow radix2 11 /\
   Rabs (B g3) <= bpow radix2 11 /\ Rabs (B g4) <= bpow radix2 11 /\ Rabs (B g5) <= bpow radix2 11 /\
   Rabs (B g6) <= bpow radix2 11 /\ Rabs (B g7) <= bpow radix2 11 /\ Rabs (B g8) <= bpow radix2 11 /\
   exists dgb, EvalCert (B cH) (B cL) (B g0) (B g1) (B g2) (B g3) (B g4) (B g5) (B g6) (B g7) (B g8) bound dgb /\
     sl 0.0078126 (seg_poly g0 g1 g2 g3 g4 g5 g6 g7 g8) * 8.7e-19 <= dgb /\
     (B cH + Rabs (B cL)) * 0.0078126 + 0.0078126 * 0.0078126 * bl 0.0078126 (seg_poly g0 g1 g2 g3 g4 g5 g6 g7 g8) + bound
-      < B c0 + B c1.
+      < 49 / 50 * (B c0 + B c1).
 
 (** The polynomial part of a segment's value stays small. *)
 Lemma fx_small cH cL c01 bound (L : list R) t : 1 <= cH -> Rabs t <= 0.0078126 ->
@@ -745,7 +791,8 @@ Theorem series_segment zh zl (k : Z) (bound : R) : (1 <= k <= 45)%Z ->
   let row := nth (Z.to_nat (k - 1)) asin_segments [] in
   let c := fun j => aw (nth j row 0%Z) in
   let t := (B zh - IZR k / 64) + B zl in
-  exists h l, asin_series zh zl = (h, l) /\ finite h /\ finite l /\ Rabs t <= 0.0078126 /\
+  exists h l, asin_series zh zl = (h, l) /\ finite h /\ finite l /\ B h = rndF (B h + B l) /\
+    Rabs t <= 0.0078126 /\
     exists e1 ea, Rabs e1 <= bound /\ Rabs ea <= 3 * bpow radix2 (- prec) ^ 2 / (1 - 4 * bpow radix2 (- prec)) /\
     B h + B l = (B (c 0%nat) + B (c 1%nat)
       + ((B (c 2%nat) + B (c 3%nat)) * t + t * t * pl (seg_poly (c 4%nat) (c 5%nat) (c 6%nat) (c 7%nat) (c 8%nat) (c 9%nat) (c 10%nat) (c 11%nat) (c 12%nat)) t)
@@ -764,12 +811,12 @@ Proof.
   { rewrite Etsum. unfold t. destruct (Rabs_le_inv _ _ Hd) as [Hd1 Hd2]. destruct (Rabs_le_inv _ _ Hl) as [Hl1 Hl2].
     rewrite bp53 in Hl1, Hl2. apply Rabs_le. split; lra. }
   unfold SegOkRow in SO. cbv zeta in SO.
-  destruct SO as [F0 [F1 [FH [FL [Fg0 [Fg1 [Fg2 [Fg3 [Fg4 [Fg5 [Fg6 [Fg7 [Fg8 [C0 [C1 [H1 [CL [G0 [G1 [G2 [G3 [G4 [G5 [G6 [G7 [G8 [dgb [EC [Hdg HSn]]]]]]]]]]]]]]]]]]]]]]]]]]]]].
+  destruct SO as [F0 [F1 [FH [FL [Fg0 [Fg1 [Fg2 [Fg3 [Fg4 [Fg5 [Fg6 [Fg7 [Fg8 [C0 [C1 [H1 [CL [Lc0 [Lc1 [G0 [G1 [G2 [G3 [G4 [G5 [G6 [G7 [G8 [dgb [EC [Hdg HSn]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]].
   pose proof (fx_small _ _ _ _ _ (B th + B tl) (proj1 H1) Htt HSn) as HS.
   pose proof (segment_eval th tl _ _ _ _ _ _ _ _ _ _ _ _ _ bound dgb Fth Ftl F0 F1 FH FL Fg0 Fg1 Fg2 Fg3 Fg4 Fg5 Fg6 Fg7 Fg8
-    Th Tn Tl1 Tl2 Htt H1 CL G0 G1 G2 G3 G4 G5 G6 G7 G8 C0 C1 EC Hdg HS) as SE.
-  destruct SE as [h [l [Hres [Fh [Fl2 [e1 [ea [E1 [Eea Eq]]]]]]]]].
-  refine (ex_intro _ h (ex_intro _ l (conj _ (conj Fh (conj Fl2 (conj _ _)))))).
+    Th Tn Tl1 Tl2 Htt H1 CL G0 G1 G2 G3 G4 G5 G6 G7 G8 C0 C1 Lc0 Lc1 EC Hdg HS) as SE.
+  destruct SE as [h [l [Hres [Fh [Fl2 [Nrm [e1 [ea [E1 [Eea Eq]]]]]]]]]].
+  refine (ex_intro _ h (ex_intro _ l (conj _ (conj Fh (conj Fl2 (conj Nrm (conj _ _))))))).
   - rewrite <- Hres. unfold asin_series. cbv zeta. fold i. rewrite Cgt, Ix, Ets. unfold seg_result, hf, tail_of. cbv zeta. simpl Z.to_nat. reflexivity.
   - rewrite <- Etsum. exact Htt.
   - exists e1, ea. rewrite <- Etsum. exact (conj E1 (conj Eea Eq)).
@@ -795,16 +842,17 @@ Lemma segok_from_values c0 c1 cH cL g0 g1 g2 g3 g4 g5 g6 g7 g8 (r0 r1 rH rL q0 q
   B c0 = r0 -> B c1 = r1 -> B cH = rH -> B cL = rL -> B g0 = q0 -> B g1 = q1 -> B g2 = q2 -> B g3 = q3 ->
   B g4 = q4 -> B g5 = q5 -> B g6 = q6 -> B g7 = q7 -> B g8 = q8 ->
   Rabs r0 <= 2 -> Rabs r1 <= 2 -> (1 <= rH <= 2) -> Rabs rL <= bpow radix2 (-50) ->
+  bpow radix2 (-7) <= r0 -> Rabs r1 <= bpow radix2 (-52) * r0 ->
   Rabs q0 <= bpow radix2 11 -> Rabs q1 <= bpow radix2 11 -> Rabs q2 <= bpow radix2 11 ->
   Rabs q3 <= bpow radix2 11 -> Rabs q4 <= bpow radix2 11 -> Rabs q5 <= bpow radix2 11 ->
   Rabs q6 <= bpow radix2 11 -> Rabs q7 <= bpow radix2 11 -> Rabs q8 <= bpow radix2 11 ->
   EvalCert rH rL q0 q1 q2 q3 q4 q5 q6 q7 q8 bound dgb ->
   sl 0.0078126 [q0; q1; q2; q3; q4; q5; q6; q7; q8] * 8.7e-19 <= dgb ->
-  (rH + Rabs rL) * 0.0078126 + 0.0078126 * 0.0078126 * bl 0.0078126 [q0; q1; q2; q3; q4; q5; q6; q7; q8] + bound < r0 + r1 ->
+  (rH + Rabs rL) * 0.0078126 + 0.0078126 * 0.0078126 * bl 0.0078126 [q0; q1; q2; q3; q4; q5; q6; q7; q8] + bound < 49 / 50 * (r0 + r1) ->
   SegOk c0 c1 cH cL g0 g1 g2 g3 g4 g5 g6 g7 g8 bound.
 Proof.
   intros F0 F1 FH FL Fg0 Fg1 Fg2 Fg3 Fg4 Fg5 Fg6 Fg7 Fg8 V0 V1 VH VL W0 W1 W2 W3 W4 W5 W6 W7 W8
-    A0 A1 AH AL B0 B1 B2 B3 B4 B5 B6 B7 B8 EC Hs Hn.
+    A0 A1 AH AL Lr0 Lr1 B0 B1 B2 B3 B4 B5 B6 B7 B8 EC Hs Hn.
   unfold SegOk. rewrite V0, V1, VH, VL, W0, W1, W2, W3, W4, W5, W6, W7, W8. unfold seg_poly. rewrite W0, W1, W2, W3, W4, W5, W6, W7, W8.
   destruct AH as [AH1 AH2]. repeat split; try assumption.
   exists dgb. exact (conj EC (conj Hs Hn)).

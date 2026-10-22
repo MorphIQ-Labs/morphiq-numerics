@@ -5,7 +5,7 @@ From Flocq Require Import Core Mult_error IEEE754.Binary IEEE754.Bits.
 From Gappa Require Import Gappa_library.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Mul IEEE64Eft Grid Encodings.
 From Interval Require Import Tactic.
-Require Import StageGappa AsinTables AsinKernel AsinSqrtStep ExpReduction.
+Require Import StageGappa AsinTables AsinKernel AsinSqrtStep AsinNormal ExpReduction.
 Require asin_series_tail.
 Open Scope R_scope.
 
@@ -227,7 +227,7 @@ Proof. rewrite (bpow_negn 21 : bpow radix2 (-21) = / 2 ^ 21). simpl. field. Qed.
 Theorem series_small_eval zh zl : finite zh -> finite zl ->
   bpow radix2 (-28) <= B zh -> B zh <= bpow radix2 (-7) ->
   B zh = rndF (B zh + B zl) -> Rabs (B zl) <= B zh / 2 ->
-  exists h l, asin_series zh zl = (h, l) /\ finite h /\ finite l /\
+  exists h l, asin_series zh zl = (h, l) /\ finite h /\ finite l /\ B h = rndF (B h + B l) /\
     exists ec ea, Rabs ec <= / 2 ^ 51 /\ Rabs ea <= / 2 ^ 104 /\
       let Tx := B zh * B zh * B zh * (q0r + B zh * B zh * (q1r + B zh * B zh * (q2r + B zh * B zh * q3r))) in
       B h + B l = (B zh + B zl + Tx * (1 + ec)) * (1 + ea).
@@ -295,8 +295,10 @@ Proof.
   assert (Ht : Rabs (B tail) <= bpow radix2 1018).
   { apply Rle_trans with (bpow radix2 (-22)); [ | apply bpow_le; lia]. rewrite Rabs_pos_eq by lra. exact T1. }
   pose proof (add_f64_ieee zh zl tail Fh Fl Ftail Dw Hzh Hzl Ht) as AF.
-  destruct (add_f64_64 zh zl tail) as [h l] eqn:Ead. cbv iota in AF. destruct AF as [Fh' [Fl' Bd]].
-  exists h, l. split; [reflexivity | ]. split; [exact Fh' | ]. split; [exact Fl' | ].
+  pose proof (add_f64_normalized_ieee zh zl tail Fh Fl Ftail Dw Hzh Hzl Ht) as AFN.
+  destruct (add_f64_64 zh zl tail) as [h l] eqn:Ead. cbv iota in AF, AFN. destruct AF as [Fh' [Fl' Bd]].
+  destruct AFN as [_ [_ Nrm]].
+  exists h, l. split; [reflexivity | ]. split; [exact Fh' | ]. split; [exact Fl' | ]. split; [exact Nrm | ].
   set (Xs := X + B zl + B tail) in *.
   assert (Hxs : 0 < Xs).
   { unfold Xs. apply Rabs_le_inv in Hl. pose proof (Rabs_pos (B tail)). 
