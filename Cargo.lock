@@ -133,6 +133,7 @@ name = "morphiq-numerics-reference"
 version = "0.0.10"
 dependencies = [
  "morphiq-numerics",
+ "morphiq-numerics-arch",
  "morphiq-numerics-digest",
  "num-bigint",
  "num-traits",
