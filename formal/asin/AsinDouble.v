@@ -104,3 +104,19 @@ Proof.
   assert (Bzh : B zh = 2 * B xh) by (rewrite Ezh; replace (2 * B xh + 2 * B xl) with ((B xh + B xl) * 2) by ring; rewrite Hscale; ring).
   repeat split; try assumption; lra.
 Qed.
+
+(** Doubling keeps a double-word number a double-word number. *)
+Lemma dw_double_norm xh xl : B xh = rndF (B xh + B xl) -> bpow radix2 (-900) <= B xh + B xl ->
+  2 * B xh = rndF (2 * B xh + 2 * B xl).
+Proof.
+  intros E Hv.
+  assert (Hmag : (-899 <= mag radix2 (B xh + B xl))%Z).
+  { apply mag_ge_bpow. rewrite Rabs_pos_eq.
+    - replace (-899 - 1)%Z with (-900)%Z by reflexivity. exact Hv.
+    - pose proof (bpow_gt_0 radix2 (-900)). lra. }
+  assert (Hpos : 0 < B xh + B xl) by (pose proof (bpow_gt_0 radix2 (-900)); lra).
+  assert (Hscale : rndF ((B xh + B xl) * bpow radix2 1) = B xh * bpow radix2 1).
+  { rewrite round_scale; [ | lra | lia | lia]. rewrite <- E. reflexivity. }
+  change (bpow radix2 1) with 2 in Hscale.
+  replace (2 * B xh + 2 * B xl) with ((B xh + B xl) * 2) by ring. rewrite Hscale. ring.
+Qed.
