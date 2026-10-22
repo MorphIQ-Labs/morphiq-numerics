@@ -82,20 +82,20 @@ Proof.
   - exact (bits_finite 0x3fbc40518de2ad7b false 7952018364870011%positive (-56) eq_refl).
 Qed.
 
-(** [64 z] is exact for a binary64 [z] in [[2^-900, 2^-7]], and its index is zero. *)
-Lemma times_64_exact_a z : finite z -> bpow radix2 (-900) <= B z -> B z <= bpow radix2 (-7) ->
+(** [64 z] is exact for a binary64 [z] in [[2^-905, 2^-7]], and its index is zero. *)
+Lemma times_64_exact_a z : finite z -> bpow radix2 (-905) <= B z -> B z <= bpow radix2 (-7) ->
   finite (fmul z asin_64) /\ B (fmul z asin_64) = B z * 64.
 Proof.
   intros Fz L U. destruct sixty_four_val as [V6 F6].
   assert (Gs : fmtF (B z * bpow radix2 6)).
   { apply mult_bpow_exact_FLT; [apply B_fmt | ].
-    assert (M : (-899 <= mag radix2 (B z))%Z).
+    assert (M : (-904 <= mag radix2 (B z))%Z).
     { apply mag_ge_bpow. rewrite Rabs_pos_eq.
-      - replace (-899 - 1)%Z with (-900)%Z by reflexivity. exact L.
-      - pose proof (bpow_gt_0 radix2 (-900)). lra. }
+      - replace (-904 - 1)%Z with (-905)%Z by reflexivity. exact L.
+      - pose proof (bpow_gt_0 radix2 (-905)). lra. }
     unfold emin, prec. lia. }
   assert (Pb : bpow radix2 (-7) = / 128) by (change (-7)%Z with (Zneg 7); rewrite bpow_neg; reflexivity).
-  assert (Pc : 0 < bpow radix2 (-900)) by apply bpow_gt_0.
+  assert (Pc : 0 < bpow radix2 (-905)) by apply bpow_gt_0.
   assert (E6 : B z * B asin_64 = B z * bpow radix2 6).
   { rewrite V6. change (bpow radix2 6) with 64. reflexivity. }
   assert (Bd : bnd 1 0 (B z * B asin_64)).
@@ -106,13 +106,13 @@ Proof.
   change (bpow radix2 6) with 64. reflexivity.
 Qed.
 
-Lemma index_zero_a z : finite z -> bpow radix2 (-900) <= B z -> B z <= bpow radix2 (-7) ->
+Lemma index_zero_a z : finite z -> bpow radix2 (-905) <= B z -> B z <= bpow radix2 (-7) ->
   asin_cmp (fsub (fadd (fmul z asin_64) asin_shifter) asin_shifter) asin_zero = Some Eq.
 Proof.
   intros Fz L U. destruct (times_64_exact_a z Fz L U) as [Fy Ey].
   rewrite asin_shifter_eq.
   assert (Pb : bpow radix2 (-7) = / 128) by (change (-7)%Z with (Zneg 7); rewrite bpow_neg; reflexivity).
-  assert (Pc : 0 < bpow radix2 (-900)) by apply bpow_gt_0.
+  assert (Pc : 0 < bpow radix2 (-905)) by apply bpow_gt_0.
   rewrite Pb in U.
   assert (Hy0 : 0 <= B (fmul z asin_64) <= / 2) by (rewrite Ey; lra).
   assert (Hb50 : Rabs (B (fmul z asin_64)) <= bpow radix2 50).
@@ -130,7 +130,7 @@ Definition p3r (u : R) : R := rn (aq2 - rn (u * aq3)).
 Definition p2r (u : R) : R := rn (aq1 - rn (u * p3r u)).
 Definition ps_of (u : R) : R := rn (aq0 - rn (u * p2r u)).
 
-Lemma series_chain zh zl : finite zh -> finite zl -> bpow radix2 (-900) <= B zh -> B zh <= bpow radix2 (-7) ->
+Lemma series_chain zh zl : finite zh -> finite zl -> bpow radix2 (-905) <= B zh -> B zh <= bpow radix2 (-7) ->
   exists tk, atan2_series zh zl = add_f64_64 zh zl tk /\ finite tk /\ Rabs (B tk) <= bpow radix2 (-22) /\
     B tk = - rn (rn (B zh * rn (B zh * B zh)) * ps_of (rn (B zh * B zh))) /\
     0 <= ps_of (rn (B zh * B zh)) <= / 2 /\ Rabs (B zh) <= bpow radix2 (-7).
@@ -143,7 +143,7 @@ Proof.
   set (Q1 := aw (nth (Z.to_nat 1%Z) atan2_poly0 0%Z)) in *.
   set (Q2 := aw (nth (Z.to_nat 2%Z) atan2_poly0 0%Z)) in *.
   set (Q3 := aw (nth (Z.to_nat 3%Z) atan2_poly0 0%Z)) in *.
-  pose proof (bpow_gt_0 radix2 (-900)) as P900.
+  pose proof (bpow_gt_0 radix2 (-905)) as P900.
   assert (Hz0 : 0 <= B zh) by lra.
   assert (U7 : Rabs (B zh) <= bpow radix2 (-7)) by (rewrite Rabs_pos_eq by lra; exact U).
   destruct (mul_range zh zh (-7) (-7) Fh Fh (conj Hz0 U) (conj Hz0 U) ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia)) as [Fz2 [Ez2 [Z20 Z21]]].
@@ -230,7 +230,7 @@ Theorem atan2_series_eval zh zl : finite zh -> finite zl ->
       B h + B l = (B zh + B zl - Tx * (1 + ec)) * (1 + ea).
 Proof.
   intros Fh Fl L U Dw Hl.
-  assert (L9 : bpow radix2 (-900) <= B zh) by (apply Rle_trans with (bpow radix2 (-100)); [apply bpow_le; lia | exact L]).
+  assert (L9 : bpow radix2 (-905) <= B zh) by (apply Rle_trans with (bpow radix2 (-100)); [apply bpow_le; lia | exact L]).
   destruct (series_chain zh zl Fh Fl L9 U) as [tk [Hs [Ftk [Btk [Etk [[Ps0 Ps1] U7]]]]]].
   pose proof (bpow_gt_0 radix2 (-100)) as P100.
   set (X := B zh) in *.
@@ -301,22 +301,22 @@ Qed.
 
 (** Below [2^-100] the cubic term is negligible: the tail is below [zh 2^-170]. *)
 Theorem atan2_series_tiny zh zl : finite zh -> finite zl ->
-  bpow radix2 (-900) <= B zh -> B zh <= bpow radix2 (-100) ->
+  bpow radix2 (-905) <= B zh -> B zh <= bpow radix2 (-100) ->
   B zh = rndF (B zh + B zl) -> Rabs (B zl) <= B zh / 2 ->
   exists h l, atan2_series zh zl = (h, l) /\ finite h /\ finite l /\ B h = rndF (B h + B l) /\
-    exists tau ea, Rabs tau <= B zh * bpow radix2 (-170) /\ Rabs ea <= / 2 ^ 104 /\
+    exists tau ea, Rabs tau <= B zh * bpow radix2 (-165) /\ Rabs ea <= / 2 ^ 104 /\
       B h + B l = (B zh + B zl + tau) * (1 + ea).
 Proof.
   intros Fh Fl L U Dw Hl.
   assert (U7 : B zh <= bpow radix2 (-7)) by (apply Rle_trans with (bpow radix2 (-100)); [exact U | apply bpow_le; lia]).
   destruct (series_chain zh zl Fh Fl L U7) as [tk [Hs [Ftk [Btk [Etk [[Ps0 Ps1] _]]]]]].
-  pose proof (bpow_gt_0 radix2 (-900)) as P900.
+  pose proof (bpow_gt_0 radix2 (-905)) as P900.
   set (X := B zh) in *.
   assert (Xp : 0 < X) by lra.
   set (u := rn (X * X)) in *.
   set (ps := ps_of u) in *.
-  assert (P1075 : bpow radix2 (-1075) <= X * bpow radix2 (-175)).
-  { apply Rle_trans with (bpow radix2 (-900) * bpow radix2 (-175)).
+  assert (P1075 : bpow radix2 (-1075) <= X * bpow radix2 (-170)).
+  { apply Rle_trans with (bpow radix2 (-905) * bpow radix2 (-170)).
     - rewrite <- bpow_plus. apply bpow_le. lia.
     - apply Rmult_le_compat_r; [apply bpow_ge_0 | exact L]. }
   assert (X2 : X * X <= bpow radix2 (-200)).
@@ -324,18 +324,18 @@ Proof.
   assert (B53 : bpow radix2 (-53) <= / 1000000) by (bpow_num; interval with (i_prec 100)).
   assert (B199 : bpow radix2 (-199) = 2 * bpow radix2 (-200)).
   { replace (-199)%Z with (-200 + 1)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 1) with 2. ring. }
-  assert (B175 : bpow radix2 (-174) = 2 * bpow radix2 (-175)).
-  { replace (-174)%Z with (-175 + 1)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 1) with 2. ring. }
-  assert (B170 : bpow radix2 (-170) = 32 * bpow radix2 (-175)).
-  { replace (-170)%Z with (-175 + 5)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 5) with 32. ring. }
-  assert (B200s : bpow radix2 (-200) <= bpow radix2 (-175) / 1000).
-  { replace (-200)%Z with (-175 + -25)%Z by reflexivity. rewrite bpow_plus.
-    assert (bpow radix2 (-25) <= / 1000) by (bpow_num; interval with (i_prec 100)). pose proof (bpow_ge_0 radix2 (-175)). nra. }
+  assert (B175 : bpow radix2 (-169) = 2 * bpow radix2 (-170)).
+  { replace (-169)%Z with (-170 + 1)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 1) with 2. ring. }
+  assert (B170 : bpow radix2 (-165) = 32 * bpow radix2 (-170)).
+  { replace (-165)%Z with (-170 + 5)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 5) with 32. ring. }
+  assert (B200s : bpow radix2 (-200) <= bpow radix2 (-170) / 1000).
+  { replace (-200)%Z with (-170 + -30)%Z by reflexivity. rewrite bpow_plus.
+    assert (bpow radix2 (-30) <= / 1000) by (bpow_num; interval with (i_prec 100)). pose proof (bpow_ge_0 radix2 (-170)). nra. }
   assert (B1075 : bpow radix2 (-1075) <= bpow radix2 (-200) / 1000).
   { replace (-1075)%Z with (-200 + -875)%Z by reflexivity. rewrite bpow_plus.
     assert (bpow radix2 (-875) <= / 1000) by (apply Rle_trans with (bpow radix2 (-20)); [apply bpow_le; lia | bpow_num; interval with (i_prec 100)]).
     pose proof (bpow_ge_0 radix2 (-200)). nra. }
-  pose proof (bpow_gt_0 radix2 (-200)) as P200. pose proof (bpow_gt_0 radix2 (-175)) as P175.
+  pose proof (bpow_gt_0 radix2 (-200)) as P200. pose proof (bpow_gt_0 radix2 (-170)) as P175.
   (* u = RN(X^2) *)
   assert (Hu : Rabs u <= bpow radix2 (-199)).
   { pose proof (rn_bound (X * X) (bpow radix2 (-200)) ltac:(rewrite Rabs_pos_eq by nra; exact X2)) as R.
@@ -345,16 +345,16 @@ Proof.
   { rewrite Rabs_mult, (Rabs_pos_eq X) by lra. nra. }
   pose proof (rn_bound (X * u) (X * bpow radix2 (-199)) Hxu) as Ha3.
   set (a3 := rn (X * u)) in *.
-  assert (E1 : X * bpow radix2 (-199) <= X * bpow radix2 (-175) / 400).
+  assert (E1 : X * bpow radix2 (-199) <= X * bpow radix2 (-170) / 400).
   { pose proof (Rmult_le_compat_l X _ _ (Rlt_le _ _ Xp) B200s) as F1. rewrite B199. nra. }
-  assert (Ha3' : Rabs a3 <= X * bpow radix2 (-174)).
+  assert (Ha3' : Rabs a3 <= X * bpow radix2 (-169)).
   { apply Rle_trans with (1 := Ha3). rewrite B175. nra. }
   (* tail = RN(a3 ps) *)
   assert (Hps : Rabs ps <= / 2) by (rewrite Rabs_pos_eq by lra; exact Ps1).
-  assert (Hap : Rabs (a3 * ps) <= X * bpow radix2 (-175)).
+  assert (Hap : Rabs (a3 * ps) <= X * bpow radix2 (-170)).
   { rewrite Rabs_mult. pose proof (Rabs_pos a3). pose proof (Rabs_pos ps). nra. }
-  pose proof (rn_bound (a3 * ps) (X * bpow radix2 (-175)) Hap) as Htl.
-  assert (Htau : Rabs (B tk) <= X * bpow radix2 (-170)).
+  pose proof (rn_bound (a3 * ps) (X * bpow radix2 (-170)) Hap) as Htl.
+  assert (Htau : Rabs (B tk) <= X * bpow radix2 (-165)).
   { rewrite Etk. rewrite Rabs_Ropp. apply Rle_trans with (1 := Htl). rewrite B170. nra. }
   assert (Htk : Rabs (B tk) <= bpow radix2 1018).
   { apply Rle_trans with (bpow radix2 (-22)); [ | apply bpow_le; lia]. rewrite Rabs_pos_eq in * by lra. exact Btk. }
@@ -370,7 +370,7 @@ Proof.
   set (Xs := X + B zl + B tk) in *.
   assert (Hxs : 0 < Xs).
   { unfold Xs. apply Rabs_le_inv in Hl. apply Rabs_le_inv in Htau.
-    assert (bpow radix2 (-170) <= / 4) by (apply Rle_trans with (bpow radix2 (-100)); [apply bpow_le; lia | bpow_num; interval with (i_prec 60)]).
+    assert (bpow radix2 (-165) <= / 4) by (apply Rle_trans with (bpow radix2 (-100)); [apply bpow_le; lia | bpow_num; interval with (i_prec 60)]).
     nra. }
   exists (B tk), ((B h + B l - Xs) / Xs). split; [exact Htau | split].
   - apply Rle_trans with (1 := Bd). replace (- prec)%Z with (-53)%Z by (unfold prec; reflexivity). rewrite bp53.

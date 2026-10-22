@@ -12,16 +12,16 @@ Require Import Ln1pLemmas AsinTables AsinKernel AsinSqrtStep AsinSeriesSmall Asi
 Open Scope R_scope.
 
 (** [|zl| <= 2^-52 zh] for a double-word whose high part is the rounded sum. *)
-Lemma low_part_small_a zh zl : bpow radix2 (-900) <= B zh -> B zh = rndF (B zh + B zl) ->
+Lemma low_part_small_a zh zl : bpow radix2 (-905) <= B zh -> B zh = rndF (B zh + B zl) ->
   Rabs (B zl) <= B zh / 2 -> Rabs (B zl) <= / 4503599627370496 * B zh.
 Proof.
   intros L Dw Hl.
   set (z := B zh) in *. set (d := B zl) in *.
-  assert (Q1 : bpow radix2 (-1022) <= bpow radix2 (-901)) by (apply bpow_le; lia).
-  assert (Q2 : bpow radix2 (-901) = bpow radix2 (-900) / 2).
-  { replace (-901)%Z with (-900 + -1)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 (-1)) with (/ 2). field. }
+  assert (Q1 : bpow radix2 (-1022) <= bpow radix2 (-906)) by (apply bpow_le; lia).
+  assert (Q2 : bpow radix2 (-906) = bpow radix2 (-905) / 2).
+  { replace (-906)%Z with (-905 + -1)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 (-1)) with (/ 2). field. }
   assert (Hn : bpow radix2 (-1022) <= Rabs (z + d)).
-  { apply Rle_trans with (bpow radix2 (-901)); [exact Q1 | ].
+  { apply Rle_trans with (bpow radix2 (-906)); [exact Q1 | ].
     apply Rabs_le_inv in Hl. rewrite Q2.
     apply Rle_trans with (z + d); [ | apply Rle_abs]. lra. }
   pose proof (rnd_rel (z + d) Hn) as R.
@@ -35,7 +35,7 @@ Qed.
 
 (** The series branch: [z = zh + zl] with [zh] in [[2^-900, 2^-7]]. *)
 Theorem fast_series_a zh zl : finite zh -> finite zl ->
-  bpow radix2 (-900) <= B zh -> B zh <= bpow radix2 (-7) ->
+  bpow radix2 (-905) <= B zh -> B zh <= bpow radix2 (-7) ->
   B zh = rndF (B zh + B zl) -> Rabs (B zl) <= B zh / 2 ->
   exists h l, atan2_series zh zl = (h, l) /\ finite h /\ finite l /\ B h = rndF (B h + B l) /\
     Rabs (B h + B l - atan (B zh + B zl)) <= bpow radix2 (-64) * atan (B zh + B zl).
@@ -43,7 +43,7 @@ Proof.
   intros Fh Fl L U Dw Hl.
   pose proof (low_part_small_a zh zl L Dw Hl) as Hd.
   pose proof U as U7.
-  pose proof (bpow_gt_0 radix2 (-900)) as P900.
+  pose proof (bpow_gt_0 radix2 (-905)) as P900.
   set (z := B zh) in *. set (d := B zl) in *.
   assert (Hz0 : 0 < z) by lra.
   bpow_num_in U.
@@ -104,7 +104,7 @@ Proof.
     destruct (atan2_series_tiny zh zl Fh Fl L Sm Dw Hl) as [h [l [Hs [Fh' [Fl' [Nrm [tau [ea [Htau [Hea Eq]]]]]]]]]].
     exists h, l. split; [exact Hs | split; [exact Fh' | split; [exact Fl' | split; [exact Nrm | ]]]].
     assert (B100 : bpow radix2 (-100) <= / 1000000000000000000000000000000) by (bpow_num; interval with (i_prec 100)).
-    assert (B170 : bpow radix2 (-170) <= / 1000000000000000000000000000000000000000000000000) by (bpow_num; interval with (i_prec 120)).
+    assert (B170 : bpow radix2 (-165) <= / 1000000000000000000000000000000000000000000000000) by (bpow_num; interval with (i_prec 120)).
     assert (B199 : bpow radix2 (-199) <= / 1000000000000000000000000000000000000000000000000) by (bpow_num; interval with (i_prec 120)).
     assert (Hzz : z * z <= bpow radix2 (-199)).
     { replace (-199)%Z with (-100 + -99)%Z by reflexivity. rewrite bpow_plus.
@@ -119,14 +119,14 @@ Proof.
           pose proof (bpow_ge_0 radix2 (-199)). assert ((z + d) * (z + d) <= 1.0001 * (z * z)) by nra. nra. }
         nra.
       - pose proof (bpow_ge_0 radix2 (-198)). nra. }
-    assert (Hb : Rabs tau <= z * bpow radix2 (-170)) by exact Htau.
+    assert (Hb : Rabs tau <= z * bpow radix2 (-165)) by exact Htau.
     assert (HE104 : / 2 ^ 104 <= / 1000000000000000000000000000000) by (interval with (i_prec 120)).
-    assert (Hnum : (z * bpow radix2 (-198) + z * bpow radix2 (-170)) * (1 + / 2 ^ 104) + / 2 ^ 104 * (0.99 * z)
+    assert (Hnum : (z * bpow radix2 (-198) + z * bpow radix2 (-165)) * (1 + / 2 ^ 104) + / 2 ^ 104 * (0.99 * z)
                    <= bpow radix2 (-64) * (0.99 * z)).
-    { bpow_num. assert (bpow radix2 (-198) <= bpow radix2 (-170)) by (apply bpow_le; lia). 
+    { bpow_num. assert (bpow radix2 (-198) <= bpow radix2 (-165)) by (apply bpow_le; lia). 
       assert (bpow radix2 (-64) >= / 100000000000000000000) by (bpow_num; interval with (i_prec 100)).
       bpow_num_in H. nra. }
-    pose proof (fast_compose (atan (z + d)) (z + d) tau ea (z * bpow radix2 (-198)) (z * bpow radix2 (-170)) (/ 2 ^ 104)
+    pose proof (fast_compose (atan (z + d)) (z + d) tau ea (z * bpow radix2 (-198)) (z * bpow radix2 (-165)) (/ 2 ^ 104)
       (0.99 * z) (bpow radix2 (-64)) HE Hb Hea HAm ltac:(lra) ltac:(apply Rlt_le; apply Rinv_0_lt_compat; apply pow_lt; lra) Hnum) as FC.
     rewrite Eq. exact FC.
 Qed.
@@ -134,13 +134,13 @@ Qed.
 (** A double-word whose high word is [zh] in [[2^-900, 1]]: the series below
     [2^-7], the table above, within [2^-63] of [atan]. *)
 Theorem fast_dw_a zh zl : finite zh -> finite zl ->
-  bpow radix2 (-900) <= B zh -> B zh <= 1 -> B zh = rndF (B zh + B zl) ->
+  bpow radix2 (-905) <= B zh -> B zh <= 1 -> B zh = rndF (B zh + B zl) ->
   Rabs (B zl) <= bpow radix2 (-53) * B zh -> on_grid (-211) (B zl) ->
   exists h l, atan2_series zh zl = (h, l) /\ finite h /\ finite l /\ B h = rndF (B h + B l) /\
     Rabs (B h + B l - atan (B zh + B zl)) <= bpow radix2 (-63) * atan (B zh + B zl).
 Proof.
   intros Fh Fl L U Dw Hl Hg.
-  pose proof (bpow_gt_0 radix2 (-900)) as P900.
+  pose proof (bpow_gt_0 radix2 (-905)) as P900.
   assert (P53 : bpow radix2 (-53) <= / 2) by (bpow_num; interval with (i_prec 60)).
   assert (Hlh : Rabs (B zl) <= B zh / 2).
   { apply Rle_trans with (1 := Hl). nra. }
