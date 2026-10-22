@@ -213,3 +213,6 @@ Proof.
       nra. }
   lra.
 Qed.
+
+Lemma bndM_le190 : bndM <= bnd190.
+Proof. unfold bndM, bnd190. interval with (i_prec 300). Qed.
