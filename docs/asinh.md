@@ -56,7 +56,8 @@ threshold as `sin` and `asin` share, and it is where [CM]'s list begins.
 [CM]'s list is complete for the domain it covers, so no input outside it is
 closer than `2^-43` ulp to a midpoint, and the hardest listed one, ranked here
 at 400 bits over the whole list, is 62.03 bits from one
-(`0x1.fd15daa6ce332p+731`). The accurate path's `2^-216` is far inside that.
+(`0x1.fd15daa6ce332p+731`). The accurate path's `2^-216` (Gappa; the Coq proof uses `2^-124`, which
+`CoreMathH` also names) is far inside that.
 `asinh x` is transcendental for `x ≠ 0`, so it is never a midpoint.
 
 ## 3. Fast path
@@ -109,9 +110,9 @@ accurate value is rounded once by `Q256::to_f64`.
 
 - The fast bound is `2^-63` (`log.g`, `large.g`; the series `2^-66.4`).
 - When the test passes, the result is `RN(asinh x)`.
-- Otherwise the accurate value is within `2^-216` relatively, and the hardest
-  input of the domain is `2^-62` ulp from a midpoint ([CM], §2), so the result
-  is `RN(asinh x)`.
+- Otherwise the accurate value is within `2^-216` relatively (Gappa; the Coq proof carries
+  `2^-124`, all the rounding needs), and the hardest input of the domain is `2^-62` ulp from a
+  midpoint ([CM], §2), so the result is `RN(asinh x)`.
 
 So `asinh` is correctly rounded on `(0x1.7137449123ef6p−26, ∞)` given [CM]'s list
 is complete, and exactly `x` below. The Coq proof covers the transcription

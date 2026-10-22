@@ -20,9 +20,9 @@ below claims more than the named artifact does.
 | Accurate path: Newton step in `Q256` (§5) | **certified** (Gappa): relative error below `2^-124.8`, given the facts §5 lists |
 | Correct rounding on `[0x1.7137449123ef6p−26, 1)` (§6) | **proved in Coq** for the transcription (`AsinCorrect.v`: `positive_correct`), given `CoreMath`, the published worst-case search; the Rust is tied to the transcription by the corpus (next row) |
 | Coq transcription of the Rust (`formal/asin/AsinKernel.v`) compared with it bit for bit (§7) | **done**: reduction, series, fast path, rounding decision, accurate path (before rounding) and entry, 19,532 corpus cases |
-| Proof that the transcription's series branch evaluates as `series_tail.g` models (`AsinSeriesSmall.v`: `series_small_eval`) | **proved in Coq**: `B h + B l = (zh + zl + Tx (1 + ec))(1 + ea)`, `Tx = zh³ P(zh²)` exact, `|ec| ≤ 2^-51`, `|ea| ≤ 2^-104`; the step to `asin z` (Sollya's bound on `P`, the series of `asin`) is `series_compose.g`'s hypotheses, stated not proved |
+| Proof that the transcription's series branch evaluates as `series_tail.g` models (`AsinSeriesSmall.v`: `series_small_eval`) | **proved in Coq**: `B h + B l = (zh + zl + Tx (1 + ec))(1 + ea)`, `Tx = zh³ P(zh²)` exact, `|ec| ≤ 2^-51`, `|ea| ≤ 2^-104`; the step to `asin z` is proved too, in `AsinPath.v` (`fast_direct`, below) |
 | Proof that the transcription's complement reduction meets `sqrt.g` (`AsinSqrtStep.v`: `reduced_complement`) | **proved in Coq**, applying the generated certificate theorem |
-| Proof that the transcription's table-segment branch evaluates as `eval_<kk>.g` models (`AsinSegment.v`: `series_segment`; `AsinSegments.v`: `segok_all`) | **proved in Coq**, for every `k = 1..45`: `B h + B l = (c0 + c1 + (c_hi + c_lo) t + t² G(t) + e1)(1 + ea)`, `t = (zh − k/64) + zl` exact, `G` the segment's polynomial at the table's own coefficients, `\|e1\| ≤ 2^-63` (each segment's generated bound), `\|ea\| ≤ 3u²/(1 − 4u)`, `u = 2^-53`; the step to `asin(a + t)` (Sollya's bound on `G`, the double-word accuracy of `asin a` and `c1`) is `compose_<kk>.g`'s hypotheses, stated not proved |
+| Proof that the transcription's table-segment branch evaluates as `eval_<kk>.g` models (`AsinSegment.v`: `series_segment`; `AsinSegments.v`: `segok_all`) | **proved in Coq**, for every `k = 1..45`: `B h + B l = (c0 + c1 + (c_hi + c_lo) t + t² G(t) + e1)(1 + ea)`, `t = (zh − k/64) + zl` exact, `G` the segment's polynomial at the table's own coefficients, `\|e1\| ≤ 2^-63` (each segment's generated bound), `\|ea\| ≤ 3u²/(1 − 4u)`, `u = 2^-53`; the step to `asin(a + t)` is proved too, in `AsinPath.v` (`fast_direct`, below), from `AsinApprox.v`'s bounds on `G` |
 | Proofs that the rest of the transcription meets §4 and §5's bounds | **proved in Coq**: the fast path (`AsinPath.v`: `fast_direct`, relative error ≤ `2^-63`; `fast_complement`, ≤ `2^-62`, both with the leading word normalized), the rounding decision (`AsinCorrect.v`: `decide_some`), and the accurate path (`AsinAccurate.v`: `accurate_direct`, `accurate_complement`, relative error ≤ `2^-124`, with the `Q256` sine and cosine series within `2^-196` and the reciprocal within `2^-252`) |
 | Entry point over every binary64 input (`AsinEntry.v`) | **proved in Coq**: `asin_entry_finite` (`\|x\| ≤ 1`: `RN(asin x)`, sign through the encoding, `±RN(π/2)` at `±1`, `x` below the threshold, `AsinSmall.v`), `asin_entry_nan`, `asin_entry_inf`, `asin_entry_large` (`\|x\| > 1`: NaN) |
 | The Taylor remainders, the argument ranges, `sin t/t` (§5) | **proved in Coq** (`formal/asin/AsinFacts.v`) |
@@ -173,8 +173,9 @@ from the standard library's alternating Taylor bounds (`sin_bound`, `cos_bound`)
   (a start error is at most `2^-62·π/4 = 1.7·10⁻¹⁹`);
 - `y_lower` (`Y ≥ 2^-26`), `d_lower` (`D ≥ 2^-27` for `x ≤ 1 − 2^-53`), `sin_ratio`
   (`sin t ≥ 0.89 t` on `(0, π/4]`) and `quarter_pi_ranges` (`cos y₀ ≥ 0.7071`, `sin y₀ ≤ 0.70711`).
-They are stated as the certificates' hypotheses; the formal lane does not machine-link a certificate
-to the lemma it assumes (the proofs about the Rust's transcription, which would, are not written).
+The Gappa certificates take them as hypotheses; the proofs about the transcription (`AsinAccurate.v`)
+use these lemmas directly (`taylor_sin`, `taylor_cos`, `sin_ratio`, `quarter_pi_ranges`), so for the
+transcription the link is machine-checked.
 
 The accurate path's facts are proved in Coq rather than assumed: the `Q256` sine and cosine series
 (`AsinQSeries.v`, `AsinSinCos.v`), the three-step reciprocal (`AsinRecip.v`) and the Newton step's

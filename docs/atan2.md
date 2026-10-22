@@ -58,7 +58,7 @@ and every bound is a Gappa certificate in `formal/atan2`.
 
 [CM]'s hardest listed pair is 101.7 bits from a midpoint, ranked here at 500
 bits (`generators/atan2_reference.py` takes the hardest 40); the accurate path's
-`2^-190` is far inside it. The list is restricted, so it does not bound the
+`2^-190.6` (Gappa; `2^-190.29` in the Coq proof, which `Stable190` names as `2^-190`) is far inside it. The list is restricted, so it does not bound the
 distance of every pair from a midpoint (§6).
 
 ## 3. Reduction and fast path
