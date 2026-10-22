@@ -144,6 +144,40 @@ result is rounded once.
   claimed there**. Every pair of [CM]'s list is correctly rounded by the bound (the
   hardest is `2^-101.7` ulp from a midpoint, §2).
 
+### Heuristic estimate beyond the guaranteed claim (NOT a proof)
+
+What is guaranteed is stated above: the result is within `(1/2 + 2^-137)` ulp of `atan2(y, x)`
+always, and correctly rounded wherever the test decides and on every pair of [CM]'s list. Beyond
+that, correct rounding is supported **heuristically only**, as follows (`generators/atan2_hardness.py`
+prints the figures).
+
+- **Assumption (the part that is not proved).** The bits of `atan2(y, x)` past the 54th behave as
+  equidistributed for the pairs that matter. Nothing here proves it; [CM]'s list is a restricted
+  set, not a search of the domain.
+- **Which pairs can matter.** The angle depends on `t = min/max ∈ (0, 1]` and the form (four
+  forms; a sign of `y` only negates it; the absolute scale of the pair does not change the angle).
+  With `e` the difference of the two exponents there are at most `2^104` significand pairs (52
+  fraction bits each, ratios not deduplicated) per `e`. Deep ratios cannot be hard: `t` is at
+  least `2^-107` relatively from every midpoint (§3's argument, not machine-checked) and
+  `atan t` is within a relative `t²/3` of `t`, so for the form `φ` nothing lies within the window
+  once `t < 2^-52.7`; for `π/2 ∓ φ` and `π ∓ φ` the constants sit 0.28 ulp from their roundings,
+  so `φ` must reach about `2^-54.2` (`2^-53.2` for `π`) before a midpoint is within range. The
+  deepest exponent differences that can matter are therefore 52 (`φ`), 54 (`π/2 − φ`,
+  `π/2 + φ`) and 53 (`π − φ`), which gives at most `2^104 · (53 + 55 + 54 + 55) ≈ 2^111.76`
+  effective pairs.
+- **Per-pair probability.** The accurate bound is `δ = 2^-190.61`. A value equidistributed past
+  the 54th bit has a midpoint inside the two-sided window `±δ|Z|` with probability
+  `2δ|Z|/ulp(Z)`; with `|Z|/ulp(Z)` log-uniform in a binade (mean `2^52/ln 2`) that is `2^-137.08`.
+- **Estimate.** `2^111.76 · 2^-137.08 ≈ 2^-25.3` (about `2.4·10^-8`) expected pairs whose accurate
+  value could round the wrong way. This is an upper-bound style estimate of the chance that any
+  pair is affected, not a count of known counterexamples, and it is only as good as the
+  equidistribution assumption.
+
+**The claim stays as stated.** `atan2` returns a value within `(1/2 + 2^-137)` ulp of the exact
+angle for every finite pair; it is correctly rounded where the rounding test decides and on
+[CM]'s list (proved for the transcription, §7 and the Coq files); beyond those, correct rounding
+is supported heuristically only, by the estimate above.
+
 ## 7. Certificates, generators and tests
 
 | Artifact | Establishes |
