@@ -1,0 +1,12 @@
+   Compiling morphiq-numerics-reference v0.0.10 (/home/stephen/Development/MorphIQ-Labs/core/worktrees/numerics-tridiagonal-reciprocal/crates/reference)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.70s
+     Running unittests src/bin/bench-tridiagonal-reciprocal.rs (target/fma/debug/deps/bench_tridiagonal_reciprocal-0a7bd03d99ae5206)
+
+running 4 tests
+test reciprocal::tests::reciprocal_range_fallback_and_argument_contract ... ok
+test reciprocal::tests::reciprocal_rounding_can_overflow_where_division_succeeds ... ok
+test reciprocal::tests::distinct_batched_integer_solutions_are_exact ... ok
+test reciprocal::tests::independently_certified_fixture_candidates_and_batch_bits ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+

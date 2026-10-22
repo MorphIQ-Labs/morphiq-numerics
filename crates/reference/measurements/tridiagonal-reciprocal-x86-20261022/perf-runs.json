@@ -1,0 +1,30 @@
+[
+  {
+    "method": "division",
+    "rhs": 1,
+    "returncode": 0,
+    "stdout": "3719103627\n",
+    "stderr": ""
+  },
+  {
+    "method": "reciprocal",
+    "rhs": 1,
+    "returncode": 0,
+    "stdout": "3115855670\n",
+    "stderr": ""
+  },
+  {
+    "method": "division",
+    "rhs": 8,
+    "returncode": 0,
+    "stdout": "5969383255\n",
+    "stderr": ""
+  },
+  {
+    "method": "reciprocal",
+    "rhs": 8,
+    "returncode": 0,
+    "stdout": "3684321312\n",
+    "stderr": ""
+  }
+]

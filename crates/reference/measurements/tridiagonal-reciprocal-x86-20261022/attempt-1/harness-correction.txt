@@ -1,0 +1,1 @@
+The rhs=1 division_group cells used the batched wrapper, contrary to the frozen scalar baseline. Those 12 cells are excluded. Attempt 2 corrects the baseline call and repeats the same matrix/protocol. All original samples are retained.

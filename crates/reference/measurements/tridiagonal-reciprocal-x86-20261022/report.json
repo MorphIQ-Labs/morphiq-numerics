@@ -1,0 +1,426 @@
+{
+  "implementation_commit": "11c26673fdabcd40565077817c7f795d02b92774",
+  "base_commit": "83c7b06808baef7a44ef5c1bb8b8eed8de6fe6d2",
+  "scope": "unpublished reference prototype; public solver API and PR #220 unchanged",
+  "native_architecture": "x86-64; ARM remains pending",
+  "stable_timing_cells": 165,
+  "total_timing_cells": 165,
+  "comparisons": {
+    "copy_control:division": {
+      "cells": 36,
+      "stable": 36,
+      "ratio_interval_below_one": 36,
+      "ratio_interval_above_one": 0
+    },
+    "reciprocal:division": {
+      "cells": 36,
+      "stable": 36,
+      "ratio_interval_below_one": 33,
+      "ratio_interval_above_one": 3
+    },
+    "reciprocal:lapack_solve": {
+      "cells": 9,
+      "stable": 9,
+      "ratio_interval_below_one": 9,
+      "ratio_interval_above_one": 0
+    },
+    "reciprocal_certified:division_certified": {
+      "cells": 36,
+      "stable": 36,
+      "ratio_interval_below_one": 24,
+      "ratio_interval_above_one": 4
+    },
+    "reciprocal_group:division_group": {
+      "cells": 36,
+      "stable": 36,
+      "ratio_interval_below_one": 18,
+      "ratio_interval_above_one": 17
+    },
+    "reciprocal_setup:division_setup": {
+      "cells": 12,
+      "stable": 12,
+      "ratio_interval_below_one": 0,
+      "ratio_interval_above_one": 10
+    }
+  },
+  "numerical_systems": 73,
+  "components": 853,
+  "changed_systems": 30,
+  "changed_components": 127,
+  "exact_max_error_comparison": {
+    "equal": 56,
+    "smaller": 1,
+    "larger": 16
+  },
+  "fallback_pivots": 88,
+  "recommendation": "Continue only as an opt-in repeated-factor solve candidate; do not replace the default solver or publish fast::linalg from this experiment.",
+  "limitations": [
+    "Rounded reciprocals change output bits and can overflow where division succeeds (explicit regression witness).",
+    "Existing certificate covers finite candidates; no uniform forward-error budget or downstream consumer acceptance is established.",
+    "One-row solve regressions and setup-plus-one-RHS losses preclude a universal speedup.",
+    "Certified workloads have much smaller gains than solve-only workloads.",
+    "Native ARM and end-to-end consumer qualification remain open.",
+    "LAPACK comparisons include RHS copying and a Fortran interface; different-contract diagnostics only.",
+    "Attempt 1 retains 12 excluded one-RHS group cells with the wrong baseline wrapper; corrected attempt 2 is the reported matrix.",
+    "All per-cell intervals assume independent rounds; shared-host temporal correlation limits interpretation.",
+    "The benchmark retains the original matrix/factors for certification; a production reciprocal-factor representation and ownership API remain to be designed."
+  ],
+  "artifact_notes": [
+    "The saved LAPACK executable hash is in each attempt metadata. The reproduction record has a different executable hash because the C assert __FILE__ path differed; pinned source checksums and compiler flags are retained.",
+    "Perf counters are separately instrumented diagnostic runs, not the uninstrumented ABBA timing evidence."
+  ],
+  "representative_401_ordinary": [
+    {
+      "kind": "ordinary",
+      "n": 401,
+      "rhs": 1,
+      "pair": "reciprocal_setup:division_setup",
+      "methods": {
+        "reciprocal_setup": {
+          "median_ns": 3565.3864942528735,
+          "q1_ns": 3565.229346264368,
+          "q3_ns": 3565.6559806034484,
+          "relative_iqr": 0.00011966005362060087,
+          "last_first_drift": 0.00013898075773854934
+        },
+        "division_setup": {
+          "median_ns": 2706.621002710027,
+          "q1_ns": 2706.365311653117,
+          "q3_ns": 2707.344647696477,
+          "relative_iqr": 0.00036182976574092464,
+          "last_first_drift": 0.00025648877036776874
+        }
+      },
+      "ratio_median": 1.3172558330908675,
+      "ratio_interval": [
+        1.3169749361470513,
+        1.3174542780967715
+      ],
+      "interval_coverage": 0.9733963012695312,
+      "unstable": false,
+      "control_unstable": false,
+      "qualified_cell": true,
+      "gain_interval_below_one": false
+    },
+    {
+      "kind": "ordinary",
+      "n": 401,
+      "rhs": 1,
+      "pair": "reciprocal:division",
+      "methods": {
+        "reciprocal": {
+          "median_ns": 2962.7725925925924,
+          "q1_ns": 2962.2743703703704,
+          "q3_ns": 2963.509111111111,
+          "relative_iqr": 0.0004167517763015673,
+          "last_first_drift": -0.00013375573143326047
+        },
+        "division": {
+          "median_ns": 3480.597756410257,
+          "q1_ns": 3480.372774216524,
+          "q3_ns": 3480.8252314814818,
+          "relative_iqr": 0.00012999412647573568,
+          "last_first_drift": 7.802160139314118e-05
+        }
+      },
+      "ratio_median": 0.8512582544433895,
+      "ratio_interval": [
+        0.8511472511659369,
+        0.8513722021913491
+      ],
+      "interval_coverage": 0.9733963012695312,
+      "unstable": false,
+      "control_unstable": false,
+      "qualified_cell": true,
+      "gain_interval_below_one": true
+    },
+    {
+      "kind": "ordinary",
+      "n": 401,
+      "rhs": 1,
+      "pair": "reciprocal_group:division_group",
+      "methods": {
+        "reciprocal_group": {
+          "median_ns": 6514.642578125,
+          "q1_ns": 6513.733235677083,
+          "q3_ns": 6515.355143229167,
+          "relative_iqr": 0.00024896339785854314,
+          "last_first_drift": 0.00013663268107810822
+        },
+        "division_group": {
+          "median_ns": 6187.7743557511,
+          "q1_ns": 6187.264142049025,
+          "q3_ns": 6188.875549968572,
+          "relative_iqr": 0.00026041801573599297,
+          "last_first_drift": 5.571797177861271e-05
+        }
+      },
+      "ratio_median": 1.0527120510556842,
+      "ratio_interval": [
+        1.052679716959198,
+        1.052920112979215
+      ],
+      "interval_coverage": 0.9733963012695312,
+      "unstable": false,
+      "control_unstable": false,
+      "qualified_cell": true,
+      "gain_interval_below_one": false
+    },
+    {
+      "kind": "ordinary",
+      "n": 401,
+      "rhs": 1,
+      "pair": "reciprocal_certified:division_certified",
+      "methods": {
+        "reciprocal_certified": {
+          "median_ns": 12761.5050955414,
+          "q1_ns": 12709.397133757962,
+          "q3_ns": 12822.633121019107,
+          "relative_iqr": 0.008873247035783209,
+          "last_first_drift": 0.004379916760289371
+        },
+        "division_certified": {
+          "median_ns": 13305.851604278076,
+          "q1_ns": 13299.00601604278,
+          "q3_ns": 13322.082219251337,
+          "relative_iqr": 0.0017342898368968235,
+          "last_first_drift": 4.103391400245293e-05
+        }
+      },
+      "ratio_median": 0.9591156436545792,
+      "ratio_interval": [
+        0.95537880952737,
+        0.9645419947426609
+      ],
+      "interval_coverage": 0.9733963012695312,
+      "unstable": false,
+      "control_unstable": false,
+      "qualified_cell": true,
+      "gain_interval_below_one": true
+    },
+    {
+      "kind": "ordinary",
+      "n": 401,
+      "rhs": 8,
+      "pair": "reciprocal:division",
+      "methods": {
+        "reciprocal": {
+          "median_ns": 3713.4013328396886,
+          "q1_ns": 3711.7624028137725,
+          "q3_ns": 3715.9867641614214,
+          "relative_iqr": 0.0011375989205073373,
+          "last_first_drift": -0.00032388218404255653
+        },
+        "division": {
+          "median_ns": 6014.5610373181535,
+          "q1_ns": 6010.419512966477,
+          "q3_ns": 6024.283048703352,
+          "relative_iqr": 0.002304995435386999,
+          "last_first_drift": 0.0016128834608470921
+        }
+      },
+      "ratio_median": 0.617720964558068,
+      "ratio_interval": [
+        0.6160755673171768,
+        0.618039281876876
+      ],
+      "interval_coverage": 0.9733963012695312,
+      "unstable": false,
+      "control_unstable": false,
+      "qualified_cell": true,
+      "gain_interval_below_one": true
+    },
+    {
+      "kind": "ordinary",
+      "n": 401,
+      "rhs": 8,
+      "pair": "reciprocal_group:division_group",
+      "methods": {
+        "reciprocal_group": {
+          "median_ns": 7977.523505976096,
+          "q1_ns": 7975.74561752988,
+          "q3_ns": 7981.461553784861,
+          "relative_iqr": 0.0007165050971895082,
+          "last_first_drift": -0.00032951010401116587
+        },
+        "division_group": {
+          "median_ns": 9274.535185185185,
+          "q1_ns": 9264.050694444444,
+          "q3_ns": 9291.584027777777,
+          "relative_iqr": 0.002968702235052558,
+          "last_first_drift": 0.0013471292574187554
+        }
+      },
+      "ratio_median": 0.8604062582188189,
+      "ratio_interval": [
+        0.8588952811335278,
+        0.8608715990195088
+      ],
+      "interval_coverage": 0.9733963012695312,
+      "unstable": false,
+      "control_unstable": false,
+      "qualified_cell": true,
+      "gain_interval_below_one": true
+    },
+    {
+      "kind": "ordinary",
+      "n": 401,
+      "rhs": 8,
+      "pair": "reciprocal_certified:division_certified",
+      "methods": {
+        "reciprocal_certified": {
+          "median_ns": 97611.26767676767,
+          "q1_ns": 97530.5782828283,
+          "q3_ns": 97733.62878787878,
+          "relative_iqr": 0.002080195349197528,
+          "last_first_drift": -0.0005274995419627393
+        },
+        "division_certified": {
+          "median_ns": 99901.08673469388,
+          "q1_ns": 99810.99489795919,
+          "q3_ns": 100049.30867346938,
+          "relative_iqr": 0.002385497328403239,
+          "last_first_drift": -0.0011212294373652565
+        }
+      },
+      "ratio_median": 0.9764115510022819,
+      "ratio_interval": [
+        0.9720339372702188,
+        0.9791493125880205
+      ],
+      "interval_coverage": 0.9733963012695312,
+      "unstable": false,
+      "control_unstable": false,
+      "qualified_cell": true,
+      "gain_interval_below_one": true
+    },
+    {
+      "kind": "ordinary",
+      "n": 401,
+      "rhs": 64,
+      "pair": "reciprocal:division",
+      "methods": {
+        "reciprocal": {
+          "median_ns": 29792.253943217664,
+          "q1_ns": 29735.494479495268,
+          "q3_ns": 29870.761829652998,
+          "relative_iqr": 0.004540353019799776,
+          "last_first_drift": 0.0013757809071288651
+        },
+        "division": {
+          "median_ns": 47849.517241379304,
+          "q1_ns": 47825.84975369458,
+          "q3_ns": 47883.78940886699,
+          "relative_iqr": 0.001210872303687695,
+          "last_first_drift": -0.0005710359630710649
+        }
+      },
+      "ratio_median": 0.6230788330934308,
+      "ratio_interval": [
+        0.6196483554655493,
+        0.6279399951283599
+      ],
+      "interval_coverage": 0.9733963012695312,
+      "unstable": false,
+      "control_unstable": false,
+      "qualified_cell": true,
+      "gain_interval_below_one": true
+    },
+    {
+      "kind": "ordinary",
+      "n": 401,
+      "rhs": 64,
+      "pair": "reciprocal_group:division_group",
+      "methods": {
+        "reciprocal_group": {
+          "median_ns": 34066.91218637993,
+          "q1_ns": 34019.65860215054,
+          "q3_ns": 34116.16756272402,
+          "relative_iqr": 0.0028329236311608027,
+          "last_first_drift": -0.0010612526862627814
+        },
+        "division_group": {
+          "median_ns": 51090.450520833336,
+          "q1_ns": 51064.9765625,
+          "q3_ns": 51131.860677083336,
+          "relative_iqr": 0.0013091314306586939,
+          "last_first_drift": -0.0002991763781341472
+        }
+      },
+      "ratio_median": 0.6672724967505006,
+      "ratio_interval": [
+        0.6652200992836026,
+        0.6677768203472361
+      ],
+      "interval_coverage": 0.9733963012695312,
+      "unstable": false,
+      "control_unstable": false,
+      "qualified_cell": true,
+      "gain_interval_below_one": true
+    },
+    {
+      "kind": "ordinary",
+      "n": 401,
+      "rhs": 64,
+      "pair": "reciprocal_certified:division_certified",
+      "methods": {
+        "reciprocal_certified": {
+          "median_ns": 800414.4583333333,
+          "q1_ns": 799315.2708333334,
+          "q3_ns": 801689.6041666666,
+          "relative_iqr": 0.0029663798655976585,
+          "last_first_drift": 0.0022153651437659683
+        },
+        "division_certified": {
+          "median_ns": 809176.6666666667,
+          "q1_ns": 808086.4791666666,
+          "q3_ns": 811836.4166666666,
+          "relative_iqr": 0.004634263016316997,
+          "last_first_drift": 0.0039188922116653035
+        }
+      },
+      "ratio_median": 0.9884280415024533,
+      "ratio_interval": [
+        0.9855870581339436,
+        0.9898776824541098
+      ],
+      "interval_coverage": 0.9733963012695312,
+      "unstable": false,
+      "control_unstable": false,
+      "qualified_cell": true,
+      "gain_interval_below_one": true
+    },
+    {
+      "kind": "ordinary",
+      "n": 401,
+      "rhs": 1,
+      "pair": "reciprocal:lapack_solve",
+      "methods": {
+        "reciprocal": {
+          "median_ns": 2962.3064850458986,
+          "q1_ns": 2961.749185667752,
+          "q3_ns": 2962.523911755997,
+          "relative_iqr": 0.00026152799926531904,
+          "last_first_drift": -9.236104672860623e-05
+        },
+        "lapack_solve": {
+          "median_ns": 3788.6544313427157,
+          "q1_ns": 3788.106599467478,
+          "q3_ns": 3789.5930962343095,
+          "relative_iqr": 0.0003923548039995113,
+          "last_first_drift": -5.988447466642732e-05
+        }
+      },
+      "ratio_median": 0.7818050416978557,
+      "ratio_interval": [
+        0.7817073547890616,
+        0.7819347162448411
+      ],
+      "interval_coverage": 0.9733963012695312,
+      "unstable": false,
+      "control_unstable": false,
+      "qualified_cell": true,
+      "gain_interval_below_one": true
+    }
+  ]
+}

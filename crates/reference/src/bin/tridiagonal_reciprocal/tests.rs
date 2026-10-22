@@ -93,6 +93,7 @@ fn independently_certified_fixture_candidates_and_batch_bits() {
             }
         }
         report.push(serde_json::json!({"case":case["name"],"n":n,
+            "baseline_bits":original.iter().map(|x|format!("{:016x}",x.to_bits())).collect::<Vec<_>>(),
             "candidate_bits":result.iter().map(|x|format!("{:016x}",x.to_bits())).collect::<Vec<_>>(),
             "changed_components":result.iter().zip(&original).filter(|(a,b)|a.to_bits()!=b.to_bits()).count(),
             "fallback_pivots":inv.iter().filter(|&&r|r==0.0).count(),
@@ -186,4 +187,52 @@ fn reciprocal_rounding_can_overflow_where_division_succeeds() {
         reciprocal: &inv,
     };
     assert_eq!(f.solve_many_into(1, &rhs, &mut [0.0]), Err(Error::Range));
+}
+
+// Exactly manufactured dyadic recurrence: all pivots are 4 and normalized
+// upper entries are 1/2. Integer intermediates are exactly representable.
+// This catches a missing/wrong solve even if its loose certificate is valid.
+#[test]
+fn distinct_batched_integer_solutions_are_exact() {
+    for n in [2_usize, 3, 17, 401] {
+        let off = vec![2.0; n - 1];
+        let mut diagonal = vec![5.0; n];
+        diagonal[0] = 4.0;
+        let a = DominantTridiagonal::new(&off, &diagonal, &off).unwrap();
+        let mut p = vec![0.0; n];
+        let mut u = vec![0.0; n - 1];
+        a.factor_into(&mut p, &mut u).unwrap();
+        let mut inv = vec![0.0; n];
+        prepare(&p, &mut inv);
+        let f = Factors {
+            lower: &off,
+            pivots: &p,
+            normalized_upper: &u,
+            reciprocal: &inv,
+        };
+        for count in [1, 2, 3, 4, 7, 8, 9, 17] {
+            let exact: Vec<_> = (0..n * count)
+                .map(|at| f64::from(i32::try_from((at * 7 + at / count * 3) % 23).unwrap() - 11))
+                .collect();
+            let rhs: Vec<_> = (0..n * count)
+                .map(|at| {
+                    let row = at / count;
+                    diagonal[row] * exact[at]
+                        + if row > 0 {
+                            2.0 * exact[at - count]
+                        } else {
+                            0.0
+                        }
+                        + if row + 1 < n {
+                            2.0 * exact[at + count]
+                        } else {
+                            0.0
+                        }
+                })
+                .collect();
+            let mut out = vec![0.0; n * count];
+            f.solve_many_into(count, &rhs, &mut out).unwrap();
+            assert_eq!(out, exact, "n={n} count={count}");
+        }
+    }
 }

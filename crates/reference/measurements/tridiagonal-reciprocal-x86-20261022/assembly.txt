@@ -1,0 +1,19 @@
+0000000000015ea0 <morphiq_numerics_arch::x86_64::avx512_run::<&mut bench_tridiagonal_reciprocal::reciprocal::lanes::Batch>>:
+15fde:	vdivpd (%r8){1to8},%zmm3,%zmm3
+15ff6:	vmulpd %zmm4,%zmm3,%zmm3
+16088:	vmulpd -0x10(%rdi,%r11,8){1to8},%zmm3,%zmm3
+160a0:	vsubpd %zmm3,%zmm4,%zmm3
+160cc:	vdivpd (%rdi,%r8,8){1to8},%zmm3,%zmm3
+160e6:	vmulpd %zmm4,%zmm3,%zmm3
+16172:	vmulpd (%r9,%r8,8){1to8},%zmm3,%zmm3
+16179:	vsubpd %zmm3,%zmm4,%zmm3
+
+0000000000016290 <morphiq_numerics_arch::x86_64::avx2_run::<&mut bench_tridiagonal_reciprocal::reciprocal::lanes::Batch>>:
+163bd:	vdivpd %ymm5,%ymm4,%ymm4
+163d5:	vmulpd %ymm5,%ymm4,%ymm4
+1646d:	vmulpd %ymm6,%ymm4,%ymm4
+16471:	vsubpd %ymm4,%ymm5,%ymm4
+164a1:	vdivpd %ymm5,%ymm4,%ymm4
+164c5:	vmulpd %ymm5,%ymm4,%ymm4
+16547:	vmulpd %ymm6,%ymm4,%ymm4
+1654b:	vsubpd %ymm4,%ymm5,%ymm4
