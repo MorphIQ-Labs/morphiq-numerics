@@ -134,72 +134,49 @@ Proof. rewrite (bpow_negn 60 : bpow radix2 (-60) = / 2 ^ 60). simpl. field. Qed.
 
 (** The second [two_sum] of the segment branch: [t = th + tl] is the exact
     sum of [x' = z - k/64] and [zl], [th] is within [0.0078126] and [tl] within
-    [8.7e-19]. *)
-Lemma t_split x' zl : finite x' -> finite zl -> Rabs (B x') <= / 128 ->
-  (B x' = 0 \/ bpow radix2 (-59) <= Rabs (B x')) ->
-  Rabs (B zl) <= bpow radix2 (-60) -> (B zl = 0 \/ bpow radix2 (-900) <= Rabs (B zl)) ->
+    [8.7e-19]. [x'] is a multiple of [2^-59] and [zl] of [2^-211] (a double-word
+    low part is within [2^-53] of nothing finer), so a nonzero sum is at least
+    [2^-211] and neither cancellation nor underflow reaches [th]. *)
+Lemma t_split x' zl : finite x' -> finite zl -> Rabs (B x') <= / 128 -> on_grid (-59) (B x') ->
+  Rabs (B zl) <= bpow radix2 (-53) -> on_grid (-211) (B zl) ->
   let '(th, tl) := two_sum64 x' zl in
   finite th /\ finite tl /\ B th = rndF (B x' + B zl) /\ B th + B tl = B x' + B zl /\
   Rabs (B th) <= 0.0078126 /\ Rabs (B tl) <= 8.7e-19 /\ (B th = 0 \/ bpow radix2 (-900) <= Rabs (B th)) /\
   Rabs (B tl) <= bpow radix2 (-52) * Rabs (B th).
 Proof.
-  intros Fx Fz Hx Hxn Hz Hzn.
+  intros Fx Fz Hx Gx Hz Gz.
+  assert (P53 : bpow radix2 (-53) = / 9007199254740992) by exact bp53.
   assert (Hts := two_sum_ieee x' zl Fx Fz
     ltac:(apply Rle_trans with 1; [apply Rle_trans with (/ 128); [exact Hx | lra] | change 1 with (bpow radix2 0); apply bpow_le; lia])
-    ltac:(apply Rle_trans with (bpow radix2 (-60)); [exact Hz | apply bpow_le; lia])).
+    ltac:(apply Rle_trans with (bpow radix2 (-53)); [exact Hz | apply bpow_le; lia])).
   destruct (two_sum64 x' zl) as [th tl] eqn:E. cbv beta iota in Hts. destruct Hts as [Fth [Ftl [Eth Esum]]].
   refine (conj Fth (conj Ftl (conj Eth (conj Esum _)))).
-  assert (P53 : bpow radix2 (-53) = / 9007199254740992) by exact bp53.
-  assert (P60 : bpow radix2 (-60) = / 1152921504606846976) by exact bm60.
-  assert (P59 : bpow radix2 (-59) = / 576460752303423488) by exact bm59.
-  assert (Pg : bpow radix2 (-1022) <= bpow radix2 (-900)) by (apply bpow_le; lia).
-  assert (Hbig : bpow radix2 (-59) <= Rabs (B x') -> bpow radix2 (-60) <= Rabs (B x' + B zl)).
-  { intros X1. rewrite P60. rewrite P59 in X1. rewrite P60 in Hz.
-    apply Rabs_le_inv in Hz. destruct (Rle_dec 0 (B x')) as [Pp | Pn].
-    + rewrite Rabs_pos_eq in X1 by exact Pp. apply Rle_trans with (B x' + B zl); [lra | apply Rle_abs].
-    + rewrite Rabs_left in X1 by lra. rewrite <- Rabs_Ropp. apply Rle_trans with (- (B x' + B zl)); [lra | apply Rle_abs]. }
+  assert (Gs : on_grid (-211) (B x' + B zl)) by (apply grid_plus; [apply (grid_le (-59)); [lia | exact Gx] | exact Gz]).
   destruct (Req_dec (B x' + B zl) 0) as [Z0 | NZ].
-  - (* x = 0 *)
-    assert (T0 : B th = 0) by (rewrite Eth, Z0; apply round_0; exact _).
+  - assert (T0 : B th = 0) by (rewrite Eth, Z0; apply round_0; exact _).
     assert (L0 : B tl = 0) by lra.
     rewrite T0, L0. rewrite Rabs_R0. split; [lra | split; [lra | split; [left; reflexivity | lra]]].
-  - assert (Hx1 : bpow radix2 (-1022) <= Rabs (B x' + B zl)).
-    { destruct Hxn as [X0 | X1].
-      - rewrite X0, Rplus_0_l in NZ |- *.
-        destruct Hzn as [Z0 | Z1]; [contradiction | ]. apply Rle_trans with (bpow radix2 (-900)); assumption.
-      - apply Rle_trans with (bpow radix2 (-60)); [apply bpow_le; lia | exact (Hbig X1)]. }
-    pose proof (rnd_rel _ Hx1) as R. change (RNE (B x' + B zl)) with (rndF (B x' + B zl)) in R.
+  - assert (Hx1 : bpow radix2 (-211) <= Rabs (B x' + B zl)) by exact (grid_nonzero _ _ Gs NZ).
+    assert (Hx2 : bpow radix2 (-1022) <= Rabs (B x' + B zl)) by (apply Rle_trans with (bpow radix2 (-211)); [apply bpow_le; lia | exact Hx1]).
+    pose proof (rnd_rel _ Hx2) as R. change (RNE (B x' + B zl)) with (rndF (B x' + B zl)) in R.
     rewrite <- Eth in R.
     assert (Etl : B tl = (B x' + B zl) - B th) by lra.
     rewrite P53 in R.
-    assert (Hxa : Rabs (B x' + B zl) <= / 128 + / 1152921504606846976).
-    { apply Rle_trans with (Rabs (B x') + Rabs (B zl)); [apply Rabs_triang | rewrite P60 in Hz; lra]. }
+    assert (Hxa : Rabs (B x' + B zl) <= / 128 + / 9007199254740992).
+    { apply Rle_trans with (Rabs (B x') + Rabs (B zl)); [apply Rabs_triang | rewrite P53 in Hz; lra]. }
     assert (Htl : Rabs (B tl) <= 8.7e-19).
-    { rewrite Etl. rewrite Rabs_minus_sym. 
+    { rewrite Etl. rewrite Rabs_minus_sym.
       apply Rle_trans with (/ 9007199254740992 * Rabs (B x' + B zl)); [exact R | ].
-      apply Rle_trans with (/ 9007199254740992 * (/ 128 + / 1152921504606846976)).
+      apply Rle_trans with (/ 9007199254740992 * (/ 128 + / 9007199254740992)).
       - apply Rmult_le_compat_l; [lra | exact Hxa].
       - lra. }
     split; [ | split; [exact Htl | split; [ | ]]].
     + assert (Hth : B th = (B x' + B zl) - B tl) by lra.
       apply Rabs_le. apply Rabs_le_inv in Htl. apply Rabs_le_inv in Hxa. lra.
-    + right. destruct Hxn as [X0 | X1].
-      * rewrite X0, Rplus_0_l in Eth. rewrite Eth. rewrite round_generic by (try exact _; apply B_fmt).
-        destruct Hzn as [Z0 | Z1]; [rewrite X0, Rplus_0_l in NZ; contradiction | exact Z1].
-      * pose proof (Hbig X1) as H60.
-        assert (Hlo : Rabs (B x' + B zl) / 2 <= Rabs (B th)).
-        { assert (Htri : Rabs (B x' + B zl) - Rabs (B tl) <= Rabs (B th)).
-          { replace (B th) with ((B x' + B zl) - B tl) by lra.
-            apply Rle_trans with (Rabs ((B x' + B zl) - B tl)); [ | apply Rle_refl].
-            apply Rabs_triang_inv. }
-          pose proof (Rabs_pos (B x' + B zl)).
-          assert (Rabs (B tl) <= / 9007199254740992 * Rabs (B x' + B zl)).
-          { rewrite Etl. rewrite Rabs_minus_sym. exact R. }
-          lra. }
-        apply Rle_trans with (bpow radix2 (-61)); [apply bpow_le; lia | ].
-        replace (bpow radix2 (-61)) with (bpow radix2 (-60) / 2).
-        -- apply Rle_trans with (Rabs (B x' + B zl) / 2); [lra | exact Hlo].
-        -- replace (-61)%Z with (-60 + -1)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 (-1)) with (/ 2). field.
+    + right. rewrite Eth. rewrite <- round_NE_abs by exact _.
+      apply Rle_trans with (bpow radix2 (-211)); [apply bpow_le; lia | ].
+      rewrite <- (round_generic radix2 (FLT_exp emin prec) (Znearest ne) (bpow radix2 (-211)) (fmt_bpow (-211) ltac:(lia))) at 1.
+      apply round_le; [exact _ | exact _ | exact Hx1].
     + assert (Etl' : Rabs (B tl) <= / 9007199254740992 * Rabs (B x' + B zl)) by (rewrite Etl; rewrite Rabs_minus_sym; exact R).
       replace (B x' + B zl) with (B th + B tl) in Etl' by lra.
       pose proof (Rabs_triang (B th) (B tl)) as Tr. pose proof (Rabs_pos (B tl)). pose proof (Rabs_pos (B th)).
@@ -346,17 +323,16 @@ Qed.
 
 (** The segment branch's reduction: for [zh] in [[1/128, 0.7072]] with index [k]
     the transcription forms [th + tl = (zh - k/64) + zl] exactly. *)
-Lemma segment_reduction zh zl (k : Z) : (1 <= k <= 45)%Z ->
-  finite zh -> finite zl -> / 128 <= B zh -> B zh <= 0.7072 -> Znearest ne (B zh * 64) = k ->
-  Rabs (B zl) <= bpow radix2 (-60) -> (B zl = 0 \/ bpow radix2 (-900) <= Rabs (B zl)) ->
+Lemma segment_reduction zh (k : Z) : (1 <= k <= 45)%Z ->
+  finite zh -> / 128 <= B zh -> B zh <= 0.7072 -> Znearest ne (B zh * 64) = k ->
   let i := fsub (fadd (fmul zh asin_64) asin_shifter) asin_shifter in
   asin_cmp i asin_zero = Some Gt /\ asin_index i = k /\
   finite (fmul i asin_inv64) /\ B (fmul i asin_inv64) = IZR k / 64 /\
   finite (fsub zh (fmul i asin_inv64)) /\ B (fsub zh (fmul i asin_inv64)) = B zh - IZR k / 64 /\
-  (B zh - IZR k / 64 = 0 \/ bpow radix2 (-59) <= Rabs (B zh - IZR k / 64)) /\
+  on_grid (-59) (B zh - IZR k / 64) /\
   Rabs (B zh - IZR k / 64) <= / 128.
 Proof.
-  intros Hk Fz Fl L U Hn Hl Hln i.
+  intros Hk Fz L U Hn i.
   destruct (index_value zh Fz L ltac:(lra)) as [Fi Ei]. rewrite Hn in Ei.
   fold i in Fi, Ei.
   assert (Hk1 : 1 <= IZR k) by (change 1 with (IZR 1); apply IZR_le; lia).
@@ -382,9 +358,7 @@ Proof.
     assert (Hp : IZR (2 ^ 53) = bpow radix2 53) by (apply (IZR_Zpower radix2); lia).
     rewrite Hp. rewrite Rmult_assoc. rewrite <- bpow_plus.
     replace (53 + -59)%Z with (-6)%Z by reflexivity. rewrite bm6. field. }
-  pose proof (grid_minus _ _ _ G1 G2) as G3.
-  destruct (Req_dec (B zh - IZR k / 64) 0) as [Z0 | NZ]; [left; exact Z0 | right].
-  exact (grid_nonzero _ _ G3 NZ).
+  exact (grid_minus _ _ _ G1 G2).
 Qed.
 
 (** Signed range lemmas: a rounded product or sum, finite, within the exact bound. *)
@@ -766,7 +740,7 @@ Definition SegOkRow (row : list Z) (bound : R) : Prop :=
     certificate's bound and one double-word addition's rounding. *)
 Theorem series_segment zh zl (k : Z) (bound : R) : (1 <= k <= 45)%Z ->
   finite zh -> finite zl -> / 128 <= B zh -> B zh <= 0.7072 -> Znearest ne (B zh * 64) = k ->
-  Rabs (B zl) <= bpow radix2 (-60) -> (B zl = 0 \/ bpow radix2 (-900) <= Rabs (B zl)) ->
+  Rabs (B zl) <= bpow radix2 (-53) -> on_grid (-211) (B zl) ->
   SegOkRow (nth (Z.to_nat (k - 1)) asin_segments []) bound ->
   let row := nth (Z.to_nat (k - 1)) asin_segments [] in
   let c := fun j => aw (nth j row 0%Z) in
@@ -777,18 +751,18 @@ Theorem series_segment zh zl (k : Z) (bound : R) : (1 <= k <= 45)%Z ->
       + ((B (c 2%nat) + B (c 3%nat)) * t + t * t * pl (seg_poly (c 4%nat) (c 5%nat) (c 6%nat) (c 7%nat) (c 8%nat) (c 9%nat) (c 10%nat) (c 11%nat) (c 12%nat)) t)
       + e1) * (1 + ea).
 Proof.
-  intros Hk Fz Fl L U Hn Hl Hln SO row c t.
-  destruct (segment_reduction zh zl k Hk Fz Fl L U Hn Hl Hln) as [Cgt [Ix [Fa [Ea [Fs [Es [Gr Hd]]]]]]].
+  intros Hk Fz Fl L U Hn Hl Hg SO row c t.
+  destruct (segment_reduction zh k Hk Fz L U Hn) as [Cgt [Ix [Fa [Ea [Fs [Es [Gr Hd]]]]]]].
   set (i := fsub (fadd (fmul zh asin_64) asin_shifter) asin_shifter) in *.
   assert (Hx' : Rabs (B (fsub zh (fmul i asin_inv64))) <= / 128) by (rewrite Es; exact Hd).
-  assert (Hxn : B (fsub zh (fmul i asin_inv64)) = 0 \/ bpow radix2 (-59) <= Rabs (B (fsub zh (fmul i asin_inv64)))) by (rewrite Es; exact Gr).
-  pose proof (t_split (fsub zh (fmul i asin_inv64)) zl Fs Fl Hx' Hxn Hl Hln) as TS.
+  assert (Hxn : on_grid (-59) (B (fsub zh (fmul i asin_inv64)))) by (rewrite Es; exact Gr).
+  pose proof (t_split (fsub zh (fmul i asin_inv64)) zl Fs Fl Hx' Hxn Hl Hg) as TS.
   destruct (two_sum64 (fsub zh (fmul i asin_inv64)) zl) as [th tl] eqn:Ets.
   destruct TS as [Fth [Ftl [Eth [Esum [Th [Tl2 [Tn Tl1]]]]]]].
   assert (Etsum : B th + B tl = t) by (unfold t; rewrite Esum, Es; reflexivity).
   assert (Htt : Rabs (B th + B tl) <= 0.0078126).
   { rewrite Etsum. unfold t. destruct (Rabs_le_inv _ _ Hd) as [Hd1 Hd2]. destruct (Rabs_le_inv _ _ Hl) as [Hl1 Hl2].
-    rewrite bm60 in *. apply Rabs_le. split; lra. }
+    rewrite bp53 in Hl1, Hl2. apply Rabs_le. split; lra. }
   unfold SegOkRow in SO. cbv zeta in SO.
   destruct SO as [F0 [F1 [FH [FL [Fg0 [Fg1 [Fg2 [Fg3 [Fg4 [Fg5 [Fg6 [Fg7 [Fg8 [C0 [C1 [H1 [CL [G0 [G1 [G2 [G3 [G4 [G5 [G6 [G7 [G8 [dgb [EC [Hdg HSn]]]]]]]]]]]]]]]]]]]]]]]]]]]]].
   pose proof (fx_small _ _ _ _ _ (B th + B tl) (proj1 H1) Htt HSn) as HS.
