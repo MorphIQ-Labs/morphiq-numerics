@@ -123,6 +123,7 @@ Proof. interval with (i_prec 120). Qed.
 Theorem fast_complement x : finite x -> SPLIT_UP_R <= B x -> B x <= 1 - / 9007199254740992 ->
   exists yh yl dh dl, asin_fast (asin_reduced x) = ((yh, yl), (dh, dl)) /\
     finite yh /\ finite yl /\ finite dh /\ finite dl /\ B yh = rndF (B yh + B yl) /\
+    0 < B dh /\ Rabs (B dl) <= bpow radix2 (-52) * B dh /\
     Rabs (B yh + B yl - asin (B x)) <= bpow radix2 (-62) * asin (B x) /\
     Rabs (B dh + B dl - (PI / 2 - asin (B x))) <= bpow radix2 (-62) * (PI / 2 - asin (B x)).
 Proof.
@@ -252,6 +253,8 @@ Proof.
   assert (HA418 : A <= 0.418) by lra.
   exists yh, yl, dh, dl. repeat split; try assumption.
   - unfold asin_fast. rewrite Hred. cbv iota. rewrite Hs. cbv iota. rewrite Emul. cbv iota. unfold hi, lo in Eth. rewrite Eth. cbv iota. rewrite Esub0. reflexivity.
+  - pose proof (bpow_gt_0 radix2 (-28)). rewrite Bdh. lra.
+  - rewrite Bdl, Bdh, P52. apply Rabs_le. split; lra.
   - assert (Hxdef : X = B hh + B hl - (B dh + B dl)) by reflexivity.
     assert (P62 : bpow radix2 (-62) = / 4611686018427387904) by (bpow_num; reflexivity).
     rewrite P62, HAx. apply Rabs_le. split; lra.

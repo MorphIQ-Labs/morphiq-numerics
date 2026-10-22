@@ -54,6 +54,7 @@ Theorem accurate_direct x yh yl :
   finite x -> finite yh -> finite yl ->
   / 67108864 <= B x -> B x <= SPLIT -> 0 < B yh -> Rabs (B yl) <= bpow radix2 (-52) * B yh ->
   Rabs (B yh + B yl - asin (B x)) <= bpow radix2 (-62) * asin (B x) ->
+  Q256Real.valid (asin_accurate_value true x (yh, yl)) /\
   Rabs (qval (asin_accurate_value true x (yh, yl)) - asin (B x)) <= bpow radix2 (-124) * asin (B x).
 Proof.
   intros Fx Fyh Fyl Hx0 HxS Hyh Hyl Hst.
@@ -170,6 +171,7 @@ Proof.
     - apply Rmult_le_compat_l; [lra | exact HY2]. }
   assert (Hd3' : Rabs d3 <= tiny) by (apply Rle_trans with (U / 2); [exact Hd3 | lra]).
   rewrite bpow_124.
+  refine (conj Vy _).
   exact (newton_direct_real Y r d (B x) snv csv riv resv prv y1v (sin r) (cos r) sigma gamma (csv * riv - 1) d3 g2 g3 rr
     (ltac:(unfold d; ring)) HY1 HY2 Hd Hc71 Hc1 ltac:(lra) Hs71 Htay ltac:(split; assumption) Hsig Hsig2 Hgam Hgam2
     ltac:(ring) He ltac:(unfold g2; ring) Hg2 Ep Hd3' ltac:(unfold g3; ring) Hg3).
@@ -253,6 +255,7 @@ Theorem accurate_complement x dh dl :
   finite x -> finite dh -> finite dl ->
   SPLIT_UP <= B x -> B x <= 1 - / 9007199254740992 -> 0 < B dh -> Rabs (B dl) <= bpow radix2 (-52) * B dh ->
   Rabs (B dh + B dl - (PI / 2 - asin (B x))) <= bpow radix2 (-62) * (PI / 2 - asin (B x)) ->
+  Q256Real.valid (asin_accurate_value false x (dh, dl)) /\
   Rabs (qval (asin_accurate_value false x (dh, dl)) - asin (B x)) <= bpow radix2 (-124) * asin (B x).
 Proof.
   intros Fx Fdh Fdl HxS HxU Hdh Hdl Hst.
@@ -384,6 +387,7 @@ Proof.
     - apply Rabs_le_inv in Hhp as [Hh1 Hh2]. rewrite Rabs_pos_eq by lra. lra.
     - assert (HDpos : 0 < D) by lra. exact (dl_small D dlv HDpos HD1 Hnewton). }
   unfold q_sub.
+  refine (conj Vfin _).
   apply (final_complement D A (qval q_half_pi) (qval (Q256.add q_half_pi (neg_q dlq))) dlv U).
   - unfold D. ring.
   - exact HDhi0. - lra. - exact Hnewton. - exact Hhp.
