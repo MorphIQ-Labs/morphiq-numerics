@@ -8,6 +8,10 @@ leaving log space. Zero mass is
 `−∞`, and positive mass too small to represent as a binary64 probability stays
 finite.
 
+The checked arbitrary-length [`normalize_log_weights`](log_normalize.md) API
+reuses this reduction, with typed failures and a derived bound on normalized
+log probabilities. It has a separate contract from the unchanged pair API.
+
 This document is the contract and derivation the implementation follows. Each
 numbered **decision** is a design choice open to review.
 

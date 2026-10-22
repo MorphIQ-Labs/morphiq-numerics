@@ -1,7 +1,8 @@
 //! `log_sum_exp` and `log_diff_exp`: logarithms of sums and differences of
 //! exponentials, without leaving log space; `log_sum_exp_pairs`,
 //! `log_sum_exp` of several pairs at once; and `log_sum_exp_and_normalize`,
-//! a pair's log-sum with its normalized pair.
+//! a pair's log-sum with its normalized pair. [`normalize_log_weights`] adds
+//! checked arbitrary-length normalization with a returned error bound.
 //!
 //! The contract, the derivation and every bound are in
 //! [`docs/log_space.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/log_space.md);
@@ -10,7 +11,13 @@
 //! `|ŷ − y| ≤ u·|y| + β·u·|L| + η`, and both are identical on every target.
 
 #[cfg(test)]
+mod normalize_tests;
+#[cfg(test)]
 mod tests;
+
+mod normalize;
+mod normalize_constants;
+pub use normalize::{LogNormalization, MAX_NORMALIZE_TERMS, NormalizeError, normalize_log_weights};
 
 use crate::eft::two_sum;
 use crate::elementary::{exp, exp_slice, expm1, ln, ln_1p, ln_1p_slice};

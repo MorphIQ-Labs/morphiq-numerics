@@ -16,7 +16,8 @@
 //!   exact zero mass; `log_sum_exp_pairs`, which returns `log_sum_exp`'s
 //!   bits for several pairs at once, in SIMD lanes with the `simd` feature;
 //!   and `log_sum_exp_and_normalize`, a pair's log-sum with the pair divided
-//!   by its own sum, sharing one exponential;
+//!   by its own sum, sharing one exponential; [`log_space::normalize_log_weights`]
+//!   supplies checked slice normalization with a returned error bound;
 //! - [`normal`]: `norm_pdf`, `norm_cdf`, `norm_ccdf`, `norm_cdf_centered` and
 //!   `log_norm_cdf`, with matching SIMD slice functions and proved error bounds;
 //!   `log_norm_pdf`, the logarithm of the standard normal
