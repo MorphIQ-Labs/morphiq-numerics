@@ -5,7 +5,7 @@ From Coq Require Import Reals ZArith Lia Lra Psatz List.
 From Flocq Require Import Core.
 From Interval Require Import Tactic.
 From Q Require Import Q256 Q256Real QSpec Limbs LimbScan.
-Require Import Ln1pLemmas AsinTables AsinKernel AsinQSeries AsinRecip AsinhTables AsinhKernel AsinhWithin AsinhRoot AsinhExp AsinhExpRed AsinhRecip.
+Require Import Ln1pLemmas AsinTables AsinKernel AsinQSeries AsinRecip AsinhTables AsinhKernel AsinhWithin AsinhRoot AsinhExp AsinhExpRed AsinhRecip AsinhNewtonReal.
 Open Scope R_scope.
 
 Lemma top_bounds c : Q256Real.valid c -> 0 < qval c -> bpow radix2 (Q256Real.top c) <= qval c < bpow radix2 (Q256Real.top c + 1).
@@ -143,6 +143,9 @@ Proof.
   - rewrite Qei. apply Rmult_lt_0_compat; [exact Pr | apply Rinv_0_lt_compat; exact Ha].
 Qed.
 
+Lemma rabs_sub_r' a b : Rabs a <= Rabs b + Rabs (a - b).
+Proof. apply Rle_trans with (Rabs (b + (a - b))); [right; f_equal; ring | apply Rabs_triang]. Qed.
+
 (** The algebra of the computed step: [finv] is within [1.2 rho + 714 U] of [yv + u]. *)
 Lemma newton_alg (C S xv sq cq Rc rrv prv finv yv u rho U eps d3 : R) :
   1 <= C -> xv - S = C * u -> Rabs u <= 0.0000011 ->
@@ -150,10 +153,10 @@ Lemma newton_alg (C S xv sq cq Rc rrv prv finv yv u rho U eps d3 : R) :
   Rabs (cq * Rc - 1) <= eps -> 0 <= eps <= rho / 1000 ->
   Rabs (rrv - (xv - sq)) <= 1.01 * U * C ->
   prv = rrv * Rc * (1 + d3) -> Rabs d3 <= U ->
-  Rabs (finv - (yv + prv)) <= U * 712 ->
+  0 <= yv <= 711 -> Rabs (finv - (yv + prv)) <= U * Rmax (Rabs yv) (Rabs prv) ->
   Rabs (finv - (yv + u)) <= 1.2 * rho + 714 * U.
 Proof.
-  intros HC Hx Hu Hs Hc [Hr0 Hr1] [HU0 HU1] He [He0 He1] Hrr Hprv Hd3 Hfin.
+  intros HC Hx Hu Hs Hc [Hr0 Hr1] [HU0 HU1] He [He0 He1] Hrr Hprv Hd3 [Hy0 Hy1] Hfin.
   pose proof Hc as Hs0. rewrite Rabs_minus_sym in Hs0. pose proof Hc as Hcabs.
   assert (HCp : 0 < C) by lra.
   set (w := rrv - C * u).
@@ -204,7 +207,142 @@ Proof.
     assert (Rabs (w / C) * Rabs P <= (1.01 * rho + 1.01 * U) * 1.0001) by (apply Rmult_le_compat; [apply Rabs_pos | apply Rabs_pos | exact Hwc | exact HPa]).
     assert (Rabs u * Rabs (P - 1) <= 0.0000011 * (2.01 * rho)) by (apply Rmult_le_compat; [apply Rabs_pos | apply Rabs_pos | exact Hu | exact HP]).
     lra. }
+  assert (Hprv1 : Rabs prv <= 1).
+  { apply Rle_trans with (Rabs u + Rabs (prv - u)); [apply rabs_sub_r' | lra]. }
+  assert (Hmx : Rmax (Rabs yv) (Rabs prv) <= 712).
+  { apply Rmax_lub; [rewrite Rabs_pos_eq by lra; lra | lra]. }
+  assert (Hfin2 : Rabs (finv - (yv + prv)) <= U * 712).
+  { apply Rle_trans with (1 := Hfin). apply Rmult_le_compat_l; lra. }
   apply Rle_trans with (Rabs (finv - (yv + prv)) + Rabs (prv - u)).
   - replace (finv - (yv + u)) with ((finv - (yv + prv)) + (prv - u)) by ring. apply Rabs_triang.
   - lra.
+Qed.
+
+Lemma bp254_small : bpow radix2 (-254) <= 1e-76.
+Proof.
+  bpow_num. apply Rle_trans with (/ 10000000000000000000000000000000000000000000000000000000000000000000000000000).
+  - apply Rinv_le_contravar; lra.
+  - lra.
+Qed.
+
+(** One computed Newton step is within [2^-235] of the exact one. *)
+Theorem newton_step_ok x y xv : Q256Real.valid x -> Q256Real.valid y -> qval x = xv -> 0 < xv ->
+  0 <= qval y <= 711 -> Rabs (arcsinh xv - qval y) <= / 1000000 ->
+  Q256Real.valid (asinh_newton x y) /\
+  Rabs (qval (asinh_newton x y) - arcsinh xv) <= 4 * ((arcsinh xv - qval y) * (arcsinh xv - qval y)) + bpow radix2 (-235).
+Proof.
+  intros Vx Vy Qx Pxv Hy Hdelta.
+  pose proof (exp_pair y Vy Hy) as XP.
+  unfold asinh_newton. destruct (asinh_exp y) as [m kz] eqn:Ex. cbv zeta in XP |- *.
+  destruct XP as [Ve [Vei [Hbe [Hbei [Pe Pei]]]]].
+  set (e := Q256Real.mul_pow2 m kz) in *. set (ei := Q256Real.mul_pow2 (asinh_recip m) (- kz)) in *.
+  set (yv := qval y) in *.
+  set (A := arcsinh xv) in *.
+  set (delta := A - yv) in *.
+  destruct bpow_254 as [B252 [B255 [Upos Usmall]]].
+  set (U := bpow radix2 (-254)) in *.
+  assert (Hrho : rho_e = 406323.2 * U).
+  { unfold rho_e, U. replace (-237)%Z with (-254 + 17)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 17) with 131072. lra. }
+  assert (B237 : bpow radix2 (-237) = 131072 * U) by (unfold U; replace (-237)%Z with (-254 + 17)%Z by reflexivity; rewrite bpow_plus; change (bpow radix2 17) with 131072; ring).
+  assert (B235 : bpow radix2 (-235) = 524288 * U) by (unfold U; replace (-235)%Z with (-254 + 19)%Z by reflexivity; rewrite bpow_plus; change (bpow radix2 19) with 524288; ring).
+  assert (B252' : bpow radix2 (-252) = 4 * U) by exact B252.
+  assert (HUs : U <= 1e-76) by exact bp254_small.
+  (* the exponentials *)
+  set (E1 := exp yv) in *. set (E2 := exp (- yv)) in *.
+  assert (HE1 : 0 < E1) by apply exp_pos. assert (HE2 : 0 < E2) by apply exp_pos.
+  assert (HE12 : E1 * E2 = 1) by (unfold E1, E2; rewrite <- exp_plus; replace (yv + - yv) with 0 by ring; apply exp_0).
+  set (C := cosh yv). set (S := sinh yv).
+  assert (HC : C = (E1 + E2) / 2) by reflexivity.
+  assert (HS : S = (E1 - E2) / 2) by reflexivity.
+  assert (HC1 : 1 <= C) by apply cosh_pos.
+  set (qe := qval e) in *. set (qei := qval ei) in *.
+  rewrite Hrho in Hbe, Hbei.
+  pose proof Hbe as Hbe_c. apply Rabs_le_inv in Hbe_c. destruct Hbe_c as [Hbe1 Hbe2].
+  pose proof Hbei as Hbei_c. apply Rabs_le_inv in Hbei_c. destruct Hbei_c as [Hbi1 Hbi2].
+  assert (Hr1 : 406323.2 * U <= 0.0001) by lra.
+  assert (P1 : 406323.2 * U * E1 <= 0.0001 * E1) by (apply Rmult_le_compat_r; lra).
+  assert (P2 : 406323.2 * U * E2 <= 0.0001 * E2) by (apply Rmult_le_compat_r; lra).
+  assert (Hqe : qe <= 1.0001 * E1) by lra.
+  assert (Hqei : qei <= 1.0001 * E2) by lra.
+  assert (Hqe0 : 0.9999 * E1 <= qe) by lra.
+  assert (Hqei0 : 0.9999 * E2 <= qei) by lra.
+  (* s0, c0 *)
+  destruct (neg_any ei Vei) as [Vn En].
+  destruct (add_any e (Q256.neg_q ei) Ve Vn) as [Vs0 Es0].
+  destruct (add_any e ei Ve Vei) as [Vc0 Ec0].
+  change (qval e) with qe in Es0, Ec0. change (qval ei) with qei in Ec0. rewrite En in Es0.
+  change (q_sub e ei) with (Q256.add e (Q256.neg_q ei)).
+  destruct (mul_pow2_any (Q256.add e (Q256.neg_q ei)) (-1) Vs0) as [Vsq Qsq].
+  destruct (mul_pow2_any (Q256.add e ei) (-1) Vc0) as [Vcq Qcq].
+  assert (Hb1 : bpow radix2 (-1) = / 2) by (bpow_num; reflexivity).
+  rewrite Hb1 in Qsq, Qcq.
+  set (sinh_q := Q256Real.mul_pow2 (Q256.add e (Q256.neg_q ei)) (-1)) in *.
+  set (cosh_q := Q256Real.mul_pow2 (Q256.add e ei) (-1)) in *.
+  assert (Hmx1 : Rmax (Rabs qe) (Rabs (- qei)) <= 1.0001 * (E1 + E2)).
+  { apply Rmax_lub; [rewrite Rabs_pos_eq by lra; lra | rewrite Rabs_Ropp, Rabs_pos_eq by lra; lra]. }
+  assert (Hmx2 : Rmax (Rabs qe) (Rabs qei) <= 1.0001 * (E1 + E2)).
+  { apply Rmax_lub; [rewrite Rabs_pos_eq by lra; lra | rewrite Rabs_pos_eq by lra; lra]. }
+  set (rhos := 406323.2 * U + 2 * U).
+  assert (Hes0 : Rabs (qval (Q256.add e (Q256.neg_q ei)) - (qe + - qei)) <= U * (1.0001 * (E1 + E2))).
+  { apply Rle_trans with (1 := Es0). apply Rmult_le_compat_l; [lra | exact Hmx1]. }
+  assert (Hec0 : Rabs (qval (Q256.add e ei) - (qe + qei)) <= U * (1.0001 * (E1 + E2))).
+  { apply Rle_trans with (1 := Ec0). apply Rmult_le_compat_l; [lra | exact Hmx2]. }
+  apply Rabs_le_inv in Hes0. destruct Hes0 as [Hs1 Hs2].
+  apply Rabs_le_inv in Hec0. destruct Hec0 as [Hc1 Hc2].
+  assert (Hsq : Rabs (qval sinh_q - S) <= rhos * C).
+  { rewrite Qsq. apply Rabs_le. unfold rhos. rewrite HC, HS. split; nra. }
+  assert (Hcq : Rabs (qval cosh_q - C) <= rhos * C).
+  { rewrite Qcq. apply Rabs_le. unfold rhos. rewrite HC. split; nra. }
+  (* the correction *)
+  assert (HsA : sinh (yv + delta) = xv) by (replace (yv + delta) with A by (unfold delta; ring); unfold A; apply sinh_arcsinh).
+  assert (Hd50 : Rabs delta <= / 50) by (apply Rle_trans with (/ 1000000); [exact Hdelta | lra]).
+  destruct (newton_exact yv delta Hd50) as [NE1 NE2].
+  rewrite HsA in NE1, NE2. change (sinh yv) with S in NE1, NE2. change (cosh yv) with C in NE1, NE2.
+  set (u := (xv - S) / C) in *.
+  assert (Hx : xv - S = C * u) by (unfold u; field; lra).
+  assert (Hu : Rabs u <= 0.0000011).
+  { apply Rle_trans with (1.1 * Rabs delta); [exact NE2 | ]. assert (Rabs delta <= / 1000000) by exact Hdelta. lra. }
+  (* cosh_q > 0, its reciprocal *)
+  assert (Hrs : 0 < rhos <= 1e-60) by (unfold rhos; split; lra).
+  apply Rabs_le_inv in Hcq. destruct Hcq as [Hcq1 Hcq2].
+  assert (Hcqp : 0 < qval cosh_q) by (unfold rhos in Hcq1; nra).
+  destruct (asinh_recip_ok cosh_q Vcq Hcqp) as [Vrc [Prc Erc]].
+  set (Rc := asinh_recip cosh_q) in *.
+  (* the residual, product and sum *)
+  destruct (neg_any sinh_q Vsq) as [Vn2 En2].
+  destruct (add_any x (Q256.neg_q sinh_q) Vx Vn2) as [Vrr Err].
+  change (q_sub x sinh_q) with (Q256.add x (Q256.neg_q sinh_q)).
+  set (rr := Q256.add x (Q256.neg_q sinh_q)) in *.
+  destruct (mul_relative rr Rc Vrr Vrc) as [Vpr [d3 [Hd3 Epr]]].
+  set (pr := Q256.mul rr Rc) in *.
+  destruct (add_any y pr Vy Vpr) as [Vfin Efin].
+  set (fin := Q256.add y pr) in *.
+  change (qval y) with yv in Efin. rewrite Qx in Err. rewrite En2 in Err.
+  apply Rabs_le_inv in Hsq. destruct Hsq as [Hsq1 Hsq2].
+  assert (HxvC : Rabs xv <= 1.01 * C).
+  { assert (E : xv = S + C * u) by lra.
+    pose proof (sinh_le_cosh yv) as Hsc. change (sinh yv) with S in Hsc. change (cosh yv) with C in Hsc.
+    assert (Hcu : Rabs (C * u) <= C * 0.0000011) by (rewrite Rabs_mult, (Rabs_pos_eq C) by lra; apply Rmult_le_compat_l; lra).
+    apply Rabs_le_inv in Hsc. apply Rabs_le_inv in Hcu. apply Rabs_le. split; lra. }
+  assert (HsqC : Rabs (qval sinh_q) <= 1.01 * C).
+  { pose proof (sinh_le_cosh yv) as Hsc. change (sinh yv) with S in Hsc. change (cosh yv) with C in Hsc.
+    apply Rabs_le_inv in Hsc. apply Rabs_le.
+    assert (rhos * C <= 1e-60 * C) by (apply Rmult_le_compat_r; lra). split; lra. }
+  assert (Hrr : Rabs (qval rr - (xv - qval sinh_q)) <= 1.01 * U * C).
+  { apply Rle_trans with (1 := Err). 
+    assert (Rmax (Rabs xv) (Rabs (- qval sinh_q)) <= 1.01 * C) by (apply Rmax_lub; [exact HxvC | rewrite Rabs_Ropp; exact HsqC]).
+    replace (1.01 * U * C) with (U * (1.01 * C)) by ring. apply Rmult_le_compat_l; lra. }
+  assert (Hd3' : Rabs d3 <= U).
+  { rewrite B255 in Hd3. apply Rle_trans with (U / 2); [exact Hd3 | lra]. }
+  assert (Hfin' : Rabs (qval fin - (yv + qval pr)) <= U * Rmax (Rabs yv) (Rabs (qval pr))) by exact Efin.
+  assert (Hepsb : 0 <= bpow radix2 (-252) <= rhos / 1000) by (rewrite B252'; unfold rhos; split; lra).
+  pose proof (newton_alg C S xv (qval sinh_q) (qval cosh_q) (qval Rc) (qval rr) (qval pr) (qval fin) yv u rhos U (bpow radix2 (-252)) d3
+    HC1 Hx Hu ltac:(rewrite Rabs_minus_sym; apply Rabs_le; split; lra) ltac:(apply Rabs_le; split; lra) Hrs
+    ltac:(split; [exact Upos | unfold rhos; lra]) Erc Hepsb Hrr Epr Hd3' Hy Hfin') as NA.
+  split; [exact Vfin | ].
+  assert (Hyu : Rabs (yv + u - A) <= 4 * (delta * delta)).
+  { replace (yv + u - A) with (u - delta) by (unfold delta; ring). exact NE1. }
+  apply Rle_trans with (Rabs (qval fin - (yv + u)) + Rabs (yv + u - A)).
+  - replace (qval fin - A) with ((qval fin - (yv + u)) + (yv + u - A)) by ring. apply Rabs_triang.
+  - rewrite B235. unfold rhos in NA. lra.
 Qed.
