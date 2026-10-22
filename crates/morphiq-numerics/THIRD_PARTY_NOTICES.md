@@ -7,13 +7,15 @@
 - SHA-256 of the complete original `src/numerics/tridiag.rs`:
   `ddd8e947454ecc0bf867d49442f81d518368ca152997cb487894083c1ac177e8`.
 - License at that commit: MIT; reproduced below without changes.
-- Derived library file: `src/linalg/tridiagonal.rs`.
+- Derived library files: `src/linalg/tridiagonal.rs` and
+  `src/linalg/tridiagonal/lanes.rs`.
 - The unpublished workspace benchmark `crates/reference/src/bin/bench-tridiagonal.rs`
   also adapts the recurrence, retaining the historical tiny-pivot threshold.
 - Changes: split factorization from RHS elimination/substitution; compact
   off-diagonal storage; engine-independent errors; checked strict-dominance
   admission; finite arithmetic checks; no absolute tiny-pivot cutoff;
-  immutable factor lifetimes; optional outward residual/error certificate.
+  immutable factor lifetimes; optional outward residual/error certificate;
+  row-interleaved batched solves with the same recurrence in independent SIMD lanes.
 - Only the recurrence from this public historical version is adapted. Later
   private source, diagnostics, fixtures and tests are not included.
 

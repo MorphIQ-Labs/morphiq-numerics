@@ -44,6 +44,7 @@ functions unnoticed.
 | `normalize_log_weights` | empty/zero mass, singleton support, signed zero, equal maximum offsets, subnormal shifts, underflow tails, invalid/unrepresentable inputs, shape mismatch; 32 slices of each length 1, 2, 3, 7, 8, 31, 32, 33, 64, 65 | normalized logs, log total, returned error radius, typed refusal code/index and untouched output on failure |
 
 | `linalg::tridiagonal` | orders 0, 1, 2, 3, 17, 64; mixed signs; six scales including subnormal/overflow; repeated RHSs; invalid shape/nonfinite/dominance and range cases | admitted margin, finite solution bits, absolute residual/error bounds, typed errors |
+| `linalg::tridiagonal::solve_many_into` | orders 0, 1, 2, 3, 17; RHS counts 0–17 around every lane width; four scales including subnormals; shape/overflow/nonfinite errors | interleaved solution bits and typed errors |
 
 ## Where it is checked
 

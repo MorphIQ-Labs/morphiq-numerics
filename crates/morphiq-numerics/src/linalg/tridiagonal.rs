@@ -25,6 +25,9 @@
 
 use crate::interval::FiniteInterval;
 
+#[cfg(feature = "simd")]
+mod lanes;
+
 /// Failure of matrix admission, factorization, solution or certification.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error {
@@ -239,6 +242,95 @@ impl ThomasFactors<'_, '_> {
             out[i] -= self.normalized_upper[i] * out[i + 1];
             if !out[i].is_finite() {
                 return Err(Error::Range);
+            }
+        }
+        Ok(())
+    }
+
+    /// Solve `rhs_count` right-hand sides sharing these factors.
+    ///
+    /// Both slices have exactly `matrix.len() * rhs_count` entries, interleaved
+    /// by row: entry `(row, column)` is at `row * rhs_count + column`.
+    /// Every column returns the bits of [`Self::solve_into`] on that RHS.
+    /// With `simd`, independent columns run on SSE2/AVX2/AVX-512 or NEON;
+    /// `std` enables runtime detection. Other builds use the scalar recurrence.
+    /// No packing, allocation, refactorization or reciprocal substitution occurs.
+    /// Work is O(n * rhs_count), with O(1) auxiliary storage. Zero rows or zero
+    /// RHSs succeed with empty slices.
+    ///
+    /// ```
+    /// use morphiq_numerics::linalg::tridiagonal::DominantTridiagonal;
+    /// let matrix = DominantTridiagonal::new(&[1.0], &[2.0, 2.0], &[1.0]).unwrap();
+    /// let mut pivots = [0.0; 2];
+    /// let mut upper = [0.0];
+    /// let factors = matrix.factor_into(&mut pivots, &mut upper).unwrap();
+    /// let mut out = [0.0; 4];
+    /// factors.solve_many_into(2, &[3.0, 0.0, 3.0, 3.0], &mut out).unwrap();
+    /// assert_eq!(out, [1.0, -1.0, 1.0, 2.0]);
+    /// ```
+    ///
+    /// # Errors
+    /// [`Error::Shape`] (including dimension-product overflow) and
+    /// [`Error::NonFinite`] leave the entire output unchanged. On
+    /// [`Error::Range`] discard the entire output; the partially written
+    /// contents and processing order are backend-dependent.
+    pub fn solve_many_into(
+        &self,
+        rhs_count: usize,
+        rhs: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), Error> {
+        let size = self
+            .matrix
+            .len()
+            .checked_mul(rhs_count)
+            .ok_or(Error::Shape)?;
+        if rhs.len() != size || out.len() != size {
+            return Err(Error::Shape);
+        }
+        if rhs.iter().any(|x| !x.is_finite()) {
+            return Err(Error::NonFinite);
+        }
+        if size == 0 {
+            return Ok(());
+        }
+        #[cfg(feature = "simd")]
+        {
+            lanes::solve(self, rhs_count, rhs, out)
+        }
+        #[cfg(not(feature = "simd"))]
+        {
+            self.solve_columns(rhs_count, rhs, out, 0)
+        }
+    }
+
+    // Same recurrence as solve_into, with interleaved RHS/output addressing.
+    fn solve_columns(
+        &self,
+        count: usize,
+        rhs: &[f64],
+        out: &mut [f64],
+        start: usize,
+    ) -> Result<(), Error> {
+        let n = self.matrix.len();
+        for column in start..count {
+            for row in 0..n {
+                let at = row * count + column;
+                out[at] = if row == 0 {
+                    rhs[at] / self.pivots[0]
+                } else {
+                    (rhs[at] - self.matrix.lower[row - 1] * out[at - count]) / self.pivots[row]
+                };
+                if !out[at].is_finite() {
+                    return Err(Error::Range);
+                }
+            }
+            for row in (0..n.saturating_sub(1)).rev() {
+                let at = row * count + column;
+                out[at] -= self.normalized_upper[row] * out[at + count];
+                if !out[at].is_finite() {
+                    return Err(Error::Range);
+                }
             }
         }
         Ok(())

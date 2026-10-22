@@ -56,6 +56,8 @@ reference, returns the same bits.
 
 Reusable, allocation-free tridiagonal factorization and solves are available
 under `linalg::tridiagonal` for strictly row-diagonally-dominant matrices.
+`solve_many_into` batches interleaved right-hand sides with scalar-identical
+SIMD across columns when the `simd` feature is enabled.
 An optional certificate bounds the absolute residual and solution error;
 see [the domain, ownership and numerical contract](docs/tridiagonal.md).
 

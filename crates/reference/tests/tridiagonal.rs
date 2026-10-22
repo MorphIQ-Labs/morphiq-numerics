@@ -88,3 +88,56 @@ fn tridiagonal_exact_solutions_and_residuals_are_inside_the_reported_bounds() {
         }
     }
 }
+
+#[test]
+fn tridiagonal_batched_solutions_have_independent_exact_error_bounds() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../fixtures/tridiagonal.json")).unwrap();
+    for case in fixture["cases"].as_array().unwrap() {
+        let lower = vector(case, "lower");
+        let diagonal = vector(case, "diagonal");
+        let upper = vector(case, "upper");
+        let rhs = vector(case, "rhs");
+        let n = diagonal.len();
+        let mut p = vec![0.0; n];
+        let mut c = vec![0.0; n.saturating_sub(1)];
+        let f = DominantTridiagonal::new(&lower, &diagonal, &upper)
+            .unwrap()
+            .factor_into(&mut p, &mut c)
+            .unwrap();
+        // Signs and zero transform the independent exact solutions without
+        // rounding the fixture inputs, including its subnormal cases.
+        for count in [2, 3, 4, 7, 8, 9, 17] {
+            let sign = |column: usize| i64::try_from(column % 3).unwrap() - 1;
+            let interleaved: Vec<_> = (0..n * count)
+                .map(|at| rhs[at / count] * (sign(at % count) as f64))
+                .collect();
+            let mut out = vec![0.0; interleaved.len()];
+            f.solve_many_into(count, &interleaved, &mut out).unwrap();
+            for column in 0..count {
+                let b: Vec<_> = (0..n)
+                    .map(|row| interleaved[row * count + column])
+                    .collect();
+                let x: Vec<_> = (0..n).map(|row| out[row * count + column]).collect();
+                let mut scalar = vec![0.0; n];
+                f.solve_into(&b, &mut scalar).unwrap();
+                assert_eq!(
+                    x.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+                    scalar.iter().map(|x| x.to_bits()).collect::<Vec<_>>()
+                );
+                let bound = f.certify(&b, &x).unwrap();
+                for (row, &value) in x.iter().enumerate() {
+                    let numerator = &integer(case["solution"][row][0].as_str().unwrap())
+                        * &Exact::integer(sign(column));
+                    let denominator = integer(case["solution"][row][1].as_str().unwrap());
+                    let error = &(&Exact::of(value) * &denominator) - &numerator;
+                    assert!(
+                        error.abs() <= &Exact::of(bound.max_solution_error()) * &denominator,
+                        "{} row={row} column={column} count={count}",
+                        case["name"]
+                    );
+                }
+            }
+        }
+    }
+}

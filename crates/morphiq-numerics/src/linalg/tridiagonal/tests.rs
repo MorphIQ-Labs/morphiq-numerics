@@ -242,3 +242,212 @@ fn certificate_is_for_the_candidate_and_can_report_large_error() {
     assert!(certificate.max_residual() >= 3.0);
     assert!(certificate.max_solution_error() >= 3.0);
 }
+
+// Every column has a different exactly manufactured integer solution. Exact
+// dyadic pivots (4) and upper coefficients (1/2) make equality an independent
+// oracle, rather than a second transcription of the floating-point solver.
+fn batch_integer_case(n: usize, count: usize) -> (std::vec::Vec<f64>, std::vec::Vec<f64>) {
+    let expected: std::vec::Vec<_> = (0..n * count)
+        .map(|i| f64::from(i32::try_from((i * 7 + i / count * 3) % 23).unwrap() - 11))
+        .collect();
+    let rhs = (0..n * count)
+        .map(|at| {
+            let row = at / count;
+            (if row == 0 { 4.0 } else { 5.0 }) * expected[at]
+                + if row > 0 {
+                    2.0 * expected[at - count]
+                } else {
+                    0.0
+                }
+                + if row + 1 < n {
+                    2.0 * expected[at + count]
+                } else {
+                    0.0
+                }
+        })
+        .collect();
+    (rhs, expected)
+}
+
+#[test]
+fn batches_have_independent_exact_solutions_and_scalar_bits() {
+    for n in [0_usize, 1, 2, 3, 17, 401] {
+        let off = std::vec![2.0; n.saturating_sub(1)];
+        let mut diagonal = std::vec![5.0; n];
+        if n > 0 {
+            diagonal[0] = 4.0;
+        }
+        let mut p = std::vec![0.0; n];
+        let mut c = std::vec![0.0; n.saturating_sub(1)];
+        let f = DominantTridiagonal::new(&off, &diagonal, &off)
+            .unwrap()
+            .factor_into(&mut p, &mut c)
+            .unwrap();
+        for count in [0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 65] {
+            let (rhs, expected) = batch_integer_case(n, count);
+            let mut out = std::vec![f64::NAN; rhs.len()];
+            f.solve_many_into(count, &rhs, &mut out).unwrap();
+            assert_eq!(out, expected, "n={n}, count={count}");
+        }
+    }
+}
+
+#[test]
+fn batch_validation_is_atomic_and_handles_empty_dimensions() {
+    let mut p = [0.0; 2];
+    let mut c = [0.0];
+    let f = DominantTridiagonal::new(&[1.0], &[2.0, 2.0], &[1.0])
+        .unwrap()
+        .factor_into(&mut p, &mut c)
+        .unwrap();
+    let mut out = [42.0; 18];
+    assert_eq!(
+        f.solve_many_into(usize::MAX, &[], &mut out),
+        Err(Error::Shape)
+    );
+    assert_eq!(
+        f.solve_many_into(9, &[1.0; 17], &mut out),
+        Err(Error::Shape)
+    );
+    assert_eq!(
+        f.solve_many_into(9, &[1.0; 18], &mut out[..17]),
+        Err(Error::Shape)
+    );
+    assert_eq!(out, [42.0; 18]);
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        for at in [0, 7, 8, 17] {
+            let mut rhs = [1.0; 18];
+            rhs[at] = bad;
+            assert_eq!(f.solve_many_into(9, &rhs, &mut out), Err(Error::NonFinite));
+            assert_eq!(out, [42.0; 18]);
+        }
+    }
+    f.solve_many_into(0, &[], &mut []).unwrap();
+    assert_eq!(f.solve_many_into(0, &[], &mut out), Err(Error::Shape));
+    DominantTridiagonal::new(&[], &[], &[])
+        .unwrap()
+        .factor_into(&mut [], &mut [])
+        .unwrap()
+        .solve_many_into(usize::MAX, &[], &mut [])
+        .unwrap();
+}
+
+#[test]
+fn batch_signed_zero_subnormal_and_mixed_lane_overflow() {
+    for d in [1.0, -1.0, f64::from_bits(1), -f64::from_bits(1)] {
+        let diagonal = [d];
+        let mut p = [0.0];
+        let f = DominantTridiagonal::new(&[], &diagonal, &[])
+            .unwrap()
+            .factor_into(&mut p, &mut [])
+            .unwrap();
+        let rhs = [0.0, -0.0, d, -d, d, -0.0, d, 0.0, -d];
+        let mut out = [0.0; 9];
+        f.solve_many_into(9, &rhs, &mut out).unwrap();
+        assert_eq!(out.map(f64::to_bits), rhs.map(|x| (x / d).to_bits()));
+        if d.abs() < f64::MIN_POSITIVE {
+            for at in 0..9 {
+                let mut bad = rhs;
+                bad[at] = 1.0;
+                assert_eq!(f.solve_many_into(9, &bad, &mut out), Err(Error::Range));
+            }
+        }
+    }
+    // Forward sweep is finite; subtraction in back substitution overflows.
+    let mut p = [0.0; 2];
+    let mut c = [0.0];
+    let f = DominantTridiagonal::new(&[0.0], &[1.0, 1.0], &[0.5])
+        .unwrap()
+        .factor_into(&mut p, &mut c)
+        .unwrap();
+    for column in 0..9 {
+        let mut rhs = [0.0; 18];
+        rhs[column] = f64::MAX;
+        rhs[9 + column] = -f64::MAX;
+        assert_eq!(
+            f.solve_many_into(9, &rhs, &mut [0.0; 18]),
+            Err(Error::Range)
+        );
+    }
+}
+
+#[cfg(feature = "simd")]
+#[test]
+fn lanes_batches_match_each_forced_backend() {
+    use morphiq_numerics_arch::{Simd, WithSimd};
+    struct Check;
+    impl WithSimd for Check {
+        type Output = ();
+        fn with<K: Simd>(self, k: K) {
+            for n in [0_usize, 1, 2, 17, 401] {
+                for scale in [1.0, -1.0, f64::MIN_POSITIVE / 16.0, 1e270] {
+                    let lower = std::vec![-scale; n.saturating_sub(1)];
+                    let upper = std::vec![0.5 * scale; n.saturating_sub(1)];
+                    let diagonal = std::vec![4.0 * scale; n];
+                    let mut p = std::vec![0.0; n];
+                    let mut c = std::vec![0.0; n.saturating_sub(1)];
+                    let f = DominantTridiagonal::new(&lower, &diagonal, &upper)
+                        .unwrap()
+                        .factor_into(&mut p, &mut c)
+                        .unwrap();
+                    for count in [1, 2, 3, 4, 5, 7, 8, 9, 17] {
+                        let rhs: std::vec::Vec<_> = (0..n * count)
+                            .map(|i| f64::from(i32::try_from((i * 7) % 19).unwrap() - 9) * scale)
+                            .collect();
+                        let mut out = std::vec![f64::NAN; rhs.len()];
+                        let end = k
+                            .vectorize(&mut lanes::Batch {
+                                factors: &f,
+                                count,
+                                rhs: &rhs,
+                                out: &mut out,
+                                start: 0,
+                            })
+                            .unwrap();
+                        f.solve_columns(count, &rhs, &mut out, end).unwrap();
+                        for column in 0..count {
+                            let single: std::vec::Vec<_> =
+                                (0..n).map(|row| rhs[row * count + column]).collect();
+                            let mut expected = std::vec![0.0; n];
+                            f.solve_into(&single, &mut expected).unwrap();
+                            for row in 0..n {
+                                assert_eq!(
+                                    out[row * count + column].to_bits(),
+                                    expected[row].to_bits(),
+                                    "{}: n={n} count={count} row={row} column={column}",
+                                    K::NAME
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            // One failing lane must reject the group on every backend, even
+            // if other lanes have finite results. Include every lane position.
+            let mut p = [0.0];
+            let diagonal = [f64::from_bits(1)];
+            let f = DominantTridiagonal::new(&[], &diagonal, &[])
+                .unwrap()
+                .factor_into(&mut p, &mut [])
+                .unwrap();
+            for at in 0..K::LANES {
+                let mut rhs = std::vec![0.0; K::LANES];
+                rhs[at] = 1.0;
+                let mut out = std::vec![0.0; K::LANES];
+                assert_eq!(
+                    k.vectorize(&mut lanes::Batch {
+                        factors: &f,
+                        count: K::LANES,
+                        rhs: &rhs,
+                        out: &mut out,
+                        start: 0,
+                    }),
+                    Err(Error::Range)
+                );
+            }
+        }
+    }
+    for backend in crate::lanes::tests::backends() {
+        backend.vectorize(Check);
+    }
+}

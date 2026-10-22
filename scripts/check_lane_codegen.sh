@@ -13,6 +13,9 @@
 # backend) and disassembles them; test functions are not checked. The only
 # calls allowed are the store and load at `lanes::cold` and the scalar-only
 # prefix `ln::lanes::finish_ln_1p`, to enter and leave the vector wrapper.
+# The batched tridiagonal solve must also contain packed division in both
+# vector widths, with no fused operations: scalar-only dispatch would satisfy
+# numerical tests while failing to provide the promised SIMD implementation.
 # Exit 1 on a violation, 2 when the check cannot run or the
 # binary has no AVX2 or AVX-512F kernels to check. x86-64 only; needs objdump.
 set -eu
@@ -37,6 +40,14 @@ objdump -d --no-show-raw-insn -C "$binary" | awk '
         if (fn ~ /^morphiq_numerics_arch::x86_64::avx512_run(::)?</) avx512++
         next
     }
+    /vdivpd/ && fn ~ /tridiagonal::lanes::Batch/ {
+        if (fn ~ /avx2_run/ && /%ymm/) tri_avx2++
+        if (fn ~ /avx512_run/ && /%zmm/) tri_avx512++
+    }
+    /vf(m|nm)(add|sub)/ && fn ~ /tridiagonal::lanes::Batch/ {
+        printf "fused operation in %s\n", fn > "/dev/stderr"
+        fused++
+    }
     /call.*helpers::(avx2|avx512)::/ {
         if (fn ~ /::tests::/) next
         if (fn ~ /^morphiq_numerics::(lanes::cold|ln::lanes::finish_ln_1p)(::)?</ && /helpers::(avx2|avx512)::(load|store)>/) next
@@ -44,6 +55,10 @@ objdump -d --no-show-raw-insn -C "$binary" | awk '
     }
     END {
         if (!avx2 || !avx512) { print "no AVX2 or AVX-512F kernels in the binary" > "/dev/stderr"; exit 2 }
+        if (!tri_avx2 || !tri_avx512 || fused) {
+            print "tridiagonal lanes require AVX2/AVX-512 packed division without FMA" > "/dev/stderr"
+            exit 1
+        }
         n = 0
         for (f in bad) { printf "%5d out-of-line lane operations in %s\n", bad[f], f; n++ }
         if (n) exit 1

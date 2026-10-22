@@ -71,6 +71,52 @@ solve arithmetic failures can leave partially written buffers; discard those
 contents. No factors escape a failed factorization. No operation changes matrix
 or RHS entries. Empty operations succeed without indexing a buffer.
 
+## SIMD across right-hand sides
+
+`ThomasFactors::solve_many_into(rhs_count, rhs, out)` solves multiple RHSs
+against the same factors. Slices have exactly `n * rhs_count` entries, interleaved
+by row: `(row, column)` lives at `row * rhs_count + column`. This layout permits
+contiguous lane loads/stores without allocation or packing inside the API.
+Factorization is still performed once, using the scalar API. Certification is
+still per vector; callers can gather a column into their own storage to certify it.
+Different matrices require separate factor objects and calls.
+
+With `simd`, the existing safe lane layer executes independent RHS columns on
+SSE2 (2 lanes), AVX2 (4), AVX-512F (8), or ARM NEON (2). With `std`, availability
+is detected at runtime; otherwise target features determine availability.
+Dispatch cascades from wider to narrower available backends, then uses scalar
+code for the final column. Without SIMD, every column uses the scalar recurrence.
+No rows are parallelized, and no reciprocal or FMA replaces a scalar operation.
+There are no padded lanes whose artificial values might cause a range failure.
+
+The per-lane equivalence argument is induction on the forward row, followed by
+reverse induction on the backward row: a lane starts with the same RHS/pivot,
+then applies the same separately rounded multiply, subtract and divide to the
+same previous lane value and shared coefficients. The row-interleaved address
+maps only that RHS into its lane. Thus every successful column has exactly the
+`solve_into` bits, including signed zero and gradual underflow. Existing lane
+primitive contracts supply the arithmetic premise. This is a source-level
+argument supported by forced-backend tests and the cross-target digest, not an
+extracted/compiler-verified SIMD proof. The scalar certificate theorem applies
+to each finite column independently, without a new accuracy claim.
+
+Dimensions use checked multiplication. Shape and nonfinite-input errors leave
+the entire output untouched. Any nonfinite intermediate lane returns `Range`;
+all output must then be discarded, because partial writes and traversal order
+can differ by backend. Zero RHSs or zero rows succeed with empty slices. Total
+work is O(n * rhs_count), output is 8*n*rhs_count bytes, and auxiliary storage
+is bounded by the backend width. Shared factor storage does not grow with the
+batch size. The API does not allocate or change any scalar entry point's bits.
+
+Exact manufactured systems test distinct columns and row boundaries. Independent
+rational fixtures check batched solutions against their exact bounds. Forced
+backend tests compare scalar bits at short, full-width and remainder sizes,
+including mixed signs, subnormals and range failures. The benchmark's `--batches`
+mode compares the batched API with independent scalar calls on the same RHSs;
+both interleaved and column-contiguous layouts are prepared before timing, so
+packing costs are excluded and must be measured separately by consumers that
+need conversion. SIMD implementation is not a native speedup claim.
+
 ## Numerical certificate
 
 `solve_into` returns a finite fixed-order approximation on success. It does not
@@ -150,6 +196,7 @@ derivation above is self-contained; see also R. S. Varga,
 [*Matrix Iterative Analysis*, 2nd ed., Springer (2000)](https://link.springer.com/book/10.1007/978-3-642-05156-2)
 for background on matrix properties and iterative methods.
 
-Performance protocols, raw samples, qualification status and release tracking
-belong to issue #219 and its pull request. Consumer adoption requires separate
+Native performance protocols, raw samples and qualification belong to #152
+under performance epic #149. Implementation and release tracking belong to #219
+and its pull request. Consumer adoption requires separate
 qualification of matrix coverage and composed numerical error.

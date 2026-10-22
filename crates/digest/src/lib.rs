@@ -903,6 +903,7 @@ pub fn corpus_digest() -> [u8; 32] {
     // stream changes. Independent inputs also keep future extension local.
     log_normalization_section(&mut r);
     tridiagonal_section(&mut r);
+    tridiagonal_batch_section(&mut r);
 
     r.0.finalize().into()
 }
@@ -1343,5 +1344,60 @@ fn normal_distribution_section(r: &mut Recorder, words: &mut Words) {
                 }
             }
         }
+    }
+}
+
+fn tridiagonal_batch_section(r: &mut Recorder) {
+    r.label("linalg::tridiagonal::solve_many_into");
+    for scale in [1.0, -1.0, f64::MIN_POSITIVE / 16.0, 1e270] {
+        let lower = [-scale; 16];
+        let diagonal = [4.0 * scale; 17];
+        let upper = [0.5 * scale; 16];
+        for n in [0_usize, 1, 2, 3, 17] {
+            let a = DominantTridiagonal::new(
+                &lower[..n.saturating_sub(1)],
+                &diagonal[..n],
+                &upper[..n.saturating_sub(1)],
+            )
+            .unwrap();
+            let mut p = [0.0; 17];
+            let mut c = [0.0; 16];
+            let f = a
+                .factor_into(&mut p[..n], &mut c[..n.saturating_sub(1)])
+                .unwrap();
+            let mut rhs = [0.0; 17 * 17];
+            let mut out = [0.0; 17 * 17];
+            for count in [0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17] {
+                for (i, x) in rhs[..n * count].iter_mut().enumerate() {
+                    *x = f64::from(i32::try_from((i * 7) % 19).unwrap() - 9) * scale;
+                }
+                f.solve_many_into(count, &rhs[..n * count], &mut out[..n * count])
+                    .unwrap();
+                for &x in &out[..n * count] {
+                    r.f64(x);
+                }
+            }
+            if n > 0 {
+                tridiagonal_error(r, f.solve_many_into(1, &rhs[..n], &mut []).unwrap_err());
+                tridiagonal_error(r, f.solve_many_into(usize::MAX, &[], &mut []).unwrap_err());
+                rhs[n * 9 - 1] = f64::NAN;
+                tridiagonal_error(
+                    r,
+                    f.solve_many_into(9, &rhs[..n * 9], &mut out[..n * 9])
+                        .unwrap_err(),
+                );
+            }
+        }
+    }
+    let mut pivots = [0.0];
+    let diagonal = [f64::from_bits(1)];
+    let f = DominantTridiagonal::new(&[], &diagonal, &[])
+        .unwrap()
+        .factor_into(&mut pivots, &mut [])
+        .unwrap();
+    for column in 0..9 {
+        let mut rhs = [0.0; 9];
+        rhs[column] = 1.0;
+        tridiagonal_error(r, f.solve_many_into(9, &rhs, &mut [0.0; 9]).unwrap_err());
     }
 }

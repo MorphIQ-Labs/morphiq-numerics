@@ -1,4 +1,4 @@
-//! Native paired tridiagonal timings. Protocol and acceptance are in issue #219.
+//! Native paired tridiagonal timings. Protocol and native qualification are in #152 under epic #149.
 //! Exact synthetic inputs; preallocated buffers; no oracle in timed loops.
 use morphiq_numerics::linalg::tridiagonal::DominantTridiagonal;
 use std::{hint::black_box, time::Instant};
@@ -101,14 +101,44 @@ impl Work {
         f.solve_into(&self.rhs, &mut self.out).unwrap();
         // Independent RHS/output pairs for eight systems sharing one matrix.
         // Both allocation and construction are outside the timed interval.
-        let bank: Vec<Vec<f64>> = if method == "independent8" {
-            (1..=8)
-                .map(|k| self.rhs.iter().map(|x| x * f64::from(k)).collect())
+        let bank_count = if method == "independent8" {
+            8
+        } else {
+            rhs_count
+        };
+        let bank: Vec<Vec<f64>> = if matches!(method, "independent8" | "independent" | "batched") {
+            (1..=bank_count)
+                .map(|k| {
+                    self.rhs
+                        .iter()
+                        .map(|x| x * f64::from(u32::try_from(k).unwrap()))
+                        .collect()
+                })
                 .collect()
         } else {
             Vec::new()
         };
         let mut results: Vec<Vec<f64>> = bank.iter().map(|_| vec![0.0; self.out.len()]).collect();
+        // Both layouts are prepared before timing. This comparison measures
+        // solve APIs; callers that need packing must measure that cost too.
+        let interleaved: Vec<_> = if bank.is_empty() {
+            Vec::new()
+        } else {
+            (0..self.rhs.len() * bank_count)
+                .map(|at| bank[at % bank_count][at / bank_count])
+                .collect()
+        };
+        let mut batch_out = vec![0.0; interleaved.len()];
+        if !bank.is_empty() {
+            f.solve_many_into(bank_count, &interleaved, &mut batch_out)
+                .unwrap();
+            for (column, (rhs, out)) in bank.iter().zip(&mut results).enumerate() {
+                f.solve_into(rhs, out).unwrap();
+                for (row, &x) in out.iter().enumerate() {
+                    assert_eq!(x.to_bits(), batch_out[row * bank_count + column].to_bits());
+                }
+            }
+        }
         let start = Instant::now();
         match method {
             "chain" => {
@@ -119,7 +149,18 @@ impl Work {
                     black_box(&self.rhs);
                 }
             }
-            "independent8" => {
+            "batched" => {
+                for _ in 0..count {
+                    f.solve_many_into(
+                        bank_count,
+                        black_box(&interleaved),
+                        black_box(&mut batch_out),
+                    )
+                    .unwrap();
+                    black_box(&batch_out);
+                }
+            }
+            "independent8" | "independent" => {
                 for _ in 0..count {
                     for (rhs, out) in bank.iter().zip(&mut results) {
                         f.solve_into(black_box(rhs), black_box(out)).unwrap();
@@ -265,6 +306,7 @@ fn main() {
         return;
     }
     println!("kind,n,rhs,pair,method,round,position,calls,elapsed_ns");
+    let batches = args.get(1).is_some_and(|s| s == "--batches");
     let compositions = args.get(1).is_some_and(|s| s == "--compositions");
     for n in [1, 3, 17, 401, 4096] {
         let kinds: &[&str] = if compositions {
@@ -288,6 +330,12 @@ fn main() {
             }
             if compositions {
                 pairs = vec![("chain", "solve", 1), ("independent8", "solve", 8)];
+            }
+            if batches {
+                pairs = [1, 2, 3, 4, 7, 8, 9, 17, 64]
+                    .into_iter()
+                    .map(|rhs| ("batched", "independent", rhs))
+                    .collect();
             }
             for (a, b, rhs) in pairs {
                 let counts = [a, b].map(|method| {
