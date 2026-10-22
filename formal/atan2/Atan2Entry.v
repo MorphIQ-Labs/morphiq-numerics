@@ -81,3 +81,86 @@ Proof.
     + exfalso. lia.
     + rewrite Hneg, Hbv. reflexivity.
 Qed.
+
+Lemma angle_real_pos a b neg : 0 < a -> 0 < b -> 0 < angle_real a b neg.
+Proof.
+  intros Ha Hb. unfold angle_real. pose proof pi_gt_3 as P3.
+  pose proof (atan_bound (a / b)) as [A1 A2]. pose proof (atan_bound (b / a)) as [B1 B2].
+  assert (Pab : 0 < a / b) by (apply Rdiv_lt_0_compat; lra). assert (Pba : 0 < b / a) by (apply Rdiv_lt_0_compat; lra).
+  pose proof (atan_pos _ Pab) as C1. pose proof (atan_pos _ Pba) as C2.
+  destruct (Rle_dec a b); destruct neg; lra.
+Qed.
+
+Lemma sign_finish Z yv xv neg a b : 0 < a -> 0 < b -> Z = angle_real a b neg ->
+  (yv = a \/ yv = - a) -> ((xv = b /\ neg = false) \/ (xv = - b /\ neg = true)) ->
+  exists sgn : R, (sgn = 1 \/ sgn = -1) /\ atan2R yv xv = sgn * Z /\ ((yv = a) -> sgn = 1) /\ ((yv = - a) -> sgn = -1).
+Proof.
+  intros Ha Hb HZ Hy Hx. subst Z.
+  destruct Hy as [-> | ->]; destruct Hx as [[-> ->] | [-> ->]].
+  - exists 1. refine (conj (or_introl eq_refl) (conj _ (conj (fun _ => eq_refl) (fun H => _)))); [rewrite atan2R_q1 by assumption; ring | lra].
+  - exists 1. refine (conj (or_introl eq_refl) (conj _ (conj (fun _ => eq_refl) (fun H => _)))); [rewrite atan2R_q2 by assumption; ring | lra].
+  - exists (-1). refine (conj (or_intror eq_refl) (conj _ (conj (fun H => _) (fun _ => eq_refl)))); [rewrite atan2R_q3 by assumption; ring | lra].
+  - exists (-1). refine (conj (or_intror eq_refl) (conj _ (conj (fun H => _) (fun _ => eq_refl)))); [rewrite atan2R_q4 by assumption; ring | lra].
+Qed.
+
+Definition atan2_certified_pair (y x : f64) : Prop :=
+  angle_certified (aw (Z.land (bits_of_b64 y) (asin_sign_bit - 1))) (aw (Z.land (bits_of_b64 x) (asin_sign_bit - 1)))
+    (negb (Z.land (bits_of_b64 x) asin_sign_bit =? 0)%Z).
+
+Theorem atan2_entry_finite y x : finite y -> finite x -> B y <> 0 -> B x <> 0 ->
+  finite (atan2_entry y x) /\
+  Rabs (B (atan2_entry y x) - atan2R (B y) (B x)) <= (/ 2 + bpow radix2 (-137)) * ulpF (B (atan2_entry y x)) /\
+  (atan2_certified_pair y x -> B (atan2_entry y x) = rndF (atan2R (B y) (B x))) /\
+  (Stable190 (Rabs (atan2R (B y) (B x))) -> B (atan2_entry y x) = rndF (atan2R (B y) (B x))).
+Proof.
+  intros Fy Fx Ny Nx.
+  assert (Hny : asin_is_nan y = false) by (destruct y; first [reflexivity | discriminate Fy]).
+  assert (Hnx : asin_is_nan x = false) by (destruct x; first [reflexivity | discriminate Fx]).
+  destruct (abs_split y Fy) as [ny [Ry [Hay [Fay [Nay Hsy]]]]].
+  destruct (abs_split x Fx) as [nx [Rx [Hax [Fax [Nax Hsx]]]]].
+  set (a := b64_of_bits ny) in *. set (b := b64_of_bits nx) in *.
+  assert (Pa : 0 < B a) by (destruct Hsy as [[_ E] | [_ E]]; [lra | lra]).
+  assert (Pb : 0 < B b) by (destruct Hsx as [[_ E] | [_ E]]; [lra | lra]).
+  assert (Hneg : (negb (Z.land (bits_of_b64 x) asin_sign_bit =? 0)%Z = true) <-> (exists m, bits_of_b64 x = (m + 2 ^ 63)%Z /\ (0 <= m < 2 ^ 63)%Z)).
+  { destruct Hsx as [[Hb _] | [Hb _]]; rewrite Hb.
+    - unfold asin_sign_bit. rewrite (proj1 (land_sign nx Rx)). simpl. split; [discriminate | intros [m [Hm Hr]]; lia].
+    - unfold asin_sign_bit. rewrite (proj2 (land_sign nx Rx)). simpl. split; [intros _; exists nx; split; [reflexivity | exact Rx] | reflexivity]. }
+  destruct (cls_pos a Fay Pa) as [E0a Eia]. destruct (cls_pos b Fax Pb) as [E0b Eib].
+  unfold atan2_entry. rewrite Hny, Hnx. rewrite Hay, Hax. cbv zeta. rewrite E0a, E0b, Eia, Eib. cbv iota.
+  set (neg := negb (Z.land (bits_of_b64 x) asin_sign_bit =? 0)%Z) in *.
+  destruct (angle_ok a b neg Fay Fax Pa Pb) as [FM [NM [Ub [Cert St]]]].
+  set (M := atan2_angle a b neg) in *.
+  destruct (ws_nonneg M y FM NM) as [Fw [Wp Wn]].
+  pose proof (angle_real_pos (B a) (B b) neg Pa Pb) as Zpos.
+  set (Z := angle_real (B a) (B b) neg) in *.
+  assert (Hcp : atan2_certified_pair y x = angle_certified a b neg) by (unfold atan2_certified_pair; rewrite Hay, Hax; reflexivity).
+  split; [exact Fw | ].
+  assert (Hq : forall sgn : R, (sgn = 1 \/ sgn = -1) -> B (asin_with_sign M y) = sgn * B M -> atan2R (B y) (B x) = sgn * Z ->
+    Rabs (B (asin_with_sign M y) - atan2R (B y) (B x)) <= (/ 2 + bpow radix2 (-137)) * ulpF (B (asin_with_sign M y)) /\
+    (angle_certified a b neg -> B (asin_with_sign M y) = rndF (atan2R (B y) (B x))) /\
+    (Stable190 (Rabs (atan2R (B y) (B x))) -> B (asin_with_sign M y) = rndF (atan2R (B y) (B x)))).
+  { intros sgn Hs Hw Hsp. rewrite Hw, Hsp.
+    destruct Hs as [-> | ->].
+    - rewrite !Rmult_1_l. split; [exact Ub | split; [exact Cert | ]]. rewrite Rabs_pos_eq by lra. exact St.
+    - replace (-1 * B M - -1 * Z) with (- (B M - Z)) by ring. rewrite Rabs_Ropp.
+      replace (-1 * B M) with (- B M) by ring. rewrite ulp_opp.
+      split; [exact Ub | split].
+      + intros C. replace (-1 * Z) with (- Z) by ring. rewrite round_NE_opp_ne. rewrite (Cert C). reflexivity.
+      + intros S. replace (-1 * Z) with (- Z) by ring. rewrite round_NE_opp_ne. rewrite St; [reflexivity | ].
+        replace (-1 * Z) with (- Z) in S by ring. rewrite Rabs_Ropp, Rabs_pos_eq in S by lra. exact S. }
+  assert (Hy : B y = B a \/ B y = - B a) by (destruct Hsy as [[_ E] | [_ E]]; [left; exact E | right; exact E]).
+  assert (Hx : (B x = B b /\ neg = false) \/ (B x = - B b /\ neg = true)).
+  { destruct Hsx as [[Hb' E] | [Hb' E]].
+    - left. split; [exact E | ]. destruct neg eqn:En; [exfalso | reflexivity].
+      destruct (proj1 Hneg eq_refl) as [m [Hm Hr]]. lia.
+    - right. split; [exact E | ]. destruct neg eqn:En; [reflexivity | exfalso].
+      assert (Ht : false = true) by (apply (proj2 Hneg); exists nx; split; [exact Hb' | exact Rx]). discriminate Ht. }
+  destruct (sign_finish Z (B y) (B x) neg (B a) (B b) Pa Pb eq_refl Hy Hx) as [sgn [Hs [Hsp [Hpos' Hneg']]]].
+  destruct Hsy as [[Hby By] | [Hby By]].
+  - assert (Hs1 : sgn = 1) by (apply Hpos'; exact By).
+    assert (Hw : B (asin_with_sign M y) = sgn * B M) by (rewrite Hs1, Rmult_1_l; apply Wp; lia).
+    destruct (Hq sgn Hs Hw Hsp) as [U [C S']]. rewrite Hcp. exact (conj U (conj C S')).
+  - assert (Hs1 : sgn = -1) by (apply Hneg'; exact By).
+    assert (Hw : B (asin_with_sign M y) = sgn * B M) by (rewrite Hs1; replace (-1 * B M) with (- B M) by ring; apply Wn; lia).
+    destruct (Hq sgn Hs Hw Hsp) as [U [C S']]. rewrite Hcp. exact (conj U (conj C S')).
+Qed.
