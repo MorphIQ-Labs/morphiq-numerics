@@ -42,3 +42,4 @@ Proof.
         assert (Hb : Z.testbit (Z.land x (Z.lnot x)) (k - 1) = false) by (rewrite L; apply Z.bits_0).
         rewrite Z.land_spec in Hb. rewrite Hb, Z.bits_0. reflexivity.
 Qed.
+
