@@ -757,3 +757,59 @@ Print Assumptions AsinEntry.asin_entry_finite.
 Print Assumptions AsinEntry.asin_entry_nan.
 Print Assumptions AsinEntry.asin_entry_inf.
 Print Assumptions AsinEntry.asin_entry_large.
+Require Atan2Segments.
+Print Assumptions Atan2Segments.fast_table.
+Require Atan2SeriesSmall.
+Print Assumptions Atan2SeriesSmall.atan2_series_eval.
+Print Assumptions Atan2SeriesSmall.atan2_series_tiny.
+Require Atan2Within.
+Print Assumptions Atan2Within.approx_series_a.
+Require Atan2Fast.
+Print Assumptions Atan2Fast.fast_dw_a.
+Require Atan2Ratio.
+Print Assumptions Atan2Ratio.ratio_core.
+Require Atan2Decide.
+Print Assumptions Atan2Decide.decide_with_ok_a.
+Require Atan2Forms.
+Print Assumptions Atan2Forms.post_ok.
+Require Atan2FastPath.
+Print Assumptions Atan2FastPath.atan2_fast_ok.
+Require Atan2Recip.
+Print Assumptions Atan2Recip.atan2_recip_ok.
+Require Atan2Newton.
+Print Assumptions Atan2Newton.newton_exact.
+Require Atan2NewtonReal.
+Print Assumptions Atan2NewtonReal.newton_atan_P.
+Print Assumptions Atan2NewtonReal.newton_atan_final.
+Require Atan2Accurate.
+Print Assumptions Atan2Accurate.newton_phi1_ok.
+Print Assumptions Atan2Accurate.atan2_accurate_ok.
+Require Atan2Angle.
+Print Assumptions Atan2Angle.accurate_ulp.
+Print Assumptions Atan2Angle.atan2_main_ok.
+Require Atan2Consts.
+Print Assumptions Atan2Consts.pi_rn.
+Print Assumptions Atan2Consts.half_pi_rn_a.
+Print Assumptions Atan2Consts.quarter_pi_rn.
+Print Assumptions Atan2Consts.three_quarter_pi_rn.
+Require Atan2Decode.
+Print Assumptions Atan2Decode.odd_part_ok.
+Require Atan2TinyMid.
+Print Assumptions Atan2TinyMid.gap_rel.
+Print Assumptions Atan2TinyMid.exact_mid.
+Require Atan2Tiny.
+Print Assumptions Atan2Tiny.tiny_phi_ok.
+Require Atan2Angle2.
+Print Assumptions Atan2Angle2.angle_core.
+Print Assumptions Atan2Angle2.angle_ok.
+Require Atan2Entry.
+Print Assumptions Atan2Entry.atan2_entry_finite.
+Print Assumptions Atan2Entry.atan2_entry_correct.
+Print Assumptions Atan2Entry.table_y_zero.
+Print Assumptions Atan2Entry.table_x_zero.
+Print Assumptions Atan2Entry.table_x_inf.
+Print Assumptions Atan2Entry.table_y_inf_x_finite.
+Print Assumptions Atan2Entry.table_y_inf_x_inf.
+Print Assumptions Atan2Entry.entry_nan.
+Print Assumptions Atan2Entry.entry_y_zero_x_pos.
+Print Assumptions Atan2Entry.pair_classes.
