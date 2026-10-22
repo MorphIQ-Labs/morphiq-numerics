@@ -95,3 +95,44 @@ Proof.
   rewrite Rabs_mult, (Rabs_pos_eq S) by lra.
   apply Rmult_le_compat_r; [lra | apply Rle_trans with (2 := EA); exact Err].
 Qed.
+
+(** The exact angle of each form. *)
+Definition form_value (f : form) (phi : R) : R :=
+  match f with
+  | Phi => phi
+  | HalfPiMinus => PI / 2 - phi
+  | HalfPiPlus => PI / 2 + phi
+  | PiMinus => PI - phi
+  end.
+
+(** The numeric core of one form: [y] within [2^-104] of [C +- phihat], [C] within [1e-32] of
+    the constant [K], [phihat] within [eF] of [phi]. *)
+Lemma form_num K s C phi phihat y eF : (s = 1 \/ s = -1) -> 1.5707 <= K -> 0 < phi <= 0.7854 ->
+  Rabs (C - K) <= / 100000000000000000000000000000000 -> Rabs (phihat - phi) <= eF * phi ->
+  0 <= eF <= / 9223372036854775808 * 1.0001 -> 0 < C + s * phihat ->
+  Rabs (y - (C + s * phihat)) <= bpow radix2 (-104) * (C + s * phihat) ->
+  0.78 <= K + s * phi ->
+  Rabs (y - (K + s * phi)) <= bpow radix2 (-62) * (K + s * phi).
+Proof.
+  intros Hs HK Hphi HC Hph HeF HS Hy HZ.
+  assert (b104 : bpow radix2 (-104) = / 20282409603651670423947251286016) by (bpow_num; reflexivity).
+  assert (b62 : bpow radix2 (-62) = / 4611686018427387904) by (bpow_num; reflexivity).
+  rewrite b104 in Hy. rewrite b62.
+  assert (Hsd : Rabs ((C + s * phihat) - (K + s * phi)) <= / 100000000000000000000000000000000 + eF * phi).
+  { replace ((C + s * phihat) - (K + s * phi)) with ((C - K) + s * (phihat - phi)) by ring.
+    apply Rle_trans with (Rabs (C - K) + Rabs (s * (phihat - phi))); [apply Rabs_triang | ].
+    rewrite Rabs_mult. assert (Rabs s = 1) by (destruct Hs as [E | E]; rewrite E; [apply Rabs_R1 | rewrite Rabs_left by lra; ring]).
+    rewrite H. lra. }
+  set (Z := K + s * phi) in *. set (S := C + s * phihat) in *.
+  apply Rabs_le_inv in Hy as [Hy1 Hy2]. apply Rabs_le_inv in Hsd as [Hd1 Hd2].
+  assert (Hphi_le : phi <= 1.01 * Z) by lra.
+  assert (HeFphi : eF * phi <= eF * (1.01 * Z)) by (apply Rmult_le_compat_l; lra).
+  assert (HeF2 : eF * (1.01 * Z) <= / 4611686018427387904 * 0.51 * Z).
+  { assert (eF * 1.01 <= / 4611686018427387904 * 0.51) by lra. nra. }
+  assert (HSZ : S <= Z + / 100000000000000000000000000000000 + eF * phi) by lra.
+  assert (HyS : / 20282409603651670423947251286016 * S <= / 20282409603651670423947251286016 * 1.0001 * Z).
+  { assert (/ 100000000000000000000000000000000 + eF * phi <= 0.0001 * Z) by nra.
+    assert (S <= 1.0001 * Z) by lra. nra. }
+  assert (Hc0 : / 100000000000000000000000000000000 <= / 4611686018427387904 * 0.01 * Z) by nra.
+  apply Rabs_le. split; nra.
+Qed.
