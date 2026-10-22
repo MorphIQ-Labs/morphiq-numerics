@@ -162,3 +162,37 @@ Proof.
         { assert (bpow radix2 (-108) <= / 2) by (apply Rle_trans with (bpow radix2 (-1)); [apply bpow_le; lia | change (bpow radix2 (-1)) with (/ 2); lra]). nra. }
         lra.
 Qed.
+
+(** A quotient that is a midpoint: the odd parts and exponents agree, and the midpoint lies in the
+    subnormal range, [(2k + 1) 2^-1075] with [0 <= k < 2^52]. *)
+Theorem exact_mid nv dv mn en md ed u :
+  fmtF u -> 0 <= u ->
+  Z.odd mn = true -> (0 < mn < 2 ^ 53)%Z -> nv = IZR mn * bpow radix2 en ->
+  Z.odd md = true -> (0 < md < 2 ^ 53)%Z -> dv = IZR md * bpow radix2 ed ->
+  0 < dv -> nv / dv = (u + succ radix2 fexp64 u) / 2 ->
+  exists k, (0 <= k < 2 ^ 52)%Z /\ mn = ((2 * k + 1) * md)%Z /\ en = (ed - 1075)%Z.
+Proof.
+  intros Fu U0 Omn Hmn Hn Omd Hmd Hd Pd E.
+  destruct (midpoint_form u Fu U0) as [mu [c [Hmu [Hc [Hu [Hmid [Hnorm Hsub]]]]]]].
+  rewrite Hmid in E.
+  assert (Hnv : nv = IZR ((2 * mu + 1) * md) * bpow radix2 (c + ed)).
+  { assert (Hdv : dv <> 0) by lra. apply (Rmult_eq_reg_r (/ dv)); [ | apply Rinv_0_lt_compat in Pd; lra].
+    unfold Rdiv in E. rewrite E. rewrite Hd. rewrite mult_IZR, bpow_plus.
+    field. split; [apply Rgt_not_eq; apply bpow_gt_0 | ].
+    assert (0 < IZR md) by (apply IZR_lt; lia). lra. }
+  assert (Hodd : Z.odd ((2 * mu + 1) * md) = true).
+  { rewrite Z.odd_mul, Omd. assert (Z.odd (2 * mu + 1) = true) by (apply Z.odd_spec; exists mu; reflexivity). rewrite H. reflexivity. }
+  destruct (odd_unique mn ((2 * mu + 1) * md) en (c + ed) Omn Hodd ltac:(lia) ltac:(nia)
+    ltac:(rewrite <- Hn; exact Hnv)) as [Een Emn].
+  assert (Hu_lt : u < bpow radix2 (-1022)).
+  { destruct (Rlt_le_dec u (bpow radix2 (-1022))) as [Lt | Ge]; [exact Lt | exfalso].
+    pose proof (Hnorm Ge) as H52. nia. }
+  assert (Hc2 : c = (-1075)%Z) by exact (Hsub Hu_lt).
+  assert (Hlt : (mu < 2 ^ 52)%Z).
+  { apply lt_IZR. rewrite izr_pow2 by lia.
+    rewrite Hc2 in Hu. replace (-1075 + 1)%Z with (-1074)%Z in Hu by reflexivity.
+    assert (E52 : bpow radix2 (-1022) = bpow radix2 52 * bpow radix2 (-1074)) by (rewrite <- bpow_plus; reflexivity).
+    rewrite Hu, E52 in Hu_lt. apply (Rmult_lt_reg_r (bpow radix2 (-1074))); [apply bpow_gt_0 | exact Hu_lt]. }
+  exists mu. refine (conj (conj (proj1 Hmu) Hlt) (conj Emn _)).
+  lia.
+Qed.
