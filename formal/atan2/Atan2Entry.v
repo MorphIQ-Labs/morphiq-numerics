@@ -321,3 +321,53 @@ Proof.
   intros Hx H. rewrite (entry_eval _ x (nan_false_zero sy) Hx), abs_zero_a, (neg_of x H). unfold entry_mag. rewrite zero_val_a.
   destruct sy; vm_compute; reflexivity.
 Qed.
+
+Lemma fin_nonzero s m e H : B (B754_finite 53 1024 s m e H) <> 0.
+Proof.
+  intros Z0. cbn [B2R] in Z0. apply eq_0_F2R in Z0. destruct s; cbn in Z0; lia.
+Qed.
+
+(** Every pair of binary64 values falls in one of the cases proved above. *)
+Theorem pair_classes y x :
+  asin_is_nan y = true \/ asin_is_nan x = true \/
+  (exists sy, y = B754_zero 53 1024 sy) \/
+  (exists sy sx, y = B754_infinity 53 1024 sy /\ x = B754_infinity 53 1024 sx) \/
+  (exists sy, y = B754_infinity 53 1024 sy /\ finite x) \/
+  (finite y /\ B y <> 0 /\ exists sx, x = B754_zero 53 1024 sx) \/
+  (finite y /\ B y <> 0 /\ exists sx, x = B754_infinity 53 1024 sx) \/
+  (finite y /\ B y <> 0 /\ finite x /\ B x <> 0).
+Proof.
+  destruct y as [sy | sy | sy ply Hy | sy my ey Hy]; destruct x as [sx | sx | sx plx Hx | sx mx ex Hx].
+  - right; right; left. exists sy. reflexivity.
+  - right; right; left. exists sy. reflexivity.
+  - right; left. reflexivity.
+  - right; right; left. exists sy. reflexivity.
+  - right; right; right; right; left. exists sy. split; reflexivity.
+  - right; right; right; left. exists sy, sx. split; reflexivity.
+  - right; left. reflexivity.
+  - right; right; right; right; left. exists sy. split; reflexivity.
+  - left. reflexivity.
+  - left. reflexivity.
+  - left. reflexivity.
+  - left. reflexivity.
+  - right; right; right; right; right; left. split; [reflexivity | split; [apply fin_nonzero | exists sx; reflexivity]].
+  - right; right; right; right; right; right; left. split; [reflexivity | split; [apply fin_nonzero | exists sx; reflexivity]].
+  - right; left. reflexivity.
+  - right; right; right; right; right; right; right. split; [reflexivity | split; [apply fin_nonzero | split; [reflexivity | apply fin_nonzero]]].
+Qed.
+
+(** The published worst-case search (CORE-MATH's [atan2] list, docs/atan2.md): no binary64 midpoint
+    within [2^-190] (relatively) of the angle of a pair the rounding test and the tiny path leave
+    to the accurate path. Under it, every finite nonzero pair is correctly rounded. *)
+Definition CoreMathAtan2 : Prop :=
+  forall y x, finite y -> finite x -> B y <> 0 -> B x <> 0 -> ~ atan2_certified_pair y x ->
+    Stable190 (Rabs (atan2R (B y) (B x))).
+
+Corollary atan2_entry_correct y x : CoreMathAtan2 -> finite y -> finite x -> B y <> 0 -> B x <> 0 ->
+  finite (atan2_entry y x) /\ B (atan2_entry y x) = rndF (atan2R (B y) (B x)).
+Proof.
+  intros CM Fy Fx Ny Nx. destruct (atan2_entry_finite y x Fy Fx Ny Nx) as [F [_ [C S]]].
+  refine (conj F _). destruct (Classical_Prop.classic (atan2_certified_pair y x)) as [H | H].
+  - exact (C H).
+  - exact (S (CM y x Fy Fx Ny Nx H)).
+Qed.
