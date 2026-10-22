@@ -49,6 +49,25 @@ implementation as the reference and the fallback; one the standard does not fix 
 not. A NaN's sign and payload are not fixed by the standard, so the hardware path
 is for arguments that are never NaN.
 
+### Survey
+
+Every operation IEEE 754 §5 fixes, against what the crate does in software:
+
+| Operation | In the crate | Disposition |
+|---|---|---|
+| `+ − × ÷` | the platform's | nothing to change |
+| `squareRoot` | the integer root; now `exact::sqrt` in `asin`, `asinh`, their lanes, `normal_pair` and `FiniteInterval::checked_sqrt` | hardware where the build has it; the public `sqrt` stays the `const fn` integer root |
+| `fusedMultiplyAdd` | Dekker's product in `eft::two_prod`; `eft::two_prod_d` (hardware on aarch64 and FMA builds) in `asin`, `asinh`, `atan2`, `erfcx`, the normal functions | each further site needs its own proof that its arguments are in `two_prod`'s domain (§2 of [lanes.md](lanes.md)); about 15 modules still call the public `two_prod` or `DoubleWord::mul`/`mul_f64`/`product`, listed by `grep two_prod`, and are the next candidates |
+| `roundToIntegralTiesToEven` | the `1.5·2^52` shifter in `exp`, `exp2`, `expm1`, `trig`, `erfcx`, the normal functions, `asin` and `atan2` | kept: x86-64 has no baseline instruction (`roundsd` is SSE4.1), the lane backends have no such operation, and the shifter is two additions on every target with the same bits |
+| `scaleB`, `copySign`, `abs`, `negate` | powers of two built from their bits; bit operations | no baseline hardware instruction, or already one operation |
+| `nextUp`, `nextDown`, `logB` | bit operations in `ulp` | exact and trivial; `core` has `next_up`/`next_down` |
+| conversions to and from integers | `as` | native |
+| `remainder`, `minNum`, `maxNum` | not used | |
+
+No other operation the standard fixes is implemented in software. Everything else in
+the crate that is not a binary64 operation (`Q128`, `Q256`, the Coq-checked integer
+limbs) is not one IEEE 754 defines.
+
 Checked by `exact::tests`, which compares the hardware root with the integer one
 on 800,000 encodings (every binade, the neighbourhood of exact squares, subnormals,
 infinity), and by the determinism digest, whose value is the same with and without

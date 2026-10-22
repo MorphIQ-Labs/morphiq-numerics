@@ -224,7 +224,7 @@ fn turn(k: u64) -> (f64, f64) {
 /// [`sincos`]: crate::elementary::sincos
 #[must_use]
 pub fn normal_pair(w1: u64, w2: u64) -> (f64, f64) {
-    let rho = crate::elementary::sqrt(-2.0 * crate::ln::ln(unit_open(w1)));
+    let rho = crate::exact::sqrt(-2.0 * crate::ln::ln(unit_open(w1)));
     let (c, s) = turn(w2 >> 11);
     (rho * c, rho * s)
 }
