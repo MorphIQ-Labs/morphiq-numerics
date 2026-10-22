@@ -18,7 +18,7 @@ constants are generated and every bound is a Gappa certificate in
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§6) | done by the formal lane (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
 | Coq transcription of the Rust (`formal/asinh/AsinhKernel.v`) compared with it bit for bit (§6) | **done**: fast path, rounding decision, exponential, accurate path (before rounding) and entry, 13,030 corpus cases; four planted faults (a series coefficient, the root's correction, Newton's residual sign, the large form's correction) each give mismatches. Proofs that it meets §3 and §4's bounds are not written |
 | ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `asinh_slice` | **done** (`asinh/lanes.rs`, [lanes.md](lanes.md)): bit-identical to `asinh` on every cascade over the fixture, thresholds, region edges and random encodings; run on NEON and on x86-64 SSE2 under Rosetta; AVX-512F is CI's SDE job |
-| Mutation witnesses | not done |
+| Mutation witnesses | **done** (§6): 98 mutants of `asinh/mod.rs` and `asinh/lanes.rs`, 72 caught, 22 unviable, 4 equivalent |
 | Same-host performance against the best alternatives | measured on NEON only: 1.01–1.66× over the scalar loop ([measurements](../crates/reference/measurements/asin-asinh-atan2-m1pro/README.md)); native x86 not measured |
 
 ## Sources
@@ -138,5 +138,14 @@ Tests:
   100,000 random arguments on which every fast-path decision equals the
   accurate path's result, and the accurate path against the fast value.
 - The formal lane's Coq proof of each certificate (`check_formal.sh` step 5).
+- **Mutation.** cargo-mutants over `asinh/mod.rs` and `asinh/lanes.rs`, built with the `simd` feature and
+  run against the unit tests, the reference fixture, the determinism digest and the lane suites,
+  generates 98 mutants: 72 are caught by a failing test and 22 do not compile. Four are equivalent:
+  - `<` against `==` or `<=` where `fast` chooses the series at `2^-7` (twice), and `<` against `<=`
+    where it chooses the large form at `2^28`: at the boundary point both forms are valid and the
+    results stay neighbouring values of one increasing function, which
+    `the_regions_agree_where_they_meet` pins;
+  - `>>` against `<<` in the lane's fallback loop: it only moves which decided lanes are recomputed by the
+    scalar function, whose result the lane equals bit for bit.
 - A negative control was run by hand: tightening `root.g`'s claim makes Gappa
   exit non-zero. It is not a gate.
