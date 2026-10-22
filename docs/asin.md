@@ -206,11 +206,15 @@ shared with `sin`. The certified fast bound is below `2^-63.5`.
   `CoreMath`, the certificates and the lemmas above; the primitive integers and floats that
   CoqInterval computes with are Coq's own axioms (`formal/axioms.int63.expected`,
   `formal/axioms.float.expected`).
-- **Not established:** that the Rust is the transcription, as a theorem.
-  `formal/asin/AsinKernel.v` transcribes `asin/mod.rs` operation for operation and the formal lane
-  runs it against the Rust on 19,532 corpus cases, so a difference in an operation, its order or a
-  table word shows (§7); no tool checks the Rust against the transcription beyond that corpus.
-  `CoreMath` is a published search, not proved here.
+- **Assurance level of the Rust link.** The Rust is tied to the proved transcription the way every
+  kernel here is (the pattern of #87): `formal/asin/AsinKernel.v` transcribes `asin/mod.rs`
+  operation for operation, and the formal lane extracts it and compares it with the Rust bit for bit on
+  19,532 corpus cases covering both paths, each branch and threshold, and inputs outside the proved
+  domains, so a difference in an operation, its order or a table word shows (§7). There is no
+  machine-checked equivalence of the Rust source with the transcription; the corpus is the evidence.
+- **Hypothesis.** `CoreMath` (no binary64 midpoint within `2^-124` relatively of `asin a`) is
+  CORE-MATH's published search, which this repository does not re-derive; `exp2` and `ln` carry the
+  same kind of stated hypothesis.
 - **Tested:** the fixture's 5,970 cases match bit for bit, including the 40
   hardest of [CM].
 
