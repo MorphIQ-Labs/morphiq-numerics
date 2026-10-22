@@ -264,3 +264,76 @@ Proof.
   exact (newton_atan_final (B n) (B d) t Y r (sin r) (cos r) w snv csv sg gm d1 d2 d3 d4 d6 (qval denq * qval (atan2_recip denq) - 1)
       g1 g4 g5 p1 p2 (qval numq) (qval denq) (qval (atan2_recip denq)) Ph (qval phi1q) Hd0 Ht0 Ht1 Hnt HYl HYt HY7' Hrw Hsnn Hs_le Hcl7 Hc1 Hex Dpos Hcub Hwb Hsg Hsg2 Hgm Hgm2 Ep1 Hd1' Ep2 Hd2' Hnu Hg1 Hdh Hd3' Hd4' Hg4 Hrih Hee Epr Hd6' HPw Hphi1 Hg5).
 Qed.
+
+Lemma bnd_room : bndN * 0.7854 + / 1000000000000000000000000000000000000000000000000000000000000000000000 <= bnd190 * 0.78.
+Proof. unfold bndN, bnd190. interval with (i_prec 300). Qed.
+
+Lemma bndN_le : bndN <= bnd190.
+Proof. unfold bndN, bnd190. interval with (i_prec 300). Qed.
+
+Theorem atan2_accurate_ok n d f ph pl :
+  finite n -> finite d -> finite ph -> finite pl ->
+  0 < B n -> B n <= B d -> bpow radix2 (-901) <= B n / B d ->
+  0 < B ph -> Rabs (B pl) <= bpow radix2 (-52) * B ph ->
+  Rabs (B ph + B pl - atan (B n / B d)) <= bpow radix2 (-63) * (1 + bpow radix2 (-39)) * atan (B n / B d) ->
+  Q256Real.valid (atan2_accurate_value n d f (ph, pl)) /\
+  Rabs (qval (atan2_accurate_value n d f (ph, pl)) - form_value f (atan (B n / B d))) <= bnd190 * form_value f (atan (B n / B d)).
+Proof.
+  intros Fn Fd Fph Fpl Hn0 Hnd Hq Hph0 Hpl Hst.
+  destruct (newton_phi1_ok n d ph pl Fn Fd Fph Fpl Hn0 Hnd Hq Hph0 Hpl Hst) as [V1 E1].
+  rewrite accurate_value_split.
+  set (t := B n / B d) in *. set (Y := atan t) in *.
+  assert (Ht0 : 0 < t) by (pose proof (bpow_gt_0 radix2 (-901)); lra).
+  assert (Ht1 : t <= 1).
+  { unfold t. assert (Hd0 : 0 < B d) by lra. apply Rmult_le_reg_r with (B d); [exact Hd0 | ]. unfold Rdiv. rewrite Rmult_assoc, Rinv_l, Rmult_1_r by lra. lra. }
+  pose proof (atan_pos t Ht0) as Y0. fold Y in Y0.
+  assert (HY4 : Y <= PI / 4) by (rewrite <- atan_1; unfold Y; apply atan_le; exact Ht1).
+  pose proof pi4_le as P4. pose proof pi_gt_3 as P3.
+  assert (P314 : 3.14 < PI) by (interval with (i_prec 60)).
+  set (p1 := newton_phi1 n d (ph, pl)) in *.
+  destruct half_pi_q as [Vh Eh].
+  destruct bpow_254 as [B252 [B255 [Upos Usmall]]]. set (U := bpow radix2 (-254)) in *.
+  assert (HU : U <= / 10000000000000000000000000000000000000000000000000000000000000000000000) by (unfold U; bpow_num; interval with (i_prec 300)).
+  set (e70 := / 10000000000000000000000000000000000000000000000000000000000000000000000) in *.
+  assert (He70 : 0 < e70) by (unfold e70; apply Rinv_0_lt_compat; lra).
+  assert (He70s : e70 <= / 1000000) by (unfold e70; apply Rinv_le_contravar; lra).
+  assert (HbNs : bndN <= / 1000000000) by (unfold bndN; interval with (i_prec 100)).
+  assert (HbNY : bndN * Y <= / 1000000000 * Y) by exact (Rmult_le_compat_r Y _ _ (Rlt_le _ _ Y0) HbNs).
+  assert (Hphi1 : Rabs (qval p1) <= 1) by (apply Rabs_le_inv in E1 as [A1 A2]; apply Rabs_le; split; lra).
+  assert (HbN : bndN * Y <= bndN * 0.7854) by (apply Rmult_le_compat_l; [unfold bndN; lra | clear - HY4 P4; lra]).
+  pose proof bnd_room as Hroom. pose proof bndN_le as HNle.
+  assert (Hb190 : 0 < bnd190) by (unfold bnd190; apply Rinv_0_lt_compat; lra).
+  destruct f; cbn [form_value].
+  - split; [exact V1 | ]. apply Rle_trans with (bndN * Y); [exact E1 | apply Rmult_le_compat_r; lra].
+  - destruct (neg_any p1 V1) as [Vn Qn].
+    destruct (add_any q_half_pi (Q256.neg_q p1) Vh Vn) as [Va Ea]. rewrite Qn in Ea.
+    refine (conj Va _).
+    assert (Hm : Rmax (Rabs (qval q_half_pi)) (Rabs (- qval p1)) <= 2).
+    { apply Rmax_lub; [apply Rabs_le_inv in Eh as [A1 A2]; apply Rabs_le; split; lra | rewrite Rabs_Ropp; lra]. }
+    assert (Hu2 : U * Rmax (Rabs (qval q_half_pi)) (Rabs (- qval p1)) <= U * 2) by (apply Rmult_le_compat_l; lra).
+    apply Rabs_le_inv in Ea as [A1 A2]. apply Rabs_le_inv in Eh as [H1 H2]. apply Rabs_le_inv in E1 as [F1 F2].
+    assert (HZ : 0.78 <= PI / 2 - Y) by lra.
+    assert (Hr : bnd190 * 0.78 <= bnd190 * (PI / 2 - Y)) by (apply Rmult_le_compat_l; lra).
+    apply Rabs_le. split; nra.
+  - destruct (add_any q_half_pi p1 Vh V1) as [Va Ea].
+    refine (conj Va _).
+    assert (Hm : Rmax (Rabs (qval q_half_pi)) (Rabs (qval p1)) <= 2).
+    { apply Rmax_lub; [apply Rabs_le_inv in Eh as [A1 A2]; apply Rabs_le; split; lra | lra]. }
+    assert (Hu2 : U * Rmax (Rabs (qval q_half_pi)) (Rabs (qval p1)) <= U * 2) by (apply Rmult_le_compat_l; lra).
+    apply Rabs_le_inv in Ea as [A1 A2]. apply Rabs_le_inv in Eh as [H1 H2]. apply Rabs_le_inv in E1 as [F1 F2].
+    assert (HZ : 0.78 <= PI / 2 + Y) by lra.
+    assert (Hr : bnd190 * 0.78 <= bnd190 * (PI / 2 + Y)) by (apply Rmult_le_compat_l; lra).
+    apply Rabs_le. split; nra.
+  - destruct (Q256Real.mul_pow2_any q_half_pi 1 Vh) as [Vh2 Qh2].
+    destruct (neg_any p1 V1) as [Vn Qn].
+    destruct (add_any (Q256Real.mul_pow2 q_half_pi 1) (Q256.neg_q p1) Vh2 Vn) as [Va Ea]. rewrite Qn, Qh2 in Ea.
+    refine (conj Va _).
+    assert (Hb1 : bpow radix2 1 = 2) by reflexivity. rewrite Hb1 in Ea.
+    assert (Hm : Rmax (Rabs (qval q_half_pi * 2)) (Rabs (- qval p1)) <= 4).
+    { apply Rmax_lub; [apply Rabs_le_inv in Eh as [A1 A2]; apply Rabs_le; split; lra | rewrite Rabs_Ropp; lra]. }
+    assert (Hu2 : U * Rmax (Rabs (qval q_half_pi * 2)) (Rabs (- qval p1)) <= U * 4) by (apply Rmult_le_compat_l; lra).
+    apply Rabs_le_inv in Ea as [A1 A2]. apply Rabs_le_inv in Eh as [H1 H2]. apply Rabs_le_inv in E1 as [F1 F2].
+    assert (HZ : 0.78 <= PI - Y) by lra.
+    assert (Hr : bnd190 * 0.78 <= bnd190 * (PI - Y)) by (apply Rmult_le_compat_l; lra).
+    apply Rabs_le. split; nra.
+Qed.
