@@ -14,9 +14,10 @@ constants are generated and every bound is a Gappa certificate in
 | Fast path: series, `ln(x + √(x² + 1))`, large form (§3) | **certified** (Gappa): relative error below `2^-63` |
 | Rounding test at `ε₁ = 2^-63` (§5) | sound given the fast bound, as [ln] §5 |
 | Accurate path: two Newton steps for `sinh y = x` in `Q256` (§4) | **certified** (Gappa): relative error below `2^-216`, given the facts §4 lists |
-| Correct rounding on `(0x1.7137449123ef6p−26, ∞)` (§5) | follows from the two bounds and [CM]'s list; the Rust is **not** machine-checked end to end |
+| Correct rounding on `(0x1.7137449123ef6p−26, ∞)` (§5) | **proved in Coq for the transcription** (`asinh_entry_finite`), given `CoreMathH`, the hypothesis that [CM]'s worst-case list is complete (no binary64 midpoint within `2^-124` of `arcsinh a`); the Rust is tied to the transcription by the 13,030-case corpus, not by a proof |
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§6) | done by the formal lane (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
-| Coq transcription of the Rust (`formal/asinh/AsinhKernel.v`) compared with it bit for bit (§6) | **done**: fast path, rounding decision, exponential, accurate path (before rounding) and entry, 13,030 corpus cases; four planted faults (a series coefficient, the root's correction, Newton's residual sign, the large form's correction) each give mismatches. Proofs that it meets §3 and §4's bounds are not written |
+| Coq transcription of the Rust (`formal/asinh/AsinhKernel.v`) compared with it bit for bit (§6) | **done**: fast path, rounding decision, exponential, accurate path (before rounding) and entry, 13,030 corpus cases; four planted faults (a series coefficient, the root's correction, Newton's residual sign, the large form's correction) each give mismatches. The proofs in `formal/asinh/` (below) show it meets §3 and §4's bounds |
+| Coq proofs over the transcription (`formal/asinh/Asinh*.v`, no admits, axioms audited in `formal/audit/KernelAudit.v`) | **done**: series, logarithm and large fast paths each within `2^-63` relatively (series `2^-66`); the rounding decision at `2^-63` returns only `RN(arcsinh x)`; the `Q256` exponential, reciprocal and Newton step; the accurate path within `2^-124` relatively (weaker than the `2^-216` Gappa figure, and all the rounding needs); `asinh x = x` for `|x| ≤ 0x1.7137449123ef6p−26` with its sign; special values and sign through the encoding. Entry: `asinh_entry_finite` (finite `x`: result is `RN(arcsinh x)` given `CoreMathH`), `asinh_entry_nan`, `asinh_entry_inf` |
 | ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `asinh_slice` | **done** (`asinh/lanes.rs`, [lanes.md](lanes.md)): bit-identical to `asinh` on every cascade over the fixture, thresholds, region edges and random encodings; run on NEON and on x86-64 SSE2 under Rosetta; AVX-512F is CI's SDE job |
 | Mutation witnesses | **done** (§6): 98 mutants of `asinh/mod.rs` and `asinh/lanes.rs`, 72 caught, 22 unviable, 4 equivalent |
 | Same-host performance against the best alternatives | measured on NEON only: 1.01–1.66× over the scalar loop ([measurements](../crates/reference/measurements/asin-asinh-atan2-m1pro/README.md)); native x86 not measured |
@@ -98,10 +99,7 @@ Every operation is binary64, in the written order, on every target.
   error (absolute), the reciprocal's and product's (relative to the
   correction) and the last sum's. `newton_1.g` and `newton_2.g` carry the two
   steps from `ε = 2^-63`; the result is within `2^-216.8` relatively.
-- **Stated, not certified:** `c₂ ≤ 1.001` (the mean value theorem for `sinh`),
-  `|ξ − y₀| ≤ 2^-52`, and the `Q256` operations' error model (truncated
-  products within `2^-255`, sums within `2^-254` of the larger operand), as for
-  `sin`/`cos`.
+- **Stated in the Gappa certificates, proved in Coq:** the mean value theorem for `sinh` (`newton_exact`) and the `Q256` operations' error model are proved over the transcription in `formal/asinh/` for the `2^-124` bound; the `2^-216.8` figure remains the Gappa certificates' with their stated facts.
 
 ## 5. Rounding test and claims
 
@@ -116,7 +114,9 @@ accurate value is rounded once by `Q256::to_f64`.
   is `RN(asinh x)`.
 
 So `asinh` is correctly rounded on `(0x1.7137449123ef6p−26, ∞)` given [CM]'s list
-is complete and the stated facts of §4 hold, and exactly `x` below.
+is complete, and exactly `x` below. The Coq proof covers the transcription
+(`asinh_entry_finite`); `CoreMathH` is its only hypothesis beyond the
+audited axioms, and the Rust-to-transcription link is the corpus comparison.
 
 ## 6. Certificates, generators and tests
 
