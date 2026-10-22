@@ -164,3 +164,94 @@ Proof.
     assert (Hw : B (asin_with_sign M y) = sgn * B M) by (rewrite Hs1; replace (-1 * B M) with (- B M) by ring; apply Wn; lia).
     destruct (Hq sgn Hs Hw Hsp) as [U [C S']]. rewrite Hcp. exact (conj U (conj C S')).
 Qed.
+
+(** The magnitude of the public entry, by the classes of the two magnitude words. *)
+Definition entry_mag (a b : f64) (neg : bool) : f64 :=
+  if eq0 a then (if neg then atan2_pi else asin_zero)
+  else if eq0 b then atan2_half_pi_f64
+  else if eqinf a then
+    (if eqinf b then (if neg then atan2_three_quarter_pi else atan2_quarter_pi) else atan2_half_pi_f64)
+  else if eqinf b then (if neg then atan2_pi else asin_zero)
+  else atan2_angle a b neg.
+
+Lemma entry_eval y x : asin_is_nan y = false -> asin_is_nan x = false ->
+  atan2_entry y x = asin_with_sign (entry_mag (aw (Z.land (bits_of_b64 y) (asin_sign_bit - 1))) (aw (Z.land (bits_of_b64 x) (asin_sign_bit - 1)))
+    (negb (Z.land (bits_of_b64 x) asin_sign_bit =? 0)%Z)) y.
+Proof. intros Hy Hx. unfold atan2_entry. rewrite Hy, Hx. reflexivity. Qed.
+
+Lemma abs_zero_a sy : aw (Z.land (bits_of_b64 (B754_zero 53 1024 sy)) (asin_sign_bit - 1)) = asin_zero.
+Proof. destruct sy; vm_compute; reflexivity. Qed.
+
+Lemma abs_inf_a sy : aw (Z.land (bits_of_b64 (B754_infinity 53 1024 sy)) (asin_sign_bit - 1)) = B754_infinity 53 1024 false.
+Proof. destruct sy; vm_compute; reflexivity. Qed.
+
+(** The sign test of [x]: through the sign bit. *)
+Lemma neg_of x : (bits_of_b64 x < 2 ^ 63)%Z -> negb (Z.land (bits_of_b64 x) asin_sign_bit =? 0)%Z = false.
+Proof.
+  intros H. destruct (land_sign_any (bits_of_b64 x) (bits_range x)) as [[_ E] | [G _]]; [rewrite E; reflexivity | lia].
+Qed.
+
+Lemma neg_of' x : (2 ^ 63 <= bits_of_b64 x)%Z -> negb (Z.land (bits_of_b64 x) asin_sign_bit =? 0)%Z = true.
+Proof.
+  intros H. destruct (land_sign_any (bits_of_b64 x) (bits_range x)) as [[L _] | [_ [m' [_ [_ E]]]]]; [lia | rewrite E; reflexivity].
+Qed.
+
+(** The classes of the magnitude word. *)
+Lemma entry_mag_zero_a b neg : eq0 asin_zero = true -> entry_mag asin_zero b neg = (if neg then atan2_pi else asin_zero).
+Proof. intros H. unfold entry_mag. rewrite H. reflexivity. Qed.
+
+
+Lemma fin_zero_inv x : finite x -> B x = 0 -> exists s, x = B754_zero 53 1024 s.
+Proof.
+  intros F Z0. destruct x as [s | s | s pl H | s m e H]; try discriminate F.
+  - exists s. reflexivity.
+  - exfalso. cbn [B2R] in Z0. apply eq_0_F2R in Z0. destruct s; cbn in Z0; lia.
+Qed.
+
+(** The result carries its magnitude [c], signed by [y]. *)
+Definition Table (y x c : f64) : Prop :=
+  finite (atan2_entry y x) /\ ((bits_of_b64 y < 2 ^ 63)%Z -> B (atan2_entry y x) = B c) /\ ((2 ^ 63 <= bits_of_b64 y)%Z -> B (atan2_entry y x) = - B c).
+
+Lemma table_from_mag y x c : asin_is_nan y = false -> asin_is_nan x = false ->
+  entry_mag (aw (Z.land (bits_of_b64 y) (asin_sign_bit - 1))) (aw (Z.land (bits_of_b64 x) (asin_sign_bit - 1)))
+    (negb (Z.land (bits_of_b64 x) asin_sign_bit =? 0)%Z) = c ->
+  finite c -> 0 <= B c -> Table y x c.
+Proof.
+  intros Hy Hx Hm Fc Nc. unfold Table. rewrite (entry_eval y x Hy Hx), Hm.
+  destruct (ws_nonneg c y Fc Nc) as [F [P N]]. exact (conj F (conj P N)).
+Qed.
+
+Lemma pi_nn : finite atan2_pi /\ 0 <= B atan2_pi.
+Proof. destruct atan2_pi_val as [F V]. split; [exact F | rewrite V; bpow_num; interval with (i_prec 60)]. Qed.
+
+Lemma half_pi_nn : finite atan2_half_pi_f64 /\ 0 <= B atan2_half_pi_f64.
+Proof. destruct atan2_half_pi_val as [F V]. split; [exact F | rewrite V; bpow_num; interval with (i_prec 60)]. Qed.
+
+Lemma quarter_pi_nn : finite atan2_quarter_pi /\ 0 <= B atan2_quarter_pi.
+Proof. destruct atan2_quarter_pi_val as [F V]. split; [exact F | rewrite V; bpow_num; interval with (i_prec 60)]. Qed.
+
+Lemma three_quarter_pi_nn : finite atan2_three_quarter_pi /\ 0 <= B atan2_three_quarter_pi.
+Proof. destruct atan2_three_quarter_pi_val as [F V]. split; [exact F | rewrite V; bpow_num; interval with (i_prec 60)]. Qed.
+
+Lemma zero_nn : finite asin_zero /\ 0 <= B asin_zero.
+Proof. destruct zero_val as [Z F]. split; [exact F | rewrite Z; lra]. Qed.
+
+Lemma nan_false_zero sy : asin_is_nan (B754_zero 53 1024 sy) = false.
+Proof. reflexivity. Qed.
+Lemma nan_false_inf sy : asin_is_nan (B754_infinity 53 1024 sy) = false.
+Proof. reflexivity. Qed.
+Lemma nan_false_fin x : finite x -> asin_is_nan x = false.
+Proof. intros F. destruct x; first [reflexivity | discriminate F]. Qed.
+
+(** y = +-0. *)
+Theorem table_y_zero sy x : asin_is_nan x = false ->
+  ((bits_of_b64 x < 2 ^ 63)%Z -> Table (B754_zero 53 1024 sy) x asin_zero) /\ ((2 ^ 63 <= bits_of_b64 x)%Z -> Table (B754_zero 53 1024 sy) x atan2_pi).
+Proof.
+  intros Hx. split; intros H; apply table_from_mag; try apply nan_false_zero; try exact Hx.
+  - rewrite abs_zero_a, (neg_of x H). unfold entry_mag. rewrite zero_val_a. reflexivity.
+  - exact (proj1 zero_nn).
+  - exact (proj2 zero_nn).
+  - rewrite abs_zero_a, (neg_of' x H). unfold entry_mag. rewrite zero_val_a. reflexivity.
+  - exact (proj1 pi_nn).
+  - exact (proj2 pi_nn).
+Qed.
