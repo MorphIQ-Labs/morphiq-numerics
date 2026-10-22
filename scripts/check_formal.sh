@@ -20,10 +20,12 @@
 #      which apply the certificates' theorems, build (formal/exp/ExpStageTables.v
 #      checks exp's 512-entry table by one reflective computation); and the global axioms the
 #      theorems in formal/audit/KernelAudit.v rest on are among
-#      formal/axioms.expected and formal/axioms.int63.expected. The second list is Coq's primitive 63-bit
-#      integers: CoqInterval, which proves the kernels' constants, computes with
-#      them through Bignums. Its calls stay above 53 bits of precision, so no
-#      primitive floats are used.
+#      formal/axioms.expected, formal/axioms.int63.expected and formal/axioms.float.expected. The second
+#      list is Coq's primitive 63-bit integers: CoqInterval, which proves the kernels' constants,
+#      computes with them through Bignums. The third is Coq's primitive floats (FloatAxioms), which
+#      CoqInterval's bisection and Taylor tactics (i_bisect, i_taylor) reach even at high precision;
+#      they are Coq's own specified primitives, as the integers are, and only asin's segment
+#      certificates (formal/asin/AsinApprox.v) and what composes them rest on them.
 #   7. The proved IEEE 754 definitions and the Q128/Q256 transcriptions,
 #      extracted to OCaml (formal/extraction), reproduce the Rust library's
 #      results bit for bit on the cross-check corpora given as the first two
@@ -282,9 +284,9 @@ finish kernel_audit "$kernel_audit"
 grep -E '^[^[:space:]]' "$work/kernel_audit.log" \
   | grep -v -E '^(Axioms:|Closed under the global context)' \
   | sed 's/ :.*//' | sort -u > "$work/kernel-axioms"
-sort -u formal/axioms.expected formal/axioms.int63.expected > "$work/kernel-expected"
+sort -u formal/axioms.expected formal/axioms.int63.expected formal/axioms.float.expected > "$work/kernel-expected"
 if ! comm -23 "$work/kernel-axioms" "$work/kernel-expected" | diff /dev/null - >&2; then
-  echo "a kernel theorem rests on an axiom outside formal/axioms.expected and formal/axioms.int63.expected" >&2
+  echo "a kernel theorem rests on an axiom outside formal/axioms.expected, formal/axioms.int63.expected and formal/axioms.float.expected" >&2
   exit 1
 fi
 kernels=$(grep -c '^Print Assumptions' formal/audit/KernelAudit.v)

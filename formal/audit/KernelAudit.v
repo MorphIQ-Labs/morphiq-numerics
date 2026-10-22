@@ -742,3 +742,18 @@ Print Assumptions AsinSegment.segment_eval.
 Print Assumptions AsinSegment.series_segment.
 Require AsinSegments.
 Print Assumptions AsinSegments.segok_all.
+Require AsinPath.
+Print Assumptions AsinPath.fast_direct.
+Print Assumptions AsinPath.fast_complement.
+Require AsinAccurate.
+Print Assumptions AsinAccurate.accurate_direct.
+Print Assumptions AsinAccurate.accurate_complement.
+Require AsinCorrect.
+Print Assumptions AsinCorrect.positive_correct.
+Require AsinSmall.
+Print Assumptions AsinSmall.small_correct.
+Require AsinEntry.
+Print Assumptions AsinEntry.asin_entry_finite.
+Print Assumptions AsinEntry.asin_entry_nan.
+Print Assumptions AsinEntry.asin_entry_inf.
+Print Assumptions AsinEntry.asin_entry_large.
