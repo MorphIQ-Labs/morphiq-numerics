@@ -255,3 +255,69 @@ Proof.
   - exact (proj1 pi_nn).
   - exact (proj2 pi_nn).
 Qed.
+
+Lemma neg_inf sx : negb (Z.land (bits_of_b64 (B754_infinity 53 1024 sx)) asin_sign_bit =? 0)%Z = sx.
+Proof. destruct sx; vm_compute; reflexivity. Qed.
+
+(** Finite nonzero [y] against [x = +-0]: [+-pi/2]. *)
+Theorem table_x_zero y sx : finite y -> B y <> 0 -> Table y (B754_zero 53 1024 sx) atan2_half_pi_f64.
+Proof.
+  intros Fy Ny. destruct (abs_split y Fy) as [ny [Ry [Hay [Fay [Nay Hsy]]]]].
+  assert (Pa : 0 < B (b64_of_bits ny)) by (destruct Hsy as [[_ E] | [_ E]]; lra).
+  destruct (cls_pos _ Fay Pa) as [E0a Eia].
+  apply table_from_mag; try apply nan_false_zero; try (apply nan_false_fin; exact Fy).
+  - rewrite Hay, abs_zero_a. unfold entry_mag. rewrite E0a, zero_val_a. reflexivity.
+  - exact (proj1 half_pi_nn).
+  - exact (proj2 half_pi_nn).
+Qed.
+
+(** Finite nonzero [y] against [x = +-inf]: [+0] or [+-pi]. *)
+Theorem table_x_inf y sx : finite y -> B y <> 0 -> Table y (B754_infinity 53 1024 sx) (if sx then atan2_pi else asin_zero).
+Proof.
+  intros Fy Ny. destruct (abs_split y Fy) as [ny [Ry [Hay [Fay [Nay Hsy]]]]].
+  assert (Pa : 0 < B (b64_of_bits ny)) by (destruct Hsy as [[_ E] | [_ E]]; lra).
+  destruct (cls_pos _ Fay Pa) as [E0a Eia].
+  apply table_from_mag; try apply nan_false_inf; try (apply nan_false_fin; exact Fy).
+  - rewrite Hay, abs_inf_a, neg_inf. unfold entry_mag. rewrite E0a, (proj1 (cls_inf false)), Eia, (proj2 (cls_inf false)).
+    destruct sx; reflexivity.
+  - destruct sx; [exact (proj1 pi_nn) | exact (proj1 zero_nn)].
+  - destruct sx; [exact (proj2 pi_nn) | exact (proj2 zero_nn)].
+Qed.
+
+(** [y = +-inf] against a finite [x]: [+-pi/2]. *)
+Theorem table_y_inf_x_finite sy x : finite x -> Table (B754_infinity 53 1024 sy) x atan2_half_pi_f64.
+Proof.
+  intros Fx. destruct (Req_dec (B x) 0) as [Z0 | NZ].
+  - destruct (fin_zero_inv x Fx Z0) as [sx ->].
+    apply table_from_mag; try apply nan_false_inf; try apply nan_false_zero.
+    + rewrite abs_inf_a, abs_zero_a. unfold entry_mag. rewrite (proj1 (cls_inf false)), zero_val_a. reflexivity.
+    + exact (proj1 half_pi_nn).
+    + exact (proj2 half_pi_nn).
+  - destruct (abs_split x Fx) as [nx [Rx [Hax [Fax [Nax Hsx]]]]].
+    assert (Pb : 0 < B (b64_of_bits nx)) by (destruct Hsx as [[_ E] | [_ E]]; lra).
+    destruct (cls_pos _ Fax Pb) as [E0b Eib].
+    apply table_from_mag; try apply nan_false_inf; try (apply nan_false_fin; exact Fx).
+    + rewrite abs_inf_a, Hax. unfold entry_mag. rewrite (proj1 (cls_inf false)), E0b, (proj2 (cls_inf false)), Eib. reflexivity.
+    + exact (proj1 half_pi_nn).
+    + exact (proj2 half_pi_nn).
+Qed.
+
+(** [y = +-inf] against [x = +-inf]: [+-pi/4] or [+-3 pi/4]. *)
+Theorem table_y_inf_x_inf sy sx : Table (B754_infinity 53 1024 sy) (B754_infinity 53 1024 sx) (if sx then atan2_three_quarter_pi else atan2_quarter_pi).
+Proof.
+  apply table_from_mag; try apply nan_false_inf.
+  - rewrite abs_inf_a, neg_inf. unfold entry_mag. rewrite (proj1 (cls_inf false)), (proj2 (cls_inf false)). destruct sx; reflexivity.
+  - destruct sx; [exact (proj1 three_quarter_pi_nn) | exact (proj1 quarter_pi_nn)].
+  - destruct sx; [exact (proj2 three_quarter_pi_nn) | exact (proj2 quarter_pi_nn)].
+Qed.
+
+Theorem entry_nan y x : (asin_is_nan y = true \/ asin_is_nan x = true) -> asin_is_nan (atan2_entry y x) = true.
+Proof. intros [H | H]; unfold atan2_entry; rewrite H; [reflexivity | destruct (asin_is_nan y); reflexivity]. Qed.
+
+(** The zero numerator against a nonnegative-signed [x]: the zero itself. *)
+Theorem entry_y_zero_x_pos sy x : asin_is_nan x = false -> (bits_of_b64 x < 2 ^ 63)%Z ->
+  atan2_entry (B754_zero 53 1024 sy) x = B754_zero 53 1024 sy.
+Proof.
+  intros Hx H. rewrite (entry_eval _ x (nan_false_zero sy) Hx), abs_zero_a, (neg_of x H). unfold entry_mag. rewrite zero_val_a.
+  destruct sy; vm_compute; reflexivity.
+Qed.
