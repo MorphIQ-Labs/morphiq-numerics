@@ -48,3 +48,54 @@ Proof. intros H. unfold asinh_entry. rewrite H. reflexivity. Qed.
 
 Theorem asinh_entry_inf s : asinh_entry (B754_infinity 53 1024 s) = B754_infinity 53 1024 s.
 Proof. destruct s; vm_compute; reflexivity. Qed.
+
+Local Opaque asinh_fast asinh_accurate asinh_decide asinh_accurate_value asinh_logarithm asinh_large asinh_series.
+
+Theorem asinh_entry_finite x : CoreMathH -> finite x ->
+  finite (asinh_entry x) /\ B (asinh_entry x) = rndF (arcsinh (B x)).
+Proof.
+  intros CM Fx.
+  assert (Hn : asin_is_nan x = false) by (destruct x; first [reflexivity | discriminate Fx]).
+  unfold asinh_entry. rewrite Hn.
+  destruct (abs_split x Fx) as [n0 [R0 [Ha [Fa [Na Hs]]]]].
+  rewrite Ha. set (a := b64_of_bits n0) in *.
+  assert (Hab : B a = Rabs (B x)).
+  { destruct Hs as [[_ E] | [_ E]]; rewrite E; [rewrite Rabs_pos_eq by exact Na; reflexivity | rewrite Rabs_Ropp, Rabs_pos_eq by exact Na; reflexivity]. }
+  destruct is_x_val as [Fi Vi]. change (IZR 3247657313705851 * bpow radix2 (-77)) with ThrT in Vi.
+  assert (C1 : asin_cmp a asinh_is_x = Some (Rcompare (B a) (B asinh_is_x))).
+  { unfold asin_cmp. rewrite (Bcompare_correct 53 1024 a asinh_is_x Fa Fi). reflexivity. }
+  rewrite C1.
+  destruct (Rcompare_spec (B a) (B asinh_is_x)) as [Hlt | Heq | Hgt].
+  - cbv iota. split; [exact Fx | ].
+    symmetry. apply small_signed; [apply B_fmt | ]. rewrite <- Hab. rewrite Vi in Hlt. lra.
+  - cbv iota. split; [exact Fx | ].
+    symmetry. apply small_signed; [apply B_fmt | ]. rewrite <- Hab. rewrite Vi in Heq. lra.
+  - cbv iota. rewrite (cmp_inf a Fa). cbv iota.
+    pose proof thr_ge_26 as T26.
+    assert (L26 : bpow radix2 (-26) <= B a) by lra.
+    pose proof (asinh_fast_ok a Fa L26) as FO.
+    pose proof (arcsinh_range a Fa L26) as [HA1 HA2].
+    destruct (asinh_fast a) as [yh yl] eqn:Ey.
+    assert (Hv : exists v, finite v /\ B v = rndF (arcsinh (B a)) /\
+      (match asinh_decide (yh, yl) with Some r => r | None => asinh_accurate a (yh, yl) end) = v).
+    { destruct (asinh_decide (yh, yl)) as [r | ] eqn:Hd.
+      - destruct FO as [Fh [Fl [Dw [L1 [L2 Er]]]]]. cbn [fst snd] in *.
+        assert (Er' : Rabs (arcsinh (B a) - (B yh + B yl)) <= bpow radix2 (-63) * Rabs (arcsinh (B a))).
+        { rewrite Rabs_minus_sym, (Rabs_pos_eq (arcsinh (B a))) by lra. exact Er. }
+        destruct (asinh_decide_some yh yl (arcsinh (B a)) r Fh Fl L1 L2 Dw Er' Hd) as [Hr HZ].
+        exists r. rewrite Hr. split; [exact Fh | split; [symmetry; exact HZ | reflexivity]].
+      - destruct FO as [Fh [Fl FO']]. cbn [fst snd] in *.
+        pose proof (asinh_accurate_value_ok a yh yl Fa Fh Fl L26 (conj Fh (conj Fl FO'))) as [Vq Eq'].
+        assert (HZr : 1e-9 <= arcsinh (B a) <= 711) by (split; lra).
+        destruct (accurate_round_h _ (arcsinh (B a)) Vq Eq' (CM a Fa Hgt) HZr) as [Fv Bv].
+        exists (Q256.to_f64 (asinh_accurate_value a (yh, yl))). split; [exact Fv | split; [exact Bv | reflexivity]]. }
+    destruct Hv as [v [Fv [Bv Ev]]]. rewrite Ev.
+    assert (Pv : 0 < B v).
+    { rewrite Bv. apply Rlt_le_trans with (bpow radix2 (-27)); [apply bpow_gt_0 | apply rndF_ge_bpow; [lia | ]].
+      assert (bpow radix2 (-27) = / 134217728) by (bpow_num; reflexivity). lra. }
+    destruct (with_sign_val v x Fv Pv Fx) as [Fws [Hp Hng]].
+    split; [exact Fws | ].
+    destruct Hs as [[Hb E] | [Hb E]].
+    + rewrite (Hp (ex_intro _ n0 (conj Hb R0))), Bv, E. reflexivity.
+    + rewrite (Hng (ex_intro _ n0 (conj Hb R0))), Bv, E, arcsinh_opp, round_NE_opp_ne. reflexivity.
+Qed.
