@@ -135,17 +135,15 @@ Qed.
     [2^-7], the table above, within [2^-63] of [atan]. *)
 Theorem fast_dw_a zh zl : finite zh -> finite zl ->
   bpow radix2 (-905) <= B zh -> B zh <= 1 -> B zh = rndF (B zh + B zl) ->
-  Rabs (B zl) <= bpow radix2 (-53) * B zh -> on_grid (-211) (B zl) ->
+  Rabs (B zl) <= bpow radix2 (-52) * B zh -> Rabs (B zl) <= bpow radix2 (-53) -> (bpow radix2 (-7) < B zh -> on_grid (-211) (B zl)) ->
   exists h l, atan2_series zh zl = (h, l) /\ finite h /\ finite l /\ B h = rndF (B h + B l) /\
     Rabs (B h + B l - atan (B zh + B zl)) <= bpow radix2 (-63) * atan (B zh + B zl).
 Proof.
-  intros Fh Fl L U Dw Hl Hg.
+  intros Fh Fl L U Dw Hl Hlabs Hg.
   pose proof (bpow_gt_0 radix2 (-905)) as P900.
-  assert (P53 : bpow radix2 (-53) <= / 2) by (bpow_num; interval with (i_prec 60)).
+  assert (P52 : bpow radix2 (-52) <= / 2) by (bpow_num; interval with (i_prec 60)).
   assert (Hlh : Rabs (B zl) <= B zh / 2).
   { apply Rle_trans with (1 := Hl). nra. }
-  assert (Hlabs : Rabs (B zl) <= bpow radix2 (-53)).
-  { apply Rle_trans with (1 := Hl). pose proof (bpow_ge_0 radix2 (-53)). nra. }
   assert (Hsum : 0 < B zh + B zl).
   { apply Rabs_le_inv in Hlh as [A1 A2]. lra. }
   destruct (Rle_dec (B zh) (bpow radix2 (-7))) as [Hs | Ht].
@@ -153,15 +151,16 @@ Proof.
     exists h, l. repeat split; try assumption.
     assert (An : 0 < atan (B zh + B zl)) by (apply atan_pos; exact Hsum).
     apply Rle_trans with (1 := Err). apply Rmult_le_compat_r; [lra | apply bpow_le; lia].
-  - assert (Hbig : / 128 < B zh).
-    { assert (bpow radix2 (-7) = / 128) by (bpow_num; reflexivity). lra. }
+  - assert (Hgrid : on_grid (-211) (B zl)) by (apply Hg; lra).
+    assert (Hbig : / 128 < B zh).
+    { assert (bpow radix2(-7) = / 128) by (bpow_num; reflexivity). lra. }
     set (k := Znearest ne (B zh * 64)).
     pose proof (Znearest_half ne (B zh * 64)) as Hh. fold k in Hh. apply Rabs_le_inv in Hh as [Hh1 Hh2].
     assert (Hk1 : (1 <= k)%Z).
     { assert (0 < IZR k) by lra. apply lt_0_IZR in H. lia. }
     assert (Hk2 : (k <= 64)%Z).
     { assert (IZR k < 65) by lra. assert (IZR k < IZR 65) by (change (IZR 65) with 65; lra). apply lt_IZR in H0. lia. }
-    destruct (fast_table k zh zl ltac:(lia) Fh Fl ltac:(lra) U eq_refl Hlabs Hg) as [h [l [Hr [Fh' [Fl' [Nrm Err]]]]]].
+    destruct (fast_table k zh zl ltac:(lia) Fh Fl ltac:(lra) U eq_refl Hlabs Hgrid) as [h [l [Hr [Fh' [Fl' [Nrm Err]]]]]].
     exists h, l. repeat split; try assumption.
     replace (B zh + B zl) with (IZR k / 64 + (B zh - IZR k / 64 + B zl)) by ring. exact Err.
 Qed.

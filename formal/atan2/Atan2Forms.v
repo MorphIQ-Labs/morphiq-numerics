@@ -187,17 +187,17 @@ Qed.
 Theorem post_ok th tl f ph pl phi :
   atan2_series th tl = (ph, pl) -> finite ph -> finite pl -> B ph = rndF (B ph + B pl) ->
   bpow radix2 (-902) <= phi -> phi <= PI / 4 ->
-  Rabs (B ph + B pl - phi) <= bpow radix2 (-63) * (1 + bpow radix2 (-40)) * phi ->
+  Rabs (B ph + B pl - phi) <= bpow radix2 (-63) * (1 + bpow radix2 (-39)) * phi ->
   exists yh yl, atan2_post th tl f = ((yh, yl), (ph, pl)) /\ finite yh /\ finite yl /\
     B yh = rndF (B yh + B yl) /\ bpow radix2 (-905) <= B yh /\ B yh <= 4 /\
     Rabs (B yh + B yl - form_value f phi) <= bpow radix2 (-62) * form_value f phi.
 Proof.
   intros Hs Fph Fpl Dw Hlo Hhi Hsr.
   pose proof pi_bounds as [Pi1 Pi2]. pose proof (bpow_gt_0 radix2 (-902)) as P902.
-  assert (HeF : 0 <= bpow radix2 (-63) * (1 + bpow radix2 (-40)) <= / 9223372036854775808 * 1.0001).
-  { split; [apply Rmult_le_pos; [apply bpow_ge_0 | pose proof (bpow_ge_0 radix2 (-40)); lra] | ].
+  assert (HeF : 0 <= bpow radix2 (-63) * (1 + bpow radix2 (-39)) <= / 9223372036854775808 * 1.0001).
+  { split; [apply Rmult_le_pos; [apply bpow_ge_0 | pose proof (bpow_ge_0 radix2 (-39)); lra] | ].
     bpow_num. interval with (i_prec 100). }
-  set (eF := bpow radix2 (-63) * (1 + bpow radix2 (-40))) in *.
+  set (eF := bpow radix2 (-63) * (1 + bpow radix2 (-39))) in *.
   set (phihat := B ph + B pl) in *.
   assert (Hphi_hi : phi <= 0.7854) by lra.
   assert (Hpos : 0 < phi) by lra.
