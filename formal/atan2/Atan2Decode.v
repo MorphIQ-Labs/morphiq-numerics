@@ -1,8 +1,8 @@
 (** Decoding a positive finite binary64 from its fraction and biased exponent fields. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
-From Binary64 Require Import Binary64Add IEEE64.
-Require Import Ln1pLemmas AsinTables AsinKernel Atan2Kernel Atan2Odd.
+From Binary64 Require Import Binary64Add IEEE64 Encodings.
+Require Import Ln1pLemmas AsinTables AsinKernel AsinSqrtStep AsinWithin AsinFacts AsinPath AsinCorrect AsinSmall AsinEntry Atan2Kernel Atan2Odd.
 Open Scope R_scope.
 
 
@@ -40,4 +40,62 @@ Proof.
         cbn [FF2R SpecFloat.cond_Zopp]. unfold F2R. cbn [Fnum Fexp].
         replace (n / 2 ^ 52 + (3 - 2 ^ (11 - 1) - (52 + 1)) - 1)%Z with (n / 2 ^ 52 - 1075)%Z by (change (2 ^ (11 - 1))%Z with 1024%Z; ring).
         reflexivity.
+Qed.
+
+Lemma lor_frac f : (0 <= f < 2 ^ 52)%Z -> Z.lor f (2 ^ 52) = (f + 2 ^ 52)%Z.
+Proof.
+  intros H.
+  assert (L : Z.land f (2 ^ 52) = 0%Z).
+  { apply Z.bits_inj'. intros k Hk. rewrite Z.land_spec, Z.pow2_bits_eqb by lia. rewrite Z.bits_0.
+    destruct (52 =? k)%Z eqn:E; [ | rewrite Bool.andb_false_r; reflexivity].
+    apply Z.eqb_eq in E. subst k. rewrite Bool.andb_true_r.
+    destruct (Z.testbit f 52) eqn:Tb; [ | reflexivity].
+    apply Z.testbit_true in Tb; [ | lia]. rewrite Z.div_small in Tb by lia. discriminate Tb. }
+  rewrite <- (Z.lxor_lor f (2 ^ 52) L). symmetry. apply Z.add_nocarry_lxor. exact L.
+Qed.
+
+Lemma pos_bits x : finite x -> 0 < B x -> (0 < bits_of_b64 x < 2 ^ 63)%Z /\ B x = B (b64_of_bits (bits_of_b64 x)) /\ finite (b64_of_bits (bits_of_b64 x)).
+Proof.
+  intros Fx Px. destruct (abs_split x Fx) as [n0 [R0 [_ [Fn [Nn [[Hb Bx] | [Hb Bx]]]]]]].
+  - rewrite Hb. repeat split; try lia; try exact Bx; try exact Fn.
+    destruct (Z.eq_dec n0 0) as [-> | Hn0]; [ | lia].
+    exfalso. assert (Hz : B (b64_of_bits 0) = 0) by (apply bits_zero with (s := false); vm_compute; reflexivity). rewrite Hz in Bx. lra.
+  - exfalso. lra.
+Qed.
+
+Theorem odd_part_ok x : finite x -> 0 < B x ->
+  exists m e, atan2_odd_part x = (m, e) /\ Z.odd m = true /\ (0 < m < 2 ^ 53)%Z /\ (-1074 <= e)%Z /\ B x = IZR m * bpow radix2 e.
+Proof.
+  intros Fx Px. destruct (pos_bits x Fx Px) as [[N0 N1] [Bx Fn]]. set (n := bits_of_b64 x) in *.
+  rewrite Bx in Px |- *.
+  assert (Hsh : Z.shiftr n 52 = (n / 2 ^ 52)%Z) by (rewrite Z.shiftr_div_pow2 by lia; reflexivity).
+  assert (Hfr : Z.land n (2 ^ 52 - 1) = (n mod 2 ^ 52)%Z).
+  { replace (2 ^ 52 - 1)%Z with (Z.ones 52) by reflexivity. rewrite Z.land_ones by lia. reflexivity. }
+  assert (Hf : (0 <= n mod 2 ^ 52 < 2 ^ 52)%Z) by (apply Z.mod_pos_bound; lia).
+  unfold atan2_odd_part. fold n. rewrite Hsh, Hfr.
+  destruct (decode_bits n (conj (proj1 (conj (Z.lt_le_incl _ _ N0) N1)) N1) Fn Px) as [[E0 [Pf V]] | [[E1 E2] V]].
+  - assert (Hb0 : (n / 2 ^ 52 =? 0)%Z = true) by (apply Z.eqb_eq; exact E0).
+    rewrite Hb0. cbv zeta iota.
+    destruct (lowbit_spec (n mod 2 ^ 52) Pf) as [v [o [Hv [Ho [Ho0 [Hm Hl]]]]]].
+    rewrite Hl, Z.log2_pow2 by lia. rewrite Z.shiftr_div_pow2 by lia.
+    assert (Hq : (n mod 2 ^ 52 / 2 ^ v)%Z = o) by (rewrite Hm at 1; apply Z.div_mul; apply Z.pow_nonzero; lia).
+    rewrite Hq.
+    exists o, (-1074 + v)%Z. refine (conj eq_refl (conj Ho (conj (conj Ho0 _) (conj _ _)))).
+    + assert (Ho2 : (o <= n mod 2 ^ 52)%Z).
+      { rewrite Hm at 1. assert (0 < 2 ^ v)%Z by (apply Z.pow_pos_nonneg; lia). apply Z.le_mul_diag_r; lia. }
+      assert (H53 : (2 ^ 52 < 2 ^ 53)%Z) by reflexivity. lia.
+    + lia.
+    + rewrite V. rewrite Hm at 1. rewrite mult_IZR. assert (Hp : IZR (2 ^ v) = bpow radix2 v) by (apply (IZR_Zpower radix2); lia). rewrite Hp, bpow_plus. ring.
+  - assert (Hb0 : (n / 2 ^ 52 =? 0)%Z = false) by (apply Z.eqb_neq; lia).
+    rewrite Hb0. cbv zeta iota. rewrite (lor_frac _ Hf).
+    destruct (lowbit_spec (n mod 2 ^ 52 + 2 ^ 52) ltac:(lia)) as [v [o [Hv [Ho [Ho0 [Hm Hl]]]]]].
+    rewrite Hl, Z.log2_pow2 by lia. rewrite Z.shiftr_div_pow2 by lia.
+    assert (Hq : ((n mod 2 ^ 52 + 2 ^ 52) / 2 ^ v)%Z = o) by (rewrite Hm at 1; apply Z.div_mul; apply Z.pow_nonzero; lia).
+    rewrite Hq.
+    exists o, (n / 2 ^ 52 - 1075 + v)%Z. refine (conj eq_refl (conj Ho (conj (conj Ho0 _) (conj _ _)))).
+    + assert (Ho2 : (o <= n mod 2 ^ 52 + 2 ^ 52)%Z).
+      { rewrite Hm at 1. assert (0 < 2 ^ v)%Z by (apply Z.pow_pos_nonneg; lia). apply Z.le_mul_diag_r; lia. }
+      assert (H53 : (2 ^ 53 = 2 * 2 ^ 52)%Z) by reflexivity. lia.
+    + lia.
+    + rewrite V. rewrite Hm at 1. rewrite mult_IZR. assert (Hp : IZR (2 ^ v) = bpow radix2 v) by (apply (IZR_Zpower radix2); lia). rewrite Hp, bpow_plus. ring.
 Qed.
