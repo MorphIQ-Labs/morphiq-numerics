@@ -71,6 +71,9 @@ jobs:
               cmp "$license" "crates/$crate/$license"
             done
           done
+      - name: The adapted Thomas recurrence ships its MIT notice
+        run: |
+          cargo package --locked --allow-dirty --list -p morphiq-numerics | grep -qx THIRD_PARTY_NOTICES.md
       - name: The library depends only on the first-party arch crate, optionally
         # Target independence and clean provenance rest on the library being
         # self-contained; its one dependency is the optional first-party lane

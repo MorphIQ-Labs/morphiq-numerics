@@ -52,10 +52,22 @@ reference, returns the same bits.
     extracted transcription compared bit for bit;
   - every proof bound by hash to the source it describes.
 
+## Tridiagonal systems
+
+Reusable, allocation-free tridiagonal factorization and solves are available
+under `linalg::tridiagonal` for strictly row-diagonally-dominant matrices.
+`solve_many_into` batches interleaved right-hand sides with scalar-identical
+SIMD across columns when the `simd` feature is enabled.
+An optional certificate bounds the absolute residual and solution error;
+see [the domain, ownership and numerical contract](docs/tridiagonal.md).
+
 ## License
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
 [MIT license](LICENSE-MIT), at your option.
+
+The adapted Thomas recurrence retains its original MIT notice in
+[THIRD_PARTY_NOTICES.md](crates/morphiq-numerics/THIRD_PARTY_NOTICES.md).
 
 Unless you explicitly state otherwise, any contribution intentionally
 submitted for inclusion in this project by you, as defined in the Apache-2.0
