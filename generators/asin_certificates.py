@@ -16,6 +16,9 @@ used) or derived here in exact rational arithmetic, widened by at least 1%
 - series.g: the series below 1/128 against asin z, relative.
 - sqrt.g and complement.g: the complement's z = sqrt((1 - x)/2) as a
   double-word, and pi/2 - 2 asin(z) against asin x, relative.
+- AsinSegments.v: for each segment, its evaluation certificate applied over the
+  table's own words, and the numeric facts the Coq proof of the table branch
+  (formal/asin/AsinSegment.v) takes as hypotheses.
 
 With --check, fails if the committed certificates differ from a fresh
 generation. Needs mpmath (generators/requirements.txt).
@@ -35,7 +38,7 @@ DIR = ROOT / 'formal/asin'
 T_LIT = '0.0078126'
 T = Fraction(78126, 10_000_000)
 U = Fraction(1, 2**53)
-TL = Fraction(87, 10**20) / 10  # |tl| <= 2^-53 T < 8.7e-19 (tl is t_lo, normalized)
+TL = Fraction(87, 10**20)  # |tl| <= 2^-53 T < 8.7e-19 (tl is t_lo, normalized)
 DW_ADD = '776b-114'      # add and sub: 3u^2/(1 - 4u), widened (docs/double-word.md)
 DW_ADD_F = Fraction(776, 2**114)
 DW_ACC = Fraction(1, 2**107)  # the tables' double-words, relative (asin_constants.py)
@@ -79,6 +82,29 @@ def hex_fraction(text):
     return Fraction(int(whole + fraction, 16)) * Fraction(2) ** (int(exponent) - 4 * len(fraction))
 
 
+def intro_pattern(names):
+    """The Coq pattern [a [b [c d]]] for a right-nested conjunction."""
+    r = names[-1]
+    for n in reversed(names[:-1]):
+        r = f'[{n} {r}]'
+    return r
+
+
+def approx_budget(k, values):
+    """Segment k's absolute approximation budget E (docs/asin.md, section 4):
+    Sollya's supnorm plus the Taylor remainder for the polynomial, and the
+    tables' double-word error for asin(a) and c1, as compose_<kk>.g takes them,
+    rounded up to a 24-bit mantissa. Returns (E, n, shift) with E = n 2^-shift."""
+    a = mpmath.mpf(k) / 64
+    asin_a = frac(mpmath.asin(a))
+    c1 = frac(1 / mpmath.sqrt(1 - a * a))
+    e_poly = T * T * (hex_fraction(values[f'u{k:02d}0']) + hex_fraction(values[f'r{k:02d}0']))
+    e = e_poly + DW_ACC * asin_a + DW_ACC * c1 * T
+    shift = 24 - math.floor(math.log2(e)) - 1
+    n = math.ceil(e * 2 ** shift)
+    return Fraction(n, 2 ** shift), n, shift
+
+
 def asin_bounds(k):
     """Rigorous lower and upper bounds of asin on [a - T, a + T], a = k/64,
     from mpmath interval arithmetic (asin v = atan2(v, sqrt(1 - v^2)))."""
@@ -102,7 +128,8 @@ def eval_certificate(k, row, bound):
         '# (the reduced argument t = th + tl, |tl| <= 2^-53 T), ph + pl = th c_hi exactly',
         '# (two_prod), and the rounded tail',
         '#   tail = s1 + n, s1 = pl + (th c_lo + tl c_hi), n = RN(th^2) g, g = Horner(th),',
-        '# against the exact value of (c_hi + c_lo) t + t^2 G(t) after ph. dg bounds',
+        '# against the exact value of (c_hi + c_lo) t + t^2 G(t) after ph, and the Horner',
+        '# value hh0 within [-2, 2] (the fast sum\'s exactness needs it). dg bounds',
         '# G(th + tl) - G(th) by the mean value theorem with sup|G\'| from the',
         '# coefficients, in exact rational arithmetic. Written by',
         '# generators/asin_certificates.py.',
@@ -134,7 +161,7 @@ def eval_certificate(k, row, bound):
         'Vx = pl + c_lo * th + c_hi * tl + c_lo * tl + tt * tt * (HH0 + dg);',
         '',
         f'{{ th_ in [-{T_LIT}, {T_LIT}] /\\ tl_ in [-8.7e-19, 8.7e-19] /\\ dg in [-{up(dg)}, {up(dg)}]',
-        f'  -> tail - Vx in [-{bound}, {bound}] }}',
+        f'  -> tail - Vx in [-{bound}, {bound}] /\\ hh0 in [-2, 2] }}',
         '',
     ]
     for i in range(7, -1, -1):
@@ -203,7 +230,7 @@ def series_tail_certificate(values):
     exactly (section 4), relative: written like trig's tails."""
     q = [values[f'p00{j}'] for j in range(4)]
     return f"""# The series' cubic term (docs/asin.md, section 4): with zh a binary64,
-# 2^-26 <= zh <= {T_LIT},
+# 2^-28 <= zh <= {T_LIT},
 #   u = RN(zh^2), p = q0 + u (q1 + u (q2 + u q3)), tail = RN(RN(zh u) p)
 # against zh^3 P(zh^2), P the same polynomial evaluated exactly. All four
 # coefficients are positive, so every operation is a relative one. Written by
@@ -225,7 +252,7 @@ P2 = q1 + zh * zh * P3;
 P = q0 + zh * zh * P2;
 Tx = zh * zh * zh * P;
 
-{{ zh_ in [1b-26, {T_LIT}] -> (tail - Tx) / Tx in [-1b-49, 1b-49] }}
+{{ zh_ in [1b-28, {T_LIT}] -> (tail - Tx) / Tx in [-1b-51, 1b-51] }}
 
 (tail - Tx) / Tx -> (1 + (a3 - zh * zh * zh) / (zh * zh * zh)) * (1 + (ps - P) / P) * (1 + (tail - a3 * ps) / (a3 * ps)) - 1
   {{ Tx <> 0, zh <> 0, P <> 0, a3 <> 0, ps <> 0 }};
@@ -236,27 +263,32 @@ Tx = zh * zh * zh * P;
 
 def series_compose_certificate(values):
     """The series' fast result against asin z (section 4), relative."""
-    rel_poly = hex_fraction(values['v000']) + Fraction(1, 2**280)
-    ec = Fraction(1, 2**49)  # series_tail.g, plus P's Sollya error 2^-54 and z_lo's 3 2^-53
-    rc = Fraction(13, 10**6)  # (asin z - z)/z <= z^2/5 over z <= T
-    claim = up(rc * ec * (1 + DW_ADD_F) + DW_ADD_F)
+    rc = Fraction(11, 10**6)  # (asin z - z)/z <= z^2/6 (1 + z^2) <= 1.02e-5 on z <= T
+    # eps, the relative gap between the computed cubic term and asin z - z:
+    # the tail's 2^-51 (series_tail.g), Sollya's 2^-54 (1 + 2^-23) for the polynomial
+    # (asin_poly.out), and zl and the rounding of zh^2 inside z^3 P(z^2): 3.1 2^-53.
+    eps = Fraction(1, 2**50)
+    parts = Fraction(1, 2**51) + Fraction(1, 2**54) * (1 + Fraction(1, 2**23)) + Fraction(31, 10) * Fraction(1, 2**53)
+    assert parts <= eps, 'the series eps pieces exceed 2^-50'
+    claim = up(rc * eps * (1 + DW_ADD_F) + DW_ADD_F)
     return rf"""# The series' fast result (docs/asin.md, section 4): F = (z + c)(1 + ea) with
 # z = zh + zl exactly, c = RN(RN(zh u) p), against A = asin z = z (1 + rc),
-# relative. rc = (asin z - z)/z <= z^2/5 <= 1.3e-6 on z <= {T_LIT}; c differs from
-# the series' cubic term by the relative eps, at most 2^-49: the tail's 2^-49
-# (formal/asin/series_tail.g, widened to include Sollya's 2^-54 for the
-# polynomial, in asin_poly.out, and zl's 3 2^-53 in zh^3 against z^3).
+# relative. rc = (asin z - z)/z <= z^2/6 (1 + z^2) <= 1.1e-5 on z <= {T_LIT}; c
+# differs from A - z by the relative eps, at most 2^-50: the tail's 2^-51
+# (formal/asin/series_tail.g), Sollya's 2^-54 (1 + 2^-23) for the polynomial
+# (asin_poly.out) and 3.1 2^-53 for zl and the rounding of zh^2 inside z^3 P(z^2);
+# generators/asin_certificates.py asserts their sum is at most 2^-50.
 # ea: add_f64, 2u^2 (docs/double-word.md). Written by
 # generators/asin_certificates.py.
 
 A = z * (1 + rc);
 F = (z * (1 + rc * (1 + eps))) * (1 + ea);
 
-{{ z in [1b-26, {T_LIT}] /\ rc in [0, 13b-23] /\ eps in [-1b-49, 1b-49] /\ ea in [-1b-104, 1b-104]
+{{ z in [1b-28, {T_LIT}] /\ rc in [0, 1.1e-5] /\ eps in [-1b-50, 1b-50] /\ ea in [-1b-104, 1b-104]
   -> (F - A) / A in [-{claim}, {claim}] }}
 
 (F - A) / A -> (rc * eps + (1 + rc * (1 + eps)) * ea) / (1 + rc) {{ z <> 0, 1 + rc <> 0 }};
-""", up(rc * ec * (1 + DW_ADD_F) + DW_ADD_F)
+""", claim
 
 
 def sqrt_certificate():
@@ -471,6 +503,165 @@ u5 = eb * (1 + eta);
     return {'newton_direct.g': direct, 'newton_complement.g': complement}
 
 
+def split_lit(text):
+    """`NbE` as (N, -E) with N odd, which is how Gappa normalizes a literal."""
+    n, e = text.split('b-')
+    n, e = int(n), -int(e)
+    while n % 2 == 0:
+        n, e = n // 2, e + 1
+    return n, e
+
+
+def word_data(x):
+    """A binary64 table word as its bits and (sign, m, k, M, d, E): the decoded
+    mantissa m and exponent -k, and the value M 2^E with M odd and E = -k + d."""
+    bits = asin_constants.to_bits(x)
+    exp, frac_bits = (bits >> 52) & 0x7ff, bits & ((1 << 52) - 1)
+    assert 0 < exp and 1075 - exp > 0, hex(bits)
+    m, k = (1 << 52) | frac_bits, 1075 - exp
+    d = (m & -m).bit_length() - 1
+    sign = bits >> 63
+    return bits, bool(sign), m, k, (-1 if sign else 1) * (m >> d), d, -k + d
+
+
+def segments_coq(rows, evals, values):
+    """formal/asin/AsinSegments.v: for each segment, its evaluation certificate
+    applied over its table coefficients and the facts `SegOkRow` states about
+    them, then the dispatcher over k."""
+    out = [
+        "(** Segment-by-segment facts of asin's tables, written by",
+        '    generators/asin_certificates.py; do not edit. For each segment k, the',
+        '    certificate formal/asin/eval_<kk>.g applied over the table words of',
+        '    src/asin/tables.rs, and the numeric facts [SegOkRow] states. *)',
+        'From Coq Require Import Reals ZArith Lia Lra Psatz List.',
+        'From Flocq Require Import Core.',
+        'From Gappa Require Import Gappa_library.',
+        'From Binary64 Require Import Binary64Add IEEE64 Grid.',
+        'From Interval Require Import Tactic.',
+        'Require Import Ln1pLemmas StageGappa AsinTables AsinKernel AsinSegment AsinApprox AsinWithin.',
+        *[f'Require asin_eval_{k:02d}.' for k in range(1, 46)],
+        'Import ListNotations.',
+        'Open Scope R_scope.',
+        '',
+        '(** The double-word addition\'s rounding is far below every budget here. *)',
+        'Lemma ea_dw_small : 0 <= 3 * bpow radix2 (- prec) ^ 2 / (1 - 4 * bpow radix2 (- prec)) <= / 1000000000000000000000000000000.',
+        'Proof.',
+        '  replace (- prec)%Z with (-53)%Z by reflexivity. bpow_num.',
+        '  split; [interval with (i_prec 120) | interval with (i_prec 160)].',
+        'Qed.',
+        '',
+    ]
+    dispatch = []
+    for k in range(1, 46):
+        row = rows[k - 1]
+        bound, dgb = evals[k]
+        bn, be = split_lit(bound)
+        dn, de = split_lit(dgb)
+        words = [word_data(x) for x in row]
+        real = [f'(IZR ({w[4]}) * bpow radix2 ({w[6]}))' for w in words]
+        bound_r = f'(IZR {bound.split("b-")[0]} * bpow radix2 (-{bound.split("b-")[1]}))'
+        dgb_r = f'(IZR {dgb.split("b-")[0]} * bpow radix2 (-{dgb.split("b-")[1]}))'
+        # EvalCert's coefficient order: c_hi, c_lo, g0 .. g8.
+        out += [
+            f'Lemma evalcert_{k:02d} : EvalCert {" ".join(real[2:])} {bound_r} {dgb_r}.',
+            'Proof.',
+            '  unfold EvalCert. intros th_ tl_ dg Th Tl Dg. split.',
+            f'  - apply (rabs_bnd _ {bn} ({-bn}) ({be})); [reflexivity | bpow_num; lra | ].',
+            f'    gappa_goal (asin_eval_{k:02d}.l1 th_ tl_ dg).',
+            '  - apply (rabs_bnd _ 1 (-1) 1); [reflexivity | bpow_num; lra | ].',
+            f'    gappa_goal (asin_eval_{k:02d}.l1 th_ tl_ dg).',
+            'Qed.',
+            '',
+            f'Lemma segok_{k:02d} : SegOkRow [{"; ".join(f"(0x{w[0]:016x})%Z" for w in words)}] {bound_r}.',
+            'Proof.',
+            '  unfold SegOkRow. cbn [nth].',
+        ]
+        for j, w in enumerate(words):
+            bits, sign, m, kk, M, d, E = w
+            out.append(f'  destruct (word_ok_intro (0x{bits:016x})%Z {"true" if sign else "false"} {m}%positive {kk}%nat'
+                       f' ({M})%Z {d}%Z ({E})%Z eq_refl eq_refl ltac:(lia) eq_refl) as [F{j} V{j}].')
+        out += [
+            f'  refine (segok_from_values {" ".join(["_"] * 28)}',
+            f'    {" ".join(f"F{j}" for j in range(13))} {" ".join(f"V{j}" for j in range(13))}',
+            f'    _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ evalcert_{k:02d} _ _).',
+            '  all: seg_numeric.',
+            'Qed.',
+            '',
+        ]
+        e_budget, e_n, e_shift = approx_budget(k, values)
+        b_frac = Fraction(int(bound.split('b-')[0]), 2 ** int(bound.split('b-')[1]))
+        e_a = 3 * U * U / (1 - 4 * U)
+        a_min = Fraction(k, 64) - T
+        assert ((e_budget + b_frac) * (1 + e_a) + e_a * a_min) * 2 ** 63 <= a_min, f'segment {k}: 2^-63 fast bound fails'
+        row_list = '[' + '; '.join(f'(0x{w[0]:016x})%Z' for w in words) + ']'
+        tt = f'((B zh - IZR {k} / 64) + B zl)'
+        kk2 = f'{k:02d}'
+        out += [
+            f'Lemma row_{kk2} : nth (Z.to_nat ({k}%Z - 1)) asin_segments [] = {row_list}.',
+            'Proof. reflexivity. Qed.',
+            '',
+            f'Lemma fast_{kk2} zh zl : finite zh -> finite zl -> / 128 <= B zh -> B zh <= 0.7072 ->',
+            f'  Znearest ne (B zh * 64) = {k}%Z -> Rabs (B zl) <= bpow radix2 (-53) -> on_grid (-211) (B zl) ->',
+            '  exists h l, asin_series zh zl = (h, l) /\\ finite h /\\ finite l /\\ B h = rndF (B h + B l) /\\',
+            f'    Rabs (B h + B l - asin (IZR {k} / 64 + {tt})) <= bpow radix2 (-63) * asin (IZR {k} / 64 + {tt}).',
+            'Proof.',
+            '  intros Fz Fl L U Hn Hl Hg.',
+            f'  pose proof (series_segment zh zl {k}%Z {bound_r} ltac:(lia) Fz Fl L U Hn Hl Hg segok_{kk2}) as SS.',
+            f'  cbv zeta in SS. rewrite row_{kk2} in SS. cbn [nth] in SS.',
+            '  destruct SS as ' + intro_pattern(['h', 'l', 'Hs', 'Fh', "Fl'", 'Nrm', 'Ht', 'e1', 'ea', 'E1', 'Eea', 'Eq']) + '.',
+            "  exists h, l. split; [exact Hs | split; [exact Fh | split; [exact Fl' | split; [exact Nrm | ]]]].",
+        ]
+        for j, w in enumerate(words):
+            bits, sign, m, kk, M, d, E = w
+            out.append(f'  destruct (word_ok_intro (0x{bits:016x})%Z {"true" if sign else "false"} {m}%positive {kk}%nat'
+                       f' ({M})%Z {d}%Z ({E})%Z eq_refl eq_refl ltac:(lia) eq_refl) as [F{j} V{j}].')
+        out += [
+            '  unfold seg_poly in Eq.',
+            f'  pose proof (approx_{kk2} _ _ _ _ _ _ _ _ _ _ _ _ _ {tt} {" ".join(f"V{j}" for j in range(13))} Ht) as AP.',
+            f'  change (IZR {k}) with ({k} : R) in *.',
+            '  apply Rabs_le_inv in Ht as Hti.',
+            f'  assert (HAm : {k} / 64 - 0.0078126 <= asin ({k} / 64 + {tt})).',
+            f'  {{ apply Rle_trans with ({k} / 64 + {tt}); [lra | apply asin_ge; split; lra]. }}',
+            '  destruct ea_dw_small as [Ea0 Ea1].',
+            '  rewrite Eq.',
+            f'  refine (fast_compose _ _ e1 ea (IZR {e_n} * bpow radix2 (-{e_shift})) {bound_r} _ ({k} / 64 - 0.0078126) _ AP E1 Eea HAm _ Ea0 _).',
+            '  - lra.',
+            '  - bpow_num. replace (- prec)%Z with (-53)%Z by reflexivity. bpow_num. clear - Fz. interval with (i_prec 200).',
+            'Qed.',
+            '',
+        ]
+        dispatch.append((k, bound_r))
+    cases = ' \\/ '.join(f'k = {k}%Z' for k in range(1, 46))
+    pattern = ' | '.join('E' for _ in range(45))
+    out += [
+        'Lemma segok_all (k : Z) : (1 <= k <= 45)%Z ->',
+        '  exists bound, SegOkRow (nth (Z.to_nat (k - 1)) asin_segments []) bound /\\ bound <= bpow radix2 (-63).',
+        'Proof.',
+        '  intros Hk.',
+        f'  assert (Hc : {cases}) by lia.',
+        '  repeat (destruct Hc as [E | Hc]; [subst k; first ' + '[' + ' | '.join(
+            f'(exists {b}; split; [exact segok_{kk:02d} | bpow_num; interval with (i_prec 60)])' for kk, b in dispatch) + '] | ]).',
+        '  subst k. ' + 'exists ' + dispatch[-1][1] + '; split; [exact segok_45 | bpow_num; interval with (i_prec 60)].',
+        'Qed.',
+        '',
+        '(** The table branch: [k = round (64 zh)] in [1..45], the tail [zl] a double-word low part',
+        '    on the [2^-211] grid. *)',
+        'Theorem fast_table (k : Z) zh zl : (1 <= k <= 45)%Z -> finite zh -> finite zl -> / 128 <= B zh -> B zh <= 0.7072 ->',
+        '  Znearest ne (B zh * 64) = k -> Rabs (B zl) <= bpow radix2 (-53) -> on_grid (-211) (B zl) ->',
+        '  exists h l, asin_series zh zl = (h, l) /\\ finite h /\\ finite l /\\ B h = rndF (B h + B l) /\\',
+        '    Rabs (B h + B l - asin (IZR k / 64 + ((B zh - IZR k / 64) + B zl)))',
+        '      <= bpow radix2 (-63) * asin (IZR k / 64 + ((B zh - IZR k / 64) + B zl)).',
+        'Proof.',
+        '  intros Hk Fz Fl L U Hn Hl Hg.',
+        f'  assert (Hc : {cases}) by lia.',
+        '  repeat (destruct Hc as [E | Hc]; [rewrite E in Hn; rewrite E; first ' + '[' + ' | '.join(
+            f'exact (fast_{kk:02d} zh zl Fz Fl L U Hn Hl Hg)' for kk, _ in dispatch) + '] | ]).',
+        '  rewrite Hc in Hn. rewrite Hc. exact (fast_45 zh zl Fz Fl L U Hn Hl Hg).',
+        'Qed.',
+    ]
+    return '\n'.join(out) + '\n'
+
+
 def derive():
     return asin_constants.derive()
 
@@ -480,15 +671,18 @@ def generate():
     out = {}
     worst = Fraction(0)
     claims = {}
+    evals = {}
     for k in range(1, asin_constants.SEGMENTS + 1):
         row = d['rows'][k - 1]
         bound = eval_bound(row)
-        text, _ = eval_certificate(k, row, bound)
+        text, dg = eval_certificate(k, row, bound)
         out[f'eval_{k:02d}.g'] = text
+        evals[k] = (bound, up(dg))
         text, claim = compose_certificate(k, row, d, bound)
         out[f'compose_{k:02d}.g'] = text
         claims[k] = claim
         worst = max(worst, claim)
+    out['AsinSegments.v'] = segments_coq(d['rows'], evals, d['values'])
     values = d['values']
     out['series_tail.g'] = series_tail_certificate(values)
     text, series_claim = series_compose_certificate(values)
@@ -516,7 +710,7 @@ def main():
         return
     for name, text in files.items():
         (DIR / name).write_text(text)
-    print(f'{len(files)} certificates; worst segment bound 2^{math.log2(worst):.2f}')
+    print(f'{len(files) - 1} certificates; worst segment bound 2^{math.log2(worst):.2f}')
 
 
 if __name__ == '__main__':

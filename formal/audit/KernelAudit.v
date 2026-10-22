@@ -731,3 +731,29 @@ Print Assumptions AsinFacts.y_lower.
 Print Assumptions AsinFacts.d_lower.
 Print Assumptions AsinFacts.sin_ratio.
 Print Assumptions AsinFacts.quarter_pi_ranges.
+Require AsinSqrtStep.
+Print Assumptions AsinSqrtStep.u_exact.
+Print Assumptions AsinSqrtStep.reduced_complement.
+Require AsinSeriesSmall.
+Print Assumptions AsinSeriesSmall.index_zero.
+Print Assumptions AsinSeriesSmall.series_small_eval.
+Require AsinSegment.
+Print Assumptions AsinSegment.segment_eval.
+Print Assumptions AsinSegment.series_segment.
+Require AsinSegments.
+Print Assumptions AsinSegments.segok_all.
+Require AsinPath.
+Print Assumptions AsinPath.fast_direct.
+Print Assumptions AsinPath.fast_complement.
+Require AsinAccurate.
+Print Assumptions AsinAccurate.accurate_direct.
+Print Assumptions AsinAccurate.accurate_complement.
+Require AsinCorrect.
+Print Assumptions AsinCorrect.positive_correct.
+Require AsinSmall.
+Print Assumptions AsinSmall.small_correct.
+Require AsinEntry.
+Print Assumptions AsinEntry.asin_entry_finite.
+Print Assumptions AsinEntry.asin_entry_nan.
+Print Assumptions AsinEntry.asin_entry_inf.
+Print Assumptions AsinEntry.asin_entry_large.

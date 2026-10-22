@@ -16,6 +16,11 @@ use.
   z <= 0.0078126, from the same file.
 - HALF_PI: pi/2 as a double-word.
 
+Also writes formal/asin/AsinTables.v, the same constants for the Coq
+transcription (formal/asin/AsinKernel.v), as binary64 encodings and `Q256`
+limbs, with the `Q256` series' steps and pi/2 read from trig's committed
+tables (crates/morphiq-numerics/src/trig/tables.rs, reduction.rs).
+
 The polynomials' errors are the Sollya supnorm plus the Taylor remainder bound
 of asin_poly.sollya. As a check, not a proof, the generator also evaluates
 each segment's polynomial at 400 points in mpmath and refuses a deviation
@@ -23,6 +28,7 @@ larger than that bound.
 """
 import math
 import pathlib
+import re
 import struct
 import sys
 
@@ -30,6 +36,9 @@ import mpmath
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'crates/morphiq-numerics/src/asin/tables.rs'
+OUTPUT_COQ = ROOT / 'formal/asin/AsinTables.v'
+TRIG_TABLES = ROOT / 'crates/morphiq-numerics/src/trig/tables.rs'
+TRIG_REDUCTION = ROOT / 'crates/morphiq-numerics/src/trig/reduction.rs'
 POLY = ROOT / 'generators/asin_poly.out'
 PREC = 600
 T = mpmath.mpf('0.0078126')  # |t| <= 1/128, widened for z's double-word error
@@ -130,14 +139,71 @@ def generate():
     return '\n'.join(lines) + '\n'
 
 
+def trig_steps(name):
+    """A `Q256` series' steps `(limbs, exponent)` from trig's tables.rs."""
+    text = TRIG_TABLES.read_text()
+    body = text[text.index(f'const {name}'):]
+    body = body[:body.index('];')]
+    steps = [([int(x, 16) for x in re.findall(r'0x([0-9a-f]+)', limbs)], int(e))
+             for limbs, e in re.findall(r'\[((?:\s*0x[0-9a-f]+,){4}\s*)\],\s*(-?\d+),', body)]
+    assert steps, name
+    return steps
+
+
+def trig_half_pi():
+    """pi/2 as `Q256` limbs and exponent, from trig's reduction.rs."""
+    text = TRIG_REDUCTION.read_text()
+    block = text[text.index('const HALF_PI: [u64; 4]'):]
+    limbs = [int(x, 16) for x in re.findall(r'0x([0-9a-f]+)', block[:block.index('];')])]
+    exponent = int(re.search(r'HALF_PI_EXPONENT: i32 = (-?\d+)', text).group(1))
+    assert len(limbs) == 4
+    return limbs, exponent
+
+
+def generate_coq():
+    d = derive()
+    word = lambda x: f'0x{to_bits(x):016x}'  # noqa: E731
+    limb = lambda x: f'0x{x:016x}'  # noqa: E731
+    def steps(name, entries):
+        rows = [f'  ([{"; ".join(limb(x) for x in l)}], {e})' for l, e in entries]
+        return [f'Definition {name} : list (list Z * Z) := [', ';\n'.join(rows), '].']
+    half_pi_limbs, half_pi_exp = trig_half_pi()
+    lines = [
+        '(** Constants of asin\'s transcription, written by generators/asin_constants.py; do',
+        '    not edit. docs/asin.md gives the derivation. Binary64 values are encodings; a',
+        '    Q256 value is its limbs, least significant first, and an exponent. *)',
+        'From Coq Require Import ZArith List.',
+        'Import ListNotations.',
+        'Open Scope Z_scope.',
+        '',
+        '(** The series polynomial below 1/128 (src/asin/tables.rs POLY0). *)',
+        f'Definition asin_poly0 : list Z := [{"; ".join(word(c) for c in d["poly0"])}].',
+        '(** [asin(a).hi, asin(a).lo, c1.hi, c1.lo, g0, ..., g8] for a = k/64, k = 1..45 at',
+        '    index k - 1 (src/asin/tables.rs SEGMENTS). *)',
+        'Definition asin_segments : list (list Z) := [',
+        ';\n'.join(f'  [{"; ".join(word(x) for x in row)}]' for row in d['rows']),
+        '].',
+        f'Definition asin_half_pi : Z * Z := ({word(d["half_pi"][0])}, {word(d["half_pi"][1])}).',
+        '(** pi/2 in Q256: limbs and exponent (src/trig/reduction.rs HALF_PI). *)',
+        f'Definition asin_q_half_pi : list Z * Z := ([{"; ".join(limb(x) for x in half_pi_limbs)}], {half_pi_exp}).',
+        '(** The steps of trig\'s Q256 series (src/trig/tables.rs SIN_STEPS, COS_STEPS), which',
+        '    asin\'s accurate path evaluates. *)',
+        *steps('asin_sin_steps', trig_steps('SIN_STEPS')),
+        *steps('asin_cos_steps', trig_steps('COS_STEPS')),
+    ]
+    return '\n'.join(lines) + '\n'
+
+
 def main():
-    data = generate()
+    outputs = {OUTPUT: generate(), OUTPUT_COQ: generate_coq()}
     if '--check' in sys.argv[1:]:
-        if OUTPUT.read_text() != data:
-            sys.exit(f'{OUTPUT} differs from a fresh generation')
+        for path, data in outputs.items():
+            if path.read_text() != data:
+                sys.exit(f'{path} differs from a fresh generation')
         return
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(data)
+    for path, data in outputs.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(data)
 
 
 if __name__ == '__main__':

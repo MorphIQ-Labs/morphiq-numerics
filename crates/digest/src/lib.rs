@@ -12,8 +12,8 @@
 use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::elementary::{
-    cos, exp, exp_slice, exp2, exp2_slice, expm1, expm1_slice, ln, ln_1p, ln_1p_slice, ln_slice,
-    log2, log10, sin, sincos, sqrt, tan,
+    asin, asin_slice, cos, exp, exp_slice, exp2, exp2_slice, expm1, expm1_slice, ln, ln_1p,
+    ln_1p_slice, ln_slice, log2, log10, sin, sincos, sqrt, tan,
 };
 use morphiq_numerics::interval::{FiniteInterval, IntervalError};
 use morphiq_numerics::log_space::{
@@ -541,6 +541,64 @@ pub fn corpus_digest() -> [u8; 32] {
         r.f64(tan((2.0 * unit - 1.0) * core::f64::consts::PI));
     }
 
+    r.label("asin");
+    // Special values, docs/asin.md's thresholds with their neighbours (`asin x = x`
+    // below ASIN_IS_X, the complement above SPLIT), ±1 and their neighbours,
+    // every shifter edge (k + 1/2)/64 and k/64, then 10,000 arguments in
+    // [-1, 1], 5,000 in the complement's range, and the binades near zero.
+    for bits in [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        1,
+        0x3e57_1374_4912_3ef5,
+        0x3e57_1374_4912_3ef6,
+        0x3e57_1374_4912_3ef7,
+        0x3fe6_a09e_667f_3bcb,
+        0x3fe6_a09e_667f_3bcc,
+        0x3fe6_a09e_667f_3bcd,
+        0x3fef_ffff_ffff_ffff,
+        0x3ff0_0000_0000_0000,
+        0x3ff0_0000_0000_0001,
+        0x7fef_ffff_ffff_ffff,
+    ] {
+        r.f64(asin(f64::from_bits(bits)));
+        r.f64(asin(-f64::from_bits(bits)));
+    }
+    for k in 0..=64_u32 {
+        for numerator in [2 * k, 2 * k + 1] {
+            let edge = f64::from(numerator) / 128.0;
+            for neighbour in [
+                edge,
+                f64::from_bits(edge.to_bits() + 1),
+                f64::from_bits(edge.to_bits().wrapping_sub(1)),
+            ] {
+                r.f64(asin(neighbour));
+                r.f64(asin(-neighbour));
+            }
+        }
+    }
+    for _ in 0..10_000 {
+        #[allow(clippy::cast_precision_loss)] // a 53-bit integer
+        let unit = (words.next_word() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+        r.f64(asin(2.0 * unit - 1.0));
+    }
+    for _ in 0..5_000 {
+        #[allow(clippy::cast_precision_loss)] // a 53-bit integer
+        let unit = (words.next_word() >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000);
+        r.f64(asin(0.7 + 0.3 * unit));
+    }
+    for exponent in 0..=60_u64 {
+        for _ in 0..64 {
+            let word = words.next_word();
+            r.f64(asin(f64::from_bits(
+                (word & (1 << 63)) | ((1023 - exponent) << 52) | (word >> 12),
+            )));
+        }
+    }
+
     r.label("sqrt");
     // Every encoding (both signs, subnormals, infinities and NaNs), then
     // positive arguments in every binade.
@@ -791,6 +849,22 @@ pub fn corpus_digest() -> [u8; 32] {
         0x433f_ffff_ffff_ffff,
     ];
     batched_section(&mut r, &mut words, ln_1p_slice, &ln_1p_edges, (-1.0, 9.0));
+
+    r.label("asin_slice");
+    let asin_edges = [
+        0x7ff8_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0,
+        1 << 63,
+        0x3ff0_0000_0000_0000,
+        0xbff0_0000_0000_0000,
+        0x3e57_1374_4912_3ef6,
+        0x3e57_1374_4912_3ef5,
+        0x3fe6_a09e_667f_3bcc,
+        0x3fe6_a09e_667f_3bcd,
+        0x3fef_ffff_ffff_ffff,
+    ];
+    batched_section(&mut r, &mut words, asin_slice, &asin_edges, (-1.1, 1.1));
 
     r.label("exp2_slice");
     let exp2_edges = [
