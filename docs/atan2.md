@@ -15,10 +15,10 @@ and every bound is a Gappa certificate in `formal/atan2`.
 | Fast path: the double-word ratio, 64 segments, the series, the forms (§3, §4) | **certified** (Gappa): relative error below `2^-63.04` |
 | Rounding test at `ε₁ = 2^-62` (§6) | sound given the fast bound, as [ln] §5 |
 | Accurate path: one cubic Newton step in `Q256` (§5) | **certified** (Gappa): relative error below `2^-190.6`, given the facts §5 lists; and **proved in Coq for the transcription** (`Atan2Accurate.v`), the facts discharged: within `5.2·10^-58` (`2^-190.29`) of the form's value |
-| Correct rounding (§6) | wherever the test decides (and on the tiny path), and on every pair of [CM]'s list; **not** claimed over the whole domain (§6). The Coq end-to-end theorem (`Atan2Entry.v`) states exactly this, with the list's completeness as an explicit hypothesis (`CoreMathAtan2`) |
+| Correct rounding (§6) | wherever the test decides (and on the tiny path), and on every pair of [CM]'s list; **not** claimed over the whole domain (§6). The Coq end-to-end theorem (`Atan2Entry.v`) states exactly this, with `Stable190` of the pair as the explicit hypothesis (`CoreMathAtan2` over the whole domain, unverified) |
 | Coq re-proof of every certificate, each rewriting hint proved, axioms audited (§7) | done by the formal lane (`scripts/write_gappa_proofs.sh`, `check_formal.sh` step 5) |
 | Coq transcription of the Rust (`formal/atan2/Atan2Kernel.v`) compared with it bit for bit (§7) | **done**: the entry (special values, forms, tiny ratios), the fast path and its decision at every form, the accurate path (before rounding), 11,477 corpus cases; five planted faults (a series coefficient, the scale, the subnormal midpoint's exponent, Newton's numerator sign, the doubling of `π/2`) each give mismatches |
-| Coq proofs about the transcription (§7) | **done**, no `Admitted`: the double-word ratio and the 64 segments' and the series' fast values (`Atan2Ratio.v`, `Atan2Segments.v`, `Atan2SeriesSmall.v`, `Atan2Fast.v`), the four forms and their composition (`Atan2Forms.v`, `Atan2FastPath.v`: every fast value within `2^-62` relatively), the rounding decision lowered to `2^-905` (`Atan2Decide.v`), the accurate path (`Atan2Newton*.v`, `Atan2Accurate.v`), the tiny ratios including the subnormal midpoints (`Atan2Tiny*.v`, `Atan2Odd.v`, `Atan2Decode.v`), the constants (`Atan2Consts.v`), and the public entry over every binary64 pair (`Atan2Entry.v`). What the proofs do **not** establish: that the Rust code is the transcription (the corpus comparison above is the only link), correct rounding off the rounding test's decisions and off [CM]'s list (`CoreMathAtan2` is an explicit hypothesis, as are the Gappa certificates' own axioms audited by `check_formal.sh`) |
+| Coq proofs about the transcription (§7) | **done**, no `Admitted`: the double-word ratio and the 64 segments' and the series' fast values (`Atan2Ratio.v`, `Atan2Segments.v`, `Atan2SeriesSmall.v`, `Atan2Fast.v`), the four forms and their composition (`Atan2Forms.v`, `Atan2FastPath.v`: every fast value within `2^-62` relatively), the rounding decision lowered to `2^-905` (`Atan2Decide.v`), the accurate path (`Atan2Newton*.v`, `Atan2Accurate.v`), the tiny ratios including the subnormal midpoints (`Atan2Tiny*.v`, `Atan2Odd.v`, `Atan2Decode.v`), the constants (`Atan2Consts.v`), and the public entry over every binary64 pair (`Atan2Entry.v`). What the proofs do **not** establish: that the Rust code is the transcription (the corpus comparison above is the only link), correct rounding off the rounding test's decisions and off [CM]'s list (`Stable190` per pair and `CoreMathAtan2` over the domain are explicit hypotheses) |
 | ARM NEON, SSE2, AVX2+FMA, AVX-512F lanes; `atan2_slice` | **done** (`atan2/lanes.rs`, [lanes.md](lanes.md)): bit-identical to `atan2` on every backend over the fixture's pairs, every pair of special values, ratios at every scale, the segment boundaries and random encodings; run on NEON, and on x86-64 SSE2 under Rosetta; AVX-512F is CI's SDE job |
 | Mutation witnesses | **done** (§7): 215 mutants of `atan2/mod.rs` and `atan2/lanes.rs`, 194 caught, 10 unviable, 6 timed out (detected), 5 equivalent |
 | Same-host performance against the best alternatives | measured on NEON only: 1.05–1.64× over the scalar loop ([measurements](../crates/reference/measurements/asin-asinh-atan2-m1pro/README.md)); native x86 not measured |
@@ -152,7 +152,8 @@ result is rounded once.
   (`Stable190`; the proofs use `2^-190`, the bound the `2^-137` slack needs). [CM]'s list is a restricted set, so no
   search excludes that over the whole domain, and **correct rounding is not claimed there**. Every pair of
   [CM]'s list is correctly rounded by the bound (the hardest is `2^-101.7` ulp from a midpoint, §2); in
-  Coq that is the hypothesis `CoreMathAtan2` of `Atan2Entry.atan2_entry_correct`.
+  Coq that is `Stable190` of the pair, a hypothesis of `Atan2Entry.atan2_entry_finite` (over every
+  pair: `CoreMathAtan2` of `atan2_entry_correct`, unverified).
 - Quotients below `2^-900` take the tiny path (§3) and are always correctly rounded (`Atan2Tiny.tiny_phi_ok`:
   `RN(n/d)` is `RN(atan(n/d))` unless `n/d` is exactly the midpoint of two subnormals, where the lower
   neighbor is the answer; no other midpoint is within `2^-108` relatively, which `atan t = t(1 − t²/3 + …)`
@@ -189,8 +190,12 @@ prints the figures).
 
 **The claim stays as stated.** `atan2` returns a value within `(1/2 + 2^-137)` ulp of the exact
 angle for every finite pair; it is correctly rounded where the rounding test decides and on
-[CM]'s list (proved for the transcription, §7 and the Coq files); beyond those, correct rounding
-is supported heuristically only, by the estimate above.
+[CM]'s list; beyond those, correct rounding is supported heuristically only, by the estimate above.
+The accuracy bound and the decision are proved for the transcription (§7, the Coq files); that each
+pair of [CM]'s list is more than `2^-190` (relatively) from a midpoint is the 500-bit reference
+computation of §2, not a Coq proof. In Coq it is the per-pair hypothesis `Stable190` of
+`Atan2Entry.atan2_entry_finite`; the same statement for every pair the accurate path serves is
+`CoreMathAtan2`, which no search has verified.
 
 ## 7. Certificates, generators and tests
 
