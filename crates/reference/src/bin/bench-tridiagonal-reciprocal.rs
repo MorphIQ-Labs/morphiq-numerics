@@ -120,8 +120,12 @@ fn main() {
                     .factor_into(black_box(&mut work_p), black_box(&mut work_u))
                     .unwrap();
                 if method == "division_group" {
-                    f.solve_many_into(count, black_box(&rhs), black_box(&mut out))
-                        .unwrap();
+                    if count == 1 {
+                        f.solve_into(black_box(&rhs), black_box(&mut out)).unwrap();
+                    } else {
+                        f.solve_many_into(count, black_box(&rhs), black_box(&mut out))
+                            .unwrap();
+                    }
                 }
                 black_box(f);
             }
