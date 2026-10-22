@@ -184,3 +184,9 @@ Proof.
   pose proof (Rle_0_sqr t). unfold Rsqr in H2.
   apply Rabs_le. split; nra.
 Qed.
+
+Lemma ln_mono x y : 0 < x -> x <= y -> ln x <= ln y.
+Proof.
+  intros Hx H. destruct (Req_dec x y) as [-> | Hn]; [lra | ].
+  pose proof (ln_increasing x y Hx ltac:(lra)). lra.
+Qed.
