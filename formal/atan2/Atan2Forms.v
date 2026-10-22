@@ -47,6 +47,8 @@ Proof.
   { rewrite Rabs_pos_eq by lra. apply Rle_trans with 1; [change 1 with (bpow radix2 0); apply bpow_le; lia | lra]. }
   pose proof (dw_low hh hl Hhhn Hhhdw) as Hhl.
   rewrite (Rabs_pos_eq (B hh)) in Hhl by lra.
+  assert (P52 : bpow radix2 (-52) = / 4503599627370496) by (bpow_num; reflexivity).
+  pose proof Hhl as Hhl'. rewrite P52 in Hhl'. apply Rabs_le_inv in Hhl' as [Hh1 Hh2].
   split; [split; [exact Hhhge | lra] | ].
   exact Hhl.
 Qed.
@@ -56,7 +58,9 @@ Lemma dw_add_ok xh xl yh yl : finite xh -> finite xl -> finite yh -> finite yl -
   B xh = rndF (B xh + B xl) -> B yh = rndF (B yh + B yl) ->
   1 <= B xh <= 4 -> Rabs (B xl) <= bpow radix2 (-52) * B xh ->
   Rabs (B yh) <= 99 / 100 * B xh -> Rabs (B yl) <= bpow radix2 (-52) * B xh ->
-  exists zh zl, add64 xh xl yh yl = (zh, zl) /\ finite zh /\ finite zl /\ B zh = rndF (B zh + B zl) /    Rabs (B zh + B zl - (B xh + B xl + (B yh + B yl))) <= bpow radix2 (-104) * (B xh + B xl + (B yh + B yl)) /    (B xh + B xl + (B yh + B yl)) >= 0.009 * B xh.
+  exists zh zl, add64 xh xl yh yl = (zh, zl) /\ finite zh /\ finite zl /\ B zh = rndF (B zh + B zl) /\
+    Rabs (B zh + B zl - (B xh + B xl + (B yh + B yl))) <= bpow radix2 (-104) * (B xh + B xl + (B yh + B yl)) /\
+    (B xh + B xl + (B yh + B yl)) >= 0.009 * B xh.
 Proof.
   intros Fxh Fxl Fyh Fyl Dx Dy [X1 X2] Hxl Hyh Hyl.
   assert (P52 : bpow radix2 (-52) = / 4503599627370496) by (bpow_num; reflexivity).
@@ -70,9 +74,11 @@ Proof.
   assert (Hne : B xh + B xl + (B yh + B yl) <> 0) by lra.
   assert (Hbig : forall v, Rabs v <= 5 -> Rabs v <= bpow radix2 1016).
   { intros v Hv. apply Rle_trans with 5; [exact Hv | apply Rle_trans with (bpow radix2 3); [change (bpow radix2 3) with 8; lra | apply bpow_le; lia]]. }
-  pose proof (add_ieee xh xl yh yl Fxh Fxl Dx Fyh Fyl Dy
-    (Hbig _ ltac:(rewrite Rabs_pos_eq by lra; lra)) (Hbig _ ltac:(apply Rabs_le; split; lra))
-    (Hbig _ ltac:(apply Rabs_le; split; lra)) (Hbig _ ltac:(apply Rabs_le; split; lra)) Hne) as AD.
+  assert (R1 : Rabs (B xh) <= bpow radix2 1016) by (apply Hbig; rewrite Rabs_pos_eq by lra; lra).
+  assert (R2 : Rabs (B xl) <= bpow radix2 1016) by (apply Hbig; apply Rabs_le; split; lra).
+  assert (R3 : Rabs (B yh) <= bpow radix2 1016) by (apply Hbig; apply Rabs_le; split; lra).
+  assert (R4 : Rabs (B yl) <= bpow radix2 1016) by (apply Hbig; apply Rabs_le; split; lra).
+  pose proof (add_ieee xh xl yh yl Fxh Fxl Dx Fyh Fyl Dy R1 R2 R3 R4 Hne) as AD.
   assert (Hlx : bpow radix2 (-900) <= B xh) by (apply Rle_trans with 1; [change 1 with (bpow radix2 0); apply bpow_le; lia | exact X1]).
   assert (Hux : B xh <= bpow radix2 900) by (apply Rle_trans with 4; [exact X2 | apply Rle_trans with (bpow radix2 3); [change (bpow radix2 3) with 8; lra | apply bpow_le; lia]]).
   pose proof (add64_normalized xh xl yh yl Fxh Fxl Fyh Fyl Hlx Hux
