@@ -182,3 +182,94 @@ Proof.
     assert (b62 : bpow radix2 (-62) <= 1 / 1000) by (apply Rle_trans with (bpow radix2 (-10)); [apply bpow_le; lia | bpow_num; interval with (i_prec 60)]).
     change (bpow radix2 2) with 4. nra.
 Qed.
+
+(** The post stage: the form's double-word and the start for the accurate path. *)
+Theorem post_ok th tl f ph pl phi :
+  atan2_series th tl = (ph, pl) -> finite ph -> finite pl -> B ph = rndF (B ph + B pl) ->
+  bpow radix2 (-902) <= phi -> phi <= PI / 4 ->
+  Rabs (B ph + B pl - phi) <= bpow radix2 (-63) * (1 + bpow radix2 (-40)) * phi ->
+  exists yh yl, atan2_post th tl f = ((yh, yl), (ph, pl)) /\ finite yh /\ finite yl /\
+    B yh = rndF (B yh + B yl) /\ bpow radix2 (-905) <= B yh /\ B yh <= 4 /\
+    Rabs (B yh + B yl - form_value f phi) <= bpow radix2 (-62) * form_value f phi.
+Proof.
+  intros Hs Fph Fpl Dw Hlo Hhi Hsr.
+  pose proof pi_bounds as [Pi1 Pi2]. pose proof (bpow_gt_0 radix2 (-902)) as P902.
+  assert (HeF : 0 <= bpow radix2 (-63) * (1 + bpow radix2 (-40)) <= / 9223372036854775808 * 1.0001).
+  { split; [apply Rmult_le_pos; [apply bpow_ge_0 | pose proof (bpow_ge_0 radix2 (-40)); lra] | ].
+    bpow_num. interval with (i_prec 100). }
+  set (eF := bpow radix2 (-63) * (1 + bpow radix2 (-40))) in *.
+  set (phihat := B ph + B pl) in *.
+  assert (Hphi_hi : phi <= 0.7854) by lra.
+  assert (Hpos : 0 < phi) by lra.
+  apply Rabs_le_inv in Hsr as [Hs1 Hs2]. destruct HeF as [HeF0 HeF1].
+  assert (Hph_lo : 0.99 * phi <= phihat) by nra.
+  assert (Hph_hi : phihat <= 0.78541) by nra.
+  assert (Hpn : bpow radix2 (-1022) <= Rabs phihat).
+  { assert (Hb : bpow radix2 (-902) = 2 * bpow radix2 (-903)) by (replace (-902)%Z with (-903 + 1)%Z by reflexivity; rewrite bpow_plus; change (bpow radix2 1) with 2; ring).
+    pose proof (bpow_gt_0 radix2 (-903)) as P903.
+    rewrite Rabs_pos_eq by lra. apply Rle_trans with (bpow radix2 (-903)); [apply bpow_le; lia | lra]. }
+  pose proof (dw_low ph pl Hpn Dw) as Hlow.
+  assert (Hphpos : 0 < B ph).
+  { rewrite Dw. apply Rlt_le_trans with (bpow radix2 (-903)); [apply bpow_gt_0 | apply rndF_bpow_le; [lia | ]].
+    assert (Hb : bpow radix2 (-902) = 2 * bpow radix2 (-903)) by (replace (-902)%Z with (-903 + 1)%Z by reflexivity; rewrite bpow_plus; change (bpow radix2 1) with 2; ring).
+    pose proof (bpow_gt_0 radix2 (-903)). nra. }
+  rewrite (Rabs_pos_eq (B ph)) in Hlow by lra.
+  assert (Hphle : B ph <= 0.79).
+  { pose proof (rnd_rel phihat Hpn) as R. change (RNE phihat) with (rndF phihat) in R. rewrite <- Dw in R.
+    pose proof (bpow_gt_0 radix2 (-53)) as P53. assert (bpow radix2 (-53) <= / 1000000) by (bpow_num; interval with (i_prec 60)).
+    rewrite (Rabs_pos_eq phihat) in R by lra. apply Rabs_le_inv in R as [R1 R2]. nra. }
+  assert (Hlow2 : Rabs (B pl) <= bpow radix2 (-52) * 1) by (apply Rle_trans with (bpow radix2 (-52) * B ph); [exact Hlow | apply Rmult_le_compat_l; [apply bpow_ge_0 | lra]]).
+  destruct half_pi_dw as [hh [hl [Ehh [Fhh [Fhl [Dhh [Hpi [[Hh1 Hh2] Hhl]]]]]]]].
+  unfold atan2_post. rewrite Hs. cbv iota. rewrite Ehh. cbv iota.
+  assert (HK : 1.5707 <= PI / 2) by lra.
+  assert (HC : Rabs (B hh + B hl - PI / 2) <= / 100000000000000000000000000000000).
+  { apply Rle_trans with (1 := Hpi). apply Rinv_le_contravar; lra. }
+  destruct (neg_dw ph pl Fph Fpl Dw) as [Fnh [Fnl Dn]].
+  destruct (fneg_val ph Fph) as [_ Vnh]. destruct (fneg_val pl Fpl) as [_ Vnl].
+  assert (Hyh : Rabs (B (fneg ph)) <= 99 / 100 * B hh) by (rewrite Vnh, Rabs_Ropp, Rabs_pos_eq by lra; lra).
+  assert (Hyl : Rabs (B (fneg pl)) <= bpow radix2 (-52) * B hh).
+  { rewrite Vnl, Rabs_Ropp. apply Rle_trans with (bpow radix2 (-52) * 1); [exact Hlow2 | apply Rmult_le_compat_l; [apply bpow_ge_0 | lra]]. }
+  assert (Hnn : B (fneg ph) + B (fneg pl) = (-1) * phihat) by (rewrite Vnh, Vnl; unfold phihat; ring).
+  assert (Hphat : Rabs (phihat - phi) <= eF * phi) by (apply Rabs_le; split; lra).
+  destruct f.
+  - (* Phi *)
+    exists ph, pl. split; [reflexivity | ]. split; [exact Fph | ]. split; [exact Fpl | ]. split; [exact Dw | ].
+    split.
+    + apply Rle_trans with (bpow radix2 (-903)); [apply bpow_le; lia | ]. rewrite Dw. apply rndF_bpow_le; [lia | ].
+      assert (Hb : bpow radix2 (-902) = 2 * bpow radix2 (-903)) by (replace (-902)%Z with (-903 + 1)%Z by reflexivity; rewrite bpow_plus; change (bpow radix2 1) with 2; ring).
+      pose proof (bpow_gt_0 radix2 (-903)). nra.
+    + split; [lra | ]. cbn [form_value]. apply Rabs_le. assert (b62 : bpow radix2 (-62) = / 4611686018427387904) by (bpow_num; reflexivity). rewrite b62.
+      split; nra.
+  - (* HalfPiMinus *)
+    destruct (form_step (-1) hh hl (fneg ph) (fneg pl) phi phihat (PI / 2) eF ltac:(right; reflexivity) Fhh Fhl Fnh Fnl Dhh Dn
+      ltac:(split; [exact Hh1 | lra]) Hhl Hyh Hyl Hnn HK ltac:(split; assumption) HC Hphat ltac:(split; assumption) ltac:(lra) ltac:(lra))
+      as [zh [zl [Ea [Fz1 [Fz2 [Dz [Lz [Uz Ez]]]]]]]].
+    exists zh, zl. unfold sub64. rewrite Ea. split; [reflexivity | ]. repeat split; try assumption.
+    cbn [form_value]. replace (PI / 2 + -1 * phi) with (PI / 2 - phi) in Ez by ring. exact Ez.
+  - (* PiMinus *)
+    assert (Hhl2 : Rabs (B hl) <= B hh / 2) by (apply Rle_trans with (bpow radix2 (-52) * B hh); [exact Hhl | assert (bpow radix2 (-52) <= / 2) by (bpow_num; interval with (i_prec 60)); nra]).
+    assert (Hl900 : bpow radix2 (-900) <= B hh) by (apply Rle_trans with 1; [change 1 with (bpow radix2 0); apply bpow_le; lia | exact Hh1]).
+    assert (Hu900 : B hh <= bpow radix2 900) by (apply Rle_trans with 2; [exact Hh2 | apply Rle_trans with (bpow radix2 1); [change (bpow radix2 1) with 2; lra | apply bpow_le; lia]]).
+    pose proof (mul_f64_two_exact hh hl Fhh Fhl Dhh Hl900 Hu900 Hhl2) as M2.
+    destruct (mul_f64_64 hh hl asin_two) as [mh ml] eqn:Emul. destruct M2 as [Fmh [Fml [Bmh Bml]]].
+    assert (Dm : B mh = rndF (B mh + B ml)).
+    { rewrite Bmh, Bml. apply dw_double_norm; [exact Dhh | ].
+      assert (P52b : bpow radix2 (-52) = / 4503599627370496) by (bpow_num; reflexivity).
+      pose proof Hhl as Hl'. rewrite P52b in Hl'. apply Rabs_le_inv in Hl' as [L1 L2].
+      apply Rle_trans with (bpow radix2 (-1)); [apply bpow_le; lia | assert (bpow radix2 (-1) = / 2) by (bpow_num; reflexivity); lra]. }
+    destruct (form_step (-1) mh ml (fneg ph) (fneg pl) phi phihat PI eF ltac:(right; reflexivity) Fmh Fml Fnh Fnl Dm Dn
+      ltac:(rewrite Bmh; split; lra) ltac:(rewrite Bml, Bmh; apply Rle_trans with (2 * (bpow radix2 (-52) * B hh)); [rewrite Rabs_mult, (Rabs_pos_eq 2) by lra; apply Rmult_le_compat_l; [lra | exact Hhl] | lra])
+      ltac:(rewrite Bmh; lra) ltac:(rewrite Bmh; apply Rle_trans with (bpow radix2 (-52) * B hh); [exact Hyl | apply Rmult_le_compat_l; [apply bpow_ge_0 | lra]])
+      Hnn ltac:(lra) ltac:(split; assumption) ltac:(rewrite Bmh, Bml; replace (2 * B hh + 2 * B hl - PI) with (2 * (B hh + B hl - PI / 2)) by field; rewrite Rabs_mult, (Rabs_pos_eq 2) by lra; apply Rle_trans with (2 * / 500000000000000000000000000000000); [apply Rmult_le_compat_l; [lra | exact Hpi] | interval with (i_prec 100)])
+      Hphat ltac:(split; assumption) ltac:(lra) ltac:(lra))
+      as [zh [zl [Ea [Fz1 [Fz2 [Dz [Lz [Uz Ez]]]]]]]].
+    exists zh, zl. cbv iota. unfold sub64. rewrite Ea. split; [reflexivity | ]. repeat split; try assumption.
+    cbn [form_value]. replace (PI + -1 * phi) with (PI - phi) in Ez by ring. exact Ez.
+  - (* HalfPiPlus *)
+    destruct (form_step 1 hh hl ph pl phi phihat (PI / 2) eF ltac:(left; reflexivity) Fhh Fhl Fph Fpl Dhh Dw
+      ltac:(split; [exact Hh1 | lra]) Hhl ltac:(rewrite Rabs_pos_eq by lra; lra) ltac:(apply Rle_trans with (bpow radix2 (-52) * 1); [exact Hlow2 | apply Rmult_le_compat_l; [apply bpow_ge_0 | lra]])
+      ltac:(unfold phihat; ring) HK ltac:(split; assumption) HC Hphat ltac:(split; assumption) ltac:(lra) ltac:(lra))
+      as [zh [zl [Ea [Fz1 [Fz2 [Dz [Lz [Uz Ez]]]]]]]].
+    exists zh, zl. rewrite Ea. split; [reflexivity | ]. repeat split; try assumption.
+    cbn [form_value]. replace (PI / 2 + 1 * phi) with (PI / 2 + phi) in Ez by ring. exact Ez.
+Qed.
