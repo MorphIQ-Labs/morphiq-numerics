@@ -757,3 +757,26 @@ Print Assumptions AsinEntry.asin_entry_finite.
 Print Assumptions AsinEntry.asin_entry_nan.
 Print Assumptions AsinEntry.asin_entry_inf.
 Print Assumptions AsinEntry.asin_entry_large.
+Require AsinhSeries.
+Print Assumptions AsinhSeries.asinh_series_fast.
+Require AsinhLog.
+Print Assumptions AsinhLog.asinh_logarithm_fast.
+Require AsinhLargeFast.
+Print Assumptions AsinhLargeFast.asinh_large_fast.
+Require AsinhFast.
+Print Assumptions AsinhFast.asinh_fast_ok.
+Print Assumptions AsinhFast.asinh_decide_some.
+Require AsinhExp.
+Print Assumptions AsinhExp.q_hser_exp.
+Require AsinhExpRed.
+Print Assumptions AsinhExpRed.asinh_exp_ok.
+Require AsinhNewton.
+Print Assumptions AsinhNewton.newton_step_ok.
+Require AsinhAccurate.
+Print Assumptions AsinhAccurate.asinh_accurate_value_ok.
+Require AsinhSmall.
+Print Assumptions AsinhSmall.small_signed.
+Require AsinhEntry.
+Print Assumptions AsinhEntry.asinh_entry_finite.
+Print Assumptions AsinhEntry.asinh_entry_nan.
+Print Assumptions AsinhEntry.asinh_entry_inf.
