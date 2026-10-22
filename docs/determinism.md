@@ -43,6 +43,8 @@ functions unnoticed.
 | `finite_interval` | every pair of 16 edge values, then random encodings, 4,096 iterations | constructors, membership, negation, absolute value, maximum, every checked arithmetic/elementary operation; endpoint bits or typed error codes |
 | `normalize_log_weights` | empty/zero mass, singleton support, signed zero, equal maximum offsets, subnormal shifts, underflow tails, invalid/unrepresentable inputs, shape mismatch; 32 slices of each length 1, 2, 3, 7, 8, 31, 32, 33, 64, 65 | normalized logs, log total, returned error radius, typed refusal code/index and untouched output on failure |
 
+| `linalg::tridiagonal` | orders 0, 1, 2, 3, 17, 64; mixed signs; six scales including subnormal/overflow; repeated RHSs; invalid shape/nonfinite/dominance and range cases | admitted margin, finite solution bits, absolute residual/error bounds, typed errors |
+
 ## Where it is checked
 
 The test `every_output_matches_the_committed_digest` runs:

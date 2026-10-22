@@ -16,6 +16,7 @@ use morphiq_numerics::elementary::{
     log2, log10, sin, sincos, sqrt, tan,
 };
 use morphiq_numerics::interval::{FiniteInterval, IntervalError};
+use morphiq_numerics::linalg::tridiagonal::{DominantTridiagonal, Error as TridiagonalError};
 use morphiq_numerics::log_space::{
     NormalizeError, log_diff_exp, log_sum_exp, log_sum_exp_and_normalize, log_sum_exp_pairs,
     normalize_log_weights,
@@ -901,8 +902,141 @@ pub fn corpus_digest() -> [u8; 32] {
     // Append the new surface after the existing corpus so no older input
     // stream changes. Independent inputs also keep future extension local.
     log_normalization_section(&mut r);
+    tridiagonal_section(&mut r);
 
     r.0.finalize().into()
+}
+
+fn tridiagonal_error(r: &mut Recorder, error: TridiagonalError) {
+    match error {
+        TridiagonalError::Shape => r.u64(1),
+        TridiagonalError::NonFinite => r.u64(2),
+        TridiagonalError::NotDominant(row) => {
+            r.u64(3);
+            r.u64(u64::try_from(row).unwrap());
+        }
+        TridiagonalError::ZeroPivot(row) => {
+            r.u64(4);
+            r.u64(u64::try_from(row).unwrap());
+        }
+        TridiagonalError::Range => r.u64(5),
+    }
+}
+
+fn tridiagonal_system<const N: usize>(r: &mut Recorder, scale: f64) {
+    let mut lower = [0.0; N];
+    let mut diagonal = [0.0; N];
+    let mut upper = [0.0; N];
+    let mut rhs = [0.0; N];
+    for i in 0..N {
+        let sign = if i % 2 == 0 { 1.0 } else { -1.0 };
+        lower[i] = sign * scale;
+        diagonal[i] = sign * 4.0 * scale;
+        upper[i] = -sign * 0.5 * scale;
+    }
+    let off = N.saturating_sub(1);
+    let a = match DominantTridiagonal::new(&lower[..off], &diagonal, &upper[..off]) {
+        Ok(a) => a,
+        Err(e) => {
+            tridiagonal_error(r, e);
+            return;
+        }
+    };
+    r.u64(0);
+    r.u64(u64::try_from(a.len()).unwrap());
+    r.u64(u64::from(a.is_empty()));
+    r.f64(a.dominance_margin());
+    let mut pivots = [0.0; N];
+    let mut normalized = [0.0; N];
+    let f = match a.factor_into(&mut pivots, &mut normalized[..off]) {
+        Ok(f) => f,
+        Err(e) => {
+            tridiagonal_error(r, e);
+            return;
+        }
+    };
+    r.u64(0);
+    for offset in 0..3 {
+        for (i, x) in rhs.iter_mut().enumerate() {
+            *x = f64::from(u32::try_from((i + offset) % 7).unwrap()) * scale;
+        }
+        let mut out = [0.0; N];
+        match f.solve_into(&rhs, &mut out) {
+            Ok(()) => {
+                r.u64(0);
+                for x in out {
+                    r.f64(x);
+                }
+                match f.certify(&rhs, &out) {
+                    Ok(c) => {
+                        r.u64(0);
+                        r.f64(c.max_residual());
+                        r.f64(c.max_solution_error());
+                    }
+                    Err(e) => tridiagonal_error(r, e),
+                }
+            }
+            Err(e) => tridiagonal_error(r, e),
+        }
+    }
+}
+
+fn tridiagonal_section(r: &mut Recorder) {
+    r.label("linalg::tridiagonal");
+    for scale in [
+        f64::from_bits(16),
+        f64::MIN_POSITIVE,
+        0.125,
+        1.0,
+        1e200,
+        f64::MAX,
+    ] {
+        tridiagonal_system::<0>(r, scale);
+        tridiagonal_system::<1>(r, scale);
+        tridiagonal_system::<2>(r, scale);
+        tridiagonal_system::<3>(r, scale);
+        tridiagonal_system::<17>(r, scale);
+        tridiagonal_system::<64>(r, scale);
+    }
+    for d in [0.0, -0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        tridiagonal_error(r, DominantTridiagonal::new(&[], &[d], &[]).unwrap_err());
+    }
+    tridiagonal_error(r, DominantTridiagonal::new(&[1.0], &[], &[]).unwrap_err());
+    for d in [1.0, 1.0_f64.next_up(), 2.0] {
+        match DominantTridiagonal::new(&[1.0, 1.0], &[2.0, d, 2.0], &[1.0, 1.0]) {
+            Ok(a) => {
+                r.u64(0);
+                r.f64(a.dominance_margin());
+            }
+            Err(e) => tridiagonal_error(r, e),
+        }
+    }
+    let diagonal = [f64::from_bits(1)];
+    let a = DominantTridiagonal::new(&[], &diagonal, &[]).unwrap();
+    tridiagonal_error(r, a.factor_into(&mut [], &mut []).unwrap_err());
+    let mut pivots = [0.0];
+    let f = a.factor_into(&mut pivots, &mut []).unwrap();
+    for rhs in [f64::NAN, 1.0] {
+        tridiagonal_error(r, f.solve_into(&[rhs], &mut [0.0]).unwrap_err());
+        tridiagonal_error(r, f.certify(&[rhs], &[0.0]).unwrap_err());
+    }
+    tridiagonal_error(r, f.solve_into(&[], &mut []).unwrap_err());
+    tridiagonal_error(r, f.certify(&[], &[]).unwrap_err());
+    let a = DominantTridiagonal::new(&[-f64::MAX / 2.0], &[2.0, f64::MAX], &[1.0]).unwrap();
+    tridiagonal_error(r, a.factor_into(&mut [0.0; 2], &mut [0.0]).unwrap_err());
+    let a = DominantTridiagonal::new(&[1.0], &[f64::MAX; 2], &[1.0]).unwrap();
+    r.f64(a.dominance_margin());
+    let mut p = [0.0; 2];
+    let mut c = [0.0];
+    let f = a.factor_into(&mut p, &mut c).unwrap();
+    let mut out = [0.0; 2];
+    f.solve_into(&[1.0; 2], &mut out).unwrap();
+    for value in out {
+        r.f64(value);
+    }
+    let certificate = f.certify(&[1.0; 2], &out).unwrap();
+    r.f64(certificate.max_residual());
+    r.f64(certificate.max_solution_error());
 }
 
 fn log_normalization_record(r: &mut Recorder, x: &[f64], output: &mut [f64]) {
