@@ -1,6 +1,6 @@
 //! Native paired tridiagonal timings. Protocol and native qualification are in #152 under epic #149.
 //! Exact synthetic inputs; preallocated buffers; no oracle in timed loops.
-use morphiq_numerics::linalg::tridiagonal::DominantTridiagonal;
+use morphiq_numerics::linalg::tridiagonal::{DominantTridiagonal, SignTridiagonal};
 use std::{hint::black_box, time::Instant};
 
 // Adapted from the same original MIT FerroRisk recurrence as the library.
@@ -44,7 +44,7 @@ struct Work {
 
 impl Work {
     fn new(n: usize, kind: &str) -> Self {
-        let scale = if kind == "subnormal" {
+        let scale = if kind == "subnormal" || kind == "sign-subnormal" {
             f64::MIN_POSITIVE / 16.0
         } else {
             1.0
@@ -52,7 +52,7 @@ impl Work {
         let lower = vec![-scale; n.saturating_sub(1)];
         let upper = (0..n.saturating_sub(1))
             .map(|i| {
-                if kind == "mixed" && i % 2 == 0 {
+                if kind.starts_with("sign") || (kind == "mixed" && i % 2 == 0) {
                     scale
                 } else {
                     -scale
@@ -60,7 +60,9 @@ impl Work {
             })
             .collect();
         let mut diagonal = vec![
-            (if kind == "near" {
+            (if kind.starts_with("sign") && kind != "sign-intersection" {
+                0.5
+            } else if kind == "near" {
                 2.0 + f64::EPSILON * 4.0
             } else {
                 4.0
@@ -256,6 +258,133 @@ impl Work {
         elapsed
     }
 
+    // Separate sign-domain entry point; the existing dominant campaign is unchanged.
+    // Layout preparation and qualification are outside every timed phase.
+    fn measure_sign(&mut self, method: &str, count: usize, rhs_count: usize) -> u128 {
+        let a = SignTridiagonal::new(&self.lower, &self.diagonal, &self.upper).unwrap();
+        let f = a
+            .factor_into(&mut self.pivots, &mut self.normalized)
+            .unwrap();
+        f.solve_into(&self.rhs, &mut self.out).unwrap();
+        f.certify_residual(&self.rhs, &self.out).unwrap();
+        if self.diagonal.iter().all(|d| *d >= 1e-300) {
+            let mut old = vec![0.0; self.out.len()];
+            legacy(
+                &self.lower,
+                &self.diagonal,
+                &self.upper,
+                &self.rhs,
+                &mut old,
+                &mut self.old_scratch,
+            );
+            assert!(
+                old.iter()
+                    .zip(&self.out)
+                    .all(|(x, y)| x.to_bits() == y.to_bits())
+            );
+        } else {
+            assert_ne!(method, "legacy");
+        }
+        let batch: Vec<_> = self
+            .rhs
+            .iter()
+            .flat_map(|&x| std::iter::repeat_n(x, rhs_count))
+            .collect();
+        let mut batch_out = vec![0.0; batch.len()];
+        f.solve_many_into(rhs_count, &batch, &mut batch_out)
+            .unwrap();
+        for (row, values) in batch_out.chunks(rhs_count.max(1)).enumerate() {
+            assert!(
+                values
+                    .iter()
+                    .all(|x| x.to_bits() == self.out[row].to_bits())
+            );
+        }
+        let start = Instant::now();
+        match method {
+            "admit" => {
+                for _ in 0..count {
+                    black_box(
+                        SignTridiagonal::new(
+                            black_box(&self.lower),
+                            black_box(&self.diagonal),
+                            black_box(&self.upper),
+                        )
+                        .unwrap(),
+                    );
+                }
+            }
+            "factor" | "reused" => {
+                for _ in 0..count {
+                    let f = a
+                        .factor_into(black_box(&mut self.pivots), black_box(&mut self.normalized))
+                        .unwrap();
+                    if method == "reused" {
+                        for _ in 0..rhs_count {
+                            f.solve_into(black_box(&self.rhs), black_box(&mut self.out))
+                                .unwrap();
+                            black_box(&self.out);
+                        }
+                    }
+                    black_box(f);
+                }
+            }
+            "solve" | "certified" => {
+                for _ in 0..count {
+                    for _ in 0..rhs_count {
+                        f.solve_into(black_box(&self.rhs), black_box(&mut self.out))
+                            .unwrap();
+                        if method == "certified" {
+                            black_box(
+                                f.certify_residual(black_box(&self.rhs), black_box(&self.out))
+                                    .unwrap(),
+                            );
+                        }
+                        black_box(&self.out);
+                    }
+                }
+            }
+            "batch" => {
+                for _ in 0..count {
+                    f.solve_many_into(rhs_count, black_box(&batch), black_box(&mut batch_out))
+                        .unwrap();
+                    black_box(&batch_out);
+                }
+            }
+            "certify" => {
+                for _ in 0..count {
+                    black_box(
+                        f.certify_residual(black_box(&self.rhs), black_box(&self.out))
+                            .unwrap(),
+                    );
+                }
+            }
+            "legacy" => {
+                for _ in 0..count {
+                    for _ in 0..rhs_count {
+                        legacy(
+                            black_box(&self.lower),
+                            black_box(&self.diagonal),
+                            black_box(&self.upper),
+                            black_box(&self.rhs),
+                            black_box(&mut self.out),
+                            black_box(&mut self.old_scratch),
+                        );
+                        black_box(&self.out);
+                    }
+                }
+            }
+            "copy_control" => {
+                for _ in 0..count {
+                    black_box(&mut self.out).copy_from_slice(black_box(&self.rhs));
+                    black_box(&self.out);
+                }
+            }
+            _ => panic!("unknown sign-domain method"),
+        }
+        start.elapsed().as_nanos()
+    }
+
     fn measure(&mut self, method: &str, count: usize, rhs_count: usize) -> u128 {
         self.run(method, count, rhs_count)
     }
@@ -295,6 +424,14 @@ fn main() {
         let count = args.get(3).expect("count").parse().unwrap();
         let mut work = Work::new(401, "ordinary");
         work.run(method, count, 8);
+        return;
+    }
+    if args.get(1).is_some_and(|s| s == "--sign-one") {
+        let n = args[2].parse().unwrap();
+        let mut work = Work::new(n, &args[3]);
+        let calls = args[5].parse().unwrap();
+        let rhs = args[6].parse().unwrap();
+        println!("{}", work.measure_sign(&args[4], calls, rhs));
         return;
     }
     if args.get(1).is_some_and(|s| s == "--one") {

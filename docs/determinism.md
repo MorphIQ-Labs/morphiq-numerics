@@ -45,6 +45,7 @@ functions unnoticed.
 
 | `linalg::tridiagonal` | orders 0, 1, 2, 3, 17, 64; mixed signs; six scales including subnormal/overflow; repeated RHSs; invalid shape/nonfinite/dominance and range cases | admitted margin, finite solution bits, absolute residual/error bounds, typed errors |
 | `linalg::tridiagonal::solve_many_into` | orders 0, 1, 2, 3, 17; RHS counts 0–17 around every lane width; four scales including subnormals; shape/overflow/nonfinite errors | interleaved solution bits and typed errors |
+| `linalg::tridiagonal::sign_domain` | non-dominant systems, orders 0–17, RHS counts 0–17, four scales including subnormal; zero links, signed zeros and invalid signs/diagonals | scalar/SIMD solution bits, residual-only bounds and typed errors |
 
 ## Where it is checked
 

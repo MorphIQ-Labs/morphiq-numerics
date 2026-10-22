@@ -42,3 +42,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+The checked sign-domain API shares the same adapted recurrence and SIMD kernel.
+Its sign admission and residual-only certificate separation are local additions;
+no additional external implementation source is incorporated.

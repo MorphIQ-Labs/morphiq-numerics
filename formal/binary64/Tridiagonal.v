@@ -86,3 +86,103 @@ Theorem rounded_error_bound error rho m :
 Proof.
   intro E. destruct (neighbour_enclosure (rho/m)) as [_ U]. lra.
 Qed.
+
+(** Explicit opposite-sign-link domain. These lemmas model finite operations
+    with gradual underflow; the Rust kernel refuses nonfinite intermediates. *)
+From Flocq Require Import Core.
+#[local] Instance sign_prec53 : Prec_gt_0 53 := eq_refl.
+
+Lemma sign_rounded_zero : rn 0 = 0.
+Proof. unfold rn. apply round_0. auto with typeclass_instances. Qed.
+
+Lemma sign_rounded_monotone x y : x <= y -> rn x <= rn y.
+Proof. unfold rn. intro H. apply round_le; auto with typeclass_instances. Qed.
+
+Lemma sign_rounded_nonnegative x : 0 <= x -> 0 <= rn x.
+Proof. intro H. rewrite <- sign_rounded_zero. now apply sign_rounded_monotone. Qed.
+
+Lemma sign_rounded_nonpositive x : x <= 0 -> rn x <= 0.
+Proof. intro H. rewrite <- sign_rounded_zero. now apply sign_rounded_monotone. Qed.
+
+Theorem sign_normalized_product a c p :
+  0 < p -> a*c <= 0 -> a * rn (c/p) <= 0.
+Proof.
+  intros P S. assert (I : 0 < /p) by (apply Rinv_0_lt_compat; exact P).
+  destruct (Rle_dec 0 a) as [A|A]; destruct (Rle_dec 0 c) as [C|C].
+  - assert (a = 0 \/ c = 0) by nra.
+    destruct H as [H|H]; rewrite H; [nra|].
+    unfold Rdiv. rewrite Rmult_0_l, sign_rounded_zero. nra.
+  - assert (rn (c/p) <= 0) by (apply sign_rounded_nonpositive; unfold Rdiv; nra). nra.
+  - assert (0 <= rn (c/p)) by (apply sign_rounded_nonnegative; unfold Rdiv; nra). nra.
+  - nra.
+Qed.
+
+Theorem sign_rounded_pivot_step b a c p :
+  0 < b -> rn b = b -> 0 < p -> a*c <= 0 ->
+  b <= rn (b - rn (a * rn (c/p))).
+Proof.
+  intros B F P S.
+  pose proof (sign_normalized_product a c p P S) as N.
+  pose proof (sign_rounded_nonpositive _ N) as T.
+  rewrite <- F at 1. apply sign_rounded_monotone. lra.
+Qed.
+
+Fixpoint sign_pivot (d l u : nat -> R) (n : nat) : R :=
+  match n with
+  | O => d O
+  | S k => d (S k) - l k * (u k / sign_pivot d l u k)
+  end.
+
+Theorem sign_exact_pivots_positive d l u :
+  (forall i, 0 < d i) -> (forall i, l i * u i <= 0) ->
+  forall i, d i <= sign_pivot d l u i /\ 0 < sign_pivot d l u i.
+Proof.
+  intros D L i. induction i as [|i [B P]]; simpl; [split; [lra|apply D]|].
+  assert (I : 0 < / sign_pivot d l u i) by (apply Rinv_0_lt_compat; exact P).
+  pose proof (L i). pose proof (D (S i)). unfold Rdiv. split; nra.
+Qed.
+
+Fixpoint sign_rounded_pivot (d l u : nat -> R) (n : nat) : R :=
+  match n with
+  | O => d O
+  | S k => rn (d (S k) - rn (l k * rn (u k / sign_rounded_pivot d l u k)))
+  end.
+
+Theorem sign_finite_pivots_positive d l u :
+  (forall i, 0 < d i) -> (forall i, rn (d i) = d i) ->
+  (forall i, l i * u i <= 0) ->
+  forall i, d i <= sign_rounded_pivot d l u i /\ 0 < sign_rounded_pivot d l u i.
+Proof.
+  intros D F L i. induction i as [|i [B P]]; simpl; [split; [lra|apply D]|].
+  pose proof (sign_rounded_pivot_step (d (S i)) (l i) (u i)
+    (sign_rounded_pivot d l u i) (D (S i)) (F (S i)) P (L i)) as T.
+  pose proof (D (S i)). split; lra.
+Qed.
+
+(** The continuant recurrence for leading tridiagonal determinants, with
+    det(empty)=1 and det(singleton)=d[0]. *)
+Fixpoint sign_continuant (d l u : nat -> R) (n : nat) : R :=
+  match n with
+  | O => 1
+  | S k => match k with
+           | O => d O
+           | S j => d k * sign_continuant d l u k -
+                    l j * u j * sign_continuant d l u j
+           end
+  end.
+
+Theorem sign_continuants_positive d l u :
+  (forall i, 0 < d i) -> (forall i, l i * u i <= 0) ->
+  forall n, 0 < sign_continuant d l u n.
+Proof.
+  intros D L n.
+  assert (H : forall k, 0 < sign_continuant d l u k /\
+                         0 < sign_continuant d l u (S k)).
+  { intro k. induction k as [|k [A B]].
+    - simpl. split; [lra|apply D].
+    - split; [exact B|].
+      change (0 < d (S k) * sign_continuant d l u (S k) -
+        l k * u k * sign_continuant d l u k).
+      pose proof (D (S k)). pose proof (L k). nra. }
+  exact (proj1 (H n)).
+Qed.

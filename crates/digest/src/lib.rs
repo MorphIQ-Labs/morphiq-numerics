@@ -904,6 +904,7 @@ pub fn corpus_digest() -> [u8; 32] {
     log_normalization_section(&mut r);
     tridiagonal_section(&mut r);
     tridiagonal_batch_section(&mut r);
+    tridiagonal_sign_section(&mut r);
 
     r.0.finalize().into()
 }
@@ -921,6 +922,14 @@ fn tridiagonal_error(r: &mut Recorder, error: TridiagonalError) {
             r.u64(u64::try_from(row).unwrap());
         }
         TridiagonalError::Range => r.u64(5),
+        TridiagonalError::NonPositiveDiagonal(row) => {
+            r.u64(6);
+            r.u64(row as u64);
+        }
+        TridiagonalError::SameSignLink(link) => {
+            r.u64(7);
+            r.u64(link as u64);
+        }
     }
 }
 
@@ -1399,5 +1408,73 @@ fn tridiagonal_batch_section(r: &mut Recorder) {
         let mut rhs = [0.0; 9];
         rhs[column] = 1.0;
         tridiagonal_error(r, f.solve_many_into(9, &rhs, &mut [0.0; 9]).unwrap_err());
+    }
+}
+
+fn tridiagonal_sign_section(r: &mut Recorder) {
+    use morphiq_numerics::linalg::tridiagonal::SignTridiagonal;
+    r.label("linalg::tridiagonal::sign_domain");
+    for scale in [f64::from_bits(16), f64::MIN_POSITIVE, 1.0, 1e270] {
+        for n in [0_usize, 1, 2, 3, 17] {
+            let lower = [-2.0 * scale; 16];
+            let upper = [scale; 16];
+            let mut diagonal = [scale; 17];
+            diagonal[0] = 2.0 * scale;
+            let mut p = [0.0; 17];
+            let mut c = [0.0; 16];
+            let off = n.saturating_sub(1);
+            let f = SignTridiagonal::new(&lower[..off], &diagonal[..n], &upper[..off])
+                .unwrap()
+                .factor_into(&mut p[..n], &mut c[..off])
+                .unwrap();
+            for count in [0, 1, 2, 3, 4, 7, 8, 9, 17] {
+                let mut rhs = [0.0; 289];
+                let mut out = [0.0; 289];
+                for (i, v) in rhs[..n * count].iter_mut().enumerate() {
+                    *v = f64::from(i32::try_from(i % 13).unwrap() - 6) * scale;
+                }
+                f.solve_many_into(count, &rhs[..n * count], &mut out[..n * count])
+                    .unwrap();
+                for &v in &out[..n * count] {
+                    r.f64(v);
+                }
+                if count > 0 {
+                    let mut b = [0.0; 17];
+                    let mut x = [0.0; 17];
+                    for i in 0..n {
+                        b[i] = rhs[i * count];
+                        x[i] = out[i * count];
+                    }
+                    match f.certify_residual(&b[..n], &x[..n]) {
+                        Ok(c) => r.f64(c.max_residual()),
+                        Err(e) => tridiagonal_error(r, e),
+                    }
+                }
+            }
+        }
+    }
+    for d in [0.0, -0.0, -1.0, f64::NAN] {
+        tridiagonal_error(r, SignTridiagonal::new(&[], &[d], &[]).unwrap_err());
+    }
+    for link in [f64::from_bits(1), -f64::from_bits(1), f64::MAX] {
+        tridiagonal_error(
+            r,
+            SignTridiagonal::new(&[link], &[1.0; 2], &[link]).unwrap_err(),
+        );
+    }
+    for (l, u) in [(0.0, -1.0), (-0.0, 1.0), (-1.0, -0.0), (1.0, 0.0)] {
+        let mut p = [0.0; 2];
+        let mut c = [0.0];
+        let lower = [l];
+        let upper = [u];
+        let f = SignTridiagonal::new(&lower, &[1.0; 2], &upper)
+            .unwrap()
+            .factor_into(&mut p, &mut c)
+            .unwrap();
+        let mut out = [0.0; 2];
+        f.solve_into(&[-0.0, 0.0], &mut out).unwrap();
+        for v in out {
+            r.f64(v);
+        }
     }
 }

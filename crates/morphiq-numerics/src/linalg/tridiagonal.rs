@@ -1,7 +1,7 @@
 // The Thomas recurrence is adapted from FerroRisk at
 // 100880f67b9da1c66e9a9d03ba9e1a5ad876eb5c, under its MIT license.
 // Copyright (c) 2026 MorphIQ Labs. See THIRD_PARTY_NOTICES.md in this crate.
-//! Reusable Thomas factors for strictly row-diagonally-dominant matrices.
+//! Reusable Thomas factors for checked dominant or opposite-sign-link matrices.
 //!
 //! The solve has a fixed binary64 operation order and returns a finite
 //! approximation. [`ThomasFactors::certify`] separately encloses its residual
@@ -37,6 +37,10 @@ pub enum Error {
     NonFinite,
     /// Strict row diagonal dominance could not be established at this row.
     NotDominant(usize),
+    /// The sign domain requires a strictly positive diagonal at this row.
+    NonPositiveDiagonal(usize),
+    /// Both nonzero entries of this adjacent lower/upper link have the same sign.
+    SameSignLink(usize),
     /// Elimination produced a zero pivot at this row (not a singularity proof).
     ZeroPivot(usize),
     /// Arithmetic or a required finite enclosure is unrepresentable.
@@ -170,6 +174,35 @@ impl<'a> DominantTridiagonal<'a> {
         pivots: &'w mut [f64],
         normalized_upper: &'w mut [f64],
     ) -> Result<ThomasFactors<'a, 'w>, Error> {
+        let matrix = Coefficients {
+            lower: self.lower,
+            diagonal: self.diagonal,
+            upper: self.upper,
+        };
+        Ok(ThomasFactors {
+            factors: matrix.factor_into(pivots, normalized_upper)?,
+            margin: self.margin,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Coefficients<'a> {
+    lower: &'a [f64],
+    diagonal: &'a [f64],
+    upper: &'a [f64],
+}
+
+impl<'a> Coefficients<'a> {
+    fn len(self) -> usize {
+        self.diagonal.len()
+    }
+
+    fn factor_into<'w>(
+        self,
+        pivots: &'w mut [f64],
+        normalized_upper: &'w mut [f64],
+    ) -> Result<Factors<'a, 'w>, Error> {
         let n = self.len();
         if pivots.len() != n || normalized_upper.len() != n.saturating_sub(1) {
             return Err(Error::Shape);
@@ -194,7 +227,7 @@ impl<'a> DominantTridiagonal<'a> {
                 }
             }
         }
-        Ok(ThomasFactors {
+        Ok(Factors {
             matrix: self,
             pivots,
             normalized_upper,
@@ -202,24 +235,98 @@ impl<'a> DominantTridiagonal<'a> {
     }
 }
 
+/// Positive diagonal and nonpositive exact products of matching off-diagonals.
+///
+/// All coefficients are finite; `diagonal[i] > 0` and
+/// `lower[i] * upper[i] <= 0` over exact reals. Admission checks signs without
+/// multiplying, so overflow/underflow cannot hide a positive product. Either
+/// signed zero is allowed in a link. This domain need not be row dominant.
+/// Exact Thomas pivots are positive, but finite-range arithmetic can refuse.
+/// No forward-error or conditioning bound is implied.
+#[derive(Clone, Copy, Debug)]
+pub struct SignTridiagonal<'a> {
+    matrix: Coefficients<'a>,
+}
+
+impl<'a> SignTridiagonal<'a> {
+    /// Check n/n-1 dimensions, finiteness, positive diagonal and link signs.
+    /// The empty matrix is admitted. Inputs are never modified.
+    ///
+    /// # Errors
+    /// [`Error::Shape`], [`Error::NonFinite`], [`Error::NonPositiveDiagonal`]
+    /// (row index) or [`Error::SameSignLink`] (off-diagonal index).
+    pub fn new(lower: &'a [f64], diagonal: &'a [f64], upper: &'a [f64]) -> Result<Self, Error> {
+        let n = diagonal.len();
+        if lower.len() != n.saturating_sub(1) || upper.len() != n.saturating_sub(1) {
+            return Err(Error::Shape);
+        }
+        if lower
+            .iter()
+            .chain(diagonal)
+            .chain(upper)
+            .any(|x| !x.is_finite())
+        {
+            return Err(Error::NonFinite);
+        }
+        for (i, &d) in diagonal.iter().enumerate() {
+            if d <= 0.0 {
+                return Err(Error::NonPositiveDiagonal(i));
+            }
+        }
+        for (i, (&l, &u)) in lower.iter().zip(upper).enumerate() {
+            if l != 0.0 && u != 0.0 && l.is_sign_negative() == u.is_sign_negative() {
+                return Err(Error::SameSignLink(i));
+            }
+        }
+        Ok(Self {
+            matrix: Coefficients {
+                lower,
+                diagonal,
+                upper,
+            },
+        })
+    }
+
+    /// Matrix order.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.matrix.len()
+    }
+
+    /// Whether the matrix has order zero.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Factor into immutable borrowed pivots (n) and normalized upper (n-1).
+    /// Uses exactly the same division/multiplication/subtraction recurrence as
+    /// [`DominantTridiagonal::factor_into`]. No automatic algorithm fallback.
+    ///
+    /// # Errors
+    /// [`Error::Shape`] leaves storage unchanged. [`Error::Range`] may leave
+    /// partial storage; no factors escape. Positive pivots cannot round to
+    /// zero in this domain under the prescribed gradual-underflow arithmetic.
+    pub fn factor_into<'w>(
+        self,
+        pivots: &'w mut [f64],
+        normalized_upper: &'w mut [f64],
+    ) -> Result<SignThomasFactors<'a, 'w>, Error> {
+        Ok(SignThomasFactors {
+            factors: self.matrix.factor_into(pivots, normalized_upper)?,
+        })
+    }
+}
+
 /// Factors tied to one immutable matrix and private, immutable factor storage.
 #[derive(Debug)]
-pub struct ThomasFactors<'a, 'w> {
-    matrix: DominantTridiagonal<'a>,
+struct Factors<'a, 'w> {
+    matrix: Coefficients<'a>,
     pivots: &'w [f64],
     normalized_upper: &'w [f64],
 }
 
-impl ThomasFactors<'_, '_> {
-    /// Solve a new RHS in O(n) work without allocation or refactorization.
-    ///
-    /// Each multiplication, subtraction and division is separately rounded.
-    /// Every output is finite on success. Use [`Self::certify`] to obtain a
-    /// quantitative bound, not an assumed accuracy tolerance.
-    ///
-    /// # Errors
-    /// [`Error::Shape`] or [`Error::NonFinite`] leaves output unchanged.
-    /// [`Error::Range`] may leave a partial output, which must not be used.
+impl Factors<'_, '_> {
     pub fn solve_into(&self, rhs: &[f64], out: &mut [f64]) -> Result<(), Error> {
         let n = self.matrix.len();
         if rhs.len() != n || out.len() != n {
@@ -247,33 +354,6 @@ impl ThomasFactors<'_, '_> {
         Ok(())
     }
 
-    /// Solve `rhs_count` right-hand sides sharing these factors.
-    ///
-    /// Both slices have exactly `matrix.len() * rhs_count` entries, interleaved
-    /// by row: entry `(row, column)` is at `row * rhs_count + column`.
-    /// Every column returns the bits of [`Self::solve_into`] on that RHS.
-    /// With `simd`, independent columns run on SSE2/AVX2/AVX-512 or NEON;
-    /// `std` enables runtime detection. Other builds use the scalar recurrence.
-    /// No packing, allocation, refactorization or reciprocal substitution occurs.
-    /// Work is O(n * rhs_count), with O(1) auxiliary storage. Zero rows or zero
-    /// RHSs succeed with empty slices.
-    ///
-    /// ```
-    /// use morphiq_numerics::linalg::tridiagonal::DominantTridiagonal;
-    /// let matrix = DominantTridiagonal::new(&[1.0], &[2.0, 2.0], &[1.0]).unwrap();
-    /// let mut pivots = [0.0; 2];
-    /// let mut upper = [0.0];
-    /// let factors = matrix.factor_into(&mut pivots, &mut upper).unwrap();
-    /// let mut out = [0.0; 4];
-    /// factors.solve_many_into(2, &[3.0, 0.0, 3.0, 3.0], &mut out).unwrap();
-    /// assert_eq!(out, [1.0, -1.0, 1.0, 2.0]);
-    /// ```
-    ///
-    /// # Errors
-    /// [`Error::Shape`] (including dimension-product overflow) and
-    /// [`Error::NonFinite`] leave the entire output unchanged. On
-    /// [`Error::Range`] discard the entire output; the partially written
-    /// contents and processing order are backend-dependent.
     pub fn solve_many_into(
         &self,
         rhs_count: usize,
@@ -336,17 +416,11 @@ impl ThomasFactors<'_, '_> {
         Ok(())
     }
 
-    /// Enclose the residual and solution error of any finite candidate vector.
-    ///
-    /// If `rho` encloses `max |A*x-rhs|` and `m` is the positive dominance
-    /// margin, `max |x-x_exact| <= rho/m`. This also bounds an absolute RHS
-    /// perturbation making the candidate exact. It is not a condition estimate
-    /// or a small relative-error promise. The O(n) check allocates nothing.
-    ///
-    /// # Errors
-    /// [`Error::Shape`], [`Error::NonFinite`] or [`Error::Range`] if a finite
-    /// outward enclosure is unavailable, even when the solution itself is finite.
-    pub fn certify(&self, rhs: &[f64], candidate: &[f64]) -> Result<Certificate, Error> {
+    fn certify_residual(
+        &self,
+        rhs: &[f64],
+        candidate: &[f64],
+    ) -> Result<ResidualCertificate, Error> {
         let a = self.matrix;
         if rhs.len() != a.len() || candidate.len() != a.len() {
             return Err(Error::Shape);
@@ -354,11 +428,8 @@ impl ThomasFactors<'_, '_> {
         if rhs.iter().chain(candidate).any(|x| !x.is_finite()) {
             return Err(Error::NonFinite);
         }
-        if a.is_empty() {
-            return Ok(Certificate {
-                residual: 0.0,
-                error: 0.0,
-            });
+        if a.len() == 0 {
+            return Ok(ResidualCertificate { residual: 0.0 });
         }
         let mut residual: f64 = 0.0;
         for i in 0..a.len() {
@@ -374,13 +445,189 @@ impl ThomasFactors<'_, '_> {
             row = row.checked_sub(point(rhs[i])?).map_err(|_| Error::Range)?;
             residual = residual.max(row.abs().upper());
         }
+        Ok(ResidualCertificate { residual })
+    }
+}
+
+/// Factors carrying a strict dominance margin and a solution-error certificate.
+#[derive(Debug)]
+pub struct ThomasFactors<'a, 'w> {
+    factors: Factors<'a, 'w>,
+    margin: f64,
+}
+
+impl ThomasFactors<'_, '_> {
+    /// Solve a new RHS in O(n) work without allocation or refactorization.
+    ///
+    /// Each multiplication, subtraction and division is separately rounded.
+    /// Every output is finite on success. Use [`Self::certify`] to obtain a
+    /// quantitative bound, not an assumed accuracy tolerance.
+    ///
+    /// # Errors
+    /// [`Error::Shape`] or [`Error::NonFinite`] leaves output unchanged.
+    /// [`Error::Range`] may leave a partial output, which must not be used.
+    pub fn solve_into(&self, rhs: &[f64], out: &mut [f64]) -> Result<(), Error> {
+        self.factors.solve_into(rhs, out)
+    }
+
+    /// Solve `rhs_count` right-hand sides sharing these factors.
+    ///
+    /// Both slices have exactly `matrix.len() * rhs_count` entries, interleaved
+    /// by row: entry `(row, column)` is at `row * rhs_count + column`.
+    /// Every column returns the bits of [`Self::solve_into`] on that RHS.
+    /// With `simd`, independent columns run on SSE2/AVX2/AVX-512 or NEON;
+    /// `std` enables runtime detection. Other builds use the scalar recurrence.
+    /// No packing, allocation, refactorization or reciprocal substitution occurs.
+    /// Work is O(n * rhs_count), with O(1) auxiliary storage. Zero rows or zero
+    /// RHSs succeed with empty slices.
+    ///
+    /// ```
+    /// use morphiq_numerics::linalg::tridiagonal::DominantTridiagonal;
+    /// let matrix = DominantTridiagonal::new(&[1.0], &[2.0, 2.0], &[1.0]).unwrap();
+    /// let mut pivots = [0.0; 2];
+    /// let mut upper = [0.0];
+    /// let factors = matrix.factor_into(&mut pivots, &mut upper).unwrap();
+    /// let mut out = [0.0; 4];
+    /// factors.solve_many_into(2, &[3.0, 0.0, 3.0, 3.0], &mut out).unwrap();
+    /// assert_eq!(out, [1.0, -1.0, 1.0, 2.0]);
+    /// ```
+    ///
+    /// # Errors
+    /// [`Error::Shape`] (including dimension-product overflow) and
+    /// [`Error::NonFinite`] leave the entire output unchanged. On
+    /// [`Error::Range`] discard the entire output; the partially written
+    /// contents and processing order are backend-dependent.
+    pub fn solve_many_into(
+        &self,
+        rhs_count: usize,
+        rhs: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), Error> {
+        self.factors.solve_many_into(rhs_count, rhs, out)
+    }
+
+    /// Enclose the residual and solution error of any finite candidate vector.
+    ///
+    /// If `rho` encloses `max |A*x-rhs|` and `m` is the positive dominance
+    /// margin, `max |x-x_exact| <= rho/m`. This also bounds an absolute RHS
+    /// perturbation making the candidate exact. It is not a condition estimate
+    /// or a small relative-error promise. The O(n) check allocates nothing.
+    ///
+    /// # Errors
+    /// [`Error::Shape`], [`Error::NonFinite`] or [`Error::Range`] if a finite
+    /// outward enclosure is unavailable, even when the solution itself is finite.
+    pub fn certify(&self, rhs: &[f64], candidate: &[f64]) -> Result<Certificate, Error> {
+        let residual = self.factors.certify_residual(rhs, candidate)?.residual;
+        if self.factors.matrix.len() == 0 {
+            return Ok(Certificate {
+                residual,
+                error: 0.0,
+            });
+        }
         // Direct positive division avoids an overflowing reciprocal for tiny
         // margins. The successor encloses rounding, including underflow.
-        let error = (residual / a.margin).next_up();
+        let error = (residual / self.margin).next_up();
         if !error.is_finite() {
             return Err(Error::Range);
         }
         Ok(Certificate { residual, error })
+    }
+}
+
+/// Factors for the sign domain, with residual-only certification.
+///
+/// The private matrix/factor borrows prevent stale or mismatched factors.
+/// The dominance-only solution-error certificate is deliberately unavailable.
+///
+/// ```
+/// use morphiq_numerics::linalg::tridiagonal::SignTridiagonal;
+/// let matrix = SignTridiagonal::new(&[-3.0; 2], &[2.0; 3], &[3.0; 2]).unwrap();
+/// let mut pivots = [0.0; 3];
+/// let mut upper = [0.0; 2];
+/// let factors = matrix.factor_into(&mut pivots, &mut upper).unwrap();
+/// let mut out = [0.0; 3];
+/// factors.solve_into(&[-4.0, 2.0, 12.0], &mut out).unwrap();
+/// let residual = factors.certify_residual(&[-4.0, 2.0, 12.0], &out).unwrap();
+/// assert!(residual.max_residual().is_finite());
+/// ```
+///
+/// ```compile_fail
+/// use morphiq_numerics::linalg::tridiagonal::SignTridiagonal;
+/// let mut p = [0.0];
+/// let f = SignTridiagonal::new(&[], &[1.0], &[]).unwrap()
+///     .factor_into(&mut p, &mut []).unwrap();
+/// f.certify(&[1.0], &[1.0]); // no dominance evidence
+/// ```
+///
+/// ```compile_fail
+/// use morphiq_numerics::linalg::tridiagonal::SignTridiagonal;
+/// let mut diagonal = [1.0];
+/// let mut p = [0.0];
+/// let f = SignTridiagonal::new(&[], &diagonal, &[]).unwrap()
+///     .factor_into(&mut p, &mut []).unwrap();
+/// diagonal[0] = 2.0;
+/// f.solve_into(&[1.0], &mut [0.0]).unwrap();
+/// ```
+#[derive(Debug)]
+pub struct SignThomasFactors<'a, 'w> {
+    factors: Factors<'a, 'w>,
+}
+
+impl SignThomasFactors<'_, '_> {
+    /// Finite fixed-order approximation using the shared Thomas recurrence.
+    /// Same operation order and O(n) allocation-free work as
+    /// [`ThomasFactors::solve_into`]; no forward-error guarantee.
+    ///
+    /// # Errors
+    /// [`Error::Shape`] and [`Error::NonFinite`] leave output unchanged;
+    /// [`Error::Range`] invalidates the entire partially written output.
+    pub fn solve_into(&self, rhs: &[f64], out: &mut [f64]) -> Result<(), Error> {
+        self.factors.solve_into(rhs, out)
+    }
+
+    /// Solve row-interleaved RHS columns using the shared scalar/SIMD kernel.
+    /// Layout, complexity and bit equality follow [`ThomasFactors::solve_many_into`].
+    ///
+    /// # Errors
+    /// [`Error::Shape`] (including size overflow) and [`Error::NonFinite`] leave
+    /// output unchanged. [`Error::Range`] invalidates the entire output, whose
+    /// partial contents depend on backend traversal. Empty batches succeed.
+    pub fn solve_many_into(
+        &self,
+        rhs_count: usize,
+        rhs: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), Error> {
+        self.factors.solve_many_into(rhs_count, rhs, out)
+    }
+
+    /// Enclose `max |A*x-rhs|` for any finite candidate in O(n), without allocation.
+    /// This bounds an absolute RHS perturbation making the candidate exact;
+    /// it does not bound solution error. The original matrix is used.
+    ///
+    /// # Errors
+    /// [`Error::Shape`], [`Error::NonFinite`] or [`Error::Range`] if a finite
+    /// outward residual enclosure is unavailable, even after a successful solve.
+    pub fn certify_residual(
+        &self,
+        rhs: &[f64],
+        candidate: &[f64],
+    ) -> Result<ResidualCertificate, Error> {
+        self.factors.certify_residual(rhs, candidate)
+    }
+}
+
+/// Absolute RHS backward-error enclosure, without a solution-error bound.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ResidualCertificate {
+    residual: f64,
+}
+
+impl ResidualCertificate {
+    /// Upper bound on the exact `max |A*x-rhs|` for the supplied candidate.
+    #[must_use]
+    pub fn max_residual(&self) -> f64 {
+        self.residual
     }
 }
 

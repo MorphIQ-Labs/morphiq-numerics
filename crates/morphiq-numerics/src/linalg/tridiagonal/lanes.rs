@@ -2,11 +2,11 @@
 // 100880f67b9da1c66e9a9d03ba9e1a5ad876eb5c, under its MIT license.
 // Copyright (c) 2026 MorphIQ Labs. See THIRD_PARTY_NOTICES.md in this crate.
 //! Independent RHS columns, with the scalar recurrence in every lane.
-use super::{Error, ThomasFactors};
+use super::{Error, Factors};
 use morphiq_numerics_arch::{Simd, WithSimd};
 
 pub(super) fn solve(
-    factors: &ThomasFactors<'_, '_>,
+    factors: &Factors<'_, '_>,
     count: usize,
     rhs: &[f64],
     out: &mut [f64],
@@ -53,7 +53,7 @@ pub(super) fn solve(
 }
 
 pub(super) struct Batch<'s, 'a, 'w> {
-    pub(super) factors: &'s ThomasFactors<'a, 'w>,
+    pub(super) factors: &'s Factors<'a, 'w>,
     pub(super) count: usize,
     pub(super) rhs: &'s [f64],
     pub(super) out: &'s mut [f64],

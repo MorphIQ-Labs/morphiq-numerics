@@ -1,4 +1,4 @@
-# Strictly dominant tridiagonal systems
+# Checked no-pivot tridiagonal systems
 
 `linalg::tridiagonal` separates checked matrix admission, Thomas factorization,
 repeated RHS solves, and a posteriori certification. All four operations are
@@ -38,6 +38,64 @@ matrix or factors. New coefficients require admission and factorization again.
 No pointer identity or matrix hash substitutes for equality. There is no hidden
 cache, allocation, one-shot duplicate algorithm or automatic pivoted fallback.
 
+## Positive-diagonal, opposite-sign-link domain
+
+`SignTridiagonal::new(lower, diagonal, upper)` separately admits finite inputs
+with the same shapes and these exact-real conditions:
+
+    d[i] > 0
+    l[i] * u[i] <= 0
+
+The second predicate compares signs after testing each operand against zero;
+it never multiplies. Both signed zeros are zero for admission. Consequently,
+underflow cannot hide a tiny positive product and overflow cannot invalidate
+an opposite-sign pair. `NonPositiveDiagonal(row)` and `SameSignLink(link)`
+identify unsupported inputs, not singularity. Shape and finiteness checks run
+first. Empty matrices are admitted. No dominance margin is manufactured.
+
+For example, diagonal `[2,2,2]`, lower `[-3,-3]` and upper `[3,3]` is outside
+row dominance but has positive exact pivots 2, 13/2 and 44/13 and determinant 44.
+In general the exact pivot recurrence below gives `p[i] >= d[i] > 0` by
+induction: a nonpositive product is subtracted from a positive diagonal.
+Equivalently the leading determinants satisfy the continuant recurrence
+`D[0]=1`, `D[1]=d[0]`,
+`D[k+1]=d[k]*D[k]-l[k-1]*u[k-1]*D[k-1]`; induction makes all D positive.
+The standard tridiagonal determinant expansion identifies these continuants
+with the leading determinants, establishing nonsingularity.
+
+The separately rounded recurrence retains positive pivots whenever its
+intermediates are finite. Division by a positive pivot preserves the weak sign
+of the upper coefficient, including gradual underflow to signed zero. The
+lower-times-normalized-upper product is therefore nonpositive, as is its
+rounded value. Subtracting it gives a value at least the representable positive
+diagonal; monotonic nearest rounding cannot round below that diagonal. There
+is no zero-pivot cancellation in this domain. Overflow in division, multiplication,
+addition or solving still produces `Range`. Admission does not promise that
+all factors, solutions or enclosures are representable, or well conditioned.
+
+`SignTridiagonal::factor_into` returns `SignThomasFactors`. Both public factor
+types delegate to one private factor/solve kernel and the same SIMD dispatch.
+On the domains' intersection, factor and solution bits agree, including signed
+zero. The lifetime/shape/output-failure contracts above apply to both. Only
+`ThomasFactors` stores a dominance margin and exposes `certify`.
+`SignThomasFactors::certify_residual` returns a distinct `ResidualCertificate`
+with only `max_residual()`: the original-matrix interval computation encloses
+`max |A*x-rhs|` for any finite candidate, without a forward-error claim.
+It can return `Range` even for a finite candidate, and returns zero for n=0.
+A solution-error bound for this domain would require separately established
+inverse-norm/conditioning evidence; it is not part of this API.
+
+`Tridiagonal.v` proves exact pivot positivity, positivity of the continuant
+recurrence, and monotonic/sign-preserving binary64 nearest-rounding lemmas
+that establish rounded pivot positivity for representable diagonals. Flocq's
+FLT format includes gradual underflow; its unbounded-exponent real model is
+used only while Rust's intermediate finiteness checks succeed. The continuant's
+identification with a matrix-library determinant is the standard mathematical
+argument above, not a formal matrix determinant theorem here. Signed-zero bit
+behavior is fixed by the implementation sequence and cross-target tests;
+the real-valued proof identifies both zeros. These are source-bound proofs,
+not an extraction/compiler verification of the Rust loop.
+
 ## Fixed-order recurrence
 
 Each displayed multiplication, subtraction and division rounds separately to
@@ -56,7 +114,8 @@ Factorization uses n−1 multiplies, subtracts and divides. A solve uses n divid
 2(n−1) multiplies and 2(n−1) subtracts. There is no factorization in the solve
 path. Input finiteness checks are additional linear passes. Factor storage is
 8(2n−1) bytes for n>0; output is 8n bytes. The matrix and RHS remain caller-owned.
-The handles have only slice descriptors and a margin; auxiliary stack is O(1).
+The handles have only slice descriptors and, for the dominant domain, a margin;
+auxiliary stack is O(1).
 
 Underflow, including a rounded zero coefficient or solution component, follows
 IEEE binary64 gradual underflow. Signed zero follows the stated operation order.
@@ -73,7 +132,7 @@ or RHS entries. Empty operations succeed without indexing a buffer.
 
 ## SIMD across right-hand sides
 
-`ThomasFactors::solve_many_into(rhs_count, rhs, out)` solves multiple RHSs
+Both factor types expose `solve_many_into(rhs_count, rhs, out)` to solve multiple RHSs
 against the same factors. Slices have exactly `n * rhs_count` entries, interleaved
 by row: `(row, column)` lives at `row * rhs_count + column`. This layout permits
 contiguous lane loads/stores without allocation or packing inside the API.
@@ -97,7 +156,7 @@ maps only that RHS into its lane. Thus every successful column has exactly the
 `solve_into` bits, including signed zero and gradual underflow. Existing lane
 primitive contracts supply the arithmetic premise. This is a source-level
 argument supported by forced-backend tests and the cross-target digest, not an
-extracted/compiler-verified SIMD proof. The scalar certificate theorem applies
+extracted/compiler-verified SIMD proof. The appropriate domain certificate applies
 to each finite column independently, without a new accuracy claim.
 
 Dimensions use checked multiplication. Shape and nonfinite-input errors leave
@@ -177,6 +236,14 @@ NaN/infinity, signed zero, and range failures. Compile-fail examples enforce
 matrix/factor immutability. The determinism corpus records solutions,
 certificates and admission/solve errors across targets and feature configurations.
 
+`generators/tridiagonal_sign_reference.py` adds independently constructed
+opposite-sign systems, triangular/zero links, alternating link directions,
+extreme scaling and exact manufactured non-dominant systems up to 401 rows.
+The reference suite checks arbitrary-candidate residuals with exact arithmetic
+and exact manufactured solution values. Forced SIMD tests exercise both domains;
+compile-fail tests prevent using dominance certification on sign-domain factors.
+No consumer fixtures or private audit data are included.
+
 The established general alternative is LAPACK's pivoted
 [DGTTRF/DGTTRS](https://netlib.org/lapack/lug/node38.html), with row pivots and a
 second superdiagonal. It supports matrices outside the domain here; it does not
@@ -200,3 +267,15 @@ Native performance protocols, raw samples and qualification belong to #152
 under performance epic #149. Implementation and release tracking belong to #219
 and its pull request. Consumer adoption requires separate
 qualification of matrix coverage and composed numerical error.
+
+The existing `bench-tridiagonal` tool accepts
+`--sign-one ORDER KIND METHOD CALLS RHS_COUNT`. Kinds `sign`,
+`sign-intersection` and `sign-subnormal` cover non-dominance, the common domain
+and subnormal scaling. Methods separate admission, factorization, single solves,
+batched solves, residual certification, certified solves, factor-plus-RHS groups,
+copy control and the historical recurrence (`legacy`, excluding tiny pivots).
+Input/layout construction and correctness checks precede timing; the tool's
+single-cell output alone is not qualification. On `sign-intersection`, its
+existing `--one` mode uses the same coefficients with dominant admission;
+certificate comparisons must distinguish residual-only work from the dominant
+solution-error bound. Packing and consumer cache costs remain separately owned.
