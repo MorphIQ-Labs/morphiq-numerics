@@ -1705,9 +1705,12 @@ fn tridiagonal_sign_section(r: &mut Recorder) {
 /// The correlations of the bivariate normal sections: every rule limit and
 /// the regime split at adjacent doubles, then the degenerate and invalid
 /// values.
-fn bivariate_correlations() -> [f64; 64] {
-    let mut rho = [0.0; 64];
-    let edges: [f64; 8] = [0.06, 0.22, 0.40, 0.55, 0.70, 0.80, 0.85, 0.925];
+fn bivariate_correlations() -> [f64; 112] {
+    let mut rho = [0.0; 112];
+    let edges: [f64; 16] = [
+        0.055, 0.06, 0.20, 0.22, 0.38, 0.40, 0.54, 0.55, 0.66, 0.70, 0.75, 0.80, 0.81, 0.85, 0.89,
+        0.925,
+    ];
     for (i, edge) in edges.into_iter().enumerate() {
         rho[6 * i] = edge;
         rho[6 * i + 1] = edge.next_up();
@@ -1716,7 +1719,7 @@ fn bivariate_correlations() -> [f64; 64] {
         rho[6 * i + 4] = -edge.next_up();
         rho[6 * i + 5] = -edge.next_down();
     }
-    rho[48..].copy_from_slice(&[
+    rho[96..].copy_from_slice(&[
         0.0,
         -0.0,
         f64::EPSILON,
@@ -1769,7 +1772,7 @@ fn bivariate_normal_section(r: &mut Recorder) {
     for i in 0..4_000 {
         let x = batched_input(&mut words, &[0x7ff8_0000_0000_0000, 1 << 63], i, -9.0, 9.0);
         let y = batched_input(&mut words, &[0x7ff0_0000_0000_0000, 0], i + 1, -9.0, 9.0);
-        let rho = rho_list[(words.next_word() % 64) as usize];
+        let rho = rho_list[(words.next_word() % 112) as usize];
         let p = bivariate_norm_cdf_bounded(x, y, rho);
         r.f64(p.value);
         r.f64(p.error);
@@ -1787,7 +1790,7 @@ fn bivariate_normal_section(r: &mut Recorder) {
             for j in 0..len {
                 x[j] = batched_input(&mut words, &[0x7ff8_0000_0000_0000], 4 * j + i, -9.0, 9.0);
                 y[j] = batched_input(&mut words, &[1 << 63], 4 * j + 1 + i, -9.0, 9.0);
-                rho[j] = rho_list[(words.next_word() % 64) as usize];
+                rho[j] = rho_list[(words.next_word() % 112) as usize];
             }
             // Mixed correlations, then one correlation for the whole slice.
             bivariate_norm_cdf_slice(&x[..len], &y[..len], &rho[..len], &mut out[..len]);
