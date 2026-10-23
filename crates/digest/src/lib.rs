@@ -9,6 +9,10 @@
 
 #![no_std]
 
+use morphiq_numerics::bivariate_normal::{
+    BivariateNormal, BoundedProbability, bivariate_norm_cdf, bivariate_norm_cdf_bounded,
+    bivariate_norm_cdf_bounded_slice, bivariate_norm_cdf_slice,
+};
 use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::elementary::{
@@ -1123,6 +1127,7 @@ pub fn corpus_digest() -> [u8; 32] {
     tridiagonal_section(&mut r);
     tridiagonal_batch_section(&mut r);
     tridiagonal_sign_section(&mut r);
+    bivariate_normal_section(&mut r);
 
     r.0.finalize().into()
 }
@@ -1693,6 +1698,126 @@ fn tridiagonal_sign_section(r: &mut Recorder) {
         f.solve_into(&[-0.0, 0.0], &mut out).unwrap();
         for v in out {
             r.f64(v);
+        }
+    }
+}
+
+/// The correlations of the bivariate normal sections: every rule limit and
+/// the regime split at adjacent doubles, then the degenerate and invalid
+/// values.
+fn bivariate_correlations() -> [f64; 112] {
+    let mut rho = [0.0; 112];
+    let edges: [f64; 16] = [
+        0.055, 0.06, 0.20, 0.22, 0.38, 0.40, 0.54, 0.55, 0.66, 0.70, 0.75, 0.80, 0.81, 0.85, 0.89,
+        0.925,
+    ];
+    for (i, edge) in edges.into_iter().enumerate() {
+        rho[6 * i] = edge;
+        rho[6 * i + 1] = edge.next_up();
+        rho[6 * i + 2] = edge.next_down();
+        rho[6 * i + 3] = -edge;
+        rho[6 * i + 4] = -edge.next_up();
+        rho[6 * i + 5] = -edge.next_down();
+    }
+    rho[96..].copy_from_slice(&[
+        0.0,
+        -0.0,
+        f64::EPSILON,
+        f64::EPSILON.next_down(),
+        0.5,
+        -0.5,
+        0.786_151_377_757_423_3,
+        0.99,
+        -0.99,
+        1.0,
+        -1.0,
+        1.0_f64.next_down(),
+        -1.0_f64.next_up(),
+        f64::NAN,
+        1.5,
+        f64::INFINITY,
+    ]);
+    rho
+}
+
+/// `bivariate_norm_cdf` and its bounded form at every correlation of
+/// [`bivariate_correlations`] over a grid of thresholds and random ones, then
+/// the one-correlation and paired slice forms on every length from 1 to 17.
+fn bivariate_normal_section(r: &mut Recorder) {
+    let mut words = Words::new(0x6269_7661_7269_6174);
+    let rho_list = bivariate_correlations();
+    let points = [
+        0.0,
+        -0.0,
+        0.5,
+        -1.0,
+        3.0,
+        -8.0,
+        38.9,
+        -38.9,
+        39.0,
+        -39.0,
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+    ];
+    r.label("bivariate_normal");
+    for &rho in &rho_list {
+        for &x in &points {
+            for &y in &points {
+                r.f64(bivariate_norm_cdf(x, y, rho));
+            }
+        }
+    }
+    for i in 0..4_000 {
+        let x = batched_input(&mut words, &[0x7ff8_0000_0000_0000, 1 << 63], i, -9.0, 9.0);
+        let y = batched_input(&mut words, &[0x7ff0_0000_0000_0000, 0], i + 1, -9.0, 9.0);
+        let rho = rho_list[(words.next_word() % 112) as usize];
+        let p = bivariate_norm_cdf_bounded(x, y, rho);
+        r.f64(p.value);
+        r.f64(p.error);
+    }
+
+    r.label("bivariate_normal_slice");
+    let zero = BoundedProbability {
+        value: 0.0,
+        error: 0.0,
+    };
+    let (mut x, mut y, mut rho, mut out) = ([0.0; 17], [0.0; 17], [0.0; 17], [0.0; 17]);
+    let mut bounded = [zero; 17];
+    for i in 0..200 {
+        for len in 1..=17 {
+            for j in 0..len {
+                x[j] = batched_input(&mut words, &[0x7ff8_0000_0000_0000], 4 * j + i, -9.0, 9.0);
+                y[j] = batched_input(&mut words, &[1 << 63], 4 * j + 1 + i, -9.0, 9.0);
+                rho[j] = rho_list[(words.next_word() % 112) as usize];
+            }
+            // Mixed correlations, then one correlation for the whole slice.
+            bivariate_norm_cdf_slice(&x[..len], &y[..len], &rho[..len], &mut out[..len]);
+            for &v in &out[..len] {
+                r.f64(v);
+            }
+            bivariate_norm_cdf_bounded_slice(
+                &x[..len],
+                &y[..len],
+                &rho[..len],
+                &mut bounded[..len],
+            );
+            for p in &bounded[..len] {
+                r.f64(p.value);
+                r.f64(p.error);
+            }
+            if let Ok(table) = BivariateNormal::new(rho[0]) {
+                table.cdf_slice(&x[..len], &y[..len], &mut out[..len]);
+                for &v in &out[..len] {
+                    r.f64(v);
+                }
+                table.cdf_bounded_slice(&x[..len], &y[..len], &mut bounded[..len]);
+                for p in &bounded[..len] {
+                    r.f64(p.value);
+                    r.f64(p.error);
+                }
+            }
         }
     }
 }

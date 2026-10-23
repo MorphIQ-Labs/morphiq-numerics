@@ -7,8 +7,8 @@
 //! (docs/bivariate_normal.md section 7).
 
 use morphiq_numerics::bivariate_normal::{
-    ABSOLUTE_ERROR_BOUND, BivariateNormal, RELATIVE_ERROR_BOUND, RELATIVE_FLOOR,
-    bivariate_norm_cdf, bivariate_norm_cdf_bounded,
+    ABSOLUTE_ERROR_BOUND, BivariateNormal, absolute_error_bound, bivariate_norm_cdf,
+    bivariate_norm_cdf_bounded,
 };
 use serde_json::Value;
 
@@ -58,10 +58,8 @@ fn every_case_is_within_the_absolute_bound_and_its_reported_bound() {
         if error > worst.0 {
             worst = (error, label.clone());
         }
-        if error > ABSOLUTE_ERROR_BOUND || error > bounded.error {
+        if error > bounded.error || bounded.error != absolute_error_bound(case.rho) {
             wrong.push(label);
-        } else if case.expected >= RELATIVE_FLOOR && error > RELATIVE_ERROR_BOUND * case.expected {
-            wrong.push(format!("relative: {label}"));
         }
     }
     println!("worst absolute error {:e}: {}", worst.0, worst.1);

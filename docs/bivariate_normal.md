@@ -14,22 +14,23 @@ what remains; nothing below claims more than the checks named here establish.
 | Public scalar API, domains, special values, refusals (section 2) | done |
 | Genz (2004) algorithm, both regimes, ported from FerroRisk (section 3) | done |
 | Per-correlation evaluator, no allocation, bit-identical to the one-shot function | done |
-| Absolute bound `2.5e-16` and relative bound above `1e-3` | **measured, not proved** (section 6); the quadrature truncation term is proved (section 4) |
+| Absolute bound per correlation, `1.9e-16` to `3.72e-16` for `|rho| < 0.925` | **proved** (section 6); the high-correlation branch's bound is provisional |
 | Independent MPFR/mpmath reference, two precisions, second route (section 7) | done |
 | Generator for the quadrature rules, replayed by `check_generators.sh` | done |
 | Correctly rounded `asin` (#41) | done: the table's angle is `elementary::asin(rho)` (section 5) |
 | Relative accuracy of small probabilities (FerroRisk's tail construction) | not ported: refused instead (section 8) |
-| ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits | not done |
+| ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits, with slice and paired entry points (section 12) | done for the low-correlation quadrature: bit equality, digest and mutation witnesses (section 12); AVX2 and AVX-512F not yet run here (CI) |
 | Gappa/Coq proof of the error budget | truncation of the low-correlation rules **proved** (`formal/bivariate/`); the other terms and the high-correlation branch not done |
-| Same-host scalar and batch performance against the FerroRisk baseline | measured (section 9); lanes not measured |
+| Same-host scalar and batch performance against the FerroRisk baseline | measured (section 9); lanes **unmeasured** |
 
 ## 2. Specification
 
 * **Domain.** `x`, `y` in the extended reals; `rho` in `[-1, 1]`.
-* **Value.** The exact probability, within the absolute bound `ABSOLUTE_ERROR_BOUND = 2.5e-16`
-  of section 6. This is not a correctly rounded function: the library's
-  correct-rounding standard (`AGENTS.md`) is claimed only for results that
-  carry it, and this one publishes a bound instead, as the issue requires.
+* **Value.** The exact probability, within `absolute_error_bound(rho)` (at most
+  `ABSOLUTE_ERROR_BOUND = 3.721e-16`, section 6). This is not a correctly rounded
+  function: the library's correct-rounding standard (`AGENTS.md`) is claimed only
+  for results that carry it, and this one publishes a bound instead, as the issue
+  requires. No relative bound is published.
 * **Special values.** A NaN argument or a NaN or out-of-range (`|rho| > 1`)
   correlation gives NaN, with a NaN error from the bounded forms. `x = -inf` or
   `y = -inf` gives exactly `+0`; `y = +inf` gives `Phi(x)` and both `+inf`
@@ -52,7 +53,7 @@ what remains; nothing below claims more than the checks named here establish.
   `Err(InvalidCorrelation)` for NaN or `|rho| > 1`, so a table can never be
   built for a correlation it cannot serve. It holds three arrays of 24 `f64`
   and a few scalars (about 600 bytes), copies freely, never allocates, and
-  builds in `n` `sincos` evaluations plus one `asin` for the `n`-node rule of
+  builds in `n` `sin` evaluations plus one `asin` for the `n`-node rule of
   the low-correlation regime and in no work otherwise. The one-shot functions
   are the evaluator behind a freshly built table, so the two are the same
   arithmetic by construction.
@@ -141,38 +142,46 @@ error times the integrand at the interval end over `2 pi`, at most
 
 ## 6. Error budget
 
-The result is `Phi(x) Phi(y) + (asr / 4 pi) S`, where `S = sum_i w_i
-exp((sn_i x y - hs) / cos_i^2)`, `hs = (x^2 + y^2)/2`, `asr` is the computed
-`asin(rho)` and `sn_i, cos_i` the computed sine and cosine of node `i`'s angle.
-The terms, with their status:
+The low-correlation result is `Phi(x) Phi(y) + sum_i kw_i exp(-(d p_i + m q_i))`
+with `kw_i = w_i asr / (4 pi)` the folded weights and `d p_i + m q_i` the node
+exponent as a sum of two non-negative terms (section 3). `docs/bivariate_normal_budget.md`
+derives the bound of this operation sequence and `formal/bivariate/` checks it.
+The terms:
 
 | Term | Bound | Status |
 | --- | --- | --- |
-| Quadrature truncation | `<= 2e-17` (section 4) | **proved** for the low-correlation rules (Bernstein ellipse, certificates in `formal/bivariate/`, with the classical theorems the truncation document lists as its assumptions) |
-| Rule rounding: nodes and weights rounded once | each relative `<= 2^-53`; effect `<= 2^-53 * (asr/4 pi) * sum w_i * 1 <= 2.2e-17 * 0.19 = 4e-18` | derived; the integrand is at most 1 |
-| `asin` | `<= 1.8e-17` (section 5) | derived from `asin`'s correct rounding (half an ulp) |
-| Node angle `t_i = asr (1 +- x_i)/2` and its `sincos` | angle error `<= 1.2e-16` moves the integrand by `|f'| * 1.2e-16`, `|f'| <= 3` where `f` is not negligible | derived by inspection of `f'`, **not proved**; folded into the measurement |
-| Exponent `(sn x y - hs)/cos^2`: a few rounding errors on a quantity of size `|arg|` | `exp` relative error `<= 3 eps |arg|`, and `max_{arg <= 0} e^{arg} |arg| = 1/e`: `<= 3 eps/e * 0.19 = 2.5e-17` | derived |
-| `exp` (correctly rounded) and the weighted sum | each term carries `<= 0.5 ulp` from `exp` and one rounding from the weight product; the terms are summed as a double-word, whose own error is one final rounding plus `O(n^2 u^2)`, so the sum's relative error is a few `u` however many nodes (a recursive sum would carry up to `n - 1 = 23` roundings, a worst case of about `5e-16` at `x = y = 0`, which is why the accumulation is a double-word); observed `<= 3e-17` | structure **derived**; the total over all thresholds is the stage-2 derivation below, not yet proved |
-| `Phi(x)`, `Phi(y)` | each within the library's proved normal-CDF bound (`docs/normal.md`) | referenced |
-| Product, sum and the clamp to `[0, 1]` | `<= 1.5 ulp(value)` | derived |
+| Quadrature truncation | `<= 2e-17` (section 4) | **proved**: Bernstein ellipse, certificates in `formal/bivariate/`, with the classical theorems the truncation document lists |
+| `asin`, the node angles and their `sin` | folded into the per-node constants of the budget | **proved** (`BvnLow.v`, `BvnNode.v`), from the functions' documented contracts |
+| Node exponent, `exp`, weight product | per-node constant `<= 6.2e-16` relative on the term, times the correction `<= 0.19` | **proved** (`BvnArg.v`, `BvnQuadG.v`, `BvnLowRule.v`) |
+| Double-word sum, one rounding | `O(n^2 u^2)` relative, however many nodes | **proved** (`BvnSum.v`) |
+| `Phi(x)`, `Phi(y)` and their product | `2 (2^-54 + 2^-112)` from the operands, kept as a double-word, then one rounding of the result | **proved** from `norm_cdf`'s documented contract (`BvnTail.v`, `BvnFinal.v`) |
 
-Two statements hold: the *published* bound `2.5e-16` is the FerroRisk
-contract, kept so a consumer's bound does not change; and it is **measured**
-against the reference over a finite set (section 7): worst error `2.22e-16`
-on the fixture and `1.97e-16` over 20 000 random low-regime cases and `1.11e-16`
-over 3 000 random high-regime cases, all in the region where the value is near
-1 and one unit in the last place is `1.1e-16`. The margin is thin (11 per cent
-on the fixture). A **proof** of `2.5e-16` needs the remaining terms above bounded with
-interval or Gappa arithmetic, the sum's rounding by a tighter analysis than the
-worst case above (the truncation term is proved, section 4); that is the proof
-obligation this slice leaves open.
+**Proved bounds, low-correlation branch.** The bound of the rule `|rho|`
+selects, for every threshold pair with `|x|, |y| <= 64`:
 
-At or above `RELATIVE_FLOOR = 1e-3`, the bounded forms report
-`min(1e-13 * value, 2.5e-16)`; measured worst relative error there is
-`3.2e-15`. Below the floor only the absolute bound is reported, so a caller
-that divides by a small probability carries `2.5e-16` as the error and cannot
-mistake the result for a relative one.
+| rule (nodes), `|rho|` up to | 4, 0.055 | 6, 0.20 | 8, 0.38 | 10, 0.54 | 12, 0.66 | 14, 0.75 | 16, 0.81 | 20, 0.89 | 24, 0.925 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| bound, `1e-16` | 1.90 | 2.07 | 2.31 | 2.57 | 2.76 | 2.95 | 3.09 | 3.48 | 3.72 |
+
+`absolute_error_bound(rho)` returns that bound (rounded up in the fourth digit),
+`BoundedProbability::error` carries it, and `ABSOLUTE_ERROR_BOUND = 3.721e-16` is
+the largest. FerroRisk's published `2.5e-16` is therefore proved only up to
+`|rho| <= 0.38`; it was a measured figure, and for the high-correlation branch it
+was false (section 3: `bivariate_norm_cdf(-0.21101192279835226, -0.0014549743776884816, 0.925)`
+was `2.58e-16` from the exact value). The closed-form regimes (independent,
+countermonotone: `1.7e-16`; comonotone and the saturated limits: `5.7e-17`) are
+derived from the same `norm_cdf` contract by a few lines, not machine-checked.
+The high-correlation branch's bound is provisionally the low branch's largest,
+`3.721e-16`, until its proof is complete (`docs/bivariate_normal_high.md`).
+
+**Measured.** Over the fixture's 3,495 cases (section 7) the worst absolute error
+is `1.11e-16`, within the bound of each case's own correlation; the proved figures
+are worst-case alignments of every rounding.
+
+**No relative bound.** Nothing here bounds the error relative to the value, and the
+bounded forms report only the absolute bound. A caller that divides by a small
+probability carries `error` as the error of the quotient's numerator and must refuse
+the quotient where `error` is not far below the value (section 8).
 
 ## 7. Evidence
 
@@ -228,17 +237,19 @@ with `-1/s^2 <= g'' <= -1`, with tangent-line tails, four 16/32-point panels
 and a rounding bound from `log_norm_cdf`; its discretization estimate was
 its one non-certified part, and it did not cover `|rho| >= 0.925`.
 
-This slice does **not** resolve the corner; it **refuses** it. In the corner the
-value is returned to the absolute bound, and the bounded form reports
-`2.5e-16`, which is larger than the value: the caller sees the result is
-not usable relative to itself. The three cases above, and five more
+The function does **not** resolve the corner; it **refuses** it, by contract. In the
+corner the value is returned to the absolute bound, and the bounded form reports the
+correlation's bound (at least `1.9e-16`), which is larger than the value: the
+caller sees the result is not usable relative to itself, and must refuse a quotient
+by it. Where the bound supports relative use is where the value is far above it: a
+relative error of `error / value` is supported only for that ratio, never more. The three cases above, and five more
 (`-8,-8,-0.5`, `-12,-12,-0.95`, `-5,-7,-0.99`, and the two positive-correlation
 mirrors), are required cases in the fixture (`kind = "hard"`), and the test
 `hard_cases_are_bounded_absolutely_and_refuse_relative_use` asserts both the
-absolute bound and that the reported error is not smaller than the value. The
-relative construction is the first item of the remaining work (section 11),
-and it needs a proved remainder bound on the discretization to meet this
-library's standard.
+absolute bound and that the reported error is not smaller than the value. A function
+that returns such values to relative accuracy would be a separate one with its own
+proved remainder bound on the discretization, which FerroRisk's construction
+lacked; this one does not claim it.
 
 ## 9. Performance
 
@@ -258,9 +269,9 @@ taken from libm. Item by item (the list FerroRisk's deletion cites):
 | FerroRisk item | Disposition |
 | --- | --- |
 | `numerics/bivariate_normal.rs`: Genz low and high regimes, regime classifier, saturation limits, degenerate limits, probability clamp | **ported** (this module) |
-| `BoundedProbability`, `bivariate_norm_cdf_bounded` semantics and constants (`2.5e-16`, `1e-3`, `1e-13`) | **ported**; the sub-floor relative construction is **deferred** (section 8) |
+| `BoundedProbability`, `bivariate_norm_cdf_bounded` semantics | **ported** with a correlation-dependent proved bound; the `2.5e-16`, `1e-3` and `1e-13` constants are **not** carried over (section 6); the sub-floor relative construction is **refused**, not deferred (section 8) |
 | `BvnQuadrature` per-correlation reuse | **ported** as `BivariateNormal` (fallible construction, `Copy`, no allocation, bit-identical to the one-shot function) |
-| SIMD (`pulp`) fused Genz sum and its x86 padding | **deferred**: the lanes must return the scalar bits (issue acceptance), which a re-association does not |
+| SIMD (`pulp`) fused Genz sum and its x86 padding | **replaced** by the lanes of section 12, which keep the scalar summation order and so return the scalar bits |
 | `tests/bivariate_normal_property.rs` | **ported** as deterministic unit tests (proptest is not a dependency) |
 | `fuzz/fuzz_targets/bvn_bounded_invariants.rs` | **ported as a test** over 60 000 arbitrary bit patterns; the library has no fuzz target |
 | `tests/bivariate_normal_reference.rs`, `testing/bivariate_normal_support.rs` | **ported as test-only**: the reference test reads the fixture and applies the absolute, relative and reported-bound checks |
@@ -273,12 +284,92 @@ taken from libm. Item by item (the list FerroRisk's deletion cites):
 
 ## 11. Remaining work, in order
 
-1. The relative construction below the floor (section 8), with a proved
-   remainder bound, or an explicit refusal API; resolves the #380 corner.
-2. Interval/Gappa bounds for the remaining budget terms (with a tighter
-   accumulation analysis for the weighted sum) and for the high-correlation
-   branch, whose truncation is a separate analysis, then the Coq pipeline of #87.
-3. SIMD lanes (NEON, SSE2, AVX2+FMA, AVX-512F) returning the scalar bits, and
-   their measurement on ARM and native x86.
-4. Re-measure against the performance bar on a quiet host; this slice's
-   numbers are one noisy shared host (section 9).
+1. The high-correlation branch's rounding proof (`docs/bivariate_normal_high.md`),
+   after which its bound replaces the provisional one (section 6).
+2. The Coq transcription of the kernel, extracted and compared bit for bit with the
+   Rust, and mutation witnesses for the scalar kernel (issue #87's pipeline).
+3. Vector lanes for the high-correlation branch from the final kernel (section 12).
+4. Measure the lanes on ARM and native x86 (#216) and re-measure against the
+   performance bar on a quiet host (section 9); this slice's numbers are one noisy
+   shared host.
+
+## 12. Batch evaluation and lanes
+
+Entry points (all return the scalar bits on every target, with or without the
+`simd` feature; a length mismatch panics with `<name>: slices of different
+lengths`, as the other slice functions do):
+
+| Function | Computes |
+| --- | --- |
+| `BivariateNormal::cdf_slice(x, y, out)` | `out[i] = self.cdf(x[i], y[i])` at the evaluator's one correlation |
+| `BivariateNormal::cdf_bounded_slice(x, y, out)` | the bounded form into `[BoundedProbability]`; values are `cdf_slice`'s, bounds are the scalar function of the value, computed in blocks of 64 so nothing allocates |
+| `bivariate_norm_cdf_slice(x, y, rho, out)` | `out[i] = bivariate_norm_cdf(x[i], y[i], rho[i])`; an invalid `rho[i]` gives NaN in lane `i` only |
+| `bivariate_norm_cdf_bounded_slice(x, y, rho, out)` | the bounded paired form |
+
+With `simd` the pairs go through the library's backend cascade (AVX-512F, AVX2,
+SSE2 on x86-64; NEON on aarch64; a last single pair is scalar). A chunk's lane
+`i` reads its own table, so a paired batch may mix regimes and rule lengths:
+the evaluator is built per lane by the scalar `BivariateNormal::new` (reused
+while consecutive correlations are bit-equal), which costs the same `asin` and
+`sincos` as the scalar path.
+
+**Vectorised.** After the scalar ordering `x <= y`, a lane is served by the
+vector code when neither argument is NaN, `x > -39`, `y < 39`, and its
+correlation selects the low-correlation quadrature (`EPSILON <= |rho| < 0.925`):
+`d = (x-y)^2`, `m = (x+y)^2`, the node loop in node order with
+`kw[j] * exp(-(d p[j] + m q[j]))` accumulated as the scalar double-word
+(`two_sum` per term, the low parts added in order), `two_prod(Phi(x), Phi(y))`
+with its error term dropped below `PRODUCT_EXACT_FLOOR`, `two_sum(hi, high)`,
+the final `sum + (err + (low + lo))` and the clamp. A lane whose rule has fewer
+nodes than the chunk's longest (rules of 4 to 24 nodes) is masked on the extra
+nodes (its sums are untouched and its `exp` argument is `0`), so no lane
+accumulates a node the scalar code does not. The lane `two_prod` returns
+`eft::two_prod`'s bits (docs/lanes.md section 2). `exp` and
+`norm_cdf` are the library's lane kernels (`Exp`, `Normal<1>`), each equal to
+its scalar function bit for bit, so no new transcendental is introduced and
+no platform libm is called. Every operation is an individual lane add,
+multiply or divide; nothing is fused or reassociated.
+
+**Scalar per lane.** The high-correlation series (`|rho| >= 0.925`) is **not**
+vectorised: its lanes call `BivariateNormal::cdf`. So are the closed-form
+regimes (independent, comonotone, countermonotone), a NaN argument, a
+saturated argument (`x <= -39` or `y >= 39`), and a lane whose vector result is
+NaN. A lane that is masked out of the quadrature carries a harmless argument
+(`0`) and its result is discarded.
+
+**Checked by** (`bivariate_normal/lanes/tests.rs`, with `src/lanes/tests.rs`'
+backends and `MORPHIQ_LANE_CASES`): bit equality of every lane on every
+backend the CPU has, including the one-lane scalar backend, over the
+reference fixture's `(h, k, rho)` triples, every correlation (each rule limit
+and the Genz split at adjacent doubles, `0`, `+-1` and their neighbours,
+`2^-52` and its neighbour, NaN, infinities, `|rho| > 1`) against every
+threshold (zeros of both signs, infinities, NaN, the saturation edges at
+adjacent doubles, extremes) and random triples with mixed correlations; one
+table across every threshold pair; the served-lane mask of each regime class
+in every lane position; every length from 0 to 17 at eight offsets through the
+driver; repeated invalid correlations; the length checks; and the determinism
+digest's `bivariate_normal` and `bivariate_normal_slice` sections, scalar and
+`simd`.
+
+**Mutation.** cargo-mutants over `bivariate_normal/lanes.rs`, built with
+`simd`: cargo-mutants 27.1.0 (`-j1`, per-job target directories, aarch64 NEON host) generated 98 mutants:
+69 are caught, 7 do not compile and 22 survive. None of the survivors changes a result:
+  - `&&` against `||` and `<` against `<=` at the node-activity test in `low` (2): a lane that
+    reads a node past its rule's end reads the table's zero padding (`kw = 0`), whose term is an
+    exact `+0` that `two_sum` and the low-part sum pass through unchanged, and an inactive lane is discarded.
+  - `>>` against `<<` where `chunk` decides which lanes the scalar function recomputes (1): the scalar
+    function returns the lane's own bits, so recomputing more lanes costs time only.
+  - `lane > 0` against `lane < 0` in the table reuse (1): reuse only avoids rebuilding an identical table.
+  - `>>` against `<<` in the propagation of an invalid correlation to a repeated neighbour (1): equivalent
+    on a two-lane backend, where only lane 1 repeats lane 0; on four- and eight-lane backends
+    `repeated_correlations_keep_their_validity_in_every_lane` (40 repeats) is expected to kill it, which this host cannot confirm.
+  - The cascade's width test and counter on NEON (2): they select which backend runs which elements,
+    which `lanes.md` section 6 records as speed only.
+  - The x86-64 cascade lines (15) are not compiled on this host, so cargo-mutants reports them as
+    survivors without running them. The mutation run must be repeated on x86-64 (AVX2, AVX-512F under SDE)
+    to classify them; the `done +=` and subtraction mutants there should be killed by
+    `the_cascade_returns_the_scalar_bits`, and the width tests are speed only.
+
+**Not measured.** The lanes' speed, and whether a regime-mixed batch or the
+per-lane table construction pays for itself, are not measured here;
+performance is scheduled separately.

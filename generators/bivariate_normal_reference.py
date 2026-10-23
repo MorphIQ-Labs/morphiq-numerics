@@ -17,10 +17,12 @@ T function, which shares no integrand with the first, and must agree with the
 first to 1e-30 absolute. The value is written with 36 significant digits.
 Replay with --check.
 """
+import math
 import json
 import os
 import pathlib
 import sys
+import time
 from multiprocessing import Pool
 
 import mpmath as mp
@@ -31,11 +33,14 @@ OUT = ROOT / 'crates/reference/fixtures/bivariate_normal.json'
 
 PRECISIONS = (280, 360)
 DIGITS = 36
+RULE_LIMITS = (0.055, 0.20, 0.38, 0.54, 0.66, 0.75, 0.81, 0.89)
 ONE_MINUS = [2.0 ** -k for k in (20, 30, 40, 50, 52)]
 RHOS = sorted({
     0.0, 2.0 ** -40, 2.0 ** -20, 0.01, 0.09, 0.0900000000000001, 0.1, 0.3, 0.3000000000000001,
     0.5, 0.65, 0.7, 0.75, 0.7500000000000001, 0.8, 0.9, 0.92, 0.925, 0.9250000000000002,
     0.93, 0.95, 0.99, 0.999, *(1.0 - e for e in ONE_MINUS),
+    # Each rule limit (docs/bivariate_normal.md section 4) at adjacent doubles.
+    *(v for limit in RULE_LIMITS for v in (math.nextafter(limit, 0.0), limit, math.nextafter(limit, 1.0))),
 })
 RHOS = sorted({s * r for r in RHOS for s in (1.0, -1.0)})
 # Thresholds the quadrature meets in turn: the origin, both signs and both
@@ -55,6 +60,13 @@ PAIRS = [(0.0, 0.0), (0.25, -0.25), (1.0, 1.0), (-1.0, -1.0), (1.0, -2.0), (2.0,
 HARD = [(-3.0, -3.0, -0.7861513777574233), (-6.0, -6.0, -0.9), (-20.0, 1.0, -0.5),
         (-3.0, -3.0, 0.7861513777574233), (-38.0, -30.0, 0.7861513777574233),
         (-8.0, -8.0, -0.5), (-12.0, -12.0, -0.95), (-5.0, -7.0, -0.99)]
+# The high-correlation peak, where the 20-node rule's truncation is largest:
+# |rho| just above the Genz split, one threshold near zero (docs/bivariate_normal_high.md).
+PEAK = [(h, k, rho)
+        for rho in (0.925, 0.9250000000000002, 0.93, 0.94, 0.954, 0.9755, 0.995, -0.925, -0.94, -0.9755)
+        for h, k in ((-0.21101192279835226, -0.0014549743776884816),
+                     (-0.0014549743776884816, -0.21101192279835226),
+                     (-0.2, -0.001), (-0.38, 0.0), (0.21101192279835226, 0.0014549743776884816))]
 FERRO = ROOT / 'generators/bivariate_normal_ferro_inputs.json'
 
 
@@ -170,6 +182,8 @@ def cases():
             out.append((h, k, rho, 'grid', None))
     for h, k, rho in HARD:
         out.append((h, k, rho, 'hard', None))
+    for h, k, rho in PEAK:
+        out.append((h, k, rho, 'peak', None))
     for _ in range(200):
         h = (next(rng) / 2.0 ** 64 * 2 - 1) * 12
         k = (next(rng) / 2.0 ** 64 * 2 - 1) * 12
@@ -181,9 +195,31 @@ def cases():
     return out
 
 
+def beyond_binary64(h, k, rho):
+    """True when the probability is rigorously below 1e-330, so its binary64 value is 0.
+
+    For h, k < 0 and rho < 0 the quadrant lies in the half-plane tangent at its
+    corner (moving into the quadrant raises the quadratic form), so
+    P <= Phi(-d) <= exp(-d^2 / 2) / 2 with d^2 = (h^2 + k^2 - 2 rho h k) / (1 - rho^2).
+    Their exact evaluation costs hours and says nothing more than 0.
+    """
+    if not (h < 0 and k < 0 and rho < 0):
+        return False
+    with mp.workdps(40):
+        h, k, rho = mp.mpf(h), mp.mpf(k), mp.mpf(rho)
+        d2 = (h * h + k * k - 2 * rho * h * k) / (1 - rho * rho)
+        return mp.exp(-d2 / 2) / 2 < mp.mpf(10) ** -330
+
+
 def evaluate(case):
     """One case at both precisions, plus the second route on a subset."""
     index, (h, k, rho, kind, ferro) = case
+    if beyond_binary64(h, k, rho):
+        row = {'kind': kind, 'h': f'{to_bits(h):016x}', 'k': f'{to_bits(k):016x}',
+               'rho': f'{to_bits(rho):016x}', 'value': '0'}
+        if ferro is not None:
+            row['ferro'] = {'family': ferro[0], 'status': ferro[1], 'value': ferro[2]}
+        return row, False, None
     lo, hi = (at(p, bvn, h, k, rho) for p in PRECISIONS)
     tolerance = max(abs(hi) * mp.mpf(10) ** -36, mp.mpf(10) ** -46)
     assert abs(lo - hi) <= tolerance, (h, k, rho, lo, hi)
@@ -212,9 +248,24 @@ def evaluate(case):
     return row, crossed, disagreement
 
 
+def evaluate_indexed(case):
+    started = time.monotonic()
+    result = evaluate(case)
+    elapsed = time.monotonic() - started
+    if elapsed > 30:
+        print(f'bivariate_normal: case {case[0]} took {elapsed:.0f}s', file=sys.stderr, flush=True)
+    return case[0], result
+
+
 def generate():
+    work = list(enumerate(cases()))
+    results = []
     with Pool(int(os.environ.get('BVN_WORKERS', '3'))) as pool:
-        results = pool.map(evaluate, list(enumerate(cases())), chunksize=8)
+        for done, result in enumerate(pool.imap_unordered(evaluate_indexed, work, chunksize=4), 1):
+            results.append(result)
+            if done % 100 == 0 or done == len(work):
+                print(f'bivariate_normal: {done}/{len(work)} cases', file=sys.stderr, flush=True)
+    results = [result for _, result in sorted(results, key=lambda pair: pair[0])]
     rows = [row for row, _, _ in results]
     cross = sum(1 for _, crossed, _ in results if crossed)
     disagreements = [d for _, _, d in results if d is not None]

@@ -848,6 +848,16 @@ Print Assumptions BvnTruncation.certified_16.
 Print Assumptions BvnTruncation.certified_20.
 Print Assumptions BvnTruncation.certified_24.
 
+Require BvnBudget.
+Print Assumptions BvnBudget.low_4.
+Print Assumptions BvnBudget.low_6.
+Print Assumptions BvnBudget.low_8.
+Print Assumptions BvnBudget.low_10.
+Print Assumptions BvnBudget.low_12.
+Print Assumptions BvnBudget.low_14.
+Print Assumptions BvnBudget.low_16.
+Print Assumptions BvnBudget.low_20.
+Print Assumptions BvnBudget.low_24.
 Require BvnHighAlgebra BvnHighAssembly BvnHighPanels BvnHighBudget.
 Print Assumptions BvnHighAlgebra.plackett_exponent.
 Print Assumptions BvnHighAlgebra.smooth_exponent.
