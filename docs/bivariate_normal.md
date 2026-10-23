@@ -339,7 +339,7 @@ digest's `bivariate_normal` and `bivariate_normal_slice` sections, scalar and
 `simd`.
 
 **Mutation.** cargo-mutants over `bivariate_normal/lanes.rs`, built with
-`simd`: MUTATION_RESULT
+`simd`: not yet complete for the current lane kernel; the run is repeated once the scalar low-correlation kernel is final.
 
 **Not measured.** The lanes' speed, and whether a regime-mixed batch or the
 per-lane table construction pays for itself, are not measured here;
