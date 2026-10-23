@@ -11,7 +11,9 @@
 //! (`ln::stages::stage_h_screen`, `stage_b_screen`, `stage_h_parts`,
 //! `stage_b_parts`), and `exp2`'s fallback reduction and accurate value
 //! on reproducible inputs, with
-//! this crate's results. `scripts/check_formal.sh` runs the proved
+//! this crate's results, and the bivariate normal's scalar kernel (`bivariate.rs`:
+//! `bivariate_norm_cdf` and the table `BivariateNormal::new` builds, with the library
+//! calls each makes, for `formal/bivariate/BvnKernel.v`). `scripts/check_formal.sh` runs the proved
 //! transcriptions (`formal/q`, `formal/binary64/RoundingTest.v`,
 //! `formal/exp/ExpStageReduction.v`, `ExpStageA.v`, `ExpStageB.v`,
 //! `ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v`, `ExpSmall.v`,

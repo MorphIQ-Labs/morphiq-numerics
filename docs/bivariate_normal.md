@@ -20,7 +20,8 @@ what remains; nothing below claims more than the checks named here establish.
 | Correctly rounded `asin` (#41) | done: the table's angle is `elementary::asin(rho)` (section 5) |
 | Relative accuracy of small probabilities (FerroRisk's tail construction) | not ported: refused instead (section 8) |
 | ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits, with slice and paired entry points (section 12) | done for the low-correlation quadrature: bit equality, digest and mutation witnesses (section 12); AVX2 and AVX-512F not yet run here (CI) |
-| Coq proof of the error budget | **proved** for both branches (`formal/bivariate/`), from the named hypotheses of section 6; the Coq transcription is by reading, not extracted (section 11) |
+| Coq proof of the error budget | **proved** for both branches (`formal/bivariate/`), from the named hypotheses of section 6 |
+| The kernel the proofs describe | the scalar kernel is transcribed over the proved binary64 operations (`formal/bivariate/BvnKernel.v`), **extracted and compared bit for bit** with this code on 13 966 cases, and its operations are proved equal to the proofs' rounding model (section 6.5); the hypotheses that remain are listed there |
 | Same-host scalar and batch performance against the FerroRisk baseline | measured (section 9); lanes **unmeasured** |
 
 ## 2. Specification
@@ -185,7 +186,7 @@ kind as the low branch's: the library contracts (`exp`, `sqrt`, `norm_cdf`,
 `two_sum`), classical analysis (Plackett's identity, the Gauss-Legendre
 remainder, the skip bounds for `hk >= 100` and `b >= 20 s`) cited and not
 machine-checked, and the stored tables' fidelity; the Coq transcription of
-the operation sequence matches `mod.rs` by reading. `docs/bivariate_normal_high.md`
+the operation sequence is checked against `mod.rs` mechanically (section 6.5). `docs/bivariate_normal_high.md`
 lists each.
 
 **Measured.** Over the fixture's 3,495 cases (section 7) the worst absolute error
@@ -196,6 +197,80 @@ are worst-case alignments of every rounding.
 bounded forms report only the absolute bound. A caller that divides by a small
 probability carries `error` as the error of the quotient's numerator and must refuse
 the quotient where `error` is not far below the value (section 8).
+
+### 6.5 What ties the proofs to the shipped code
+
+`formal/bivariate/BvnKernel.v` is the scalar kernel: `BivariateNormal::new` (the regime, the
+rule choice, the angle `asr`, `kw`, `p`, `q` of each node) and `::cdf` (ordering, saturation,
+the closed forms, the low quadrature's double-word sum and last stage, and the high branch with its
+reflection, panels, double-word sum, closed form and scaling), operation for operation over the proved
+IEEE 754 operations (`fadd`, `fsub`, `fmul`, `fdiv`, `fsqrt`, `two_sum64`, `two_prod64`), with the Rust's
+constants and the stored tables (`BvnTables.v`, written by `generators/bivariate_normal_nodes.py`). The library
+functions it calls (`exp`, `sin`, `asin`, `norm_cdf`) are verified elsewhere and are not part of it: they are
+the fields of a record, and `sqrt` is the IEEE operation.
+
+**Extracted comparison.** `check_formal.sh` extracts the kernel to OCaml (`formal/extraction/BvnCrosscheck.v`)
+and runs it (`bvndriver.ml`) on the `bvn_` lines of the internal cross-check corpus, which
+`internal_crosscheck/bivariate.rs` writes from fixed seeds. Each line carries the library calls the Rust made
+(`bivariate_normal/trace.rs` records them in tests only), and the extracted kernel's `exp`, `sin`, `asin` and
+`norm_cdf` return those results, looked up by argument: a call the kernel makes that the Rust did not, a call
+the Rust made that the kernel did not, and a result that differs by one bit are each a mismatch. (A zero argument
+is looked up without its sign, since Rust fixes neither the sign of `max(-0.0, 0.0)` nor, here, any library result
+that differs between `-0` and `+0`; a recorded pair that disagrees fails.) The corpus is 252 correlations and
+13 966 cases, with the table of each correlation compared as well (the regime, `asr`, and every node's `kw`, `p`
+and `q`): 252 tables (6 independent, 1 comonotone, 1 countermonotone, 118 low, 119 high, 7 invalid), 13 966 values,
+0 mismatches. By the writer's own coverage account (a case may count under several): independent 330, comonotone 55,
+countermonotone 55, invalid correlation 511, NaN threshold 542, saturated below 1 540 and above 1 170, swapped
+arguments 3 203, signed-zero threshold 542 and correlation 73; the low rules of 4, 6, 8, 10, 12, 14, 16, 20 and 24
+nodes 495, 660, 660, 990, 935, 660, 385, 660 and 937, each rule limit with the adjacent doubles either side; the high
+branch for `rho > 0` 1 492 and `rho < 0` 1 889 (`Phi(-dh) > Phi(dk)` in 407 of them, `<=` in 1 347), the `hk >= 100` skip 327, the
+closed form evaluated 1 043 and skipped (`sqrt(bs) >= 20 s`) 2 011, 16-node panels 1 400 and 15-node panels 7 616,
+and cases with 0 to 7 panels 979, 222, 238, 263, 269, 377, 374 and 332, including the correlation at which the panel
+scale crosses `0.095 2^j` and `0.003 2^j` and the counterexample `bivariate_norm_cdf(-0.21101192279835226,
+-0.0014549743776884816, 0.925)`. A random corpus cannot tell apart two orderings whose results differ with
+probability below about `2^-37` per case: the association of `c d ass^2 / 5` in the closed form's `p1`, a term about
+`1e-11` of the sum it joins, is one such, and a mutant that reassociates it is not killed.
+
+**The kernel against the proofs.** `BvnLift.v` relates each binary64 operation to the real-valued rounding
+the error proofs are written in (`B (fadd a b) = rndF (B a + B b)` when no operation overflows), with crude
+magnitude bounds that exclude overflow and carry no accuracy; `BvnRefineLow.v` and `BvnRefineHigh.v` use it to prove
+that the kernel's pieces return the proofs' values:
+
+* low branch: the node angle (`angle`), a node's term (`node_term` of BvnLow.v, with `p` and `q` as the table
+  stores them), the double-word accumulation (`low_sum` is `acc` of BvnSum.v), the last stage (`low_finish` is
+  `finish` of BvnFinal.v, including `PRODUCT_EXACT_FLOOR`, which is the least binary64 not below `1e-270`, so
+  `PFLOOR <= hi` and `hi >= 1e-270` are one test on binary64 values), and the whole branch
+  (`kernel_low_ok`: the kernel's value is `Rhat` of BvnTop.v on a table whose nodes match the proof's `NodeS`
+  records), with the table finite (`BvnTableFacts.v`) and `cdf` on ordered unsaturated thresholds equal to the
+  branch (`cdf_low`);
+* high branch: a node's term (`node_value_ok`: `node_term` of BvnHighNode.v), Genz's closed form (`closed_form_ok`:
+  `closed_k` of BvnHighCF.v), the panels' accumulation and loop (`panel_fold_ok`, `panel_sum_ok`: `dwsum` over the
+  `node_term`s of every panel, the scale halving, the rule choice, at most seven panels), the integral
+  (`high_integral_ok`: `rnd (Cl + rnd (Pw + Pl))` of `J_bound`), the three final assemblies of BvnHighEnd.v
+  (`high_finish_pos`, `_neg_diff`, `_neg_zero`) and the whole branch for each sign
+  (`high_pos_composite`, `high_neg_diff_composite`, `high_neg_zero_composite`).
+
+What is **not** established by these theorems, and stays a hypothesis of them or of the proofs:
+
+1. The library functions: the theorems take `exp`, `sin`, `norm_cdf` as finite functions of the relation
+   `lib_*_rel` (value and a magnitude bound), whose contents are the contracts of docs/exp.md, docs/sin_cos.md
+   and docs/normal.md; `asin` enters through the angle's own relation to the proof's `asr`.
+2. The closed form's exponent arguments are `rnd(-x/2)`; the proof writes `-(x/2)`. They are one number unless
+   `x` (the exponent sum `sg` or `hk`) is a nonzero binary64 below `2^-1000`, where the halving rounds by under `2^-1075`
+   and `exp` is 1 either way; `closed_form_ok` assumes the case away (`Hh1`, `Hh2`). This is a gap in what the proof
+   models, found by the comparison.
+3. The proofs' ranges, as hypotheses of the composites: thresholds below 39 in magnitude, `a = sqrt((1 - |rho|)(1 + |rho|))`
+   in `(0, 0.381]`, `hk` below the cutoff, and the computed `bs` and `hk` with `-(4 hk) <= bs` (true for their exact
+   values; for the computed ones it can fail by an ulp of rounding only where the products are near the
+   subnormals), and the closed form's inputs at the last scale.
+4. The low rule's limits are binary64 values (`0.055` is `0.0550000000000000002...`) where the packaged theorems
+   `low_4`, ... state decimal limits; the margin `L + 2e-4 <= sin A` of each rule is far wider than the rounding,
+   but the instances are not re-derived at the binary64 limits.
+5. The stored abscissas and weights are the roundings of the exact rule's: `BvnData.v` and the generator, as before
+   (the kernel's tables are the same encodings), and the per-node ranges (`node_ranges`) that the low theorems'
+   `ok` hypotheses imply are not re-derived from `ok`.
+6. The hypotheses of `J_bound` on the panels' node terms (`Hnodes`, `Hsum`) are those of BvnHighPanels.v and
+   `node_error`; the kernel's list of node terms is `panel_terms`, which is what they are applied to by reading.
 
 ## 7. Evidence
 
@@ -298,8 +373,8 @@ taken from libm. Item by item (the list FerroRisk's deletion cites):
 
 ## 11. Remaining work, in order
 
-1. The Coq transcription of the kernel, extracted and compared bit for bit with the
-   Rust, and mutation witnesses for the scalar kernel (issue #87's pipeline).
+1. Mutation witnesses for the scalar kernel (issue #87's pipeline); the extracted
+   comparison is built (section 6.5), the mutation lane is not.
 2. Measure the lanes on ARM and native x86 (#216) and re-measure against the
    performance bar on a quiet host (section 9); this slice's numbers are one noisy
    shared host.

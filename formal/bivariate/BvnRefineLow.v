@@ -8,7 +8,7 @@ Import ListNotations.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
 From Double Require Import DWPlus.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Mul IEEE64Sqrt IEEE64Div.
-Require Import BvnKernel BvnLift.
+Require Import BvnKernel BvnLift BvnTableFacts.
 Require Import BvnRound BvnQ BvnArg BvnNode BvnTrig BvnLow BvnSum BvnTail BvnFinal BvnRule BvnTop.
 Open Scope R_scope.
 
@@ -370,4 +370,35 @@ Proof.
   - eapply exb_weak; [exact Hhigh | assert (Z.of_nat (length nodes) <= 24)%Z by lia; lia].
   - eapply exb_weak; [exact Hlow | assert (Z.of_nat (length nodes) <= 24)%Z by lia; lia].
   - lia.
+Qed.
+
+(** The table [build_table] makes for a low-correlation [rho]: its angle is the library's
+    [asin rho] and its nodes are those of [low_correlation_rule rho] at the constant [K]. *)
+Lemma build_table_low (L : lib) rho t : regime_of rho = Some Low -> build_table L rho = Some t ->
+  t_regime t = Low /\ t_asr t = lib_asin L rho /\
+  t_nodes t = low_nodes L (t_asr t) (t_asr t /f (k2 *f ktau))
+                (fst (low_correlation_rule rho)) (snd (low_correlation_rule rho)).
+Proof.
+  intros Hreg Hb. unfold build_table in Hb. rewrite Hreg in Hb.
+  destruct (low_correlation_rule rho) as [xs ws] eqn:Er. injection Hb as <-. cbn [t_regime t_asr t_nodes fst snd].
+  repeat split.
+Qed.
+
+(** [cdf] on ordered, unsaturated thresholds at a low-correlation table is [kernel_low]. *)
+Lemma cdf_low (L : lib) (t : table) (x y : f64) :
+  t_regime t = Low -> finite x -> finite y -> fle x y = true -> - 39 < B x -> B y < 39 ->
+  cdf L t x y = kernel_low L t x y.
+Proof.
+  intros Hr Fx Fy Hle Hx Hy. unfold cdf. rewrite Hle. cbv iota. unfold degenerate_limit.
+  rewrite (fisnan_finite x Fx), (fisnan_finite y Fy). cbv iota.
+  assert (Hs : finite ksaturated /\ B ksaturated = 39) by (split; [exact (proj1 exb_ksaturated) | exact (proj1 (proj2 exb_ksaturated))]).
+  assert (Fn : finite (fneg ksaturated)) by (exact (exb_fin _ _ _ (exb_neg _ _ _ exb_ksaturated))).
+  assert (Vn : B (fneg ksaturated) = - 39) by (exact (exb_val _ _ _ (exb_neg _ _ _ exb_ksaturated))).
+  assert (E1 : fle x (fneg ksaturated) = false).
+  { destruct (fle x (fneg ksaturated)) eqn:E; [| reflexivity]. exfalso.
+    apply (fle_iff _ _ Fx Fn) in E. rewrite Vn in E. lra. }
+  assert (E2 : fge y ksaturated = false).
+  { destruct (fge y ksaturated) eqn:E; [| reflexivity]. exfalso.
+    apply (fge_iff _ _ Fy (proj1 Hs)) in E. rewrite (proj2 Hs) in E. lra. }
+  rewrite E1, E2. cbv iota. rewrite Hr. reflexivity.
 Qed.

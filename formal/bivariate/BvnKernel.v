@@ -210,9 +210,13 @@ Definition kernel_low (L : lib) (t : table) (x y : f64) : f64 :=
 
 (** [PanelRule]: the weights, the unit squares of the abscissas [t] as
     [((3 + t)/4)^2] and [((3 - t)/4)^2], and the centre node's weight. *)
-Definition panel_rule (s : f64) : list Z * list Z * list Z * option Z :=
-  if fgt s kpanel_wide then (gl16_w, gl16_xp, gl16_xm, None)
+Definition panel_rule_of (wide : bool) : list Z * list Z * list Z * option Z :=
+  if wide then (gl16_w, gl16_xp, gl16_xm, None)
   else (gl15_w, gl15_xp, gl15_xm, Some gl15_w0).
+
+(** The rule of the panel of scale [s]: 16 nodes above [0.095], 15 below. *)
+Definition panel_rule (s : f64) : list Z * list Z * list Z * option Z :=
+  panel_rule_of (fgt s kpanel_wide).
 
 (** [integrand_term]. *)
 Definition integrand_term (L : lib) (xs w bs hk : f64) : f64 :=
@@ -228,10 +232,20 @@ Definition panel_nodes (rule : list Z * list Z * list Z * option Z) : list (f64 
     (combine (combine plus minus) w)
   ++ match centre with Some w0 => [(kcentre_square, aw w0)] | None => [] end.
 
-(** The panels: [two_sum] per term into the double-word [(high, low)], the scale
-    halving while it exceeds [PANEL_FLOOR]; [fuel] bounds the loop (the scale
-    starts at most [0.38] and the floor is [0.003], so eight halvings end it).
-    The result is the double-word and the last scale. *)
+(** One node's term of a panel of half-width [s / 4]: [half_width * integrand_term]
+    at the node's unit square [xu] (the panel's [s^2 * xu] is [xs]) and weight [w]. *)
+Definition node_value (L : lib) (half_width s2 xu w bs hk : f64) : f64 :=
+  half_width *f integrand_term L (s2 *f xu) w bs hk.
+
+(** One node of a panel into the double-word [(high, low)]: [two_sum] of the term
+    into the high word, its error added to the low word. *)
+Definition panel_step (L : lib) (half_width s2 bs hk : f64) (st : f64 * f64) (xw : f64 * f64) : f64 * f64 :=
+  let '(sum, err) := two_sum64 (fst st) (node_value L half_width s2 (fst xw) (snd xw) bs hk) in
+  (sum, snd st +f err).
+
+(** The panels: the scale halves while it exceeds [PANEL_FLOOR]; [fuel] bounds the
+    loop (the scale starts at most [0.38] and the floor is [0.003], so eight halvings
+    end it). The result is the double-word and the last scale. *)
 Fixpoint panel_sum (L : lib) (fuel : nat) (s bs hk high low : f64) : f64 * f64 * f64 :=
   match fuel with
   | O => (high, low, s)
@@ -239,47 +253,51 @@ Fixpoint panel_sum (L : lib) (fuel : nat) (s bs hk high low : f64) : f64 * f64 *
       if fgt s kpanel_floor then
         let half_width := s /f k4 in
         let s2 := s *f s in
-        let '(high, low) :=
-          fold_left (fun st xw =>
-              let term := half_width *f integrand_term L (s2 *f fst xw) (snd xw) bs hk in
-              let '(sum, err) := two_sum64 (fst st) term in
-              (sum, snd st +f err))
-            (panel_nodes (panel_rule s)) (high, low) in
+        let '(high, low) := fold_left (panel_step L half_width s2 bs hk) (panel_nodes (panel_rule s)) (high, low) in
         panel_sum L fuel' (s /f k2) bs hk high low
       else (high, low, s)
   end.
 
+(** The pieces of Genz's closed form: [c = (4 - hk) / 8], [d = (12 - hk) / 16],
+    [w = 1 - d bs / 5], [x = c (bs - ass) w / 3], [1 - x + c d ass^2 / 5] and
+    [1 - c bs w / 3]. *)
+Definition gen_c (hk : f64) : f64 := (k4 -f hk) /f k8.
+Definition gen_d (hk : f64) : f64 := (k12 -f hk) /f k16.
+Definition gen_w (d bs : f64) : f64 := k1 -f d *f bs /f k5.
+Definition gen_x (c bs ass w : f64) : f64 := c *f (bs -f ass) *f w /f k3.
+Definition gen_p1 (c d ass x : f64) : f64 := k1 -f x +f c *f d *f ass *f ass /f k5.
+Definition gen_p2 (c bs w : f64) : f64 := k1 -f c *f bs *f w /f k3.
+
 (** Genz's closed form for the integral on the last scale [s <= 0.003], zero
     where [b >= 20 s]. *)
-Definition closed_form (L : lib) (s bs hk c d : f64) : f64 :=
+Definition closed_form (L : lib) (s bs hk : f64) : f64 :=
   let b := fsqrt bs in
   if flt b (k20 *f s) then
     let ass := s *f s in
-    let asr := fneg (bs /f ass +f hk) /f k2 in
-    let bvn := s *f lib_exp L asr
-               *f (k1 -f c *f (bs -f ass) *f (k1 -f d *f bs /f k5) /f k3 +f c *f d *f ass *f ass /f k5) in
-    bvn -f lib_exp L (fneg hk /f k2) *f ksqrt_tau *f lib_norm_cdf L (fneg b /f s) *f b
-           *f (k1 -f c *f bs *f (k1 -f d *f bs /f k5) /f k3)
+    let c := gen_c hk in
+    let d := gen_d hk in
+    let w := gen_w d bs in
+    let p1 := gen_p1 c d ass (gen_x c bs ass w) in
+    let p2 := gen_p2 c bs w in
+    let a1 := s *f lib_exp L (fneg (bs /f ass +f hk) /f k2) *f p1 in
+    let a2 := lib_exp L (fneg hk /f k2) *f ksqrt_tau *f lib_norm_cdf L (fneg b /f s) *f b *f p2 in
+    a1 -f a2
   else k0.
 
 (** The integral [-J] accumulates, before its scaling: [bvn] of [high_correlation]
     after the panels and the closed form. *)
-Definition high_integral (L : lib) (dh k hk bs rho : f64) : f64 :=
+Definition high_integral (L : lib) (hk bs rho : f64) : f64 :=
   if flt hk khk_cutoff then
     let ass := (k1 -f fabs rho) *f (k1 +f fabs rho) in
     let a := fsqrt ass in
-    let c := (k4 -f hk) /f k8 in
-    let d := (k12 -f hk) /f k16 in
     let '(high, low, s) := panel_sum L 64%nat a bs hk k0 k0 in
     let panels := high +f low in
-    closed_form L s bs hk c d +f panels
+    closed_form L s bs hk +f panels
   else k0.
 
-(** [high_correlation]: [dh] and [dk] are the negated thresholds. *)
-Definition high_correlation (L : lib) (dh dk rho : f64) : f64 :=
-  let '(k, hk) := if flt rho k0 then (fneg dk, fneg (dh *f dk)) else (dk, dh *f dk) in
-  let bs := (dh -f k) *f (dh -f k) in
-  let bvn := high_integral L dh k hk bs rho in
+(** The high branch's last stage: the integral's scaling [-bvn / TAU], the
+    normal-distribution terms of the reflection, and the clamp. *)
+Definition high_finish (L : lib) (dh dk rho bvn : f64) : f64 :=
   let bvn := fneg bvn /f ktau in
   let result :=
     if fgt rho k0 then bvn +f lib_norm_cdf L (fneg (fmax dh dk))
@@ -289,6 +307,12 @@ Definition high_correlation (L : lib) (dh dk rho : f64) : f64 :=
       hi +f (lo +f g)
     else fneg bvn in
   clamp_to_probability result.
+
+(** [high_correlation]: [dh] and [dk] are the negated thresholds. *)
+Definition high_correlation (L : lib) (dh dk rho : f64) : f64 :=
+  let '(k, hk) := if flt rho k0 then (fneg dk, fneg (dh *f dk)) else (dk, dh *f dk) in
+  let bs := (dh -f k) *f (dh -f k) in
+  high_finish L dh dk rho (high_integral L hk bs rho).
 
 (** [BivariateNormal::cdf]. *)
 Definition cdf (L : lib) (t : table) (x y : f64) : f64 :=

@@ -11,8 +11,8 @@
     exist to exclude overflow, never to carry accuracy. *)
 
 From Coq Require Import Reals ZArith Lia Lra.
-From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
-From Binary64 Require Import Binary64Add Binary64Mul IEEE64 IEEE64Add IEEE64Mul IEEE64Sqrt IEEE64Div Encodings.
+From Flocq Require Import Core Relative IEEE754.Binary IEEE754.Bits.
+From Binary64 Require Import Binary64Add Binary64Mul IEEE64 IEEE64Add IEEE64Mul IEEE64Eft IEEE64Sqrt IEEE64Div Encodings.
 Require Import BvnKernel.
 Open Scope R_scope.
 
@@ -35,6 +35,9 @@ Proof.
   intros [F [V H]] L. repeat split; try assumption.
   eapply Rle_trans; [exact H | apply bpow_le; exact L].
 Qed.
+
+Lemma exb_tight a r E E' : exb a r E -> Rabs r <= bpow radix2 E' -> exb a r E'.
+Proof. intros [F [V H]] H'. repeat split; assumption. Qed.
 
 Lemma exb_cong a r r' E : exb a r E -> r = r' -> exb a r' E.
 Proof. intros H ->. exact H. Qed.
@@ -321,6 +324,9 @@ Lemma exb_kquarter : exb kquarter (/ 4) 0. Proof. unfold kquarter. kconst. Qed.
 Lemma exb_ktau : exb ktau (884279719003555 / 140737488355328) 3. Proof. unfold ktau. kconst. Qed.
 Lemma exb_ksqrt_tau : exb ksqrt_tau (2822212540896131 / 1125899906842624) 2. Proof. unfold ksqrt_tau. kconst. Qed.
 Lemma exb_kcentre_square : exb kcentre_square (9 / 16) 0. Proof. unfold kcentre_square. kconst. Qed.
+Lemma exb_ksaturated : exb ksaturated 39 6. Proof. unfold ksaturated. kconst. Qed.
+Lemma exb_kpanel_floor : exb kpanel_floor (3458764513820541 / 1152921504606846976) 0. Proof. unfold kpanel_floor. kconst. Qed.
+Lemma exb_kpanel_wide : exb kpanel_wide (3422735716801577 / 36028797018963968) 0. Proof. unfold kpanel_wide. kconst. Qed.
 
 Lemma exb_k0' : exb k0 0 0. Proof. eapply exb_weak; [exact exb_k0 | lia]. Qed.
 
@@ -444,25 +450,36 @@ Proof.
   apply round_le; [exact _ | exact _ | exact H].
 Qed.
 
+Lemma exb_div_one2 a b ra rb E1 E2 : 1 <= Rabs rb -> exb a ra E1 -> exb b rb E2 -> (E2 <= 1000)%Z ->
+  (cl (E1 + 0) <= 1000)%Z -> exb (fdiv a b) (rndF (ra / rb)) (cl (E1 + 0)).
+Proof. intros Hl Ha Hb He Hc. exact (exb_div_one a b ra rb E1 E2 Ha Hb He Hl Hc). Qed.
+
+Lemma exb_div2 a b ra rb E1 E2 L : divlow rb L -> exb a ra E1 -> exb b rb E2 -> (E2 <= 1000)%Z ->
+  (cl (E1 + L) <= 1000)%Z -> exb (fdiv a b) (rndF (ra / rb)) (cl (E1 + L)).
+Proof. intros Hl Ha Hb He Hc. exact (exb_div a b ra rb E1 E2 L Ha Hb He Hl Hc). Qed.
+
 (** The tactic that builds the relation from the kernel's operations. *)
 Ltac cl_side := unfold cl; lia.
 Ltac one_side := rewrite Rabs_pos_eq by lra; lra.
 Ltac lift :=
-  first
-  [ eassumption
-  | solve [ eauto with exb ]
-  | (eapply exb_neg; lift)
-  | (eapply exb_abs; lift)
-  | (eapply exb_add; [ lift | lift | cl_side ])
-  | (eapply exb_sub; [ lift | lift | cl_side ])
-  | (eapply exb_mul; [ lift | lift | cl_side ])
-  | (eapply exb_div_one; [ lift | lift | cl_side | one_side | cl_side ])
-  | (eapply exb_div; [ lift | lift | cl_side | eassumption | cl_side ])
-  | (eapply exb_sqrt; [ lift | eassumption | cl_side ])
-  | (eapply exb_lib_exp; [ eassumption | lift | lra ])
-  | (eapply exb_lib_sin; [ eassumption | lift | lra ])
-  | (eapply exb_lib_ncdf; [ eassumption | lift ])
-  ].
+  first [ eassumption | lift_struct ]
+with lift_struct :=
+  lazymatch goal with
+  | |- exb (fneg _) _ _ => eapply exb_neg; lift
+  | |- exb (fabs _) _ _ => eapply exb_abs; lift
+  | |- exb (fadd _ _) _ _ => eapply exb_add; [ lift | lift | cl_side ]
+  | |- exb (fsub _ _) _ _ => eapply exb_sub; [ lift | lift | cl_side ]
+  | |- exb (fmul _ _) _ _ => eapply exb_mul; [ lift | lift | cl_side ]
+  | |- exb (fdiv _ _) _ _ =>
+      first
+      [ eapply exb_div_one2; [ one_side | lift | lift | cl_side | cl_side ]
+      | eapply exb_div2; [ eassumption | lift | lift | cl_side | cl_side ] ]
+  | |- exb (fsqrt _) _ _ => eapply exb_sqrt; [ lift | eassumption | cl_side ]
+  | |- exb (lib_exp _ _) _ _ => eapply exb_lib_exp; [ eassumption | lift | lra ]
+  | |- exb (lib_sin _ _) _ _ => eapply exb_lib_sin; [ eassumption | lift | lra ]
+  | |- exb (lib_norm_cdf _ _) _ _ => eapply exb_lib_ncdf; [ eassumption | lift ]
+  | _ => solve [ eauto with exb ]
+  end.
 
 (** Exactness of the doubling and the halvings the kernel does by [2] and [4]. *)
 Lemma fmtF_double r : fmtF r -> fmtF (2 * r).
@@ -523,3 +540,126 @@ Qed.
 
 (** [lift_to E] proves [exb a r E] with the bound the operations give, if it is at most [E]. *)
 Ltac lift_to := eapply exb_weak; [ lift | cl_side ].
+
+(** Doubling and quartering. *)
+Lemma exb_double a r E : exb a r E -> (cl (E + 1) <= 1000)%Z -> exb (k2 *f a) (2 * r) (cl (E + 1)).
+Proof.
+  intros Ha Hc.
+  pose proof (exb_mul k2 a 2 r 1 E exb_k2 Ha ltac:(unfold cl in Hc |- *; lia)) as H.
+  assert (E0 : rndF (2 * r) = 2 * r).
+  { apply round_generic; [exact _ |]. apply fmtF_double. rewrite <- (exb_val _ _ _ Ha). apply B_fmt. }
+  rewrite E0 in H. eapply exb_weak; [exact H | unfold cl; lia].
+Qed.
+
+Lemma exb_quarter a r E : exb a r E -> (r = 0 \/ bpow radix2 (-1000) <= Rabs r) -> (cl E <= 1000)%Z ->
+  exb (a /f k4) (r / 4) (cl E).
+Proof.
+  intros Ha Hr Hc.
+  pose proof (exb_div_one a k4 r 4 E 2 Ha exb_k4 ltac:(lia) ltac:(rewrite Rabs_pos_eq by lra; lra) ltac:(unfold cl in Hc |- *; lia)) as H.
+  assert (E0 : rndF (r / 4) = r / 4).
+  { apply round_generic; [exact _ |]. destruct Hr as [-> | Hr].
+    - replace (0 / 4) with 0 by field. apply generic_format_0.
+    - change 4 with (bpow radix2 2).
+      pose proof (B_fmt a) as Fa. rewrite (exb_val _ _ _ Ha) in Fa.
+      apply fmtF_div_pow2; [exact Fa | exact Hr | lia]. }
+  rewrite E0 in H. replace (cl (E + 0)) with (cl E) in H by (unfold cl; f_equal; lia). exact H.
+Qed.
+
+(** The rounding error of one operation. *)
+Lemma rndF_err x : Rabs (rndF x - x) <= bpow radix2 (-53) * Rabs x + bpow radix2 (-1075).
+Proof.
+  destruct (Rle_or_lt (bpow radix2 (-1022)) (Rabs x)) as [H | H].
+  - pose proof (relative_error_N_FLT radix2 (-1074) 53 ltac:(lia) (fun n => negb (Z.even n)) x) as R.
+    replace (-1074 + 53 - 1)%Z with (-1022)%Z in R by reflexivity. specialize (R H).
+    assert (E : / 2 * bpow radix2 (- (53) + 1) = bpow radix2 (-53)).
+    { replace (- (53) + 1)%Z with (-53 + 1)%Z by reflexivity. rewrite bpow_plus.
+      change (bpow radix2 1) with 2%R. field. }
+    assert (R' : Rabs (rndF x - x) <= bpow radix2 (-53) * Rabs x) by (rewrite <- E; exact R).
+    pose proof (bpow_ge_0 radix2 (-1075)). lra.
+  - destruct (Req_dec x 0) as [H0 | H0].
+    + assert (Hz : rndF 0 = 0) by (apply round_0; exact _).
+      rewrite H0, Hz. rewrite Rminus_0_r, Rabs_R0. pose proof (bpow_ge_0 radix2 (-1075)). lra.
+    + pose proof (error_le_half_ulp radix2 (FLT_exp (-1074) 53) (fun n => negb (Z.even n)) x) as E.
+      assert (Hu : ulp radix2 (FLT_exp (-1074) 53) x <= bpow radix2 (-1074)).
+      { rewrite ulp_neq_0 by exact H0. unfold cexp, FLT_exp.
+        pose proof (mag_le_bpow radix2 x (-1022) H0 H) as Hm. apply bpow_le. lia. }
+      assert (E2 : / 2 * bpow radix2 (-1074) = bpow radix2 (-1075)).
+      { replace (-1074)%Z with (-1075 + 1)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 1) with 2%R. field. }
+      assert (E3 : Rabs (rndF x - x) <= / 2 * bpow radix2 (-1074)).
+      { eapply Rle_trans; [exact E |]. apply Rmult_le_compat_l; [lra | exact Hu]. }
+      pose proof (bpow_ge_0 radix2 (-53)) as P. pose proof (Rabs_pos x). nra.
+Qed.
+
+
+(** Rounding preserves a bound that is itself a binary64 value. *)
+Lemma rnd_ge_fmt a x : fmtF a -> a <= x -> a <= rndF x.
+Proof.
+  intros F H. rewrite <- (round_generic radix2 (FLT_exp (-1074) 53) (Znearest ne) _ F) at 1.
+  apply round_le; [exact _ | exact _ | exact H].
+Qed.
+
+Lemma rnd_le_fmt b x : fmtF b -> x <= b -> rndF x <= b.
+Proof.
+  intros F H. rewrite <- (round_generic radix2 (FLT_exp (-1074) 53) (Znearest ne) _ F) at 1.
+  apply round_le; [exact _ | exact _ | exact H].
+Qed.
+
+Lemma fmtF_one : fmtF 1.
+Proof. replace 1 with (bpow radix2 0) by reflexivity. apply fmtF_bpow. lia. Qed.
+
+(** 2Sum on operands bounded by [2^E] ([-100 <= E]): the rounded sum, bounded by [2^(E+1)],
+    and its exact error, bounded by [2^E]. *)
+Lemma exb_two_sum_ideal a b ra rb E : exb a ra E -> exb b rb E -> (-100 <= E <= 1000)%Z ->
+  exb (fst (two_sum64 a b)) (rndF (ra + rb)) (E + 1)
+  /\ exb (snd (two_sum64 a b)) (ra + rb - rndF (ra + rb)) E.
+Proof.
+  intros Ha Hb HE.
+  pose proof (exb_two_sum a b ra rb E Ha Hb ltac:(lia)) as H1.
+  assert (Ba : Rabs (B a) <= bpow radix2 1020).
+  { rewrite (exb_val _ _ _ Ha). eapply Rle_trans; [exact (exb_bnd _ _ _ Ha) | apply bpow_le; lia]. }
+  assert (Bb : Rabs (B b) <= bpow radix2 1020).
+  { rewrite (exb_val _ _ _ Hb). eapply Rle_trans; [exact (exb_bnd _ _ _ Hb) | apply bpow_le; lia]. }
+  pose proof (two_sum_ieee a b (exb_fin _ _ _ Ha) (exb_fin _ _ _ Hb) Ba Bb) as H2.
+  revert H1 H2. generalize (two_sum64 a b) as p. intros [s t] H1 H2.
+  destruct H1 as [E1 E2]. destruct H2 as [Fs [Ft [Bs Bst]]].
+  cbn [fst snd] in E1, E2 |- .
+  rewrite (exb_val _ _ _ Ha), (exb_val _ _ _ Hb) in Bs, Bst.
+  pose proof (exb_val _ _ _ E1) as V1. pose proof (exb_val _ _ _ E2) as V2.
+  split.
+  - eapply exb_cong; [exact E1 |]. rewrite <- V1. exact Bs.
+  - assert (Et : B t = ra + rb - rndF (ra + rb)) by lra.
+    split; [exact Ft | split; [exact Et |]].
+    pose proof (exb_bnd _ _ _ Ha) as A. pose proof (exb_bnd _ _ _ Hb) as B1.
+    pose proof (rndF_err (ra + rb)) as Er.
+    assert (Hab : Rabs (ra + rb) <= bpow radix2 (E + 1)).
+    { eapply Rle_trans; [apply Rabs_triang |].
+      rewrite bpow_plus. change (bpow radix2 1) with 2. lra. }
+    assert (Hrn : Rabs (rndF (ra + rb) - (ra + rb)) <= bpow radix2 (-53) * bpow radix2 (E + 1) + bpow radix2 (-1075)).
+    { eapply Rle_trans; [exact Er |]. apply Rplus_le_compat_r. apply Rmult_le_compat_l; [apply bpow_ge_0 | exact Hab]. }
+    assert (Hc1 : bpow radix2 (-53) * bpow radix2 (E + 1) = bpow radix2 (E - 52)).
+    { rewrite <- bpow_plus. f_equal. ring. }
+    assert (Hc2 : bpow radix2 (E - 52) + bpow radix2 (-1075) <= bpow radix2 E).
+    { assert (bpow radix2 (E - 52) <= bpow radix2 (E - 1)) by (apply bpow_le; lia).
+      assert (bpow radix2 (-1075) <= bpow radix2 (E - 1)) by (apply bpow_le; lia).
+      assert (bpow radix2 E = bpow radix2 (E - 1) + bpow radix2 (E - 1)).
+      { replace E with ((E - 1) + 1)%Z at 1 by ring. rewrite bpow_plus. change (bpow radix2 1) with 2.
+        replace (E - 1 + 1)%Z with E by ring. replace (E - 1)%Z with (E - 1)%Z by ring. lra. }
+      lra. }
+    replace (ra + rb - rndF (ra + rb)) with (- (rndF (ra + rb) - (ra + rb))) by ring.
+    rewrite Rabs_Ropp. lra.
+Qed.
+
+(** Numeric literals for powers of two: [simpl] leaves [Z.pow_pos 2 n], which
+    [lra] cannot read. *)
+Ltac zpow_goal :=
+  repeat match goal with
+  | |- context [Z.pow_pos ?a ?n] =>
+      let v := eval vm_compute in (Z.pow_pos a n) in change (Z.pow_pos a n) with v
+  end.
+Ltac zpow_hyp H :=
+  repeat match type of H with
+  | context [Z.pow_pos ?a ?n] =>
+      let v := eval vm_compute in (Z.pow_pos a n) in change (Z.pow_pos a n) with v in H
+  end.
+Ltac bnum := simpl; zpow_goal.
+Ltac bnum_in H := simpl in H; zpow_hyp H.
