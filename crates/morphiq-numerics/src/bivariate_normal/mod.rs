@@ -19,10 +19,9 @@ use core::f64::consts::TAU;
 
 mod tables;
 use tables::{
-    GL3_W, GL3_W0, GL3_X, GL4_W, GL4_X, GL5_W, GL5_W0, GL5_X, GL6_W, GL6_X, GL7_W, GL7_W0, GL7_X,
-    GL8_W, GL8_X, GL9_W, GL9_W0, GL9_X, GL10_W, GL10_X, GL11_W, GL11_W0, GL11_X, GL12_W, GL12_X,
-    GL13_W, GL13_W0, GL13_X, GL14_W, GL14_X, GL15_W, GL15_W0, GL15_X, GL16_W, GL16_X, GL20_W,
-    GL20_X, GL24_W, GL24_X,
+    GL4_W, GL4_X, GL6_W, GL6_X, GL8_W, GL8_X, GL10_W, GL10_X, GL12_W, GL12_X, GL14_W, GL14_X,
+    GL15_W, GL15_W0, GL15_XM, GL15_XP, GL16_W, GL16_X, GL16_XM, GL16_XP, GL20_W, GL20_X, GL24_W,
+    GL24_X,
 };
 
 #[cfg(test)]
@@ -317,88 +316,67 @@ pub fn bivariate_norm_cdf_bounded(x: f64, y: f64, rho: f64) -> BoundedProbabilit
 }
 
 /// Panels of the high-correlation quadrature are `[s / 2, s]` for `s = a, a/2,
-/// a/4, ...` while `s` exceeds this; what remains below the last panel is
-/// dropped (`docs/bivariate_normal_high.md` section 3: the dropped part of the
-/// integral is below `7.2 * 0.003^7 / 7 = 2.3e-18`).
+/// a/4, ...` while `s` exceeds this. On the remaining `[0, s]` the integrand is
+/// integrated analytically (`docs/bivariate_normal_high.md` sections 1.4, 1.5).
 const PANEL_FLOOR: f64 = 0.003;
 
-/// An odd-order Gauss-Legendre rule: the positive abscissas, their weights and
-/// the weight of the centre node at 0.
-struct OddRule {
-    x: &'static [f64],
+/// The integral of the high branch is zero to `1e-22` from this `hk` on, and
+/// is not computed (`docs/bivariate_normal_high.md` section 1.7, A3).
+const HK_CUTOFF: f64 = 100.0;
+
+/// `hk` and `bs` below this are taken as zero, which keeps every rounded
+/// intermediate of the quadrature a normal number (section 4.1).
+const TINY: f64 = 1.0e-200;
+
+/// A Gauss-Legendre rule of the panels: the positive abscissas' weights, the
+/// unit squares `((3 + t)/4)^2` and `((3 - t)/4)^2` of the abscissas `t`, and
+/// the weight of the centre node at 0 (`None` for an even order).
+struct PanelRule {
     w: &'static [f64],
-    w0: f64,
+    plus: &'static [f64],
+    minus: &'static [f64],
+    centre: Option<f64>,
 }
 
-/// The rule of the panel of scale `s`: 15 nodes above `0.19`, then 13, 11, 9,
-/// 7, 5 and 3 as `s` halves down to the floor. Each class of scales holds at
-/// most one panel, so the proved bound of the 63-node design covers every `a`.
-fn panel_rule(s: f64) -> OddRule {
-    if s > 0.19 {
-        OddRule {
-            x: &GL15_X,
-            w: &GL15_W,
-            w0: GL15_W0,
-        }
-    } else if s > 0.095 {
-        OddRule {
-            x: &GL13_X,
-            w: &GL13_W,
-            w0: GL13_W0,
-        }
-    } else if s > 0.0475 {
-        OddRule {
-            x: &GL11_X,
-            w: &GL11_W,
-            w0: GL11_W0,
-        }
-    } else if s > 0.02375 {
-        OddRule {
-            x: &GL9_X,
-            w: &GL9_W,
-            w0: GL9_W0,
-        }
-    } else if s > 0.011875 {
-        OddRule {
-            x: &GL7_X,
-            w: &GL7_W,
-            w0: GL7_W0,
-        }
-    } else if s > 0.0059375 {
-        OddRule {
-            x: &GL5_X,
-            w: &GL5_W,
-            w0: GL5_W0,
+/// The rule of the panel of scale `s`: 16 nodes above `0.095`, 15 below.
+fn panel_rule(s: f64) -> PanelRule {
+    if s > 0.095 {
+        PanelRule {
+            w: &GL16_W,
+            plus: &GL16_XP,
+            minus: &GL16_XM,
+            centre: None,
         }
     } else {
-        OddRule {
-            x: &GL3_X,
-            w: &GL3_W,
-            w0: GL3_W0,
+        PanelRule {
+            w: &GL15_W,
+            plus: &GL15_XP,
+            minus: &GL15_XM,
+            centre: Some(GL15_W0),
         }
     }
 }
 
-/// One node of the remainder integrand of Genz's BVND at abscissa `x`, times
-/// its weight factor `wf`: `wf * exp(asr) * (exp(-hk x^2 / (2 (1 + rs)^2)) / rs
-/// - (1 + c x^2 (1 + d x^2)))`, zero where `exp(asr)` is below `e^-100`.
-fn remainder_term(x: f64, wf: f64, bs: f64, hk: f64, c: f64, d: f64) -> f64 {
-    let xs = x * x;
-    let asr = -(bs / xs + hk) / 2.0;
-    if asr > -100.0 {
-        let rs = sqrt(1.0 - xs);
-        let one_plus_rs = 1.0 + rs;
-        wf * exp(asr)
-            * (exp(-hk * xs / (2.0 * one_plus_rs * one_plus_rs)) / rs
-                - (1.0 + c * xs * (1.0 + d * xs)))
+/// The integrand of the high-correlation integral at a node of the panel, times
+/// its weight: `weight * exp(-phi) / rs` with `xs = x^2` (the panel's `s^2`
+/// times the node's unit square), `rs = sqrt(1 - xs)` and
+/// `phi = bs / (2 xs) + hk / (1 + rs)`; zero where `exp(-phi)` is below `e^-100`.
+/// `phi` is not negative on the branch's domain, so every term is positive.
+fn integrand_term(xs: f64, weight: f64, bs: f64, hk: f64) -> f64 {
+    let rs = sqrt(1.0 - xs);
+    let phi = bs / (2.0 * xs) + hk / (1.0 + rs);
+    if phi < 100.0 {
+        weight * (exp(-phi) / rs)
     } else {
         0.0
     }
 }
 
-/// Genz's upper-tail high-correlation algorithm (BVND, `|rho| >= 0.925`), in
-/// his variable names for the closed-form part, with the quadrature of the
-/// remainder on graded panels so that its truncation is provably bounded.
+/// Genz's upper-tail high-correlation algorithm (BVND, `|rho| >= 0.925`), with
+/// the integral `J` of `exp(-bs/(2 x^2) - hk/(1 + rs)) / rs` over `[0, a]`
+/// taken on graded panels above `0.003` (a double-word sum of positive terms,
+/// whose truncation is provably bounded) and in closed form below, where
+/// Genz's Taylor-corrected moments are accurate to `2.3e-18`.
 /// `dh` and `dk` are the negated thresholds, `P(X >= dh, Y >= dk)`.
 /// `docs/bivariate_normal_high.md` derives each line.
 fn high_correlation(dh: f64, dk: f64, rho: f64) -> f64 {
@@ -408,63 +386,77 @@ fn high_correlation(dh: f64, dk: f64, rho: f64) -> f64 {
     } else {
         (dk, dh * dk)
     };
-    let ass = (1.0 - rho.abs()) * (1.0 + rho.abs());
-    let a = sqrt(ass);
     let bs = (dh - k) * (dh - k);
-    let c = (4.0 - hk) / 8.0;
-    let d = (12.0 - hk) / 16.0;
-    let asr = -(bs / ass + hk) / 2.0;
+    let hk = if hk.abs() < TINY { 0.0 } else { hk };
+    let bs = if bs < TINY { 0.0 } else { bs };
 
-    let mut bvn = if asr > -100.0 {
-        a * exp(asr) * (1.0 - c * (bs - ass) * (1.0 - d * bs / 5.0) / 3.0 + c * d * ass * ass / 5.0)
-    } else {
-        0.0
-    };
+    // `J`, the quantity `bvn` below accumulates (its negative over `TAU`).
+    let mut bvn = 0.0;
+    if hk < HK_CUTOFF {
+        let ass = (1.0 - rho.abs()) * (1.0 + rho.abs());
+        let a = sqrt(ass);
+        let c = (4.0 - hk) / 8.0;
+        let d = (12.0 - hk) / 16.0;
 
-    if -hk < 100.0 {
-        let b = sqrt(bs);
-        bvn -= exp(-hk / 2.0)
-            * SQRT_TAU
-            * norm_cdf(-b / a)
-            * b
-            * (1.0 - c * bs * (1.0 - d * bs / 5.0) / 3.0);
-    }
-
-    // The remainder: a rule per panel `[s/2, s]`, `s` halving from `a`. The node
-    // terms are small (their sum is below 6e-5), so a plain sum in a local
-    // carries about 60 roundings of that size; it is added to `bvn` once.
-    let mut remainder = 0.0;
-    let mut s = a;
-    while s > PANEL_FLOOR {
-        let rule = panel_rule(s);
-        let half_width = s / 4.0;
-        // The panel's node is `x = (s/4)(3 + t)` for the rule's abscissa `t`.
-        for i in 0..rule.x.len() {
-            let wf = half_width * rule.w[i];
-            remainder += remainder_term(half_width * (3.0 + rule.x[i]), wf, bs, hk, c, d);
-            remainder += remainder_term(half_width * (3.0 - rule.x[i]), wf, bs, hk, c, d);
+        // The panels cover `[x_m, a]`, `x_m` the first scale at or below the
+        // floor. Their terms are positive and sum to up to 0.41, so the sum is a
+        // double-word: `two_sum` per term, the low parts added in order.
+        let (mut high, mut low) = (0.0, 0.0);
+        let mut s = a;
+        while s > PANEL_FLOOR {
+            let rule = panel_rule(s);
+            let half_width = s / 4.0;
+            let s2 = s * s;
+            let mut add = |xs_unit: f64, w: f64| {
+                let term = half_width * integrand_term(s2 * xs_unit, w, bs, hk);
+                let (sum, err) = two_sum(high, term);
+                high = sum;
+                low += err;
+            };
+            for i in 0..rule.w.len() {
+                add(rule.plus[i], rule.w[i]);
+                add(rule.minus[i], rule.w[i]);
+            }
+            if let Some(w0) = rule.centre {
+                add(0.5625, w0);
+            }
+            s /= 2.0;
         }
-        remainder += remainder_term(half_width * 3.0, half_width * rule.w0, bs, hk, c, d);
-        s /= 2.0;
+        let panels = high + low;
+
+        // Genz's closed form for `int_0^s E T dx` on the rest, `s <= 0.003`.
+        let ass = s * s;
+        let asr = -(bs / ass + hk) / 2.0;
+        if asr > -100.0 {
+            bvn = s
+                * exp(asr)
+                * (1.0 - c * (bs - ass) * (1.0 - d * bs / 5.0) / 3.0 + c * d * ass * ass / 5.0);
+        }
+        if -hk < 100.0 {
+            let b = sqrt(bs);
+            bvn -= exp(-hk / 2.0)
+                * SQRT_TAU
+                * norm_cdf(-b / s)
+                * b
+                * (1.0 - c * bs * (1.0 - d * bs / 5.0) / 3.0);
+        }
+        bvn += panels;
     }
-    bvn += remainder;
 
     bvn = -bvn / TAU;
     let result = if rho > 0.0 {
         bvn + norm_cdf(-dh.max(dk))
-    } else {
+    } else if -dh > dk {
         // `-bvn` is the integral's share, `g`. The second term is
-        // `max(0, Phi(-dh) - Phi(dk))`: when `Phi(-dh) > Phi(dk)` the exact
-        // difference is kept as the double-word `s + e`, so it carries no
-        // rounding of its own, and `g` joins it once (`BvnHighAssembly.v`).
+        // `Phi(-dh) - Phi(dk)`, positive here: the exact difference of the two
+        // values is kept as the double-word `s + e`, so it carries no rounding
+        // of its own, and `g` joins it once (`BvnHighAssembly.v`).
         let g = -bvn;
-        let (p1, p2) = (norm_cdf(-dh), norm_cdf(dk));
-        if p1 > p2 {
-            let (hi, lo) = two_sum(p1, -p2);
-            hi + (lo + g)
-        } else {
-            g
-        }
+        let (hi, lo) = two_sum(norm_cdf(-dh), -norm_cdf(dk));
+        hi + (lo + g)
+    } else {
+        // `Phi(-dh) <= Phi(dk)`: the reflection's difference term is zero.
+        -bvn
     };
     clamp_to_probability(result)
 }

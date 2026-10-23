@@ -21,10 +21,14 @@ import mpmath as mp
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'crates/morphiq-numerics/src/bivariate_normal/tables.rs'
 ORDERS = (4, 6, 8, 10, 12, 14, 16, 20, 24)
-# The odd orders of the high-correlation panels (docs/bivariate_normal_high.md):
+# The odd order of the high-correlation panels (docs/bivariate_normal_high.md):
 # the (n - 1)/2 positive abscissas and weights as above, and the centre node's
 # weight, whose abscissa is exactly 0.
-ODD_ORDERS = (3, 5, 7, 9, 11, 13, 15)
+ODD_ORDERS = (15,)
+# The orders the high-correlation panels use. Each also gets the unit squares
+# ((3 + t) / 4)^2 and ((3 - t) / 4)^2 of its positive abscissas t, rounded once
+# from the exact root: a node of the panel of scale s has x^2 = s^2 * unit square.
+PANEL_ORDERS = (15, 16)
 DPS = 120
 
 
@@ -74,6 +78,8 @@ def generate():
         xs, ws, centre = rule(n)
         m = n // 2
         for name, values in (('X', xs), ('W', ws)):
+            if name == 'X' and n in ODD_ORDERS:
+                continue  # only the unit squares and weights are used
             if name == 'X':
                 lines.append(f'/// The {m} positive abscissas of the {n}-point rule')
             elif centre is None:
@@ -89,6 +95,18 @@ def generate():
             for v in values:
                 lines.append(f'    f64::from_bits(0x{to_bits(float(v)):016x}),')
             lines.append('];')
+        if n in PANEL_ORDERS:
+            for name, sign in (('XP', 1), ('XM', -1)):
+                squares = [float(((3 + sign * v) / 4) ** 2) for v in xs]
+                lines.append(f'/// `((3 {"+" if sign > 0 else "-"} t) / 4)^2` for the abscissas of the {n}-point rule')
+                if m == 1:
+                    lines.append(f'pub(super) const GL{n}_{name}: [f64; 1] = '
+                                 f'[f64::from_bits(0x{to_bits(squares[0]):016x})];')
+                    continue
+                lines.append(f'pub(super) const GL{n}_{name}: [f64; {m}] = [')
+                for v in squares:
+                    lines.append(f'    f64::from_bits(0x{to_bits(v):016x}),')
+                lines.append('];')
         if centre is not None:
             lines.append(f'/// The weight of the {n}-point rule\'s centre node, abscissa 0')
             lines.append(f'pub(super) const GL{n}_W0: f64 = f64::from_bits(0x{to_bits(float(centre)):016x});')
