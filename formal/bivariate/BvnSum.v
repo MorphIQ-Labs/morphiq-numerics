@@ -150,7 +150,8 @@ End Acc.
 Lemma acc_final ts :
   (forall t, In t ts -> fmtF t /\ 0 <= t) -> (length ts <= 24)%nat ->
   fmtF (fst (acc ts (0, 0))) /\ fmtF (snd (acc ts (0, 0))) /\
-  Rabs (fst (acc ts (0, 0)) + snd (acc ts (0, 0)) - sumR ts) <= 2000 * u * u * sumR ts + 30 * z.
+  Rabs (fst (acc ts (0, 0)) + snd (acc ts (0, 0)) - sumR ts) <= 2000 * u * u * sumR ts + 30 * z /\
+  Rabs (snd (acc ts (0, 0))) <= 24 * (3 * u * sumR ts + 2 * z).
 Proof.
   intros Hts Hn.
   assert (HT : 0 <= sumR ts) by (apply sumR_nonneg; intros t Ht; apply (Hts t Ht)).
@@ -159,12 +160,17 @@ Proof.
   assert (H1 : 0 + sumR ts <= sumR ts * (1 + u) ^ 0%nat) by (simpl; lra).
   assert (H2 : Rabs 0 <= INR 0%nat * (3 * u * sumR ts + 2 * z)) by (rewrite Rabs_R0; simpl; lra).
   specialize (H H1 H2 ltac:(lia)).
-  destruct H as [Fa [Fb [_ Hd]]].
-  repeat split; try assumption.
+  destruct H as [Fa [Fb [Hl Hd]]].
   pose proof u_pos as Hu. pose proof u_val as Huv. pose proof z_pos as Hz0.
+  assert (HlL : Rabs (snd (acc ts (0, 0))) <= 24 * (3 * u * sumR ts + 2 * z)).
+  { eapply Rle_trans; [exact Hl |]. rewrite Nat.add_0_l.
+    assert (Hln : INR (length ts) <= 24) by (replace 24 with (INR 24) by (simpl; lra); apply le_INR; exact Hn).
+    assert (Hc0 : 0 <= 3 * u * sumR ts + 2 * z) by nra.
+    nra. }
+  refine (conj Fa (conj Fb (conj _ HlL))).
   replace (0 + 0 + sumR ts) with (sumR ts) in Hd by ring.
   eapply Rle_trans; [exact Hd |].
-  assert (Hl : INR (length ts) <= 24) by (replace 24 with (INR 24) by (simpl; lra); apply le_INR; exact Hn).
+  assert (Hl2 : INR (length ts) <= 24) by (replace 24 with (INR 24) by (simpl; lra); apply le_INR; exact Hn).
   assert (He : 0 <= u * (24 * (3 * u * sumR ts + 2 * z) + 2 * u * sumR ts) + z) by nra.
   assert (Hk : u * (24 * (3 * u * sumR ts + 2 * z) + 2 * u * sumR ts) + z <= 80 * u * u * sumR ts + 2 * z) by nra.
   assert (Hm : INR (length ts) * (u * (24 * (3 * u * sumR ts + 2 * z) + 2 * u * sumR ts) + z)
@@ -214,14 +220,15 @@ Proof. induction ts as [| t ts IH]; simpl; [ring | rewrite IH; ring]. Qed.
 Lemma acc_final_neg ts :
   (forall t, In t ts -> fmtF t /\ t <= 0) -> (length ts <= 24)%nat ->
   fmtF (fst (acc ts (0, 0))) /\ fmtF (snd (acc ts (0, 0))) /\
-  Rabs (fst (acc ts (0, 0)) + snd (acc ts (0, 0)) - sumR ts) <= 2000 * u * u * Rabs (sumR ts) + 30 * z.
+  Rabs (fst (acc ts (0, 0)) + snd (acc ts (0, 0)) - sumR ts) <= 2000 * u * u * Rabs (sumR ts) + 30 * z /\
+  Rabs (snd (acc ts (0, 0))) <= 24 * (3 * u * Rabs (sumR ts) + 2 * z).
 Proof.
   intros Hts Hn.
   assert (Hts' : forall t, In t (map Ropp ts) -> fmtF t /\ 0 <= t).
   { intros t Ht. apply in_map_iff in Ht. destruct Ht as [t0 [E Ht0]]. subst t.
     destruct (Hts t0 Ht0) as [F H0]. split; [apply generic_format_opp; exact F | lra]. }
   assert (Hn' : (length (map Ropp ts) <= 24)%nat) by (rewrite map_length; exact Hn).
-  destruct (acc_final (map Ropp ts) Hts' Hn') as [F1 [F2 Hb]].
+  destruct (acc_final (map Ropp ts) Hts' Hn') as [F1 [F2 [Hb HbL]]].
   assert (E : acc ts (0, 0) = (- fst (acc (map Ropp ts) (0, 0)), - snd (acc (map Ropp ts) (0, 0)))).
   { assert (Hz : acc (map Ropp (map Ropp ts)) (- 0, - 0) = (- fst (acc (map Ropp ts) (0, 0)), - snd (acc (map Ropp ts) (0, 0)))) by (apply acc_opp).
     rewrite map_map in Hz. rewrite (map_ext (fun x => Ropp (Ropp x)) (fun x => x)) in Hz by (intros; ring).
@@ -233,6 +240,7 @@ Proof.
   rewrite Hsn in Hnn.
   split; [apply generic_format_opp; exact F1 |]. split; [apply generic_format_opp; exact F2 |].
   rewrite (Rabs_left1 (sumR ts)) by lra.
+  split; [| rewrite Rabs_Ropp; rewrite Hsn in HbL; exact HbL].
   assert (Ee : - fst (acc (map Ropp ts) (0, 0)) + - snd (acc (map Ropp ts) (0, 0)) - sumR ts
                = - (fst (acc (map Ropp ts) (0, 0)) + snd (acc (map Ropp ts) (0, 0)) - - sumR ts)) by ring.
   rewrite Ee, Rabs_Ropp. exact Hb.

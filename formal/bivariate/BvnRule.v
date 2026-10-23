@@ -74,7 +74,7 @@ Lemma node_facts n d :
   0 <= bp -> bq <= bp -> node_enc Kh n d -> dat_ok A d ->
   Rabs (tn n - vn n) <= vbn n d + 3 * z /\
   psi2 * Rabs (vn n) + (1 + psi2) * vbn n d <= gn n d /\ 0 <= vbn n d /\
-  fmtF (tn n) /\ (0 <= Kex -> 0 <= tn n) /\ (Kex <= 0 -> tn n <= 0).
+  fmtF (tn n) /\ (0 <= Kex -> 0 <= tn n) /\ (Kex <= 0 -> tn n <= 0) /\ Rabs (vn n) <= / 10.
 Proof.
   intros Hbp Hbq [Hsg [Hxs [Htau [Hxh [HW [Hwh Hkw]]]]]] [Hlo [Hhi [Hwd [Hk1 [Hk2 [Hsgk [Hsgs Hth]]]]]]].
   destruct HW as [HW1 HW2].
@@ -106,7 +106,35 @@ Proof.
       { rewrite <- exp_0. apply exp_mono. assert (0 <= theta_of A d * Qn n) by (apply Rmult_le_pos; lra). lra. }
       assert (1 <= (1 + ew) * (1 + rx)) by nra. nra. }
     lra. }
-  refine (conj Hbound (conj _ (conj Hvb (conj _ _)))).
+  assert (Hs12 : (0 <= Kex -> 0 <= tn n) /\ (Kex <= 0 -> tn n <= 0)).
+  { pose proof (Rabs_pos Kex).
+    unfold tn, node_term, termf.
+    set (a := argnc x y (sinI (angle asr (nsgn n) (nxh n)))).
+    destruct (Hexp (- a)) as [Zc [Ex HZ]].
+    assert (Hpos : 0 <= expI (- a)).
+    { rewrite Ex. rewrite <- rnd_zero.
+      apply rnd_mono. pose proof (exp_pos (- a)).
+      assert (Hb : bpow radix2 (-100) <= / 2) by (replace (/ 2) with (bpow radix2 (-1)) by reflexivity; apply bpow_le; lia).
+      assert (Hm : bpow radix2 (-100) * exp (- a) <= / 2 * exp (- a)) by (apply Rmult_le_compat_r; lra).
+      apply Rabs_le_between in HZ. lra. }
+    assert (Hwh0 : 0 <= nwh n) by (rewrite Hwh; rewrite <- rnd_zero; apply rnd_mono; lra).
+    split.
+    + intros HK0. assert (HKh0 : 0 <= Kh).
+      { apply Rabs_le_between in HKh. rewrite (Rabs_pos_eq Kex HK0) in HKh. assert (ETAK <= 1) by (unfold ETAK; lra). nra. }
+      assert (Hk0 : 0 <= nkw n) by (rewrite Hkw; rewrite <- rnd_zero; apply rnd_mono; apply Rmult_le_pos; assumption).
+      rewrite <- rnd_zero. apply rnd_mono. apply Rmult_le_pos; assumption.
+    + intros HK0. assert (HKh0 : Kh <= 0).
+      { apply Rabs_le_between in HKh. rewrite (Rabs_left1 Kex HK0) in HKh. assert (ETAK <= 1) by (unfold ETAK; lra). nra. }
+      assert (Hk0 : nkw n <= 0) by (rewrite Hkw; rewrite <- rnd_zero; apply rnd_mono; nra).
+      rewrite <- rnd_zero. apply rnd_mono. nra. }
+  assert (Habs : Rabs (vn n) <= / 10).
+  { unfold vn. rewrite Rabs_mult, (Rabs_pos_eq (exp (- Qn n))) by (apply Rlt_le; apply exp_pos).
+    assert (Hq1 : exp (- Qn n) <= 1) by (rewrite <- exp_0; apply exp_mono; lra).
+    rewrite Rabs_mult, (Rabs_pos_eq (nW n)) by lra.
+    assert (Hm : Rabs Kex * nW n <= / 10 * 1) by (apply Rmult_le_compat; [apply Rabs_pos | lra | exact HK2 | lra]).
+    assert (Hm2 : Rabs Kex * nW n * exp (- Qn n) <= / 10 * 1 * 1) by (apply Rmult_le_compat; [apply Rmult_le_pos; [apply Rabs_pos | lra] | left; apply exp_pos | exact Hm | exact Hq1]).
+    lra. }
+  refine (conj Hbound (conj _ (conj Hvb (conj _ (conj _ _))))).
   - (* the supremum *)
     pose proof (node_sup bp (theta_of A d) (Qn n) HQ Hbp (proj1 Hth') (proj2 Hth')) as Hns.
     unfold gn, vbn, vn.
@@ -129,26 +157,8 @@ Proof.
     assert (Hm2 : W * (f * ((1 + bq) * E - 1)) <= W * (f * ((1 + bp) * E - 1))) by (apply Rmult_le_compat_l; [exact HW0 | exact Hmono]).
     rewrite HKa. lra.
   - unfold tn, node_term, termf. apply fmtF_rnd.
-  - (* signs *)
-    unfold tn, node_term, termf.
-    set (a := argnc x y (sinI (angle asr (nsgn n) (nxh n)))).
-    destruct (Hexp (- a)) as [Zc [Ex HZ]].
-    assert (Hpos : 0 <= expI (- a)).
-    { rewrite Ex. rewrite <- rnd_zero.
-      apply rnd_mono. pose proof (exp_pos (- a)).
-      assert (Hb : bpow radix2 (-100) <= / 2) by (replace (/ 2) with (bpow radix2 (-1)) by reflexivity; apply bpow_le; lia).
-      assert (Hm : bpow radix2 (-100) * exp (- a) <= / 2 * exp (- a)) by (apply Rmult_le_compat_r; lra).
-      apply Rabs_le_between in HZ. lra. }
-    assert (Hwh0 : 0 <= nwh n) by (rewrite Hwh; rewrite <- rnd_zero; apply rnd_mono; lra).
-    split.
-    + intros HK0. assert (HKh0 : 0 <= Kh).
-      { apply Rabs_le_between in HKh. rewrite (Rabs_pos_eq Kex HK0) in HKh. assert (ETAK <= 1) by (unfold ETAK; lra). nra. }
-      assert (Hk0 : 0 <= nkw n) by (rewrite Hkw; rewrite <- rnd_zero; apply rnd_mono; apply Rmult_le_pos; assumption).
-      rewrite <- rnd_zero. apply rnd_mono. apply Rmult_le_pos; assumption.
-    + intros HK0. assert (HKh0 : Kh <= 0).
-      { apply Rabs_le_between in HKh. rewrite (Rabs_left1 Kex HK0) in HKh. assert (ETAK <= 1) by (unfold ETAK; lra). nra. }
-      assert (Hk0 : nkw n <= 0) by (rewrite Hkw; rewrite <- rnd_zero; apply rnd_mono; nra).
-      rewrite <- rnd_zero. apply rnd_mono. nra.
+  - exact (proj1 Hs12).
+  - exact (conj (proj2 Hs12) Habs).
 Qed.
 
 Definition ok (n : NodeS) (d : Dat) : Prop := node_enc Kh n d /\ dat_ok A d.
@@ -160,17 +170,18 @@ Lemma rule_facts nodes dats :
   0 <= sumR (map (fun n => Rabs (vn n)) nodes) /\ 0 <= sum2 vbn nodes dats /\
   (forall t, In t (map tn nodes) -> fmtF t) /\
   (0 <= Kex -> forall t, In t (map tn nodes) -> 0 <= t) /\
-  (Kex <= 0 -> forall t, In t (map tn nodes) -> t <= 0).
+  (Kex <= 0 -> forall t, In t (map tn nodes) -> t <= 0) /\
+  sumR (map (fun n => Rabs (vn n)) nodes) <= INR (length nodes) / 10.
 Proof.
   intros Hbp Hbq Hall.
   induction Hall as [| n d nodes dats [Hok1 Hok2] Hall IH].
-  - simpl. refine (conj _ (conj _ (conj _ (conj _ (conj _ (conj _ _)))))); try (intros; contradiction); try lra.
+  - simpl. refine (conj _ (conj _ (conj _ (conj _ (conj _ (conj _ (conj _ _))))))); try (intros; contradiction); try lra.
     replace (0 - 0) with 0 by ring. rewrite Rabs_R0. lra.
-  - destruct IH as [I1 [I2 [I3 [I4 [I5 [I6 I7]]]]]].
-    destruct (node_facts n d Hbp Hbq Hok1 Hok2) as [F1 [F2 [F3 [F4 [F5 F6]]]]].
+  - destruct IH as [I1 [I2 [I3 [I4 [I5 [I6 [I7 I8]]]]]]].
+    destruct (node_facts n d Hbp Hbq Hok1 Hok2) as [F1 [F2 [F3 [F4 [F5 [F6 F7]]]]]].
     pose proof z_pos as Hz. pose proof (Rabs_pos (vn n)).
     simpl map. simpl sumR. simpl sum2. simpl length. rewrite S_INR.
-    refine (conj _ (conj _ (conj _ (conj _ (conj _ (conj _ _)))))).
+    refine (conj _ (conj _ (conj _ (conj _ (conj _ (conj _ (conj _ _))))))).
     + assert (E : tn n + sumR (map tn nodes) - (vn n + sumR (map vn nodes))
                   = (tn n - vn n) + (sumR (map tn nodes) - sumR (map vn nodes))) by ring.
       rewrite E. eapply Rle_trans; [apply Rabs_triang |]. lra.
@@ -180,15 +191,17 @@ Proof.
     + intros t [Ht | Ht]; [rewrite <- Ht; exact F4 | apply I5; exact Ht].
     + intros HK t [Ht | Ht]; [rewrite <- Ht; apply F5; exact HK | apply I6; assumption].
     + intros HK t [Ht | Ht]; [rewrite <- Ht; apply F6; exact HK | apply I7; assumption].
+    + lra.
 Qed.
 
 Lemma rule_bound nodes dats :
   0 <= bp -> bq <= bp -> List.Forall2 ok nodes dats -> (length nodes <= 24)%nat ->
   Rabs (fst (acc (map tn nodes) (0, 0)) + snd (acc (map tn nodes) (0, 0)) - sumR (map vn nodes))
-    <= sum2 gn nodes dats + 200 * z.
+    <= sum2 gn nodes dats + 200 * z /\
+  fmtF (fst (acc (map tn nodes) (0, 0))) /\ Rabs (snd (acc (map tn nodes) (0, 0))) <= 24 * (3 * u * (Rabs (sumR (map vn nodes)) + sum2 vbn nodes dats + 72 * z) + 2 * z).
 Proof.
   intros Hbp Hbq Hall Hlen.
-  destruct (rule_facts nodes dats Hbp Hbq Hall) as [I1 [I2 [I3 [I4 [I5 [I6 I7]]]]]].
+  destruct (rule_facts nodes dats Hbp Hbq Hall) as [I1 [I2 [I3 [I4 [I5 [I6 [I7 I8]]]]]]].
   pose proof z_pos as Hz. pose proof u_pos as Hu. pose proof u_val as Huv.
   assert (Hlen' : (length (map tn nodes) <= 24)%nat) by (rewrite map_length; exact Hlen).
   assert (Hl : INR (length nodes) <= 24) by (replace 24 with (INR 24) by (simpl; lra); apply le_INR; exact Hlen).
@@ -199,15 +212,20 @@ Proof.
   { unfold V, Va. clear. induction nodes as [| n ns IH]; simpl; [rewrite Rabs_R0; lra |].
     eapply Rle_trans; [apply Rabs_triang |]. lra. }
   assert (HT : Rabs (T - V) <= B1 + 72 * z) by nra.
-  assert (Hacc : Rabs (fst (acc (map tn nodes) (0, 0)) + snd (acc (map tn nodes) (0, 0)) - T) <= 2000 * u * u * Rabs T + 30 * z).
+  assert (Hacc : fmtF (fst (acc (map tn nodes) (0, 0))) /\
+    Rabs (fst (acc (map tn nodes) (0, 0)) + snd (acc (map tn nodes) (0, 0)) - T) <= 2000 * u * u * Rabs T + 30 * z /\
+    Rabs (snd (acc (map tn nodes) (0, 0))) <= 24 * (3 * u * Rabs T + 2 * z)).
   { destruct (Rle_dec 0 Kex) as [Hk | Hk].
-    - destruct (acc_final (map tn nodes) (fun t Ht => conj (I5 t Ht) (I6 Hk t Ht)) Hlen') as [_ [_ H]].
-      rewrite (Rabs_pos_eq T) by (apply sumR_nonneg; intros t Ht; apply (I6 Hk t Ht)). exact H.
-    - destruct (acc_final_neg (map tn nodes) (fun t Ht => conj (I5 t Ht) (I7 ltac:(lra) t Ht)) Hlen') as [_ [_ H]]. exact H. }
+    - destruct (acc_final (map tn nodes) (fun t Ht => conj (I5 t Ht) (I6 Hk t Ht)) Hlen') as [Fh [_ [H HL]]].
+      rewrite (Rabs_pos_eq T) by (apply sumR_nonneg; intros t Ht; apply (I6 Hk t Ht)). exact (conj Fh (conj H HL)).
+    - destruct (acc_final_neg (map tn nodes) (fun t Ht => conj (I5 t Ht) (I7 ltac:(lra) t Ht)) Hlen') as [Fh [_ [H HL]]]. exact (conj Fh (conj H HL)). }
+  destruct Hacc as [Fh [Hacc HaccL]].
   assert (HTa : Rabs T <= Va + B1 + 72 * z).
   { assert (E : T = V + (T - V)) by ring. assert (Rabs T <= Rabs V + Rabs (T - V)) by (rewrite E at 1; apply Rabs_triang). lra. }
   assert (E2 : fst (acc (map tn nodes) (0, 0)) + snd (acc (map tn nodes) (0, 0)) - V
                = (fst (acc (map tn nodes) (0, 0)) + snd (acc (map tn nodes) (0, 0)) - T) + (T - V)) by ring.
+  refine (conj _ (conj Fh _)).
+  2: { eapply Rle_trans; [exact HaccL |]. assert (Hm : 3 * u * Rabs T <= 3 * u * (Rabs V + B1 + 72 * z)) by (apply Rmult_le_compat_l; [lra | assert (Rabs T <= Rabs V + Rabs (T - V)) by (assert (E3 : T = V + (T - V)) by ring; rewrite E3 at 1; apply Rabs_triang); lra]). lra. }
   rewrite E2. eapply Rle_trans; [apply Rabs_triang |].
   assert (Hs : 2000 * u * u * Rabs T <= 2000 * u * u * (Va + B1 + 72 * z)) by (apply Rmult_le_compat_l; [nra | exact HTa]).
   assert (Hps : psi2 = 2000 * u * u) by reflexivity.

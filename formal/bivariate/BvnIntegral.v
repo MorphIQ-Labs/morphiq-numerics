@@ -3,7 +3,7 @@
     integrand lies in [(0, 1]] on [|t| <= 3/2]. *)
 From Coq Require Import Reals Lra Psatz.
 From Coquelicot Require Import Coquelicot.
-Require Import BvnRound BvnArg BvnNode BvnTrig.
+Require Import BvnRound BvnQ BvnTrig.
 Open Scope R_scope.
 
 Definition fint (r p : R) (t : R) : R := exp (- Qf r p (sin t)).
