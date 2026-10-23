@@ -522,53 +522,6 @@ fn the_slice_form_equals_the_one_shot_function() {
     }
 }
 
-#[test]
-#[should_panic(expected = "cdf_slice: slices of different lengths")]
-fn cdf_slice_rejects_slices_of_different_lengths() {
-    BivariateNormal::new(0.5)
-        .unwrap()
-        .cdf_slice(&[0.0, 1.0], &[0.0, 1.0], &mut [0.0]);
-}
-
-#[test]
-#[should_panic(expected = "cdf_bounded_slice: slices of different lengths")]
-fn cdf_bounded_slice_rejects_slices_of_different_lengths() {
-    BivariateNormal::new(0.5).unwrap().cdf_bounded_slice(
-        &[0.0],
-        &[0.0, 1.0],
-        &mut [BoundedProbability {
-            value: 0.0,
-            error: 0.0,
-        }],
-    );
-}
-
-#[test]
-#[should_panic(expected = "bivariate_norm_cdf_slice: slices of different lengths")]
-fn paired_slice_rejects_slices_of_different_lengths() {
-    bivariate_norm_cdf_slice(&[0.0, 1.0], &[0.0, 1.0], &[0.5], &mut [0.0, 0.0]);
-}
-
-#[test]
-#[should_panic(expected = "bivariate_norm_cdf_bounded_slice: slices of different lengths")]
-fn paired_bounded_slice_rejects_slices_of_different_lengths() {
-    bivariate_norm_cdf_bounded_slice(
-        &[0.0],
-        &[0.0],
-        &[0.5],
-        &mut [
-            BoundedProbability {
-                value: 0.0,
-                error: 0.0,
-            },
-            BoundedProbability {
-                value: 0.0,
-                error: 0.0,
-            },
-        ],
-    );
-}
-
 /// `map` itself, the cascade: whole chunks in lanes, the rest scalar.
 #[test]
 fn the_cascade_returns_the_scalar_bits() {

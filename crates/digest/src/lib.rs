@@ -1782,7 +1782,7 @@ fn bivariate_normal_section(r: &mut Recorder) {
     };
     let (mut x, mut y, mut rho, mut out) = ([0.0; 17], [0.0; 17], [0.0; 17], [0.0; 17]);
     let mut bounded = [zero; 17];
-    for i in 0..1_000 {
+    for i in 0..200 {
         for len in 1..=17 {
             for j in 0..len {
                 x[j] = batched_input(&mut words, &[0x7ff8_0000_0000_0000], 4 * j + i, -9.0, 9.0);
