@@ -279,3 +279,55 @@ single-cell output alone is not qualification. On `sign-intersection`, its
 existing `--one` mode uses the same coefficients with dominant admission;
 certificate comparisons must distinguish residual-only work from the dominant
 solution-error bound. Packing and consumer cache costs remain separately owned.
+
+## General checked unpivoted contract
+
+`UnpivotedTridiagonal` admits only compact shapes and finite coefficients. It
+imposes no global matrix class. `factor_into` shares the exact private recurrence
+with both strong APIs and returns `UnpivotedThomasFactors` only when every
+computed pivot is finite/nonzero and every normalized upper entry is finite.
+Negative pivots and zero original diagonals are permitted. Empty matrices work.
+This does not establish exact nonsingularity or numerical stability. Even an
+exactly nonsingular matrix such as [[0,1],[1,1]] is refused at its leading pivot.
+There is no pivoting, automatic fallback, reciprocal substitution or new kernel.
+
+`solve_into` and `solve_many_into` share the same checked scalar/SIMD substitution;
+all output entries are finite on success. Range failure invalidates the output,
+whose partial contents are not specified. Shape/nonfinite RHS failures leave
+output unchanged. Shape/finite checks precede arithmetic; factor shape failures
+leave buffers unchanged and arithmetic failures cannot produce a factor object.
+The cost is O(n) admission/factorization/solve, O(n*count) for batches, no
+allocation, and caller storage of n pivots plus n-1 normalized upper entries.
+
+`min_abs_pivot()` scans the immutable computed pivots in O(n) without allocation,
+returning `None` for an empty system. Absolute value and selection are exact on
+finite values. The minimum is positive; comparison to a caller's positive floor
+is equivalent to comparing each computed pivot. It is scale-dependent, not a
+condition estimate, exact-pivot bound or proof of nonsingularity. No floor is
+imposed by this generic API.
+
+`certify_residual` uses the same original-coefficient interval computation and
+`ResidualCertificate` as the sign API, with no solution-error certificate. Its
+residual enclosure and backward-error interpretation require no matrix sign or
+dominance assumption: with r=A*x-b and b'=b+r, A*x=b', and max|b'-b|<=rho.
+Small residual does not imply small solution error. Certificate range refusal
+can occur after a successful finite solve. Existing dominance/sign contracts and
+operation order are unchanged.
+
+`generators/tridiagonal_unpivoted_reference.py` independently constructs mixed
+links, negative pivots, zero diagonals, exact manufactured long systems and an
+exact nonsingular refusal witness. Dense pivoted rational Gauss-Jordan supplies
+exact solutions; manufactured solutions are independently checked by exact A*x.
+Reference tests check arbitrary-candidate residual enclosures against exact
+integer arithmetic and the dyadic manufactured solutions exactly, without an
+accuracy tolerance. The determinism corpus includes general factors, batched
+results, residuals and pivot minima. Compile-fail tests prevent mutable factor
+reuse and claiming the dominance-only certificate.
+
+`bench-tridiagonal --unpivoted-one ORDER KIND METHOD CALLS` measures the general
+API on the existing public synthetic workload definitions. Methods `admit`,
+`factor` (including admission), `minimum`, `solve`, `residual`, `total` (including
+admission, factorization, a benchmark caller's pivot floor and solve), and
+`legacy` expose the extra validation/storage passes. Result-bit checks precede
+timing. These successful finite-domain modes exclude the legacy baseline's
+subnormal-pivot refusals and do not qualify performance by themselves.

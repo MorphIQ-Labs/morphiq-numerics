@@ -1,7 +1,7 @@
 // The Thomas recurrence is adapted from FerroRisk at
 // 100880f67b9da1c66e9a9d03ba9e1a5ad876eb5c, under its MIT license.
 // Copyright (c) 2026 MorphIQ Labs. See THIRD_PARTY_NOTICES.md in this crate.
-//! Reusable Thomas factors for checked dominant or opposite-sign-link matrices.
+//! Reusable Thomas factors with explicit dominant, sign and unpivoted contracts.
 //!
 //! The solve has a fixed binary64 operation order and returns a finite
 //! approximation. [`ThomasFactors::certify`] separately encloses its residual
@@ -315,6 +315,166 @@ impl<'a> SignTridiagonal<'a> {
         Ok(SignThomasFactors {
             factors: self.matrix.factor_into(pivots, normalized_upper)?,
         })
+    }
+}
+
+/// Finite tridiagonal coefficients for checked, unpivoted Thomas elimination.
+///
+/// Admission checks only n/n-1 shapes and finite entries, not nonsingularity,
+/// conditioning or stability. Factorization can refuse a nonsingular matrix
+/// (for example one with a zero leading pivot). Rounded factorization success
+/// does not establish exact nonsingularity. Use a pivoted solver when required.
+/// Negative pivots are allowed. No automatic fallback or forward-error bound.
+#[derive(Clone, Copy, Debug)]
+pub struct UnpivotedTridiagonal<'a> {
+    matrix: Coefficients<'a>,
+}
+
+impl<'a> UnpivotedTridiagonal<'a> {
+    /// Validate compact dimensions and finite coefficients; allow empty matrices.
+    /// Zero diagonals are admitted here and checked during elimination.
+    ///
+    /// # Errors
+    /// [`Error::Shape`] or [`Error::NonFinite`]. Inputs remain unchanged.
+    pub fn new(lower: &'a [f64], diagonal: &'a [f64], upper: &'a [f64]) -> Result<Self, Error> {
+        let n = diagonal.len();
+        if lower.len() != n.saturating_sub(1) || upper.len() != n.saturating_sub(1) {
+            return Err(Error::Shape);
+        }
+        if lower
+            .iter()
+            .chain(diagonal)
+            .chain(upper)
+            .any(|x| !x.is_finite())
+        {
+            return Err(Error::NonFinite);
+        }
+        Ok(Self {
+            matrix: Coefficients {
+                lower,
+                diagonal,
+                upper,
+            },
+        })
+    }
+
+    /// Matrix order.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.matrix.len()
+    }
+
+    /// Whether the matrix has order zero.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Factor using the shared fixed-order recurrence, in O(n) without allocation.
+    /// Pivots have length n and normalized upper length n-1 (zero when empty).
+    /// Successful factors contain only finite entries and nonzero pivots.
+    /// This is a finite-computation check, not a stability certificate.
+    ///
+    /// # Errors
+    /// [`Error::Shape`] leaves storage unchanged. [`Error::ZeroPivot`] or
+    /// [`Error::Range`] may leave partial storage; no factors escape on failure.
+    pub fn factor_into<'w>(
+        self,
+        pivots: &'w mut [f64],
+        normalized_upper: &'w mut [f64],
+    ) -> Result<UnpivotedThomasFactors<'a, 'w>, Error> {
+        Ok(UnpivotedThomasFactors {
+            factors: self.matrix.factor_into(pivots, normalized_upper)?,
+        })
+    }
+}
+
+/// Immutable checked factors with residual-only certification.
+///
+/// A solve returns a finite approximation; useful accuracy is not guaranteed.
+/// Matrix and factor borrows prevent stale/mismatched storage without copying.
+///
+/// ```
+/// use morphiq_numerics::linalg::tridiagonal::UnpivotedTridiagonal;
+/// let matrix = UnpivotedTridiagonal::new(&[1.0], &[1.0, 0.0], &[1.0]).unwrap();
+/// let mut p = [0.0; 2];
+/// let mut u = [0.0];
+/// let f = matrix.factor_into(&mut p, &mut u).unwrap();
+/// let mut x = [0.0; 2];
+/// f.solve_into(&[1.0, 2.0], &mut x).unwrap();
+/// assert_eq!(x, [2.0, -1.0]);
+/// assert_eq!(f.min_abs_pivot(), Some(1.0));
+/// assert!(f.certify_residual(&[1.0, 2.0], &x).unwrap().max_residual().is_finite());
+/// ```
+///
+/// ```compile_fail
+/// use morphiq_numerics::linalg::tridiagonal::UnpivotedTridiagonal;
+/// let mut p = [0.0];
+/// let f = UnpivotedTridiagonal::new(&[], &[1.0], &[]).unwrap()
+///     .factor_into(&mut p, &mut []).unwrap();
+/// f.certify(&[1.0], &[1.0]); // no dominance evidence
+/// ```
+///
+/// ```compile_fail
+/// use morphiq_numerics::linalg::tridiagonal::UnpivotedTridiagonal;
+/// let mut p = [0.0];
+/// let f = UnpivotedTridiagonal::new(&[], &[1.0], &[]).unwrap()
+///     .factor_into(&mut p, &mut []).unwrap();
+/// p[0] = 2.0;
+/// f.solve_into(&[1.0], &mut [0.0]).unwrap();
+/// ```
+#[derive(Debug)]
+pub struct UnpivotedThomasFactors<'a, 'w> {
+    factors: Factors<'a, 'w>,
+}
+
+impl UnpivotedThomasFactors<'_, '_> {
+    /// Smallest absolute computed pivot, or None for an empty matrix.
+    /// O(n), allocation-free, with no rounding beyond exact absolute value.
+    /// This is not a condition estimate, exact-pivot bound or singularity test.
+    #[must_use]
+    pub fn min_abs_pivot(&self) -> Option<f64> {
+        self.factors.pivots.iter().map(|p| p.abs()).reduce(f64::min)
+    }
+
+    /// Shared O(n), allocation-free fixed-order solve; finite output on success.
+    /// See [`ThomasFactors::solve_into`] for the arithmetic order.
+    ///
+    /// # Errors
+    /// [`Error::Shape`] and [`Error::NonFinite`] leave output unchanged;
+    /// [`Error::Range`] invalidates the entire partially written output.
+    pub fn solve_into(&self, rhs: &[f64], out: &mut [f64]) -> Result<(), Error> {
+        self.factors.solve_into(rhs, out)
+    }
+
+    /// Shared scalar/SIMD row-interleaved solve, bit-identical per RHS.
+    /// Layout and complexity follow [`ThomasFactors::solve_many_into`].
+    ///
+    /// # Errors
+    /// [`Error::Shape`] (including size overflow) and [`Error::NonFinite`] leave
+    /// output unchanged. [`Error::Range`] invalidates the entire output; partial
+    /// contents depend on backend traversal. Empty batches succeed.
+    pub fn solve_many_into(
+        &self,
+        rhs_count: usize,
+        rhs: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), Error> {
+        self.factors.solve_many_into(rhs_count, rhs, out)
+    }
+
+    /// Enclose max |A*x-rhs| for any finite candidate in O(n), without allocation.
+    /// An absolute RHS backward-error enclosure, not a solution-error bound.
+    ///
+    /// # Errors
+    /// [`Error::Shape`], [`Error::NonFinite`] or [`Error::Range`] if no finite
+    /// outward enclosure is representable, even after a successful solve.
+    pub fn certify_residual(
+        &self,
+        rhs: &[f64],
+        candidate: &[f64],
+    ) -> Result<ResidualCertificate, Error> {
+        self.factors.certify_residual(rhs, candidate)
     }
 }
 

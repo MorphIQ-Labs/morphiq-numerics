@@ -186,3 +186,10 @@ Proof.
       pose proof (D (S k)). pose proof (L k). nra. }
   exact (proj1 (H n)).
 Qed.
+
+(** Residual-only certification is independent of matrix admission. It says
+    nothing about existence/uniqueness for the original RHS or solution error. *)
+Theorem residual_backward_error ax b rho :
+  Rabs (ax - b) <= rho ->
+  exists perturbed_rhs, ax = perturbed_rhs /\ Rabs (perturbed_rhs - b) <= rho.
+Proof. intro H. exists ax. split; [reflexivity | exact H]. Qed.
