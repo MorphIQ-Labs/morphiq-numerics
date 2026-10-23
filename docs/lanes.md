@@ -1,6 +1,6 @@
 # Batched functions and lane evaluation
 
-`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice, asin_slice, asinh_slice, atan2_slice}` apply
+`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice, asin_slice, asinh_slice, atan2_slice}` (and the bivariate normal's slice forms, below) apply
 [`exp`](exp.md), [`exp2`](exp2.md), [`expm1`](expm1.md), [`ln` and `ln_1p`](ln.md) to every element of a slice. The
 lane kernels are `crates/morphiq-numerics/src/lanes/`, `exp/lanes.rs`, `exp2/lanes.rs`, `expm1/lanes.rs` and
 `ln/lanes.rs`; the SIMD backends are the `morphiq-numerics-arch` crate
@@ -311,6 +311,18 @@ of two read from the larger's exponent field, the double-word quotient with
 `two_prod`'s residual, `atan t`'s table and series (as `asin`'s, with 64 rows), the
 four forms (each only if some lane takes it), and the rounding test at
 `EPS = 2^-62(1 + 2^-50)`. A lane the screen or the test doesn't settle calls `atan2`.
+
+## `bivariate_normal`
+
+`BivariateNormal::cdf_slice` and `bivariate_norm_cdf_slice`
+(`bivariate_normal/lanes.rs`) take pairs, or triples with a correlation per
+lane, through the same backend cascade; the kernel carries per-lane tables, so
+it is a function of a context and not a `Kernel2`. The low-correlation node
+loop and Genz's high-correlation series run in lanes with the scalar operation
+order, on the library's lane `exp` and `norm_cdf` and the scalar `sqrt` per
+lane; the closed-form correlations, NaN and saturated pairs, and any lane whose
+result is NaN call the scalar evaluator. The argument and the checks are in
+[bivariate_normal.md](bivariate_normal.md) section 12.
 
 ## 6. Checked by
 

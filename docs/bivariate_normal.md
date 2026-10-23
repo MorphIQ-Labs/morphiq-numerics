@@ -19,9 +19,9 @@ what remains; nothing below claims more than the checks named here establish.
 | Generator for the quadrature rules, replayed by `check_generators.sh` | done |
 | Correctly rounded `asin` (#41) | done: the table's angle is `elementary::asin(rho)` (section 5) |
 | Relative accuracy of small probabilities (FerroRisk's tail construction) | not ported: refused instead (section 8) |
-| ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits | not done |
+| ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits, with slice and paired entry points (section 12) | done: bit equality, digest and mutation witnesses (section 12); AVX2 and AVX-512F not yet run here (CI) |
 | Gappa/Coq proof of the error budget | not done |
-| Same-host scalar and batch performance against the FerroRisk baseline | measured (section 9); lanes not measured |
+| Same-host scalar and batch performance against the FerroRisk baseline | measured (section 9); lanes **unmeasured** |
 
 ## 2. Specification
 
@@ -275,7 +275,7 @@ taken from libm. Item by item (the list FerroRisk's deletion cites):
 | `numerics/bivariate_normal.rs`: Genz low and high regimes, regime classifier, saturation limits, degenerate limits, probability clamp | **ported** (this module) |
 | `BoundedProbability`, `bivariate_norm_cdf_bounded` semantics and constants (`2.5e-16`, `1e-3`, `1e-13`) | **ported**; the sub-floor relative construction is **deferred** (section 8) |
 | `BvnQuadrature` per-correlation reuse | **ported** as `BivariateNormal` (fallible construction, `Copy`, no allocation, bit-identical to the one-shot function) |
-| SIMD (`pulp`) fused Genz sum and its x86 padding | **deferred**: the lanes must return the scalar bits (issue acceptance), which a re-association does not |
+| SIMD (`pulp`) fused Genz sum and its x86 padding | **replaced** by the lanes of section 12, which keep the scalar summation order and so return the scalar bits |
 | `tests/bivariate_normal_property.rs` | **ported** as deterministic unit tests (proptest is not a dependency) |
 | `fuzz/fuzz_targets/bvn_bounded_invariants.rs` | **ported as a test** over 60 000 arbitrary bit patterns; the library has no fuzz target |
 | `tests/bivariate_normal_reference.rs`, `testing/bivariate_normal_support.rs` | **ported as test-only**: the reference test reads the fixture and applies the absolute, relative and reported-bound checks |
@@ -292,7 +292,74 @@ taken from libm. Item by item (the list FerroRisk's deletion cites):
    remainder bound, or an explicit refusal API; resolves the #380 corner.
 2. The Bernstein-ellipse proof of the truncation term and interval/Gappa
    bounds for the rest, then the Coq pipeline of #87.
-3. SIMD lanes (NEON, SSE2, AVX2+FMA, AVX-512F) returning the scalar bits, and
-   their measurement on ARM and native x86.
+3. Measure the lanes (section 12) on ARM and native x86.
 4. Re-measure against the performance bar on a quiet host; this slice's
    numbers are one noisy shared host (section 9).
+
+## 12. Batch evaluation and lanes
+
+Entry points (all return the scalar bits on every target, with or without the
+`simd` feature; a length mismatch panics with `<name>: slices of different
+lengths`, as the other slice functions do):
+
+| Function | Computes |
+| --- | --- |
+| `BivariateNormal::cdf_slice(x, y, out)` | `out[i] = self.cdf(x[i], y[i])` at the evaluator's one correlation |
+| `BivariateNormal::cdf_bounded_slice(x, y, out)` | the bounded form into `[BoundedProbability]`; values are `cdf_slice`'s, bounds are the scalar function of the value, computed in blocks of 64 so nothing allocates |
+| `bivariate_norm_cdf_slice(x, y, rho, out)` | `out[i] = bivariate_norm_cdf(x[i], y[i], rho[i])`; an invalid `rho[i]` gives NaN in lane `i` only |
+| `bivariate_norm_cdf_bounded_slice(x, y, rho, out)` | the bounded paired form |
+
+With `simd` the pairs go through the library's backend cascade (AVX-512F, AVX2,
+SSE2 on x86-64; NEON on aarch64; a last single pair is scalar). A chunk's lane
+`i` reads its own table, so a paired batch may mix regimes and rule lengths:
+the evaluator is built per lane by the scalar `BivariateNormal::new` (reused
+while consecutive correlations are bit-equal), which costs the same `asin` and
+`sincos` as the scalar path.
+
+**Vectorised.** After the scalar ordering `x <= y`, a lane is served by the
+vector code when neither argument is NaN, `x > -39`, `y < 39`, and its
+correlation selects a quadrature regime:
+
+* *Low correlation.* `hs`, `x y`, the node loop in node order with
+  `weight[j] * exp((sn[j] x y - hs) / den[j])` accumulated by the same
+  additions, the scale `asr / (2 TAU)`, `Phi(x) Phi(y)` and the clamp. A lane
+  whose rule has fewer nodes than the chunk's longest is masked on the extra
+  nodes (its sum is untouched, its `exp` argument is `0`), so no lane sums a
+  node the scalar code does not.
+* *High correlation* (`|rho| >= 0.925`). Genz's series with the same grouping
+  as `high_correlation`: the leading term and the `Phi` term under their
+  `asr > -100` and `-hk < 100` conditions as masks, the 20-point quadrature
+  with each node's pair in the scalar order, the reflection by the sign of
+  `rho`, and the clamp. The scalar `sqrt` is taken per lane.
+
+`exp` and `norm_cdf` are the library's lane kernels (`Exp`, `Normal<1>`), each
+equal to its scalar function bit for bit, so no new transcendental is
+introduced and no platform libm is called. Every operation is an individual
+lane add, multiply or divide; nothing is fused or reassociated.
+
+**Scalar per lane.** The closed-form regimes (independent, comonotone,
+countermonotone), a NaN argument, a saturated argument (`x <= -39` or
+`y >= 39`), and a lane whose vector result is NaN are evaluated by
+`BivariateNormal::cdf`. A lane that is masked out of a regime's computation
+carries a harmless argument (`0`) and its result is discarded.
+
+**Checked by** (`bivariate_normal/lanes/tests.rs`, with `src/lanes/tests.rs`'
+backends and `MORPHIQ_LANE_CASES`): bit equality of every lane on every
+backend the CPU has, including the one-lane scalar backend, over the
+reference fixture's `(h, k, rho)` triples, every correlation (each rule limit
+and the Genz split at adjacent doubles, `0`, `+-1` and their neighbours,
+`2^-52` and its neighbour, NaN, infinities, `|rho| > 1`) against every
+threshold (zeros of both signs, infinities, NaN, the saturation edges at
+adjacent doubles, extremes) and random triples with mixed correlations; one
+table across every threshold pair; the served-lane mask of each regime class
+in every lane position; every length from 0 to 17 at eight offsets through the
+driver; repeated invalid correlations; the length checks; and the determinism
+digest's `bivariate_normal` and `bivariate_normal_slice` sections, scalar and
+`simd`.
+
+**Mutation.** cargo-mutants over `bivariate_normal/lanes.rs`, built with
+`simd`: MUTATION_RESULT
+
+**Not measured.** The lanes' speed, and whether a regime-mixed batch or the
+per-lane table construction pays for itself, are not measured here;
+performance is scheduled separately.

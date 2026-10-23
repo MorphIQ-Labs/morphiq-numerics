@@ -229,7 +229,7 @@ impl BivariateNormal {
     /// selects a quadrature regime (`EPSILON <= |rho| < 1`), each
     /// lane performing the scalar operation sequence; a closed-form
     /// correlation, a NaN or saturated pair is the scalar function's, per lane
-    /// (`docs/bivariate_normal.md` section 10).
+    /// (`docs/bivariate_normal.md` section 12).
     ///
     /// # Panics
     ///
@@ -382,7 +382,7 @@ fn bounded_in_blocks(
 /// With `simd` the triples are evaluated in SIMD lanes, a lane at its own
 /// correlation, so a batch may mix regimes and rule lengths; a lane the
 /// screen doesn't admit is the scalar function's
-/// (`docs/bivariate_normal.md` section 10).
+/// (`docs/bivariate_normal.md` section 12).
 ///
 /// # Panics
 ///
