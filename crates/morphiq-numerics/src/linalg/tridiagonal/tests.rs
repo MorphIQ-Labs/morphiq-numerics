@@ -469,6 +469,57 @@ fn lanes_batches_match_each_forced_backend() {
                     }
                 }
             }
+            // Negative pivots exercise the general contract on each forced backend.
+            for n in [2_usize, 3, 17, 401] {
+                let lower = std::vec![2.0; n-1];
+                let upper = std::vec![-1.0; n-1];
+                let mut diagonal = std::vec![-1.0; n];
+                diagonal[0] = -2.0;
+                let mut p = std::vec![0.0; n];
+                let mut c = std::vec![0.0; n-1];
+                let f = UnpivotedTridiagonal::new(&lower, &diagonal, &upper)
+                    .unwrap()
+                    .factor_into(&mut p, &mut c)
+                    .unwrap();
+                for count in [1, 2, 3, 4, 7, 8, 9, 17] {
+                    let exact = |row: usize, col: usize| {
+                        f64::from(i32::try_from((row * 7 + col * 3) % 19).unwrap() - 9)
+                    };
+                    let rhs: std::vec::Vec<_> = (0..n * count)
+                        .map(|at| {
+                            let row = at / count;
+                            let col = at % count;
+                            diagonal[row] * exact(row, col)
+                                + if row > 0 {
+                                    2. * exact(row - 1, col)
+                                } else {
+                                    0.
+                                }
+                                + if row + 1 < n {
+                                    -exact(row + 1, col)
+                                } else {
+                                    0.
+                                }
+                        })
+                        .collect();
+                    let mut out = std::vec![f64::NAN;rhs.len()];
+                    let end = k
+                        .vectorize(&mut lanes::Batch {
+                            factors: &f.factors,
+                            count,
+                            rhs: &rhs,
+                            out: &mut out,
+                            start: 0,
+                        })
+                        .unwrap();
+                    f.factors.solve_columns(count, &rhs, &mut out, end).unwrap();
+                    for row in 0..n {
+                        for col in 0..count {
+                            assert_eq!(out[row * count + col], exact(row, col), "{}", K::NAME);
+                        }
+                    }
+                }
+            }
             // One failing lane must reject the group on every backend, even
             // if other lanes have finite results. Include every lane position.
             let mut p = [0.0];
@@ -665,5 +716,158 @@ fn domains_share_result_bits_and_residual_enclosures_on_their_intersection() {
         }
         assert_eq!(p.map(f64::to_bits), q.map(f64::to_bits));
         assert_eq!(c.map(f64::to_bits), d.map(f64::to_bits));
+    }
+}
+
+#[test]
+fn unpivoted_admission_is_finite_shape_only_and_factorization_checks_breakdown() {
+    for (l, d, u, error) in [
+        (&[1.][..], &[][..], &[][..], Error::Shape),
+        (&[][..], &[][..], &[1.][..], Error::Shape),
+        (&[][..], &[f64::NAN][..], &[][..], Error::NonFinite),
+        (
+            &[f64::INFINITY][..],
+            &[1., 2.][..],
+            &[1.][..],
+            Error::NonFinite,
+        ),
+        (
+            &[1.][..],
+            &[1., 2.][..],
+            &[f64::NEG_INFINITY][..],
+            Error::NonFinite,
+        ),
+    ] {
+        assert_eq!(UnpivotedTridiagonal::new(l, d, u).unwrap_err(), error);
+    }
+    for (l, d, u, error) in [
+        ([1.], [0., 1.], [1.], Error::ZeroPivot(0)),
+        ([1.], [1., 1.], [1.], Error::ZeroPivot(1)),
+        ([0.], [f64::from_bits(1), 1.], [f64::MAX], Error::Range),
+        ([f64::MAX], [1., 1.], [2.], Error::Range),
+    ] {
+        let matrix = UnpivotedTridiagonal::new(&l, &d, &u).unwrap();
+        assert_eq!(
+            matrix.factor_into(&mut [0.; 2], &mut [0.]).unwrap_err(),
+            error
+        );
+    }
+    let matrix = UnpivotedTridiagonal::new(&[], &[], &[]).unwrap();
+    assert!(matrix.is_empty());
+    let f = matrix.factor_into(&mut [], &mut []).unwrap();
+    assert_eq!(f.min_abs_pivot(), None);
+    f.solve_many_into(usize::MAX, &[], &mut []).unwrap();
+    assert_eq!(f.certify_residual(&[], &[]).unwrap().max_residual(), 0.);
+}
+
+#[test]
+fn unpivoted_negative_pivots_repeated_rhs_and_refusals_are_explicit() {
+    let matrix = UnpivotedTridiagonal::new(&[1.], &[-2., 0.], &[1.]).unwrap();
+    assert_eq!(matrix.len(), 2);
+    assert!(!matrix.is_empty());
+    let mut p = [42.; 2];
+    let mut c = [42.];
+    assert_eq!(
+        matrix.factor_into(&mut p, &mut []).unwrap_err(),
+        Error::Shape
+    );
+    assert_eq!(p, [42.; 2]);
+    let f = matrix.factor_into(&mut p, &mut c).unwrap();
+    assert_eq!(f.min_abs_pivot(), Some(0.5));
+    for (rhs, expected) in [([0., 1.], [1., 2.]), ([1., -2.], [-2., -3.])] {
+        let mut out = [42.; 2];
+        f.solve_into(&rhs, &mut out).unwrap();
+        assert_eq!(out, expected);
+    }
+    let mut out = [42.; 2];
+    assert_eq!(f.solve_into(&[], &mut out), Err(Error::Shape));
+    assert_eq!(out, [42.; 2]);
+    assert_eq!(
+        f.solve_into(&[0., f64::NAN], &mut out),
+        Err(Error::NonFinite)
+    );
+    assert_eq!(out, [42.; 2]);
+    assert_eq!(
+        f.solve_many_into(usize::MAX, &[], &mut out),
+        Err(Error::Shape)
+    );
+    assert_eq!(
+        f.solve_many_into(1, &[f64::INFINITY, 0.], &mut out),
+        Err(Error::NonFinite)
+    );
+    assert_eq!(f.certify_residual(&[], &[]), Err(Error::Shape));
+    assert_eq!(
+        f.certify_residual(&[0.; 2], &[f64::NAN, 0.]),
+        Err(Error::NonFinite)
+    );
+    let tiny = [f64::from_bits(1)];
+    let mut p = [0.];
+    let f = UnpivotedTridiagonal::new(&[], &tiny, &[])
+        .unwrap()
+        .factor_into(&mut p, &mut [])
+        .unwrap();
+    assert_eq!(f.min_abs_pivot(), Some(tiny[0]));
+    assert_eq!(f.solve_into(&[1.], &mut [0.]), Err(Error::Range));
+    assert_eq!(
+        f.solve_many_into(9, &[1.; 9], &mut [0.; 9]),
+        Err(Error::Range)
+    );
+}
+
+#[test]
+fn finite_preflight_covers_vector_tails_and_preserves_outputs() {
+    const N: usize = 33;
+    for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        for band in 0..3 {
+            for index in 0..if band == 1 { N } else { N - 1 } {
+                let mut lower = [0.; N - 1];
+                let mut diagonal = [2.; N];
+                let mut upper = [0.; N - 1];
+                match band {
+                    0 => lower[index] = invalid,
+                    1 => diagonal[index] = invalid,
+                    _ => upper[index] = invalid,
+                }
+                assert_eq!(
+                    DominantTridiagonal::new(&lower, &diagonal, &upper).unwrap_err(),
+                    Error::NonFinite
+                );
+                assert_eq!(
+                    SignTridiagonal::new(&lower, &diagonal, &upper).unwrap_err(),
+                    Error::NonFinite
+                );
+                assert_eq!(
+                    UnpivotedTridiagonal::new(&lower, &diagonal, &upper).unwrap_err(),
+                    Error::NonFinite
+                );
+            }
+        }
+        let mut pivots = [0.; N];
+        let mut upper = [0.; N - 1];
+        let lower = [0.; N - 1];
+        let diagonal = [2.; N];
+        let factors = UnpivotedTridiagonal::new(&lower, &diagonal, &lower)
+            .unwrap()
+            .factor_into(&mut pivots, &mut upper)
+            .unwrap();
+        for index in 0..N {
+            let mut rhs = [1.; N];
+            rhs[index] = invalid;
+            let mut out = [-7.25; N];
+            assert_eq!(factors.solve_into(&rhs, &mut out), Err(Error::NonFinite));
+            assert_eq!(out, [-7.25; N]);
+        }
+        // Seven columns exercise vector groups and scalar tails. No column
+        // may be written before admission of the entire RHS batch succeeds.
+        for index in 0..N * 7 {
+            let mut rhs = [1.; N * 7];
+            rhs[index] = invalid;
+            let mut out = [-7.25; N * 7];
+            assert_eq!(
+                factors.solve_many_into(7, &rhs, &mut out),
+                Err(Error::NonFinite)
+            );
+            assert_eq!(out, [-7.25; N * 7]);
+        }
     }
 }
