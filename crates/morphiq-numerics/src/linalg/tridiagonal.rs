@@ -61,6 +61,12 @@ pub struct DominantTridiagonal<'a> {
     margin: f64,
 }
 
+// Bitwise accumulation permits vectorization without moving admission after
+// output writes. A nonfinite input still leaves all caller storage unchanged.
+fn all_finite(values: &[f64]) -> bool {
+    values.iter().fold(true, |finite, x| finite & x.is_finite())
+}
+
 fn point(x: f64) -> Result<FiniteInterval, Error> {
     FiniteInterval::point(x).map_err(|_| Error::NonFinite)
 }
@@ -83,12 +89,7 @@ impl<'a> DominantTridiagonal<'a> {
         if lower.len() != n.saturating_sub(1) || upper.len() != n.saturating_sub(1) {
             return Err(Error::Shape);
         }
-        if lower
-            .iter()
-            .chain(diagonal)
-            .chain(upper)
-            .any(|x| !x.is_finite())
-        {
+        if !all_finite(lower) || !all_finite(diagonal) || !all_finite(upper) {
             return Err(Error::NonFinite);
         }
         let mut margin = f64::MAX;
@@ -207,24 +208,38 @@ impl<'a> Coefficients<'a> {
         if pivots.len() != n || normalized_upper.len() != n.saturating_sub(1) {
             return Err(Error::Shape);
         }
-        for i in 0..n {
-            let pivot = if i == 0 {
-                self.diagonal[0]
-            } else {
-                self.diagonal[i] - self.lower[i - 1] * normalized_upper[i - 1]
-            };
-            if !pivot.is_finite() {
+        if let Some((first, remaining)) = pivots.split_first_mut() {
+            let mut previous = self.diagonal[0];
+            if !previous.is_finite() {
                 return Err(Error::Range);
             }
-            if pivot == 0.0 {
-                return Err(Error::ZeroPivot(i));
+            if previous == 0.0 {
+                return Err(Error::ZeroPivot(0));
             }
-            pivots[i] = pivot;
-            if i + 1 < n {
-                normalized_upper[i] = self.upper[i] / pivot;
-                if !normalized_upper[i].is_finite() {
+            *first = previous;
+            // Admission and the workspace check establish the same n-1 length
+            // for every iterator. Finish row i's upper before row i+1's pivot,
+            // preserving both arithmetic order and partial writes on failure.
+            let rows = self.diagonal[1..]
+                .iter()
+                .zip(self.lower)
+                .zip(self.upper)
+                .zip(normalized_upper.iter_mut())
+                .zip(remaining);
+            for (i, ((((&diagonal, &lower), &upper), upper_out), pivot_out)) in rows.enumerate() {
+                *upper_out = upper / previous;
+                if !upper_out.is_finite() {
                     return Err(Error::Range);
                 }
+                let pivot = diagonal - lower * *upper_out;
+                if !pivot.is_finite() {
+                    return Err(Error::Range);
+                }
+                if pivot == 0.0 {
+                    return Err(Error::ZeroPivot(i + 1));
+                }
+                *pivot_out = pivot;
+                previous = pivot;
             }
         }
         Ok(Factors {
@@ -260,12 +275,7 @@ impl<'a> SignTridiagonal<'a> {
         if lower.len() != n.saturating_sub(1) || upper.len() != n.saturating_sub(1) {
             return Err(Error::Shape);
         }
-        if lower
-            .iter()
-            .chain(diagonal)
-            .chain(upper)
-            .any(|x| !x.is_finite())
-        {
+        if !all_finite(lower) || !all_finite(diagonal) || !all_finite(upper) {
             return Err(Error::NonFinite);
         }
         for (i, &d) in diagonal.iter().enumerate() {
@@ -341,12 +351,7 @@ impl<'a> UnpivotedTridiagonal<'a> {
         if lower.len() != n.saturating_sub(1) || upper.len() != n.saturating_sub(1) {
             return Err(Error::Shape);
         }
-        if lower
-            .iter()
-            .chain(diagonal)
-            .chain(upper)
-            .any(|x| !x.is_finite())
-        {
+        if !all_finite(lower) || !all_finite(diagonal) || !all_finite(upper) {
             return Err(Error::NonFinite);
         }
         Ok(Self {
@@ -434,7 +439,13 @@ impl UnpivotedThomasFactors<'_, '_> {
     /// This is not a condition estimate, exact-pivot bound or singularity test.
     #[must_use]
     pub fn min_abs_pivot(&self) -> Option<f64> {
-        self.factors.pivots.iter().map(|p| p.abs()).reduce(f64::min)
+        // Private factors contain finite nonzero pivots, so absolute values
+        // are positive and need neither NaN handling nor signed-zero selection.
+        self.factors
+            .pivots
+            .iter()
+            .map(|p| p.abs())
+            .reduce(|a, b| if a < b { a } else { b })
     }
 
     /// Shared O(n), allocation-free fixed-order solve; finite output on success.
@@ -492,24 +503,52 @@ impl Factors<'_, '_> {
         if rhs.len() != n || out.len() != n {
             return Err(Error::Shape);
         }
-        if rhs.iter().any(|x| !x.is_finite()) {
+        if !all_finite(rhs) {
             return Err(Error::NonFinite);
         }
-        for i in 0..n {
-            out[i] = if i == 0 {
-                rhs[i] / self.pivots[i]
-            } else {
-                (rhs[i] - self.matrix.lower[i - 1] * out[i - 1]) / self.pivots[i]
-            };
-            if !out[i].is_finite() {
-                return Err(Error::Range);
-            }
+        self.forward(rhs.iter(), out.iter_mut())?;
+        self.backward(out.iter_mut())
+    }
+
+    // The public entry points validate dimensions and finite RHS values first.
+    // Iterator lengths follow from those checks and immutable factor ownership.
+    // Both contiguous solves and scalar batch columns use this recurrence.
+    fn forward<'r, 'o>(
+        &self,
+        rhs: impl Iterator<Item = &'r f64>,
+        out: impl Iterator<Item = &'o mut f64>,
+    ) -> Result<(), Error> {
+        let mut rows = rhs.zip(self.pivots).zip(out);
+        let Some(((&rhs, &pivot), first)) = rows.next() else {
+            return Ok(());
+        };
+        *first = rhs / pivot;
+        if !first.is_finite() {
+            return Err(Error::Range);
         }
-        for i in (0..n.saturating_sub(1)).rev() {
-            out[i] -= self.normalized_upper[i] * out[i + 1];
-            if !out[i].is_finite() {
+        let mut previous = *first;
+        for (((&rhs, &pivot), value), &lower) in rows.zip(self.matrix.lower) {
+            *value = (rhs - lower * previous) / pivot;
+            if !value.is_finite() {
                 return Err(Error::Range);
             }
+            previous = *value;
+        }
+        Ok(())
+    }
+
+    fn backward<'o>(&self, out: impl DoubleEndedIterator<Item = &'o mut f64>) -> Result<(), Error> {
+        let mut values = out.rev();
+        let Some(last) = values.next() else {
+            return Ok(());
+        };
+        let mut next = *last;
+        for (value, &upper) in values.zip(self.normalized_upper.iter().rev()) {
+            *value -= upper * next;
+            if !value.is_finite() {
+                return Err(Error::Range);
+            }
+            next = *value;
         }
         Ok(())
     }
@@ -528,7 +567,7 @@ impl Factors<'_, '_> {
         if rhs.len() != size || out.len() != size {
             return Err(Error::Shape);
         }
-        if rhs.iter().any(|x| !x.is_finite()) {
+        if !all_finite(rhs) {
             return Err(Error::NonFinite);
         }
         if size == 0 {
@@ -552,26 +591,15 @@ impl Factors<'_, '_> {
         out: &mut [f64],
         start: usize,
     ) -> Result<(), Error> {
-        let n = self.matrix.len();
+        if self.matrix.len() == 0 {
+            return Ok(());
+        }
         for column in start..count {
-            for row in 0..n {
-                let at = row * count + column;
-                out[at] = if row == 0 {
-                    rhs[at] / self.pivots[0]
-                } else {
-                    (rhs[at] - self.matrix.lower[row - 1] * out[at - count]) / self.pivots[row]
-                };
-                if !out[at].is_finite() {
-                    return Err(Error::Range);
-                }
-            }
-            for row in (0..n.saturating_sub(1)).rev() {
-                let at = row * count + column;
-                out[at] -= self.normalized_upper[row] * out[at + count];
-                if !out[at].is_finite() {
-                    return Err(Error::Range);
-                }
-            }
+            self.forward(
+                rhs[column..].iter().step_by(count),
+                out[column..].iter_mut().step_by(count),
+            )?;
+            self.backward(out[column..].iter_mut().step_by(count))?;
         }
         Ok(())
     }
@@ -585,7 +613,7 @@ impl Factors<'_, '_> {
         if rhs.len() != a.len() || candidate.len() != a.len() {
             return Err(Error::Shape);
         }
-        if rhs.iter().chain(candidate).any(|x| !x.is_finite()) {
+        if !all_finite(rhs) || !all_finite(candidate) {
             return Err(Error::NonFinite);
         }
         if a.len() == 0 {

@@ -813,3 +813,61 @@ fn unpivoted_negative_pivots_repeated_rhs_and_refusals_are_explicit() {
         Err(Error::Range)
     );
 }
+
+#[test]
+fn finite_preflight_covers_vector_tails_and_preserves_outputs() {
+    const N: usize = 33;
+    for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        for band in 0..3 {
+            for index in 0..if band == 1 { N } else { N - 1 } {
+                let mut lower = [0.; N - 1];
+                let mut diagonal = [2.; N];
+                let mut upper = [0.; N - 1];
+                match band {
+                    0 => lower[index] = invalid,
+                    1 => diagonal[index] = invalid,
+                    _ => upper[index] = invalid,
+                }
+                assert_eq!(
+                    DominantTridiagonal::new(&lower, &diagonal, &upper).unwrap_err(),
+                    Error::NonFinite
+                );
+                assert_eq!(
+                    SignTridiagonal::new(&lower, &diagonal, &upper).unwrap_err(),
+                    Error::NonFinite
+                );
+                assert_eq!(
+                    UnpivotedTridiagonal::new(&lower, &diagonal, &upper).unwrap_err(),
+                    Error::NonFinite
+                );
+            }
+        }
+        let mut pivots = [0.; N];
+        let mut upper = [0.; N - 1];
+        let lower = [0.; N - 1];
+        let diagonal = [2.; N];
+        let factors = UnpivotedTridiagonal::new(&lower, &diagonal, &lower)
+            .unwrap()
+            .factor_into(&mut pivots, &mut upper)
+            .unwrap();
+        for index in 0..N {
+            let mut rhs = [1.; N];
+            rhs[index] = invalid;
+            let mut out = [-7.25; N];
+            assert_eq!(factors.solve_into(&rhs, &mut out), Err(Error::NonFinite));
+            assert_eq!(out, [-7.25; N]);
+        }
+        // Seven columns exercise vector groups and scalar tails. No column
+        // may be written before admission of the entire RHS batch succeeds.
+        for index in 0..N * 7 {
+            let mut rhs = [1.; N * 7];
+            rhs[index] = invalid;
+            let mut out = [-7.25; N * 7];
+            assert_eq!(
+                factors.solve_many_into(7, &rhs, &mut out),
+                Err(Error::NonFinite)
+            );
+            assert_eq!(out, [-7.25; N * 7]);
+        }
+    }
+}

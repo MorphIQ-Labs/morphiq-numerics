@@ -333,3 +333,20 @@ admission, factorization, a benchmark caller's pivot floor and solve), and
 `legacy` expose the extra validation/storage passes. Result-bit checks precede
 timing. These successful finite-domain modes exclude the legacy baseline's
 subnormal-pivot refusals and do not qualify performance by themselves.
+
+
+The shared scalar recurrence traverses the validated coefficient and factor
+slices with safe iterators. Forward substitution carries the preceding forward
+value; backward substitution carries the next solved value. Contiguous solves
+and scalar batch columns use the same helpers, with unchanged separately rounded
+multiply/subtract/divide operations. Matrix and RHS finite admission finish
+before any factor/output writes; within each slice, admission accumulates all
+finite predicates without short-circuiting, permitting vectorized scans. Invalid
+input still leaves caller storage unchanged. Range failure still invalidates
+partial output.
+
+The unpivoted minimum-pivot diagnostic reduces positive finite absolute pivots
+with ordered comparisons. The private validated factors exclude NaNs, infinities
+and zero pivots, so the reduction needs neither NaN selection nor signed-zero
+selection. Empty factors still return `None`; no minimum metadata or additional
+per-factor storage is introduced.
