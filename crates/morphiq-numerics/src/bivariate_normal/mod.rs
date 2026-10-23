@@ -12,6 +12,7 @@
 //! guarantee is not made below [`RELATIVE_FLOOR`]; a caller that divides by a
 //! small probability must carry the absolute bound itself.
 
+use crate::eft::two_sum;
 use crate::elementary::{asin, exp, sincos, sqrt};
 use crate::normal::norm_cdf;
 use core::f64::consts::TAU;
@@ -240,11 +241,17 @@ impl BivariateNormal {
     fn low(&self, x: f64, y: f64) -> f64 {
         let hs = (x * x + y * y) / 2.0;
         let xy = x * y;
-        let mut sum = 0.0;
+        // The terms are non-negative; their sum is accumulated as a double-word
+        // (`two_sum` per term, the low parts added in order) so that it carries
+        // one final rounding rather than one per node.
+        let (mut high, mut low) = (0.0, 0.0);
         for i in 0..self.nodes {
-            sum += self.weight[i] * exp((self.sn[i] * xy - hs) / self.den[i]);
+            let term = self.weight[i] * exp((self.sn[i] * xy - hs) / self.den[i]);
+            let (s, e) = two_sum(high, term);
+            high = s;
+            low += e;
         }
-        sum *= self.asr / (2.0 * TAU);
+        let sum = (high + low) * (self.asr / (2.0 * TAU));
         clamp_to_probability(sum + norm_cdf(x) * norm_cdf(y))
     }
 }

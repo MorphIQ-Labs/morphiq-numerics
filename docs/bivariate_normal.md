@@ -74,7 +74,8 @@ substitution moves out of reach of the interval for `|rho| < 1`, where the
 `rho` form has a branch point at `rho = 1` close enough to slow a fixed rule.
 The sum is `asin(rho)/(4 pi)` times the weighted sum of the integrand over the
 rule's nodes, which come in `+-` pairs about the interval's centre and are
-summed in node order.
+summed in node order as a double-word (`two_sum` of each term, the
+low parts added in order), which rounds once rather than once per node.
 
 Two regimes (Genz 2004, ported from FerroRisk at commit `72db248c`):
 
@@ -152,7 +153,7 @@ The terms, with their status:
 | `asin` | `<= 1.8e-17` (section 5) | derived from `asin`'s correct rounding (half an ulp) |
 | Node angle `t_i = asr (1 +- x_i)/2` and its `sincos` | angle error `<= 1.2e-16` moves the integrand by `|f'| * 1.2e-16`, `|f'| <= 3` where `f` is not negligible | derived by inspection of `f'`, **not proved**; folded into the measurement |
 | Exponent `(sn x y - hs)/cos^2`: a few rounding errors on a quantity of size `|arg|` | `exp` relative error `<= 3 eps |arg|`, and `max_{arg <= 0} e^{arg} |arg| = 1/e`: `<= 3 eps/e * 0.19 = 2.5e-17` | derived |
-| `exp` (correctly rounded) and the weighted sum | `<= 0.5 ulp` each, summed with `n <= 24` additions: `<= 24 * 1.1e-16 * 0.19 / 2 = 2.5e-16` worst case if all rounding errors aligned, which alone equals the published bound; observed `<= 3e-17` | derived worst case far above the observed; **not tight, and too loose to close the budget**: a proof of `2.5e-16` needs a tighter accumulation analysis |
+| `exp` (correctly rounded) and the weighted sum | each term carries `<= 0.5 ulp` from `exp` and one rounding from the weight product; the terms are summed as a double-word, whose own error is one final rounding plus `O(n^2 u^2)`, so the sum's relative error is a few `u` however many nodes (a recursive sum would carry up to `n - 1 = 23` roundings, a worst case of about `5e-16` at `x = y = 0`, which is why the accumulation is a double-word); observed `<= 3e-17` | structure **derived**; the total over all thresholds is the stage-2 derivation below, not yet proved |
 | `Phi(x)`, `Phi(y)` | each within the library's proved normal-CDF bound (`docs/normal.md`) | referenced |
 | Product, sum and the clamp to `[0, 1]` | `<= 1.5 ulp(value)` | derived |
 
