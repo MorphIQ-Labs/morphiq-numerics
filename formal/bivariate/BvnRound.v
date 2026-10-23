@@ -177,3 +177,24 @@ Proof.
   - simpl. exact E2.
   - simpl. lia.
 Qed.
+
+(** The sum of two binary64 numbers rounds with a relative error, or exactly
+    when it is subnormal. *)
+Lemma rnd_add_delta a b : fmtF a -> fmtF b ->
+  exists d, Rabs d <= u /\ rndF (a + b) = (a + b) * (1 + d).
+Proof.
+  intros Fa Fb.
+  destruct (Rle_or_lt (bpow radix2 (-1022)) (Rabs (a + b))) as [H | H].
+  - apply rnd_delta. right. exact H.
+  - exists 0. split; [rewrite Rabs_R0; apply Rlt_le, u_pos |].
+    assert (Hs : Rabs (a + b) <= bpow radix2 (53 + -1074)).
+    { left. eapply Rlt_le_trans; [exact H |]. apply bpow_le. lia. }
+    assert (Fs : fmtF (a + b)) by exact (FLT_format_plus_small radix2 (-1074) 53 a b Fa Fb Hs).
+    rewrite round_generic by (auto with typeclass_instances || exact Fs). ring.
+Qed.
+
+Lemma rnd_nonneg x : 0 <= x -> 0 <= rndF x.
+Proof.
+  intros H. apply round_ge_generic; [auto with typeclass_instances | auto with typeclass_instances | |  exact H].
+  apply generic_format_0.
+Qed.
