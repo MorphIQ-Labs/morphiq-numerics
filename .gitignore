@@ -5,3 +5,9 @@
 .DS_Store
 /reports
 __pycache__/
+/formal/**/.*.aux
+/formal/**/.nra.cache
+/formal/**/*.vo
+/formal/**/*.vok
+/formal/**/*.vos
+/formal/**/*.glob

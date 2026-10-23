@@ -19,8 +19,10 @@ use core::f64::consts::TAU;
 
 mod tables;
 use tables::{
-    GL4_W, GL4_X, GL6_W, GL6_X, GL8_W, GL8_X, GL10_W, GL10_X, GL12_W, GL12_X, GL14_W, GL14_X,
-    GL16_W, GL16_X, GL20_W, GL20_X, GL24_W, GL24_X,
+    GL3_W, GL3_W0, GL3_X, GL4_W, GL4_X, GL5_W, GL5_W0, GL5_X, GL6_W, GL6_X, GL7_W, GL7_W0, GL7_X,
+    GL8_W, GL8_X, GL9_W, GL9_W0, GL9_X, GL10_W, GL10_X, GL11_W, GL11_W0, GL11_X, GL12_W, GL12_X,
+    GL13_W, GL13_W0, GL13_X, GL14_W, GL14_X, GL15_W, GL15_W0, GL15_X, GL16_W, GL16_X, GL20_W,
+    GL20_X, GL24_W, GL24_X,
 };
 
 #[cfg(test)]
@@ -314,9 +316,91 @@ pub fn bivariate_norm_cdf_bounded(x: f64, y: f64, rho: f64) -> BoundedProbabilit
     }
 }
 
+/// Panels of the high-correlation quadrature are `[s / 2, s]` for `s = a, a/2,
+/// a/4, ...` while `s` exceeds this; what remains below the last panel is
+/// dropped (`docs/bivariate_normal_high.md` section 3: the dropped part of the
+/// integral is below `7.2 * 0.003^7 / 7 = 2.3e-18`).
+const PANEL_FLOOR: f64 = 0.003;
+
+/// An odd-order Gauss-Legendre rule: the positive abscissas, their weights and
+/// the weight of the centre node at 0.
+struct OddRule {
+    x: &'static [f64],
+    w: &'static [f64],
+    w0: f64,
+}
+
+/// The rule of the panel of scale `s`: 15 nodes above `0.19`, then 13, 11, 9,
+/// 7, 5 and 3 as `s` halves down to the floor. Each class of scales holds at
+/// most one panel, so the proved bound of the 63-node design covers every `a`.
+fn panel_rule(s: f64) -> OddRule {
+    if s > 0.19 {
+        OddRule {
+            x: &GL15_X,
+            w: &GL15_W,
+            w0: GL15_W0,
+        }
+    } else if s > 0.095 {
+        OddRule {
+            x: &GL13_X,
+            w: &GL13_W,
+            w0: GL13_W0,
+        }
+    } else if s > 0.0475 {
+        OddRule {
+            x: &GL11_X,
+            w: &GL11_W,
+            w0: GL11_W0,
+        }
+    } else if s > 0.02375 {
+        OddRule {
+            x: &GL9_X,
+            w: &GL9_W,
+            w0: GL9_W0,
+        }
+    } else if s > 0.011875 {
+        OddRule {
+            x: &GL7_X,
+            w: &GL7_W,
+            w0: GL7_W0,
+        }
+    } else if s > 0.0059375 {
+        OddRule {
+            x: &GL5_X,
+            w: &GL5_W,
+            w0: GL5_W0,
+        }
+    } else {
+        OddRule {
+            x: &GL3_X,
+            w: &GL3_W,
+            w0: GL3_W0,
+        }
+    }
+}
+
+/// One node of the remainder integrand of Genz's BVND at abscissa `x`, times
+/// its weight factor `wf`: `wf * exp(asr) * (exp(-hk x^2 / (2 (1 + rs)^2)) / rs
+/// - (1 + c x^2 (1 + d x^2)))`, zero where `exp(asr)` is below `e^-100`.
+fn remainder_term(x: f64, wf: f64, bs: f64, hk: f64, c: f64, d: f64) -> f64 {
+    let xs = x * x;
+    let asr = -(bs / xs + hk) / 2.0;
+    if asr > -100.0 {
+        let rs = sqrt(1.0 - xs);
+        let one_plus_rs = 1.0 + rs;
+        wf * exp(asr)
+            * (exp(-hk * xs / (2.0 * one_plus_rs * one_plus_rs)) / rs
+                - (1.0 + c * xs * (1.0 + d * xs)))
+    } else {
+        0.0
+    }
+}
+
 /// Genz's upper-tail high-correlation algorithm (BVND, `|rho| >= 0.925`), in
-/// his variable names so the transcription can be checked line by line.
+/// his variable names for the closed-form part, with the quadrature of the
+/// remainder on graded panels so that its truncation is provably bounded.
 /// `dh` and `dk` are the negated thresholds, `P(X >= dh, Y >= dk)`.
+/// `docs/bivariate_normal_high.md` derives each line.
 fn high_correlation(dh: f64, dk: f64, rho: f64) -> f64 {
     // Genz reflects `k` and `hk` together for negative correlation.
     let (k, hk) = if rho < 0.0 {
@@ -325,7 +409,7 @@ fn high_correlation(dh: f64, dk: f64, rho: f64) -> f64 {
         (dk, dh * dk)
     };
     let ass = (1.0 - rho.abs()) * (1.0 + rho.abs());
-    let mut a = sqrt(ass);
+    let a = sqrt(ass);
     let bs = (dh - k) * (dh - k);
     let c = (4.0 - hk) / 8.0;
     let d = (12.0 - hk) / 16.0;
@@ -346,29 +430,41 @@ fn high_correlation(dh: f64, dk: f64, rho: f64) -> f64 {
             * (1.0 - c * bs * (1.0 - d * bs / 5.0) / 3.0);
     }
 
-    a /= 2.0;
-    for i in 0..GL20_X.len() {
-        for sign in [1.0_f64, -1.0] {
-            let x = a * (sign * GL20_X[i] + 1.0);
-            let xs = x * x;
-            let asr = -(bs / xs + hk) / 2.0;
-            if asr > -100.0 {
-                let rs = sqrt(1.0 - xs);
-                let one_plus_rs = 1.0 + rs;
-                bvn += a
-                    * GL20_W[i]
-                    * exp(asr)
-                    * (exp(-hk * xs / (2.0 * one_plus_rs * one_plus_rs)) / rs
-                        - (1.0 + c * xs * (1.0 + d * xs)));
-            }
+    // The remainder: a rule per panel `[s/2, s]`, `s` halving from `a`. The node
+    // terms are small (their sum is below 6e-5), so a plain sum in a local
+    // carries about 60 roundings of that size; it is added to `bvn` once.
+    let mut remainder = 0.0;
+    let mut s = a;
+    while s > PANEL_FLOOR {
+        let rule = panel_rule(s);
+        let half_width = s / 4.0;
+        // The panel's node is `x = (s/4)(3 + t)` for the rule's abscissa `t`.
+        for i in 0..rule.x.len() {
+            let wf = half_width * rule.w[i];
+            remainder += remainder_term(half_width * (3.0 + rule.x[i]), wf, bs, hk, c, d);
+            remainder += remainder_term(half_width * (3.0 - rule.x[i]), wf, bs, hk, c, d);
         }
+        remainder += remainder_term(half_width * 3.0, half_width * rule.w0, bs, hk, c, d);
+        s /= 2.0;
     }
+    bvn += remainder;
 
     bvn = -bvn / TAU;
     let result = if rho > 0.0 {
         bvn + norm_cdf(-dh.max(dk))
     } else {
-        -bvn + (norm_cdf(-dh) - norm_cdf(dk)).max(0.0)
+        // `-bvn` is the integral's share, `g`. The second term is
+        // `max(0, Phi(-dh) - Phi(dk))`: when `Phi(-dh) > Phi(dk)` the exact
+        // difference is kept as the double-word `s + e`, so it carries no
+        // rounding of its own, and `g` joins it once (`BvnHighAssembly.v`).
+        let g = -bvn;
+        let (p1, p2) = (norm_cdf(-dh), norm_cdf(dk));
+        if p1 > p2 {
+            let (hi, lo) = two_sum(p1, -p2);
+            hi + (lo + g)
+        } else {
+            g
+        }
     };
     clamp_to_probability(result)
 }
