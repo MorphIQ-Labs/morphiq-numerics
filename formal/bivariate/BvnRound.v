@@ -45,6 +45,11 @@ Proof.
   - apply Rabs_def1; lra.
 Qed.
 
+Lemma exp_mono a b : a <= b -> exp a <= exp b.
+Proof.
+  intros H. destruct H as [H | H]; [left; apply exp_increasing; exact H | right; rewrite H; reflexivity].
+Qed.
+
 Lemma u_pos : 0 < u.
 Proof. unfold u. apply bpow_gt_0. Qed.
 
