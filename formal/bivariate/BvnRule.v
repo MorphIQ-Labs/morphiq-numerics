@@ -195,4 +195,17 @@ Proof.
     apply Rmult_le_compat_r; [exact HG | exact HW2]. }
   lra.
 Qed.
+
+Lemma sum_g_nonneg nodes dats :
+  0 <= bp -> Forall2 (node_ok asr A) nodes dats -> 0 <= sum2 gn nodes dats.
+Proof.
+  intros Hbp Hall. induction Hall as [| n d nodes dats Hok Hall IH]; simpl; [lra |].
+  assert (Hg : 0 <= gn n d).
+  { unfold gn. destruct Hok as [_ [_ [_ [_ [_ [_ [HW [_ [_ [_ [_ [_ [_ Hth]]]]]]]]]]]]].
+    destruct HW as [HW1 HW2].
+    assert (HG : 0 <= Gsup bp (theta_of A d) (1 - theta_of A d)).
+    { apply Gsup_nonneg; [exact Hbp | lra | lra]. }
+    apply Rmult_le_pos; [lra | exact HG]. }
+  lra.
+Qed.
 End Rule.
