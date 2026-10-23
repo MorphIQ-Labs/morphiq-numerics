@@ -71,3 +71,9 @@ Proof.
   { rewrite E2. apply Rmult_le_compat_l; [lra | lra]. }
   nra.
 Qed.
+
+Lemma Gsup_nonneg b theta nu : 0 <= b -> 0 < theta -> 0 < nu -> 0 <= Gsup b theta nu.
+Proof.
+  intros Hb Ht Hn. unfold Gsup. destruct (Rle_dec (nu * b) theta); [| exact Hb].
+  apply Rmult_le_pos; [apply Rlt_le; apply Rmult_lt_0_compat; [exact Ht | apply Rinv_0_lt_compat; exact Hn] | left; apply exp_pos].
+Qed.

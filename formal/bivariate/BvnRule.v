@@ -14,7 +14,7 @@ Record NodeS := mkN { nsgn : R; nxs : R; nxh : R; nW : R; nwh : R }.
 
 (** The enclosure data of a node: bounds on [tau = (sign x + 1)/2] and the
     binade [2^k] above the largest sine of its angle. *)
-Record Dat := mkD { dtaulo : R; dtauhi : R; dk : Z }.
+Record Dat := mkD { dtaulo : R; dtauhi : R; dwhi : R; dk : Z }.
 
 Definition tau_of (n : NodeS) : R := (nsgn n * nxs n + 1) / 2.
 
@@ -40,7 +40,7 @@ Definition zt_of (A : R) (d : Dat) : R :=
 Definition node_ok (asr A : R) (n : NodeS) (d : Dat) : Prop :=
   (nsgn n = 1 \/ nsgn n = -1) /\ 0 < nxs n < 1 /\
   dtaulo d <= tau_of n <= dtauhi d /\ / 4096 <= dtaulo d /\ dtauhi d <= 1 /\
-  nxh n = rndF (nxs n) /\ / 4096 <= nW n <= / 2 /\ nwh n = rndF (nW n) /\
+  nxh n = rndF (nxs n) /\ / 4096 <= nW n <= dwhi d /\ dwhi d <= / 2 /\ nwh n = rndF (nW n) /\
   (-1000 <= dk d)%Z /\ (dk d <= 0)%Z /\
   sin (A * dtauhi d + u * A * (dtauhi d + 76 / 100)) <= bpow radix2 (dk d) /\
   zt_of A d <= / 2 /\ 0 < theta_of A d < 1.
@@ -73,8 +73,8 @@ Lemma node_facts n d :
   fmtF (tn n) /\ 0 <= tn n.
 Proof.
   intros Hx Hy Ha1 Ha2 HA Hok.
-  destruct Hok as [Hsg [Hxs [Htau [Hlo [Hhi [Hxh [HW [Hwh [Hk1 [Hk2 [Hsgk [Hzt Hth]]]]]]]]]]]].
-  destruct HW as [HW1 HW2].
+  destruct Hok as [Hsg [Hxs [Htau [Hlo [Hhi [Hxh [HW [Hwd [Hwh [Hk1 [Hk2 [Hsgk [Hzt Hth]]]]]]]]]]]]].
+  destruct HW as [HW1 HW2']. assert (HW2 : nW n <= / 2) by lra.
   pose proof u_pos as Hu. pose proof u_val as Huv. pose proof z_pos as Hz.
   pose proof (node_full x y asr (nsgn n) (nxs n) (nxh n) (nW n) (nwh n) A (dtauhi d) (dtaulo d) (dk d)
     Hx Hy Ha1 Ha2 HA Hsg Hxs (proj1 Htau) (proj2 Htau) Hlo Hhi Hxh HW1 HW2 Hwh Hk1 Hk2 Hsgk Hzt) as Hnf.
@@ -175,6 +175,24 @@ Proof.
   eapply Rle_trans; [exact Hc |].
   assert (Hm : Kex * (psi etaK * sumR (map vn nodes) + (1 + psi etaK) * sum2 vbn nodes dats) <= Kex * sum2 gn nodes dats)
     by (apply Rmult_le_compat_l; [exact HK0 | exact I2]).
+  lra.
+Qed.
+
+Definition gdat (d : Dat) : R := dwhi d * Gsup bp (theta_of A d) (1 - theta_of A d).
+
+Fixpoint sumD (f : Dat -> R) (l : list Dat) : R :=
+  match l with nil => 0 | d :: l' => f d + sumD f l' end.
+
+Lemma sum_g_le nodes dats :
+  0 <= bp -> Forall2 (node_ok asr A) nodes dats -> sum2 gn nodes dats <= sumD gdat dats.
+Proof.
+  intros Hbp Hall. induction Hall as [| n d nodes dats Hok Hall IH]; simpl; [lra |].
+  assert (Hg : gn n d <= gdat d).
+  { unfold gn, gdat. destruct Hok as [_ [_ [_ [_ [_ [_ [HW [_ [_ [_ [_ [_ [_ Hth]]]]]]]]]]]]].
+    destruct HW as [HW1 HW2].
+    assert (HG : 0 <= Gsup bp (theta_of A d) (1 - theta_of A d)).
+    { apply Gsup_nonneg; [exact Hbp | lra | lra]. }
+    apply Rmult_le_compat_r; [exact HG | exact HW2]. }
   lra.
 Qed.
 End Rule.
