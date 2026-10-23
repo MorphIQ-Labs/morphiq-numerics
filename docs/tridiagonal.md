@@ -325,7 +325,9 @@ results, residuals and pivot minima. Compile-fail tests prevent mutable factor
 reuse and claiming the dominance-only certificate.
 
 `bench-tridiagonal --unpivoted-one ORDER KIND METHOD CALLS` measures the general
-API on the existing public synthetic workload definitions. Methods `admit`,
+API on public synthetic workload definitions. Kind `unpivoted` uses mixed
+links and alternating negative/positive exact pivots outside the strong domains.
+Methods `admit`,
 `factor` (including admission), `minimum`, `solve`, `residual`, `total` (including
 admission, factorization, a benchmark caller's pivot floor and solve), and
 `legacy` expose the extra validation/storage passes. Result-bit checks precede

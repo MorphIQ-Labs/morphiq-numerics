@@ -51,8 +51,8 @@ impl Work {
         } else {
             1.0
         };
-        let lower = vec![-scale; n.saturating_sub(1)];
-        let upper = (0..n.saturating_sub(1))
+        let mut lower = vec![-scale; n.saturating_sub(1)];
+        let mut upper: Vec<_> = (0..n.saturating_sub(1))
             .map(|i| {
                 if kind.starts_with("sign") || (kind == "mixed" && i % 2 == 0) {
                     scale
@@ -71,6 +71,16 @@ impl Work {
             }) * scale;
             n
         ];
+        if kind == "unpivoted" {
+            for i in 0..n.saturating_sub(1) {
+                lower[i] = if i % 3 == 0 { -2.0 } else { 2.0 };
+                upper[i] = if i % 2 == 0 { 1.0 } else { -1.0 };
+            }
+            for i in 0..n {
+                diagonal[i] = (if i % 2 == 0 { 2.0 } else { -2.0 })
+                    + if i > 0 { lower[i - 1] / 2.0 } else { 0.0 };
+            }
+        }
         let rhs = (0..n)
             .map(|i| f64::from(u32::try_from(i % 13).unwrap()) * scale)
             .collect();
