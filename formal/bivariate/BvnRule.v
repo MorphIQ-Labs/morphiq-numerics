@@ -14,7 +14,7 @@ Record NodeS := mkN { nsgn : R; nxs : R; nxh : R; nW : R; nwh : R }.
 
 (** The enclosure data of a node: bounds on [tau = (sign x + 1)/2] and the
     binade [2^k] above the largest sine of its angle. *)
-Record Dat := mkD { dtaulo : R; dtauhi : R; dwhi : R; dk : Z }.
+Record Dat := mkD { dtaulo : R; dtauhi : R; dwhi : R; dk : Z; dbr : bool }.
 
 Definition tau_of (n : NodeS) : R := (nsgn n * nxs n + 1) / 2.
 
@@ -44,6 +44,33 @@ Definition node_ok (asr A : R) (n : NodeS) (d : Dat) : Prop :=
   (-1000 <= dk d)%Z /\ (dk d <= 0)%Z /\
   sin (A * dtauhi d + u * A * (dtauhi d + 76 / 100)) <= bpow radix2 (dk d) /\
   zt_of A d <= / 2 /\ 0 < theta_of A d < 1.
+
+(** The part of [node_ok] about the enclosure data alone. *)
+Definition dat_ok (A : R) (d : Dat) : Prop :=
+  / 4096 <= dtaulo d /\ dtauhi d <= 1 /\ dwhi d <= / 2 /\
+  (-1000 <= dk d)%Z /\ (dk d <= 0)%Z /\
+  sin (A * dtauhi d + u * A * (dtauhi d + 76 / 100)) <= bpow radix2 (dk d) /\
+  zt_of A d <= / 2 /\ 0 < theta_of A d < 1.
+
+(** The part of [node_ok] about the exact node, its stored values and its enclosure. *)
+Definition node_enc (n : NodeS) (d : Dat) : Prop :=
+  (nsgn n = 1 \/ nsgn n = -1) /\ 0 < nxs n < 1 /\
+  dtaulo d <= tau_of n <= dtauhi d /\
+  nxh n = rndF (nxs n) /\ / 4096 <= nW n <= dwhi d /\ nwh n = rndF (nW n).
+
+Lemma node_ok_of asr A n d : node_enc n d -> dat_ok A d -> node_ok asr A n d.
+Proof.
+  intros [Hsg [Hxs [Htau [Hxh [HW Hwh]]]]] [Hlo [Hhi [Hwd [Hk1 [Hk2 [Hsgk [Hzt Hth]]]]]]].
+  exact (conj Hsg (conj Hxs (conj Htau (conj Hlo (conj Hhi (conj Hxh (conj HW (conj Hwd (conj Hwh (conj Hk1 (conj Hk2 (conj Hsgk (conj Hzt Hth))))))))))))).
+Qed.
+
+Lemma Forall2_node_ok asr A nodes dats :
+  Forall2 node_enc nodes dats -> Forall (dat_ok A) dats -> Forall2 (node_ok asr A) nodes dats.
+Proof.
+  intros H1. induction H1 as [| n d nodes dats He H1 IH]; intros H2.
+  - constructor.
+  - inversion H2 as [| d' l' Hd Hl]; subst. constructor; [apply node_ok_of; assumption | apply IH; assumption].
+Qed.
 
 (** Per-node quantities at the correlation's angle bound [asr]. *)
 Section Rule.
@@ -207,5 +234,28 @@ Proof.
     { apply Gsup_nonneg; [exact Hbp | lra | lra]. }
     apply Rmult_le_pos; [lra | exact HG]. }
   lra.
+Qed.
+
+Definition gcl (d : Dat) : R :=
+  dwhi d * (if dbr d then theta_of A d / (1 - theta_of A d) * exp ((1 - theta_of A d) * bp / theta_of A d - 1) else bp).
+
+(** The branch flag of a datum records which side of [Gsup] applies. *)
+Definition br_ok (d : Dat) : Prop :=
+  (dbr d = true -> (1 - theta_of A d) * bp <= theta_of A d) /\
+  (dbr d = false -> theta_of A d < (1 - theta_of A d) * bp).
+
+Lemma gdat_gcl d : br_ok d -> gdat d = gcl d.
+Proof.
+  intros [H1 H2]. unfold gdat, gcl, Gsup. destruct (dbr d) eqn:E.
+  - destruct (Rle_dec ((1 - theta_of A d) * bp) (theta_of A d)) as [H | H]; [reflexivity |].
+    exfalso. apply H. apply H1. reflexivity.
+  - destruct (Rle_dec ((1 - theta_of A d) * bp) (theta_of A d)) as [H | H]; [| reflexivity].
+    exfalso. pose proof (H2 eq_refl). lra.
+Qed.
+
+Lemma sumD_gcl dats : Forall br_ok dats -> sumD gdat dats = sumD gcl dats.
+Proof.
+  intros H. induction H as [| d dats Hd H IH]; simpl; [reflexivity |].
+  rewrite (gdat_gcl d Hd), IH. reflexivity.
 Qed.
 End Rule.
