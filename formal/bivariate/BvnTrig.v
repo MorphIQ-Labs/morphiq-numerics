@@ -34,7 +34,7 @@ Proof.
   apply Rabs_lt_between. nra.
 Qed.
 
-Lemma cos_lb x : Rabs x <= 6 / 5 -> 3 / 10 <= cos x.
+Lemma cos_lb x : Rabs x <= 5 / 4 -> 3 / 10 <= cos x.
 Proof.
   intros H.
   assert (Hc : cos x = cos (Rabs x)).
