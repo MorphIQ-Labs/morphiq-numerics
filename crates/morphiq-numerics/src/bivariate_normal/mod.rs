@@ -12,9 +12,9 @@
 //! guarantee is not made below [`RELATIVE_FLOOR`]; a caller that divides by a
 //! small probability must carry the absolute bound itself.
 
-use crate::elementary::{exp, sincos, sqrt};
+use crate::elementary::{asin, exp, sincos, sqrt};
 use crate::normal::norm_cdf;
-use core::f64::consts::{FRAC_PI_2, TAU};
+use core::f64::consts::TAU;
 
 mod tables;
 use tables::{
@@ -126,34 +126,6 @@ fn low_correlation_rule(rho: f64) -> (&'static [f64], &'static [f64]) {
     }
 }
 
-/// `asin(m)` for `0 < m < 0.925`: a series start refined by two Newton steps
-/// on `sin t = m` (`docs/bivariate_normal.md` section 5).
-fn asin_low(m: f64) -> f64 {
-    // Series start, from `m` itself up to 0.5 and from the half-angle
-    // `asin(m) = pi/2 - 2 asin(sqrt((1 - m) / 2))` above it, where the
-    // argument is below 0.5 and the series converges at once.
-    fn series(u: f64) -> f64 {
-        let u2 = u * u;
-        u * (1.0
-            + u2 * (1.0 / 6.0
-                + u2 * (3.0 / 40.0
-                    + u2 * (5.0 / 112.0
-                        + u2 * (35.0 / 1152.0
-                            + u2 * (63.0 / 2816.0
-                                + u2 * (231.0 / 13312.0 + u2 * (143.0 / 10240.0))))))))
-    }
-    let mut t = if m <= 0.5 {
-        series(m)
-    } else {
-        FRAC_PI_2 - 2.0 * series(sqrt((1.0 - m) * 0.5))
-    };
-    for _ in 0..2 {
-        let (s, c) = sincos(t);
-        t -= (s - m) / c;
-    }
-    t
-}
-
 /// A bivariate normal distribution function at one correlation, with the
 /// `rho`-dependent quadrature table built once.
 ///
@@ -191,11 +163,7 @@ impl BivariateNormal {
             den: [1.0; MAX_NODES],
         };
         if regime == Regime::Low {
-            let asr = if rho < 0.0 {
-                -asin_low(-rho)
-            } else {
-                asin_low(rho)
-            };
+            let asr = asin(rho);
             let (abscissas, weights) = low_correlation_rule(rho);
             table.asr = asr;
             table.nodes = 2 * abscissas.len();

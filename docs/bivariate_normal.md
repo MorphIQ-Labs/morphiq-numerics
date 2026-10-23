@@ -17,7 +17,7 @@ what remains; nothing below claims more than the checks named here establish.
 | Absolute bound `2.5e-16` and relative bound above `1e-3` | **measured, not proved** (section 6) |
 | Independent MPFR/mpmath reference, two precisions, second route (section 7) | done |
 | Generator for the quadrature rules, replayed by `check_generators.sh` | done |
-| Correctly rounded `asin` (#41) | not done: an internal bounded `asin` stands in (section 5) |
+| Correctly rounded `asin` (#41) | done: the table's angle is `elementary::asin(rho)` (section 5) |
 | Relative accuracy of small probabilities (FerroRisk's tail construction) | not ported: refused instead (section 8) |
 | ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits | not done |
 | Gappa/Coq proof of the error budget | not done |
@@ -146,20 +146,14 @@ thresholds are). That analysis is not done.
 ## 5. `asin` of the correlation
 
 The low regime needs `asin(rho)` for `0 < |rho| < 0.925`, an angle up to 1.18.
-The library has no `asin` yet (#41) and forbids the platform one. `asin_low(m)`
-therefore computes it from the correctly rounded `sincos`: a series start
-(`m` itself up to 0.5, and `pi/2 - 2 asin(sqrt((1 - m)/2))` above, where the
-argument is below 0.5), then two Newton steps `t <- t - (sin t - m)/cos t`.
-The start is within `1e-7`, so one step is within `1e-14` and the second
-reaches the rounding floor: the error of the result is that of `sin` at
-the converged angle divided by `cos t`, at most `5.5e-17 / 0.38 = 1.5e-16` at
-`|rho| = 0.925`. Its effect on the result is that error times the integrand at
-the interval end over `2 pi`, at most `1.5e-16 * 1 / 6.28 = 2.4e-17`. The test
-`asin_low_inverts_sin_to_the_stated_bound` checks the sine residual.
-
-When #41 lands a correctly rounded `asin`, `asin_low` is replaced and the
-budget term below shrinks to `1.1e-16 / 2 pi = 1.8e-17`; no other change is
-needed.
+It is `elementary::asin(rho)`, which is correctly rounded (`docs/asin.md`): the
+computed angle is within half an ulp of `asin(rho)`, at most `1.1e-16` at the
+top of the range, and the function is odd, so a negative correlation's angle is
+exactly the negation of the positive one's. Its effect on the result is that
+error times the integrand at the interval end over `2 pi`, at most
+`1.1e-16 * 1 / 6.28 = 1.8e-17`. The test
+`angular_range_is_the_correctly_rounded_asin` checks the table's angle is
+`asin(rho)` bit for bit and odd in `rho`.
 
 ## 6. Error budget
 
@@ -172,7 +166,7 @@ The terms, with their status:
 | --- | --- | --- |
 | Quadrature truncation | `<= 2e-17` (section 4) | measured on 24 thresholds per correlation |
 | Rule rounding: nodes and weights rounded once | each relative `<= 2^-53`; effect `<= 2^-53 * (asr/4 pi) * sum w_i * 1 <= 2.2e-17 * 0.19 = 4e-18` | derived; the integrand is at most 1 |
-| `asin` | `<= 2.4e-17` (section 5) | derived from the rounding of `sin`; sine residual tested |
+| `asin` | `<= 1.8e-17` (section 5) | derived from `asin`'s correct rounding (half an ulp) |
 | Node angle `t_i = asr (1 +- x_i)/2` and its `sincos` | angle error `<= 1.2e-16` moves the integrand by `|f'| * 1.2e-16`, `|f'| <= 3` where `f` is not negligible | derived by inspection of `f'`, **not proved**; folded into the measurement |
 | Exponent `(sn x y - hs)/cos^2`: a few rounding errors on a quantity of size `|arg|` | `exp` relative error `<= 3 eps |arg|`, and `max_{arg <= 0} e^{arg} |arg| = 1/e`: `<= 3 eps/e * 0.19 = 2.5e-17` | derived |
 | `exp` (correctly rounded) and the weighted sum | `<= 0.5 ulp` each, summed with `n <= 20` additions: `<= 20 * 1.1e-16 * 0.19 / 2 = 2e-16` worst case if all rounding errors aligned; observed `<= 3e-17` | derived worst case far above the observed; **not tight** |
@@ -296,10 +290,9 @@ taken from libm. Item by item (the list FerroRisk's deletion cites):
 
 1. The relative construction below the floor (section 8), with a proved
    remainder bound, or an explicit refusal API; resolves the #380 corner.
-2. A correctly rounded `asin` (#41, asin only); then drop `asin_low`.
-3. The Bernstein-ellipse proof of the truncation term and interval/Gappa
+2. The Bernstein-ellipse proof of the truncation term and interval/Gappa
    bounds for the rest, then the Coq pipeline of #87.
-4. SIMD lanes (NEON, SSE2, AVX2+FMA, AVX-512F) returning the scalar bits, and
+3. SIMD lanes (NEON, SSE2, AVX2+FMA, AVX-512F) returning the scalar bits, and
    their measurement on ARM and native x86.
-5. Re-measure against the performance bar on a quiet host; this slice's
+4. Re-measure against the performance bar on a quiet host; this slice's
    numbers are one noisy shared host (section 9).

@@ -310,21 +310,18 @@ fn results_are_continuous_across_every_rule_limit() {
     }
 }
 
-/// The internal `asin` inverts `sin` to within the rounding of `sin`.
+/// The table's angular range is the library's correctly rounded `asin` of the
+/// correlation, so it is odd in `rho` and shares that function's bits.
 #[test]
-fn asin_low_inverts_sin_to_the_stated_bound() {
+fn angular_range_is_the_correctly_rounded_asin() {
     let mut rng = SplitMix64::new(0x3f);
     for _ in 0..20_000 {
-        let m = unit(&mut rng) * 0.925;
-        if m == 0.0 {
-            continue;
-        }
-        let t = asin_low(m);
-        let (s, c) = sincos(t);
-        assert!(
-            (s - m).abs() <= 2.0 * f64::EPSILON * m.max(0.25),
-            "asin({m}) = {t}: sin = {s}, cos = {c}"
-        );
+        let rho = unit(&mut rng) * 0.925;
+        let (Ok(pos), Ok(neg)) = (BivariateNormal::new(rho), BivariateNormal::new(-rho)) else {
+            panic!("rho = {rho} is a valid correlation");
+        };
+        assert_eq!(pos.asr.to_bits(), asin(rho).to_bits());
+        assert_eq!(neg.asr.to_bits(), (-pos.asr).to_bits());
     }
 }
 
