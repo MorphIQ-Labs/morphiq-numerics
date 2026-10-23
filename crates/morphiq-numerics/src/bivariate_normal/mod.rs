@@ -12,8 +12,8 @@
 //! guarantee is not made below [`RELATIVE_FLOOR`]; a caller that divides by a
 //! small probability must carry the absolute bound itself.
 
-use crate::eft::two_sum;
-use crate::elementary::{asin, exp, sincos, sqrt};
+use crate::eft::{two_prod, two_sum};
+use crate::elementary::{asin, exp, sin, sqrt};
 use crate::normal::norm_cdf;
 use core::f64::consts::TAU;
 
@@ -47,6 +47,10 @@ const SATURATED_THRESHOLD: f64 = 39.0;
 
 /// `sqrt(2 pi)` rounded to nearest.
 const SQRT_TAU: f64 = f64::from_bits(0x4004_0d93_1ff6_2706);
+
+/// A product of the two distribution functions at or above this has an exact
+/// `two_prod` error term (the exactness domain is `2^-969`).
+const PRODUCT_EXACT_FLOOR: f64 = 1.0e-270;
 
 /// The largest rule, and so the length of the per-correlation tables.
 const MAX_NODES: usize = 24;
@@ -143,11 +147,11 @@ pub struct BivariateNormal {
     nodes: usize,
     /// `asin(rho)`, the quadrature's angular range.
     asr: f64,
-    weight: [f64; MAX_NODES],
-    /// `sin` of each node's angle.
-    sn: [f64; MAX_NODES],
-    /// `1 - sin^2`, formed as `cos^2` so it keeps its relative accuracy.
-    den: [f64; MAX_NODES],
+    kw: [f64; MAX_NODES],
+    /// `1 / (4 (1 - sin theta))` of each node's angle `theta`.
+    p: [f64; MAX_NODES],
+    /// `1 / (4 (1 + sin theta))`.
+    q: [f64; MAX_NODES],
 }
 
 impl BivariateNormal {
@@ -162,21 +166,22 @@ impl BivariateNormal {
             regime,
             nodes: 0,
             asr: 0.0,
-            weight: [0.0; MAX_NODES],
-            sn: [0.0; MAX_NODES],
-            den: [1.0; MAX_NODES],
+            kw: [0.0; MAX_NODES],
+            p: [0.25; MAX_NODES],
+            q: [0.25; MAX_NODES],
         };
         if regime == Regime::Low {
             let asr = asin(rho);
             let (abscissas, weights) = low_correlation_rule(rho);
+            let k = asr / (2.0 * TAU);
             table.asr = asr;
             table.nodes = 2 * abscissas.len();
             for i in 0..abscissas.len() {
                 for (slot, sign) in [(2 * i, 1.0_f64), (2 * i + 1, -1.0)] {
-                    let (s, c) = sincos(asr * (sign * abscissas[i] + 1.0) / 2.0);
-                    table.weight[slot] = weights[i];
-                    table.sn[slot] = s;
-                    table.den[slot] = c * c;
+                    let s = sin(asr * (sign * abscissas[i] + 1.0) / 2.0);
+                    table.kw[slot] = weights[i] * k;
+                    table.p[slot] = 0.25 / (1.0 - s);
+                    table.q[slot] = 0.25 / (1.0 + s);
                 }
             }
         }
@@ -236,23 +241,32 @@ impl BivariateNormal {
     }
 
     /// The Genz low-correlation quadrature for ordered `x <= y`:
-    /// `Phi(x) Phi(y) + asin(rho)/(4 pi) * sum_i w_i exp((sn_i x y - hs) / cos_i^2)`
-    /// over the rule's nodes, in node order.
+    /// `Phi(x) Phi(y) + sum_i kw_i exp(-(d p_i + m q_i))`, `d = (x - y)^2`,
+    /// `m = (x + y)^2`, with `kw_i = w_i asr / (4 pi)` over the rule's nodes in
+    /// node order. `d p_i + m q_i` is the exponent `(x^2 + y^2 - 2 x y sin t_i) /
+    /// (2 cos^2 t_i)` written as a sum of two non-negative terms, so it carries no
+    /// cancellation. The terms are accumulated as a double-word, the product of the
+    /// two distribution functions is kept as a double-word, and the two are summed
+    /// without rounding until the one final addition, so the result is rounded once
+    /// (`docs/bivariate_normal_budget.md`).
     fn low(&self, x: f64, y: f64) -> f64 {
-        let hs = (x * x + y * y) / 2.0;
-        let xy = x * y;
-        // The terms are non-negative; their sum is accumulated as a double-word
-        // (`two_sum` per term, the low parts added in order) so that it carries
-        // one final rounding rather than one per node.
+        let e1 = x - y;
+        let d = e1 * e1;
+        let e2 = x + y;
+        let m = e2 * e2;
         let (mut high, mut low) = (0.0, 0.0);
         for i in 0..self.nodes {
-            let term = self.weight[i] * exp((self.sn[i] * xy - hs) / self.den[i]);
+            let term = self.kw[i] * exp(-(d * self.p[i] + m * self.q[i]));
             let (s, e) = two_sum(high, term);
             high = s;
             low += e;
         }
-        let sum = (high + low) * (self.asr / (2.0 * TAU));
-        clamp_to_probability(sum + norm_cdf(x) * norm_cdf(y))
+        let (hi, lo) = two_prod(norm_cdf(x), norm_cdf(y));
+        // `two_prod` is exact for products of at least 2^-969; a smaller product is
+        // below 2^-900 and its rounding error is irrelevant.
+        let lo = if hi >= PRODUCT_EXACT_FLOOR { lo } else { 0.0 };
+        let (sum, err) = two_sum(hi, high);
+        clamp_to_probability(sum + (err + (low + lo)))
     }
 }
 
