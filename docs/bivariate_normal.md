@@ -52,7 +52,7 @@ what remains; nothing below claims more than the checks named here establish.
   `Err(InvalidCorrelation)` for NaN or `|rho| > 1`, so a table can never be
   built for a correlation it cannot serve. It holds three arrays of 24 `f64`
   and a few scalars (about 600 bytes), copies freely, never allocates, and
-  builds in `n` `sincos` evaluations plus one `asin` for the `n`-node rule of
+  builds in `n` `sin` evaluations plus one `asin` for the `n`-node rule of
   the low-correlation regime and in no work otherwise. The one-shot functions
   are the evaluator behind a freshly built table, so the two are the same
   arithmetic by construction.
@@ -168,10 +168,13 @@ interval or Gappa arithmetic, the sum's rounding by a tighter analysis than the
 worst case above (the truncation term is proved, section 4); that is the proof
 obligation this slice leaves open.
 
-**Proved bound.** `docs/bivariate_normal_budget.md` proves, for the kernel as
-written, `5.3e-16` over the whole low-correlation branch (`2.5e-16` holds only for
-`|rho| <= 0.055`); the published `2.5e-16` is a measurement, not a proved bound,
-for `|rho|` above that.
+**Proved bound.** `docs/bivariate_normal_budget.md` proves the kernel's error
+from its operation sequence (the exponent as a sum of two non-negative terms,
+the weight folded into the table, the result rounded once): `3.72e-16` over the
+whole low-correlation branch, and `2.5e-16` for `|rho| <= 0.38`. The table above
+lists the structure of the error; the budget document supersedes its sums. The
+published `2.5e-16` is a measurement, not a proved bound, for `|rho|` above
+`0.38`.
 
 At or above `RELATIVE_FLOOR = 1e-3`, the bounded forms report
 `min(1e-13 * value, 2.5e-16)`; measured worst relative error there is
