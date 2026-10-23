@@ -3,6 +3,8 @@
 //! (`Stages::of`, `a_value`, `a`, `b_value`, `b`), the fallback's reduction,
 //! fast value (`exp::fast_at`), accurate path (`Reduced::accurate_value`) and
 //! small-argument path (`exp::small_parts`, `exp::small`), and `ln`'s
+//! `asin`'s reduction, series, fast path, accurate path and entry
+//! (`asin::crosscheck_*`), and `ln`'s
 //! reduction (`ln::Reduced::of`, `z`, `z_exact`), the accurate values of `ln`
 //! and `ln_1p` (`Reduced::accurate_value`, `z_prime`, `ln::split`,
 //! `ln::small_accurate`) and `ln_1p`'s screens and stages H and B
@@ -33,6 +35,9 @@ use crate::random::SplitMix64;
 use std::fmt::Write as _;
 use std::string::String;
 
+mod asin;
+mod asinh;
+mod atan2;
 mod normal;
 
 fn q128(q: Q128) -> String {
@@ -247,6 +252,9 @@ fn internal_crosscheck_corpus() {
     let mut rng = SplitMix64::new(0x7163_726f_7373_0001);
     let mut out = String::new();
     normal::write(&mut out);
+    asin::write(&mut out);
+    asinh::write(&mut out);
+    atan2::write(&mut out);
     q256_exponent_corpus(&mut out);
     erfcx_accurate_tail_corpus(&mut out);
     erfcx_accurate_exponential_corpus(&mut out);

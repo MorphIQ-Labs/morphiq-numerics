@@ -1,7 +1,9 @@
 (* Runs the extracted Q128 and Q256 transcriptions, rounding tests, exp's
    stages, exp's fallback reduction, fast value, accurate path and
    small-argument path, ln's reduction, ln's and ln_1p's accurate values and
-   ln_1p's screens and stages H and B (InternalCrosscheck.v) on the internal
+   ln_1p's screens and stages H and B, asin's reduction, series, fast
+   path, accurate path and entry, and asinh's fast path, exponential, accurate
+   path and entry, and atan2's entry, fast path and accurate path (InternalCrosscheck.v) on the internal
    cross-check corpus and compares each result with the Rust library's.
 
    Each line is "op args : result". A value is "n e k l1 .. lk": its sign
@@ -408,6 +410,79 @@ let compute op args =
            String.concat " " (List.map show_bits
              (x_fast (z_of_u64 (hex rh)) (z_of_u64 (hex rl)) (z_of_int (int_of_string j))))
        | _ -> failwith "fast takes two words and a table index")
+  | "atan2_entry" ->
+      (match args with
+       | [y; x] -> show_bits (x_atan2_entry (z_of_u64 (hex y)) (z_of_u64 (hex x)))
+       | _ -> failwith "atan2_entry takes two words")
+  | "atan2_fast" ->
+      (match args with
+       | [n; d; f] ->
+           let (words, decided) = x_atan2_fast (z_of_u64 (hex n)) (z_of_u64 (hex d)) (z_of_int (int_of_string f)) in
+           String.concat " " (List.map show_bits words @ [show_opt decided])
+       | _ -> failwith "atan2_fast takes two words and a form")
+  | "atan2_accurate" ->
+      (match args with
+       | [n; d; f; ph; pl] ->
+           let ((n, e), l) = x_atan2_accurate (z_of_u64 (hex n)) (z_of_u64 (hex d)) (z_of_int (int_of_string f))
+             (z_of_u64 (hex ph)) (z_of_u64 (hex pl)) in
+           show (n, e, l)
+       | _ -> failwith "atan2_accurate takes two words, a form and two words")
+  | "asinh_entry" ->
+      (match args with
+       | [x] -> show_bits (x_asinh_entry (z_of_u64 (hex x)))
+       | _ -> failwith "asinh_entry takes one word")
+  | "asinh_fast" ->
+      (match args with
+       | [x] ->
+           let (words, decided) = x_asinh_fast (z_of_u64 (hex x)) in
+           String.concat " " (List.map show_bits words @ [show_opt decided])
+       | _ -> failwith "asinh_fast takes one word")
+  | "asinh_exp" ->
+      let ((n, e, l), _) = value args in
+      let (((n, e), l), k) = x_asinh_exp n e l in
+      show (n, e, l) ^ " " ^ string_of_int (int_of_z k)
+  | "asinh_accurate" ->
+      (match args with
+       | [x; yh; yl] ->
+           let ((n, e), l) = x_asinh_accurate (z_of_u64 (hex x)) (z_of_u64 (hex yh)) (z_of_u64 (hex yl)) in
+           show (n, e, l)
+       | _ -> failwith "asinh_accurate takes three words")
+  | "asin_entry" ->
+      (match args with
+       | [x] -> show_bits (x_asin_entry (z_of_u64 (hex x)))
+       | _ -> failwith "asin_entry takes one word")
+  | "asin_reduced" ->
+      (match args with
+       | [x] ->
+           let (direct, words) = x_asin_reduced (z_of_u64 (hex x)) in
+           String.concat " " ((if direct then "1" else "0") :: List.map show_bits words)
+       | _ -> failwith "asin_reduced takes one word")
+  | "asin_series" ->
+      (match args with
+       | [zh; zl] ->
+           String.concat " " (List.map show_bits (x_asin_series (z_of_u64 (hex zh)) (z_of_u64 (hex zl))))
+       | _ -> failwith "asin_series takes two words")
+  | "asin_fast" ->
+      (match args with
+       | [x] ->
+           let (words, decided) = x_asin_fast (z_of_u64 (hex x)) in
+           String.concat " " (List.map show_bits words @ [show_opt decided])
+       | _ -> failwith "asin_fast takes one word")
+  | "asin_accurate" ->
+      (match args with
+       | [direct; x; sh; sl] ->
+           let ((n, e), l) = x_asin_accurate (direct = "1") (z_of_u64 (hex x)) (z_of_u64 (hex sh)) (z_of_u64 (hex sl)) in
+           show (n, e, l)
+       | _ -> failwith "asin_accurate takes a branch and three words")
+  | "asin_sincos" ->
+      (match args with
+       | [sh; sl] ->
+           let (((n1, e1), l1), ((n2, e2), l2)) = x_asin_sincos (z_of_u64 (hex sh)) (z_of_u64 (hex sl)) in
+           show (n1, e1, l1) ^ " " ^ show (n2, e2, l2)
+       | _ -> failwith "asin_sincos takes two words")
+  | "asin_recip" ->
+      let ((n, e, l), _) = value args in
+      let ((n, e), l) = x_asin_recip n e l in show (n, e, l)
   | "q256_from_limbs" ->
       let ((n, e, l), _) = value args in
       let ((n, e), l) = x_q256_from_limbs n e l in show (n, e, l)

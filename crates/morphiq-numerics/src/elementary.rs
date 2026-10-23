@@ -16,6 +16,9 @@
 //! ([`lanes`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/lanes.md)),
 //! which changes speed, never a result.
 
+pub use crate::asin::asin;
+pub use crate::asinh::asinh;
+pub use crate::atan2::atan2;
 pub use crate::exp::exp;
 pub use crate::exp2::exp2;
 pub use crate::expm1::expm1;
@@ -100,3 +103,43 @@ batched!(
     /// lanes; undecided lanes call [`expm1`].
     expm1_slice, expm1, crate::expm1::lanes::Expm1
 );
+
+batched!(
+    /// [`asin`] of every element of `x`, written to `out`, bit for bit.
+    /// With `simd`, the reduction, the series and the rounding test run in
+    /// lanes; a lane the screen or the test doesn't settle calls [`asin`].
+    asin_slice, asin, crate::asin::lanes::Asin
+);
+
+batched!(
+    /// [`asinh`] of every element of `x`, written to `out`, bit for bit.
+    /// With `simd`, the series, the logarithm of `x + √(x² + 1)`, the large
+    /// form and the rounding test run in lanes; a lane the screen or the test
+    /// doesn't settle calls [`asinh`].
+    asinh_slice, asinh, crate::asinh::lanes::Asinh
+);
+
+/// [`atan2`] of every pair `(y[i], x[i])`, written to `out`: `out[i]` is
+/// `atan2(y[i], x[i])`, bit for bit, on every target and with or without the
+/// `simd` feature.
+///
+/// With `simd` the pairs are evaluated in SIMD lanes, each lane performing
+/// `atan2`'s fast path operation for operation; a lane the screen or the
+/// rounding test doesn't settle calls [`atan2`]
+/// ([docs/lanes.md](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/lanes.md)).
+///
+/// # Panics
+///
+/// If `y`, `x` and `out` don't have the same length.
+pub fn atan2_slice(y: &[f64], x: &[f64], out: &mut [f64]) {
+    assert!(
+        y.len() == x.len() && x.len() == out.len(),
+        "atan2_slice: slices of different lengths"
+    );
+    #[cfg(feature = "simd")]
+    crate::lanes::map2::<crate::atan2::lanes::Atan2>(y, x, out);
+    #[cfg(not(feature = "simd"))]
+    for ((o, &y), &x) in out.iter_mut().zip(y).zip(x) {
+        *o = atan2(y, x);
+    }
+}
