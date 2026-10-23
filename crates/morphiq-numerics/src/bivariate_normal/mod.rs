@@ -16,6 +16,8 @@ use crate::elementary::{asin, exp, sincos, sqrt};
 use crate::normal::norm_cdf;
 use core::f64::consts::TAU;
 
+#[cfg(feature = "simd")]
+mod lanes;
 mod tables;
 use tables::{
     GL4_W, GL4_X, GL6_W, GL6_X, GL8_W, GL8_X, GL10_W, GL10_X, GL12_W, GL12_X, GL14_W, GL14_X,
@@ -216,19 +218,47 @@ impl BivariateNormal {
     /// last place of the exact value, which the same bound covers.
     #[must_use]
     pub fn cdf_bounded(&self, x: f64, y: f64) -> BoundedProbability {
-        let value = self.cdf(x, y);
-        if value.is_nan() {
-            return BoundedProbability {
-                value,
-                error: f64::NAN,
-            };
+        bounded(self.cdf(x, y))
+    }
+
+    /// [`Self::cdf`] of every pair `(x[i], y[i])`, written to `out`:
+    /// `out[i]` is `self.cdf(x[i], y[i])`, bit for bit, on every target and
+    /// with or without the `simd` feature.
+    ///
+    /// With `simd` the pairs are evaluated in SIMD lanes when the correlation
+    /// selects a quadrature regime (`EPSILON <= |rho| < 1`), each
+    /// lane performing the scalar operation sequence; a closed-form
+    /// correlation, a NaN or saturated pair is the scalar function's, per lane
+    /// (`docs/bivariate_normal.md` section 10).
+    ///
+    /// # Panics
+    ///
+    /// If `x`, `y` and `out` don't have the same length.
+    pub fn cdf_slice(&self, x: &[f64], y: &[f64], out: &mut [f64]) {
+        assert!(
+            x.len() == y.len() && y.len() == out.len(),
+            "cdf_slice: slices of different lengths"
+        );
+        #[cfg(feature = "simd")]
+        lanes::map(x, y, lanes::Correlations::One(self), out);
+        #[cfg(not(feature = "simd"))]
+        for ((o, &x), &y) in out.iter_mut().zip(x).zip(y) {
+            *o = self.cdf(x, y);
         }
-        let error = if value >= RELATIVE_FLOOR {
-            (RELATIVE_ERROR_BOUND * value).min(ABSOLUTE_ERROR_BOUND)
-        } else {
-            ABSOLUTE_ERROR_BOUND
-        };
-        BoundedProbability { value, error }
+    }
+
+    /// [`Self::cdf_bounded`] of every pair `(x[i], y[i])`, written to `out`,
+    /// bit for bit; the values are [`Self::cdf_slice`]'s.
+    ///
+    /// # Panics
+    ///
+    /// If `x`, `y` and `out` don't have the same length.
+    pub fn cdf_bounded_slice(&self, x: &[f64], y: &[f64], out: &mut [BoundedProbability]) {
+        assert!(
+            x.len() == y.len() && y.len() == out.len(),
+            "cdf_bounded_slice: slices of different lengths"
+        );
+        bounded_in_blocks(x, y, out, |_, x, y, values| self.cdf_slice(x, y, values));
     }
 
     /// The Genz low-correlation quadrature for ordered `x <= y`:
@@ -302,6 +332,94 @@ pub fn bivariate_norm_cdf_bounded(x: f64, y: f64, rho: f64) -> BoundedProbabilit
             error: f64::NAN,
         },
     }
+}
+
+/// [`BivariateNormal::cdf_bounded`]'s bound for a value.
+fn bounded(value: f64) -> BoundedProbability {
+    if value.is_nan() {
+        return BoundedProbability {
+            value,
+            error: f64::NAN,
+        };
+    }
+    let error = if value >= RELATIVE_FLOOR {
+        (RELATIVE_ERROR_BOUND * value).min(ABSOLUTE_ERROR_BOUND)
+    } else {
+        ABSOLUTE_ERROR_BOUND
+    };
+    BoundedProbability { value, error }
+}
+
+/// Fill `out` with the bound of each value `fill` writes for the pairs,
+/// in blocks, so the bounded form needs no allocation.
+fn bounded_in_blocks(
+    x: &[f64],
+    y: &[f64],
+    out: &mut [BoundedProbability],
+    fill: impl Fn(usize, &[f64], &[f64], &mut [f64]),
+) {
+    const BLOCK: usize = 64;
+    let mut values = [0.0; BLOCK];
+    for (block, ((x, y), out)) in x
+        .chunks(BLOCK)
+        .zip(y.chunks(BLOCK))
+        .zip(out.chunks_mut(BLOCK))
+        .enumerate()
+    {
+        let values = &mut values[..x.len()];
+        fill(block * BLOCK, x, y, values);
+        for (o, &v) in out.iter_mut().zip(values.iter()) {
+            *o = bounded(v);
+        }
+    }
+}
+
+/// [`bivariate_norm_cdf`] of every triple `(x[i], y[i], rho[i])`, written to
+/// `out`: `out[i]` is `bivariate_norm_cdf(x[i], y[i], rho[i])`, bit for bit,
+/// on every target and with or without the `simd` feature. NaN where the
+/// correlation is invalid.
+///
+/// With `simd` the triples are evaluated in SIMD lanes, a lane at its own
+/// correlation, so a batch may mix regimes and rule lengths; a lane the
+/// screen doesn't admit is the scalar function's
+/// (`docs/bivariate_normal.md` section 10).
+///
+/// # Panics
+///
+/// If `x`, `y`, `rho` and `out` don't have the same length.
+pub fn bivariate_norm_cdf_slice(x: &[f64], y: &[f64], rho: &[f64], out: &mut [f64]) {
+    assert!(
+        x.len() == y.len() && y.len() == rho.len() && rho.len() == out.len(),
+        "bivariate_norm_cdf_slice: slices of different lengths"
+    );
+    #[cfg(feature = "simd")]
+    lanes::map(x, y, lanes::Correlations::Each(rho), out);
+    #[cfg(not(feature = "simd"))]
+    for (((o, &x), &y), &rho) in out.iter_mut().zip(x).zip(y).zip(rho) {
+        *o = bivariate_norm_cdf(x, y, rho);
+    }
+}
+
+/// [`bivariate_norm_cdf_bounded`] of every triple `(x[i], y[i], rho[i])`,
+/// written to `out`, bit for bit; the values are
+/// [`bivariate_norm_cdf_slice`]'s.
+///
+/// # Panics
+///
+/// If `x`, `y`, `rho` and `out` don't have the same length.
+pub fn bivariate_norm_cdf_bounded_slice(
+    x: &[f64],
+    y: &[f64],
+    rho: &[f64],
+    out: &mut [BoundedProbability],
+) {
+    assert!(
+        x.len() == y.len() && y.len() == rho.len() && rho.len() == out.len(),
+        "bivariate_norm_cdf_bounded_slice: slices of different lengths"
+    );
+    bounded_in_blocks(x, y, out, |start, x, y, values| {
+        bivariate_norm_cdf_slice(x, y, &rho[start..start + x.len()], values);
+    });
 }
 
 /// Genz's upper-tail high-correlation algorithm (BVND, `|rho| >= 0.925`), in
