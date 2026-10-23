@@ -272,21 +272,25 @@ fn the_panel_rule_changes_just_above_its_threshold() {
     assert_eq!(nodes(&above), 16);
 }
 
-/// The paired batch reports each pair's own correlation's bound, across blocks.
+/// The paired batch reports each pair's own value and correlation's bound, across blocks.
 #[test]
 fn the_paired_batch_bounds_every_pair_across_blocks() {
     const N: usize = 200;
     const RHOS: [f64; 5] = [0.03, -0.5, 0.85, 0.97, -0.97];
     let rhos: [f64; N] = core::array::from_fn(|i| RHOS[i % 5]);
-    let x = [0.3; N];
-    let y = [-0.4; N];
+    let x: [f64; N] = core::array::from_fn(|i| 0.3 + i as f64 * 0.01);
+    let y: [f64; N] = core::array::from_fn(|i| -0.4 + i as f64 * 0.005);
     let mut out = [BoundedProbability {
         value: 0.0,
         error: 0.0,
     }; N];
     bivariate_norm_cdf_bounded_slice(&x, &y, &rhos, &mut out);
-    for (o, &rho) in out.iter().zip(&rhos) {
-        assert_eq!(o.error, absolute_error_bound(rho));
+    for i in 0..N {
+        assert_eq!(out[i].error, absolute_error_bound(rhos[i]));
+        assert_eq!(
+            out[i].value.to_bits(),
+            bivariate_norm_cdf(x[i], y[i], rhos[i]).to_bits()
+        );
     }
 }
 
