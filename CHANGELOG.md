@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.12](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.11...v0.0.12) - 2026-10-23
+
+### Added
+
+- *(elementary)* correctly rounded asin, asinh and atan2 ([#218](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/218))
+
 ## [0.0.11](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.10...v0.0.11) - 2026-10-23
 
 ### Added
