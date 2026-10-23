@@ -129,9 +129,15 @@ Inputs are binary64 numbers with `|x|, |y| <= 64` (the kernel is reached with
 `|x|, |y| < 39`). No operation is assumed free of underflow: every rounding
 carries its subnormal term `z = 2^-1075`, and the `two_prod` error word is taken
 as zero below `1e-270`, where the product's own rounding is below `2^-900`. The
-Rust is not extracted: the Coq transcription (`angle`, `argnc`, `termf`,
-`acc`, `finish`) mirrors the sequence of section 1 by reading, not by a
-bit-for-bit comparison.
+kernel is transcribed in `formal/bivariate/BvnKernel.v`, extracted and compared bit for
+bit with the Rust (`docs/bivariate_normal.md` section 6.5), and `BvnRefineLow.v` proves
+its pieces equal the Coq functions this budget is about: `node_angle_ok` (`angle`), `low_node_ok`
+(`node_term`, with `argnc`'s `p` and `q` as the table stores them), `low_sum_ok` (`acc`),
+`low_finish_ok` (`finish`, `PRODUCT_EXACT_FLOOR` included) and `kernel_low_ok` (`Rhat` of `BvnTop.v`),
+under the magnitude bounds the proofs give and the library relations of item 1; the per-node
+ranges (`node_ranges`) and the match of the stored table to the proof's `NodeS` records
+(`nodes_match`) are hypotheses of `kernel_low_ok`; the match rests, as before, on the generator
+and the enclosures of `BvnData.v`.
 
 The global axioms of `BvnBudget.low_N` are Coq's classical-real axioms
 (`classic`, `sig_forall_dec`, `sig_not_dec`, `functional_extensionality_dep`,

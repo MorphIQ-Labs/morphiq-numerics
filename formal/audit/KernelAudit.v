@@ -894,3 +894,26 @@ Print Assumptions BvnHighEnd.closed_total.
 Print Assumptions BvnHighEnd.high_pos_end.
 Print Assumptions BvnHighEnd.high_neg_end_diff.
 Print Assumptions BvnHighEnd.high_neg_end_zero.
+Require BvnLift BvnTableFacts BvnRefineLow BvnRefineHigh.
+Print Assumptions BvnTableFacts.panel_nodes_ok.
+Print Assumptions BvnTableFacts.low_pairs_finite.
+Print Assumptions BvnRefineLow.node_angle_ok.
+Print Assumptions BvnRefineLow.low_node_ok.
+Print Assumptions BvnRefineLow.low_sum_ok.
+Print Assumptions BvnRefineLow.floor_iff.
+Print Assumptions BvnRefineLow.low_finish_ok.
+Print Assumptions BvnRefineLow.terms_ok.
+Print Assumptions BvnRefineLow.kernel_low_ok.
+Print Assumptions BvnRefineLow.build_table_low.
+Print Assumptions BvnRefineLow.cdf_low.
+Print Assumptions BvnRefineHigh.node_value_ok.
+Print Assumptions BvnRefineHigh.closed_form_ok.
+Print Assumptions BvnRefineHigh.panel_fold_ok.
+Print Assumptions BvnRefineHigh.panel_sum_ok.
+Print Assumptions BvnRefineHigh.high_integral_ok.
+Print Assumptions BvnRefineHigh.high_finish_pos.
+Print Assumptions BvnRefineHigh.high_finish_neg_diff.
+Print Assumptions BvnRefineHigh.high_finish_neg_zero.
+Print Assumptions BvnRefineHigh.high_pos_composite.
+Print Assumptions BvnRefineHigh.high_neg_diff_composite.
+Print Assumptions BvnRefineHigh.high_neg_zero_composite.

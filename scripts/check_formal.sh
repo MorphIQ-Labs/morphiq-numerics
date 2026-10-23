@@ -29,7 +29,10 @@
 #   7. The proved IEEE 754 definitions and the Q128/Q256 transcriptions,
 #      extracted to OCaml (formal/extraction), reproduce the Rust library's
 #      results bit for bit on the cross-check corpora given as the first two
-#      arguments. Write the arguments first with
+#      arguments; the bivariate normal's scalar kernel (formal/bivariate/BvnKernel.v)
+#      is extracted separately (formal/extraction/BvnCrosscheck.v, bvndriver.ml) and
+#      runs on the bvn lines of the internal corpus, with the library functions it
+#      calls given by the results the Rust recorded. Write the arguments first with
 #        cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
 #        MORPHIQ_INTERNAL_CORPUS=$PWD/target/internal-crosscheck.txt cargo test --locked -p morphiq-numerics --lib internal_crosscheck -- --ignored
 #        ./scripts/write_gappa_proofs.sh target/gappa-proofs   (in the certificates image)
@@ -230,6 +233,12 @@ crosscheck=$!
   && echo "extraction: running internalcrosscheck" \
   && ./internalcrosscheck "$icorpus") > "$work/internal_crosscheck.log" 2> "$work/internal_crosscheck.err" &
 internal_crosscheck=$!
+(cd "$build/extraction" \
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../gappa "" BvnCrosscheck.v \
+  && compile_extraction -o bvncrosscheck bvncrosscheck.mli bvncrosscheck.ml bvndriver.ml \
+  && echo "extraction: running bvncrosscheck" \
+  && ./bvncrosscheck "$icorpus") > "$work/bvn_crosscheck.log" 2> "$work/bvn_crosscheck.err" &
+bvn_crosscheck=$!
 # finish NAME PID: waits for the step, shows its errors, and fails if it did.
 finish() {
   status=0
@@ -301,4 +310,6 @@ finish crosscheck "$crosscheck"
 cat "$work/crosscheck.log"
 finish internal_crosscheck "$internal_crosscheck"
 cat "$work/internal_crosscheck.log"
+finish bvn_crosscheck "$bvn_crosscheck"
+cat "$work/bvn_crosscheck.log"
 echo "formal: OK"

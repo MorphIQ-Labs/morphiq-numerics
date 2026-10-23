@@ -3,8 +3,11 @@
 Status: the branch's absolute error is proved, from the named hypotheses of
 section 6.2 and no sampled quantity, to be at most `2.708e-16` for `rho > 0` and
 `3.333e-16` for `rho < 0`. The proof is machine-checked in `formal/bivariate/BvnHigh*.v`
-over Flocq's binary64 model; what it takes from the source by reading, and what
-it takes from classical analysis, is listed in section 6.
+over Flocq's binary64 model; the kernel it describes is the extracted transcription of
+`mod.rs` (`formal/bivariate/BvnKernel.v`, compared with the Rust bit for bit), which
+`formal/bivariate/BvnRefineHigh.v` proves equal to the functions the proof is about;
+what it takes from classical analysis, and the few hypotheses of that equality, are listed
+in section 6 and in `docs/bivariate_normal.md` section 6.5.
 
 This note covers `0.925 <= |rho| < 1`, evaluated by `high_correlation` in
 `crates/morphiq-numerics/src/bivariate_normal/mod.rs`. The low branch is in
@@ -312,10 +315,18 @@ prints the assumptions of each final theorem and the lane checks them against
 3. **Tables.** The tabulated nodes and weights are within relative `u` of the true
    Gauss-Legendre values (checked by `generators/bivariate_normal_nodes.py --check`, which
    regenerates them at high precision).
-4. **Transcription.** `closed_k`, `node_term` and `dwsum` are the source's sequences as
-   operation-by-operation Coq functions; their correspondence with `mod.rs` is by reading and
-   by the fixture rows of section 7, not mechanised. `closed_k` against the calculator's tree and
-   `closed_x` against its semantics are machine-checked.
+4. **Transcription.** `closed_k`, `node_term` and `dwsum` are written as real-valued rounding
+   sequences; the kernel is `BvnKernel.v`, the same operations over the proved IEEE 754 binary64
+   operations, extracted and compared bit for bit with `mod.rs` (`docs/bivariate_normal.md`
+   section 6.5). `BvnRefineHigh.v` proves the kernel's pieces equal these functions:
+   `node_value_ok` (`node_term`), `closed_form_ok` (`closed_k`), `panel_sum_ok` (the panels' `dwsum`
+   and the loop), `high_integral_ok` (`J_bound`'s `rnd (Cl + P)`), and the three assemblies of
+   `BvnHighEnd.v` (`high_pos_composite`, `high_neg_diff_composite`, `high_neg_zero_composite`). What
+   the equality assumes, besides the library contracts of item 1: that the exponent arguments
+   `-(sg/2)` and `-(hk/2)` are not the halving of a nonzero binary64 below `2^-1000` (where
+   `rnd(-x/2)` differs from the proof's `-(x/2)` by under `2^-1075`; `exp` is 1 there either way); the
+   thresholds below 39; and `-(4 hk) <= bs` on the computed `bs` and `hk`. `closed_k` against the
+   calculator's tree and `closed_x` against its semantics are machine-checked.
 
 ### 6.3 Not proved
 

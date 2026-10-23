@@ -14,9 +14,14 @@
 //! quotient where the bound is not far below the value.
 
 use crate::eft::{two_prod, two_sum};
-use crate::elementary::{asin, exp, sin, sqrt};
+use crate::elementary::sqrt;
+#[cfg(not(test))]
+use crate::elementary::{asin, exp, sin};
+#[cfg(not(test))]
 use crate::normal::norm_cdf;
 use core::f64::consts::TAU;
+#[cfg(test)]
+use trace::{asin, exp, norm_cdf, sin};
 
 #[cfg(feature = "simd")]
 mod lanes;
@@ -29,6 +34,8 @@ use tables::{
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+pub(crate) mod trace;
 
 /// The bound on `|result - exact|` that every finite evaluation meets, at any
 /// correlation: the largest of [`absolute_error_bound`]'s values.

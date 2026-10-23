@@ -5,7 +5,7 @@
 # when the formal gate exits nonzero AND reports the intended rejection.
 set -eu
 if [ "$#" -ne 6 ]; then
-  echo "usage: $0 <binding|admitted|axiom|certificate|crosscheck|internal-crosscheck> <deps.tar.gz> <build> <corpus> <internal corpus> <gappa proofs>" >&2
+  echo "usage: $0 <binding|admitted|axiom|certificate|crosscheck|internal-crosscheck|bvn-crosscheck> <deps.tar.gz> <build> <corpus> <internal corpus> <gappa proofs>" >&2
   exit 2
 fi
 mutation=$1
@@ -15,7 +15,7 @@ corpus=$(realpath "$4")
 icorpus=$(realpath "$5")
 proofs=$(realpath "$6")
 case "$mutation" in
-  binding|admitted|axiom|certificate|crosscheck|internal-crosscheck) ;;
+  binding|admitted|axiom|certificate|crosscheck|internal-crosscheck|bvn-crosscheck) ;;
   *) echo "unknown mutation: $mutation" >&2; exit 2 ;;
 esac
 test -f "$build/.built"
@@ -93,6 +93,26 @@ case "$mutation" in
     mv "$file.changed" "$file"
     expected='mismatch:'
     ;;
+  bvn-crosscheck)
+    # One expected result of a bivariate value line, in the internal corpus.
+    file="$work/internal-crosscheck.txt"
+    awk '!changed && /^bvn_cdf / && match($0, /: [0-9a-f]/) {
+      pos = RSTART + 2
+      token = substr($0, pos)
+      sub(/ .*/, "", token)
+      if (!(length(token) == 16 && token ~ /^(7ff|fff)/)) {
+        digit = index("0123456789abcdef", substr($0, pos, 1))
+        $0 = substr($0, 1, pos - 1) substr("1032547698badcfe", digit, 1) substr($0, pos + 1)
+        changed = 1
+      }
+    } { print }' "$file" > "$file.changed"
+    if cmp -s "$file" "$file.changed"; then
+      echo "$mutation: mutation did not change the corpus" >&2
+      exit 1
+    fi
+    mv "$file.changed" "$file"
+    expected='mismatch:'
+    ;;
 esac
 
 started=$(date +%s)
@@ -112,5 +132,6 @@ fi
 case "$mutation" in
   crosscheck) grep -qxF 'crosscheck failed' "$work/result.log" ;;
   internal-crosscheck) grep -qxF 'internal_crosscheck failed' "$work/result.log" ;;
+  bvn-crosscheck) grep -qxF 'bvn_crosscheck failed' "$work/result.log" ;;
 esac
 echo "negative ($mutation): PASS: intended rejection (exit $status, $(($(date +%s) - started)) seconds)"
