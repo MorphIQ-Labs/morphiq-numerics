@@ -858,3 +858,27 @@ Print Assumptions BvnBudget.low_14.
 Print Assumptions BvnBudget.low_16.
 Print Assumptions BvnBudget.low_20.
 Print Assumptions BvnBudget.low_24.
+Require BvnHighAlgebra BvnHighAssembly BvnHighPanels BvnHighBudget.
+Print Assumptions BvnHighAlgebra.plackett_exponent.
+Print Assumptions BvnHighAlgebra.smooth_exponent.
+Print Assumptions BvnHighAlgebra.subtraction_identity.
+Print Assumptions BvnHighAlgebra.moment_closed_form.
+Print Assumptions BvnHighAlgebra.reflection_phi_terms.
+Print Assumptions BvnHighAssembly.clamp_lipschitz.
+Print Assumptions BvnHighAssembly.round_clamp.
+Print Assumptions BvnHighAssembly.pos_assembly.
+Print Assumptions BvnHighAssembly.pos_assembly_weak.
+Print Assumptions BvnHighAssembly.neg_assembly.
+Print Assumptions BvnHighAssembly.neg_assembly_dw.
+Print Assumptions BvnHighAssembly.neg_assembly_dw_half.
+Print Assumptions BvnHighAssembly.neg_assembly_final.
+Print Assumptions BvnHighPanels.panel_design.
+Print Assumptions BvnHighBudget.tau_error.
+Print Assumptions BvnHighBudget.sqrt_tau_error.
+Print Assumptions BvnHighBudget.fsum_error.
+Print Assumptions BvnHighBudget.remainder_magnitude_bound.
+Print Assumptions BvnHighBudget.remainder_sum_error.
+Print Assumptions BvnHighBudget.division_step.
+Print Assumptions BvnHighBudget.design_total_small.
+Print Assumptions BvnHighBudget.high_pos_bound.
+Print Assumptions BvnHighBudget.high_neg_bound.

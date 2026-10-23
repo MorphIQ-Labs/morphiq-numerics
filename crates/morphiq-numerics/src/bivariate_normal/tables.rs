@@ -116,6 +116,28 @@ pub(super) const GL16_W: [f64; 8] = [
     f64::from_bits(0x3fc75f8c77e0c00f),
     f64::from_bits(0x3fc83feae80e4dfc),
 ];
+/// `((3 + t) / 4)^2` for the abscissas of the 16-point rule
+pub(super) const GL16_XP: [f64; 8] = [
+    f64::from_bits(0x3fefd4a4cca98683),
+    f64::from_bits(0x3fef1e8d57d8a84a),
+    f64::from_bits(0x3fede2de9aee34b1),
+    f64::from_bits(0x3fec34c493f0b683),
+    f64::from_bits(0x3fea2d95256a041c),
+    f64::from_bits(0x3fe7ea6f407bd7eb),
+    f64::from_bits(0x3fe589b0206a4d68),
+    f64::from_bits(0x3fe328801d4fc000),
+];
+/// `((3 - t) / 4)^2` for the abscissas of the 16-point rule
+pub(super) const GL16_XM: [f64; 8] = [
+    f64::from_bits(0x3fd02b875fded849),
+    f64::from_bits(0x3fd0e62a968eda0d),
+    f64::from_bits(0x3fd238dce63d129e),
+    f64::from_bits(0x3fd427205b6ac166),
+    f64::from_bits(0x3fd6b2b3b0932b25),
+    f64::from_bits(0x3fd9d8c24d44f240),
+    f64::from_bits(0x3fdd8f081422f432),
+    f64::from_bits(0x3fe0e0be5bb4a011),
+];
 /// The 10 positive abscissas of the 20-point rule
 pub(super) const GL20_X: [f64; 10] = [
     f64::from_bits(0x3fefc7b5a0c71ce0),
@@ -172,3 +194,35 @@ pub(super) const GL24_W: [f64; 12] = [
     f64::from_bits(0x3fc01b7117cf8bd8),
     f64::from_bits(0x3fc060475e763736),
 ];
+/// Their weights; with the centre weight, `2 * sum + centre = 2`
+pub(super) const GL15_W: [f64; 7] = [
+    f64::from_bits(0x3f9f7dc7227a291b),
+    f64::from_bits(0x3fb2038260b5d026),
+    f64::from_bits(0x3fbb6ec9635f1146),
+    f64::from_bits(0x3fc1dd73b4963161),
+    f64::from_bits(0x3fc5484f30a86ed1),
+    f64::from_bits(0x3fc7d41fa76dc267),
+    f64::from_bits(0x3fc96633f1fd02ce),
+];
+/// `((3 + t) / 4)^2` for the abscissas of the 15-point rule
+pub(super) const GL15_XP: [f64; 7] = [
+    f64::from_bits(0x3fefcee423f6fc6f),
+    f64::from_bits(0x3fef01161aab82c9),
+    f64::from_bits(0x3fed9e0d20c3da04),
+    f64::from_bits(0x3febbe1963146ab9),
+    f64::from_bits(0x3fe980f177e7cf2d),
+    f64::from_bits(0x3fe70a5ff5c4037a),
+    f64::from_bits(0x3fe47ecb2541debc),
+];
+/// `((3 - t) / 4)^2` for the abscissas of the 15-point rule
+pub(super) const GL15_XM: [f64; 7] = [
+    f64::from_bits(0x3fd031548da19ea6),
+    f64::from_bits(0x3fd104f50de1f726),
+    f64::from_bits(0x3fd285570e87b7f4),
+    f64::from_bits(0x3fd4b68da200c7cc),
+    f64::from_bits(0x3fd799c7c94230e5),
+    f64::from_bits(0x3fdb296afdc625ec),
+    f64::from_bits(0x3fdf5550656a1bb4),
+];
+/// The weight of the 15-point rule's centre node, abscissa 0
+pub(super) const GL15_W0: f64 = f64::from_bits(0x3fc9ee1575f9c980);

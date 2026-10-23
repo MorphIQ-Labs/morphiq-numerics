@@ -20,7 +20,8 @@ use core::f64::consts::TAU;
 mod tables;
 use tables::{
     GL4_W, GL4_X, GL6_W, GL6_X, GL8_W, GL8_X, GL10_W, GL10_X, GL12_W, GL12_X, GL14_W, GL14_X,
-    GL16_W, GL16_X, GL20_W, GL20_X, GL24_W, GL24_X,
+    GL15_W, GL15_W0, GL15_XM, GL15_XP, GL16_W, GL16_X, GL16_XM, GL16_XP, GL20_W, GL20_X, GL24_W,
+    GL24_X,
 };
 
 #[cfg(test)]
@@ -328,9 +329,66 @@ pub fn bivariate_norm_cdf_bounded(x: f64, y: f64, rho: f64) -> BoundedProbabilit
     }
 }
 
-/// Genz's upper-tail high-correlation algorithm (BVND, `|rho| >= 0.925`), in
-/// his variable names so the transcription can be checked line by line.
+/// Panels of the high-correlation quadrature are `[s / 2, s]` for `s = a, a/2,
+/// a/4, ...` while `s` exceeds this. On the remaining `[0, s]` the integrand is
+/// integrated analytically (`docs/bivariate_normal_high.md` sections 1.4, 1.5).
+const PANEL_FLOOR: f64 = 0.003;
+
+/// The integral of the high branch is zero to `1e-22` from this `hk` on, and
+/// is not computed (`docs/bivariate_normal_high.md` section 1.7, A3).
+const HK_CUTOFF: f64 = 100.0;
+
+/// A Gauss-Legendre rule of the panels: the positive abscissas' weights, the
+/// unit squares `((3 + t)/4)^2` and `((3 - t)/4)^2` of the abscissas `t`, and
+/// the weight of the centre node at 0 (`None` for an even order).
+struct PanelRule {
+    w: &'static [f64],
+    plus: &'static [f64],
+    minus: &'static [f64],
+    centre: Option<f64>,
+}
+
+/// The rule of the panel of scale `s`: 16 nodes above `0.095`, 15 below.
+fn panel_rule(s: f64) -> PanelRule {
+    if s > 0.095 {
+        PanelRule {
+            w: &GL16_W,
+            plus: &GL16_XP,
+            minus: &GL16_XM,
+            centre: None,
+        }
+    } else {
+        PanelRule {
+            w: &GL15_W,
+            plus: &GL15_XP,
+            minus: &GL15_XM,
+            centre: Some(GL15_W0),
+        }
+    }
+}
+
+/// The integrand of the high-correlation integral at a node of the panel, times
+/// its weight: `weight * exp(-phi) / rs` with `xs = x^2` (the panel's `s^2`
+/// times the node's unit square), `rs = sqrt(1 - xs)` and
+/// `phi = bs / (2 xs) + hk / (1 + rs)`; zero where `exp(-phi)` is below `e^-100`.
+/// `phi` is not negative on the branch's domain, so every term is positive.
+fn integrand_term(xs: f64, weight: f64, bs: f64, hk: f64) -> f64 {
+    let rs = sqrt(1.0 - xs);
+    let phi = bs / (2.0 * xs) + hk / (1.0 + rs);
+    if phi < 100.0 {
+        weight * (exp(-phi) / rs)
+    } else {
+        0.0
+    }
+}
+
+/// Genz's upper-tail high-correlation algorithm (BVND, `|rho| >= 0.925`), with
+/// the integral `J` of `exp(-bs/(2 x^2) - hk/(1 + rs)) / rs` over `[0, a]`
+/// taken on graded panels above `0.003` (a double-word sum of positive terms,
+/// whose truncation is provably bounded) and in closed form below, where
+/// Genz's Taylor-corrected moments are accurate to `2.3e-18`.
 /// `dh` and `dk` are the negated thresholds, `P(X >= dh, Y >= dk)`.
+/// `docs/bivariate_normal_high.md` derives each line.
 fn high_correlation(dh: f64, dk: f64, rho: f64) -> f64 {
     // Genz reflects `k` and `hk` together for negative correlation.
     let (k, hk) = if rho < 0.0 {
@@ -338,51 +396,75 @@ fn high_correlation(dh: f64, dk: f64, rho: f64) -> f64 {
     } else {
         (dk, dh * dk)
     };
-    let ass = (1.0 - rho.abs()) * (1.0 + rho.abs());
-    let mut a = sqrt(ass);
     let bs = (dh - k) * (dh - k);
-    let c = (4.0 - hk) / 8.0;
-    let d = (12.0 - hk) / 16.0;
-    let asr = -(bs / ass + hk) / 2.0;
 
-    let mut bvn = if asr > -100.0 {
-        a * exp(asr) * (1.0 - c * (bs - ass) * (1.0 - d * bs / 5.0) / 3.0 + c * d * ass * ass / 5.0)
-    } else {
-        0.0
-    };
+    // `J`, the quantity `bvn` below accumulates (its negative over `TAU`).
+    let mut bvn = 0.0;
+    if hk < HK_CUTOFF {
+        let ass = (1.0 - rho.abs()) * (1.0 + rho.abs());
+        let a = sqrt(ass);
+        let c = (4.0 - hk) / 8.0;
+        let d = (12.0 - hk) / 16.0;
 
-    if -hk < 100.0 {
-        let b = sqrt(bs);
-        bvn -= exp(-hk / 2.0)
-            * SQRT_TAU
-            * norm_cdf(-b / a)
-            * b
-            * (1.0 - c * bs * (1.0 - d * bs / 5.0) / 3.0);
-    }
-
-    a /= 2.0;
-    for i in 0..GL20_X.len() {
-        for sign in [1.0_f64, -1.0] {
-            let x = a * (sign * GL20_X[i] + 1.0);
-            let xs = x * x;
-            let asr = -(bs / xs + hk) / 2.0;
-            if asr > -100.0 {
-                let rs = sqrt(1.0 - xs);
-                let one_plus_rs = 1.0 + rs;
-                bvn += a
-                    * GL20_W[i]
-                    * exp(asr)
-                    * (exp(-hk * xs / (2.0 * one_plus_rs * one_plus_rs)) / rs
-                        - (1.0 + c * xs * (1.0 + d * xs)));
+        // The panels cover `[x_m, a]`, `x_m` the first scale at or below the
+        // floor. Their terms are positive and sum to up to 0.41, so the sum is a
+        // double-word: `two_sum` per term, the low parts added in order.
+        let (mut high, mut low) = (0.0, 0.0);
+        let mut s = a;
+        while s > PANEL_FLOOR {
+            let rule = panel_rule(s);
+            let half_width = s / 4.0;
+            let s2 = s * s;
+            let mut add = |xs_unit: f64, w: f64| {
+                let term = half_width * integrand_term(s2 * xs_unit, w, bs, hk);
+                let (sum, err) = two_sum(high, term);
+                high = sum;
+                low += err;
+            };
+            for i in 0..rule.w.len() {
+                add(rule.plus[i], rule.w[i]);
+                add(rule.minus[i], rule.w[i]);
             }
+            if let Some(w0) = rule.centre {
+                add(0.5625, w0);
+            }
+            s /= 2.0;
         }
+        let panels = high + low;
+
+        // Genz's closed form for `int_0^s E T dx` on the rest, `s <= 0.003`.
+        // From `b = 20 s` on, `E <= e^-200` there and the integral is below
+        // `1e-46`: the closed form is not evaluated.
+        let b = sqrt(bs);
+        if b < 20.0 * s {
+            let ass = s * s;
+            let asr = -(bs / ass + hk) / 2.0;
+            bvn = s
+                * exp(asr)
+                * (1.0 - c * (bs - ass) * (1.0 - d * bs / 5.0) / 3.0 + c * d * ass * ass / 5.0);
+            bvn -= exp(-hk / 2.0)
+                * SQRT_TAU
+                * norm_cdf(-b / s)
+                * b
+                * (1.0 - c * bs * (1.0 - d * bs / 5.0) / 3.0);
+        }
+        bvn += panels;
     }
 
     bvn = -bvn / TAU;
     let result = if rho > 0.0 {
         bvn + norm_cdf(-dh.max(dk))
+    } else if -dh > dk {
+        // `-bvn` is the integral's share, `g`. The second term is
+        // `Phi(-dh) - Phi(dk)`, positive here: the exact difference of the two
+        // values is kept as the double-word `s + e`, so it carries no rounding
+        // of its own, and `g` joins it once (`BvnHighAssembly.v`).
+        let g = -bvn;
+        let (hi, lo) = two_sum(norm_cdf(-dh), -norm_cdf(dk));
+        hi + (lo + g)
     } else {
-        -bvn + (norm_cdf(-dh) - norm_cdf(dk)).max(0.0)
+        // `Phi(-dh) <= Phi(dk)`: the reflection's difference term is zero.
+        -bvn
     };
     clamp_to_probability(result)
 }
