@@ -325,3 +325,89 @@ Proof.
   lra.
 Qed.
 
+
+(** The same when the second value is below one half, which is the only case the
+    branch meets with a nonzero difference: [Phi(-dh) > Phi(dk)] with [dh >= dk]
+    forces [dk < 0], so [Phi(dk) < 1/2].  Then its rounding is at most [2^-55]. *)
+Theorem neg_assembly_dw_half P1 P2 G g D :
+  0 <= P1 <= 1 -> 0 <= P2 < / 2 -> 0 <= G -> Rabs (g - G) <= D ->
+  generic_format radix2 fexp g -> - / 10 <= g <= / 10 ->
+  0 <= G + Rmax 0 (P1 - P2) <= 1 -> rnd P2 <= rnd P1 ->
+  let p1 := rnd P1 in let p2 := rnd P2 in
+  let s := rnd (p1 - p2) in let e := (p1 - p2) - s in
+  Rabs (clamp (rnd (s + rnd (e + g))) - (G + Rmax 0 (P1 - P2))) <= D + 21 / 8 * c54.
+Proof.
+  intros H1 H2 HG Hg Gf Hg01 HP Hle p1 p2 s e.
+  pose proof c54_pos as Hc. pose proof c54_small as Hsm.
+  assert (Hp1 : Rabs (p1 - P1) <= c54) by (apply rnd_err_unit; lra).
+  assert (Hp1u : p1 <= 1) by (unfold p1; rewrite <- rnd_one; apply rnd_le; lra).
+  assert (Hp2l : 0 <= p2) by (unfold p2; rewrite <- rnd_0; apply rnd_le; lra).
+  assert (Hp2 : Rabs (p2 - P2) <= c54 / 2).
+  { pose proof (rnd_err_half P2 (conj (proj1 H2) (proj2 H2))) as H. exact H. }
+  assert (Hle' : p2 <= p1) by exact Hle.
+  assert (Hm0 : Rmax 0 (p1 - p2) = p1 - p2) by (apply Rmax_right; lra).
+  assert (Hmax : Rabs (p1 - p2 - Rmax 0 (P1 - P2)) <= Rabs ((p1 - P1) - (p2 - P2))).
+  { rewrite <- Hm0. eapply Rle_trans; [apply Rmax0_lipschitz|]. right. f_equal. ring. }
+  pose proof (abs2m (p1 - P1) (p2 - P2)) as Hm2.
+  set (P := G + Rmax 0 (P1 - P2)) in *.
+  pose proof (round_clamp (s + rnd (e + g)) P HP) as Hfin.
+  assert (Hx : Rabs (s + rnd (e + g) - P) <= D + 13 / 8 * c54).
+  { destruct (Rle_dec (p1 / 2) p2) as [Hs|Hns].
+    - assert (Hf : generic_format radix2 fexp (p1 - p2)).
+      { apply sterbenz; [apply fexp_valid | apply fexp_mono | apply rnd_format | apply rnd_format | lra]. }
+      assert (Hs' : s = p1 - p2) by (unfold s; apply rnd_fix; exact Hf).
+      assert (He : e = 0) by (unfold e; rewrite Hs'; ring).
+      rewrite He, Rplus_0_l, (rnd_fix g Gf), Hs'.
+      replace (p1 - p2 + g - P) with ((g - G) + (p1 - p2 - Rmax 0 (P1 - P2))) by (unfold P; ring).
+      pose proof (Rabs_triang (g - G) (p1 - p2 - Rmax 0 (P1 - P2))) as H4.
+      lra.
+    - assert (He : Rabs e <= c54).
+      { unfold e. replace (p1 - p2 - s) with (-(s - (p1 - p2))) by ring. rewrite Rabs_Ropp.
+        unfold s. apply rnd_err_unit. lra. }
+      assert (Heg : Rabs (e + g) < / 8).
+      { apply Rabs_lt. pose proof (Rabs_le_inv _ _ He) as [He1 He2]. lra. }
+      pose proof (rnd_err_eighth (e + g) Heg) as Hy.
+      assert (Hv : s + rnd (e + g) - P
+        = (g - G) + (p1 - p2 - Rmax 0 (P1 - P2)) + (rnd (e + g) - (e + g))).
+      { unfold e, P. ring. }
+      rewrite Hv.
+      pose proof (abs3p (g - G) (p1 - p2 - Rmax 0 (P1 - P2)) (rnd (e + g) - (e + g))) as H3.
+      lra. }
+  lra.
+Qed.
+
+(** The branch as written: when [rnd Phi1 > rnd Phi2] the double-word form,
+    otherwise [g] alone.  The ordering [dh >= dk] of the thresholds gives the
+    hypothesis [1/2 <= P2 -> P1 <= P2]. *)
+Theorem neg_assembly_final P1 P2 G g D :
+  0 <= P1 <= 1 -> 0 <= P2 <= 1 -> 0 <= G -> Rabs (g - G) <= D ->
+  generic_format radix2 fexp g -> - / 10 <= g <= / 10 ->
+  0 <= G + Rmax 0 (P1 - P2) <= 1 -> (/ 2 <= P2 -> P1 <= P2) ->
+  let p1 := rnd P1 in let p2 := rnd P2 in
+  let s := rnd (p1 - p2) in let e := (p1 - p2) - s in
+  Rabs (clamp (if Rlt_dec p2 p1 then rnd (s + rnd (e + g)) else g)
+        - (G + Rmax 0 (P1 - P2))) <= D + 21 / 8 * c54.
+Proof.
+  intros H1 H2 HG Hg Gf Hg01 HP Hord p1 p2 s e.
+  pose proof c54_pos as Hc.
+  destruct (Rlt_dec p2 p1) as [Hlt|Hge].
+  - assert (HP2 : P2 < / 2).
+    { destruct (Rlt_le_dec P2 (/ 2)) as [|Hb]; [assumption|]. exfalso.
+      pose proof (Hord Hb) as H. pose proof (rnd_le P1 P2 H) as H'. unfold p1, p2 in Hlt. lra. }
+    apply (neg_assembly_dw_half P1 P2 G g D H1 (conj (proj1 H2) HP2) HG Hg Gf Hg01 HP).
+    unfold p1, p2 in Hlt. lra.
+  - assert (Hp1 : Rabs (p1 - P1) <= c54) by (apply rnd_err_unit; lra).
+    assert (Hp2 : Rabs (p2 - P2) <= c54) by (apply rnd_err_unit; lra).
+    pose proof (abs2m (p1 - P1) (p2 - P2)) as Hm2.
+    pose proof (Rabs_le_inv _ _ Hp1) as [Ha Hb]. pose proof (Rabs_le_inv _ _ Hp2) as [Hc2 Hd].
+    assert (Hr : Rmax 0 (P1 - P2) <= 2 * c54).
+    { unfold Rmax. destruct (Rle_dec 0 (P1 - P2)); lra. }
+    assert (Hr0 : 0 <= Rmax 0 (P1 - P2)) by (apply Rmax_l).
+    pose proof (clamp_lipschitz g (G + Rmax 0 (P1 - P2))) as Hl.
+    rewrite (clamp_in (G + Rmax 0 (P1 - P2)) HP) in Hl.
+    assert (Rabs (g - (G + Rmax 0 (P1 - P2))) <= D + 2 * c54).
+    { replace (g - (G + Rmax 0 (P1 - P2))) with ((g - G) - Rmax 0 (P1 - P2)) by ring.
+      pose proof (abs2m (g - G) (Rmax 0 (P1 - P2))) as H5. rewrite (Rabs_right (Rmax 0 (P1 - P2))) in H5 by lra.
+      lra. }
+    lra.
+Qed.
