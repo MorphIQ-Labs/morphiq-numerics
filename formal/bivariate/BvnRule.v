@@ -150,4 +150,125 @@ Proof.
       assert (Hk0 : nkw n <= 0) by (rewrite Hkw; rewrite <- rnd_zero; apply rnd_mono; nra).
       rewrite <- rnd_zero. apply rnd_mono. nra.
 Qed.
+
+Definition ok (n : NodeS) (d : Dat) : Prop := node_enc Kh n d /\ dat_ok A d.
+
+Lemma rule_facts nodes dats :
+  0 <= bp -> bq <= bp -> List.Forall2 ok nodes dats ->
+  Rabs (sumR (map tn nodes) - sumR (map vn nodes)) <= sum2 vbn nodes dats + 3 * INR (length nodes) * z /\
+  psi2 * sumR (map (fun n => Rabs (vn n)) nodes) + (1 + psi2) * sum2 vbn nodes dats <= sum2 gn nodes dats /\
+  0 <= sumR (map (fun n => Rabs (vn n)) nodes) /\ 0 <= sum2 vbn nodes dats /\
+  (forall t, In t (map tn nodes) -> fmtF t) /\
+  (0 <= Kex -> forall t, In t (map tn nodes) -> 0 <= t) /\
+  (Kex <= 0 -> forall t, In t (map tn nodes) -> t <= 0).
+Proof.
+  intros Hbp Hbq Hall.
+  induction Hall as [| n d nodes dats [Hok1 Hok2] Hall IH].
+  - simpl. refine (conj _ (conj _ (conj _ (conj _ (conj _ (conj _ _)))))); try (intros; contradiction); try lra.
+    replace (0 - 0) with 0 by ring. rewrite Rabs_R0. lra.
+  - destruct IH as [I1 [I2 [I3 [I4 [I5 [I6 I7]]]]]].
+    destruct (node_facts n d Hbp Hbq Hok1 Hok2) as [F1 [F2 [F3 [F4 [F5 F6]]]]].
+    pose proof z_pos as Hz. pose proof (Rabs_pos (vn n)).
+    simpl map. simpl sumR. simpl sum2. simpl length. rewrite S_INR.
+    refine (conj _ (conj _ (conj _ (conj _ (conj _ (conj _ _)))))).
+    + assert (E : tn n + sumR (map tn nodes) - (vn n + sumR (map vn nodes))
+                  = (tn n - vn n) + (sumR (map tn nodes) - sumR (map vn nodes))) by ring.
+      rewrite E. eapply Rle_trans; [apply Rabs_triang |]. lra.
+    + lra.
+    + lra.
+    + lra.
+    + intros t [Ht | Ht]; [rewrite <- Ht; exact F4 | apply I5; exact Ht].
+    + intros HK t [Ht | Ht]; [rewrite <- Ht; apply F5; exact HK | apply I6; assumption].
+    + intros HK t [Ht | Ht]; [rewrite <- Ht; apply F6; exact HK | apply I7; assumption].
+Qed.
+
+Lemma rule_bound nodes dats :
+  0 <= bp -> bq <= bp -> List.Forall2 ok nodes dats -> (length nodes <= 24)%nat ->
+  Rabs (fst (acc (map tn nodes) (0, 0)) + snd (acc (map tn nodes) (0, 0)) - sumR (map vn nodes))
+    <= sum2 gn nodes dats + 200 * z.
+Proof.
+  intros Hbp Hbq Hall Hlen.
+  destruct (rule_facts nodes dats Hbp Hbq Hall) as [I1 [I2 [I3 [I4 [I5 [I6 I7]]]]]].
+  pose proof z_pos as Hz. pose proof u_pos as Hu. pose proof u_val as Huv.
+  assert (Hlen' : (length (map tn nodes) <= 24)%nat) by (rewrite map_length; exact Hlen).
+  assert (Hl : INR (length nodes) <= 24) by (replace 24 with (INR 24) by (simpl; lra); apply le_INR; exact Hlen).
+  set (T := sumR (map tn nodes)) in *. set (V := sumR (map vn nodes)) in *.
+  set (Va := sumR (map (fun n => Rabs (vn n)) nodes)) in *.
+  set (B1 := sum2 vbn nodes dats) in *.
+  assert (HVa : Rabs V <= Va).
+  { unfold V, Va. clear. induction nodes as [| n ns IH]; simpl; [rewrite Rabs_R0; lra |].
+    eapply Rle_trans; [apply Rabs_triang |]. lra. }
+  assert (HT : Rabs (T - V) <= B1 + 72 * z) by nra.
+  assert (Hacc : Rabs (fst (acc (map tn nodes) (0, 0)) + snd (acc (map tn nodes) (0, 0)) - T) <= 2000 * u * u * Rabs T + 30 * z).
+  { destruct (Rle_dec 0 Kex) as [Hk | Hk].
+    - destruct (acc_final (map tn nodes) (fun t Ht => conj (I5 t Ht) (I6 Hk t Ht)) Hlen') as [_ [_ H]].
+      rewrite (Rabs_pos_eq T) by (apply sumR_nonneg; intros t Ht; apply (I6 Hk t Ht)). exact H.
+    - destruct (acc_final_neg (map tn nodes) (fun t Ht => conj (I5 t Ht) (I7 ltac:(lra) t Ht)) Hlen') as [_ [_ H]]. exact H. }
+  assert (HTa : Rabs T <= Va + B1 + 72 * z).
+  { assert (E : T = V + (T - V)) by ring. assert (Rabs T <= Rabs V + Rabs (T - V)) by (rewrite E at 1; apply Rabs_triang). lra. }
+  assert (E2 : fst (acc (map tn nodes) (0, 0)) + snd (acc (map tn nodes) (0, 0)) - V
+               = (fst (acc (map tn nodes) (0, 0)) + snd (acc (map tn nodes) (0, 0)) - T) + (T - V)) by ring.
+  rewrite E2. eapply Rle_trans; [apply Rabs_triang |].
+  assert (Hs : 2000 * u * u * Rabs T <= 2000 * u * u * (Va + B1 + 72 * z)) by (apply Rmult_le_compat_l; [nra | exact HTa]).
+  assert (Hps : psi2 = 2000 * u * u) by reflexivity.
+  assert (Hzs : 2000 * u * u * (72 * z) <= z) by (rewrite Huv; nra).
+  assert (Hva : 0 <= Va) by exact I3.
+  assert (Hb1 : 0 <= B1) by exact I4.
+  assert (Hq : 2000 * u * u * (Va + B1 + 72 * z) = psi2 * Va + psi2 * B1 + 2000 * u * u * (72 * z)) by (rewrite Hps; ring).
+  nra.
+Qed.
+
+(** The branch flag of a datum records which side of [Gsup] applies. *)
+Definition gdat (d : Dat) : R := dwhi d * Gsup bp (theta_of A d) (1 - theta_of A d).
+
+Fixpoint sumD (f : Dat -> R) (l : list Dat) : R :=
+  match l with nil => 0 | d :: l' => f d + sumD f l' end.
+
+Lemma sum_g_le nodes dats :
+  0 <= bp -> List.Forall2 ok nodes dats -> sum2 gn nodes dats <= Rabs Kex * sumD gdat dats.
+Proof.
+  intros Hbp Hall. induction Hall as [| n d nodes dats [Hok1 Hok2] Hall IH]; simpl; [lra |].
+  destruct Hok1 as [_ [_ [_ [_ [HW _]]]]]. destruct HW as [HW1 HW2].
+  destruct Hok2 as [_ [_ [Hwd [_ [_ [_ [_ Hth]]]]]]].
+  assert (HG : 0 <= Gsup bp (theta_of A d) (1 - theta_of A d)) by (apply Gsup_nonneg; [exact Hbp | lra | lra]).
+  assert (Hg : gn n d <= Rabs Kex * gdat d).
+  { unfold gn, gdat. assert (Rabs Kex * nW n <= Rabs Kex * dwhi d) by (apply Rmult_le_compat_l; [apply Rabs_pos | exact HW2]).
+    assert (Hm : Rabs Kex * nW n * Gsup bp (theta_of A d) (1 - theta_of A d) <= Rabs Kex * dwhi d * Gsup bp (theta_of A d) (1 - theta_of A d))
+      by (apply Rmult_le_compat_r; [exact HG | assumption]).
+    lra. }
+  lra.
+Qed.
+
+Lemma sum_g_nonneg nodes dats :
+  0 <= bp -> List.Forall2 ok nodes dats -> 0 <= sum2 gn nodes dats.
+Proof.
+  intros Hbp Hall. induction Hall as [| n d nodes dats [Hok1 Hok2] Hall IH]; simpl; [lra |].
+  destruct Hok1 as [_ [_ [_ [_ [HW _]]]]]. destruct HW as [HW1 HW2].
+  destruct Hok2 as [_ [_ [_ [_ [_ [_ [_ Hth]]]]]]].
+  assert (HG : 0 <= Gsup bp (theta_of A d) (1 - theta_of A d)) by (apply Gsup_nonneg; [exact Hbp | lra | lra]).
+  assert (Hg : 0 <= gn n d) by (unfold gn; apply Rmult_le_pos; [apply Rmult_le_pos; [apply Rabs_pos | lra] | exact HG]).
+  lra.
+Qed.
+
+Definition gcl (d : Dat) : R :=
+  dwhi d * (if dbr d then theta_of A d / (1 - theta_of A d) * exp ((1 - theta_of A d) * bp / theta_of A d - 1) else bp).
+
+Definition br_ok (d : Dat) : Prop :=
+  (dbr d = true -> (1 - theta_of A d) * bp <= theta_of A d) /\
+  (dbr d = false -> theta_of A d < (1 - theta_of A d) * bp).
+
+Lemma gdat_gcl d : br_ok d -> gdat d = gcl d.
+Proof.
+  intros [H1 H2]. unfold gdat, gcl, Gsup. destruct (dbr d) eqn:E.
+  - destruct (Rle_dec ((1 - theta_of A d) * bp) (theta_of A d)) as [H | H]; [reflexivity |].
+    exfalso. apply H. apply H1. reflexivity.
+  - destruct (Rle_dec ((1 - theta_of A d) * bp) (theta_of A d)) as [H | H]; [| reflexivity].
+    exfalso. pose proof (H2 eq_refl). lra.
+Qed.
+
+Lemma sumD_gcl dats : List.Forall br_ok dats -> sumD gdat dats = sumD gcl dats.
+Proof.
+  intros H. induction H as [| d dats Hd H IH]; simpl; [reflexivity |].
+  rewrite (gdat_gcl d Hd), IH. reflexivity.
+Qed.
 End Rule.
