@@ -9,7 +9,7 @@
       for a value just above [2^(k-1)];
     - [rnd_opp]: rounding is odd. *)
 From Coq Require Import Reals ZArith Lia Lra.
-From Flocq Require Import Core Relative.
+From Flocq Require Import Core Relative Plus_error.
 Open Scope R_scope.
 
 Notation rndF := (round radix2 (FLT_exp (-1074) 53) (Znearest (fun n => negb (Z.even n)))).
@@ -82,4 +82,67 @@ Proof.
       - rewrite (Rabs_right _ Hp) in Hf. exact Hf. }
     rewrite round_generic by (auto with typeclass_instances || exact Hx2).
     replace (x - x) with 0 by ring. rewrite Rabs_R0. left. apply bpow_gt_0.
+Qed.
+
+Notation fmtF := (generic_format radix2 (FLT_exp (-1074) 53)).
+
+Lemma fmtF_rnd x : fmtF (rndF x).
+Proof. apply generic_format_round; auto with typeclass_instances. Qed.
+
+(** Away from underflow rounding is a relative perturbation. *)
+Lemma rnd_delta x : x = 0 \/ bpow radix2 (-1022) <= Rabs x ->
+  exists d, Rabs d <= u /\ rndF x = x * (1 + d).
+Proof.
+  intros [H | H].
+  - subst x. exists 0. split; [rewrite Rabs_R0; apply Rlt_le, u_pos |].
+    rewrite round_0 by auto with typeclass_instances. ring.
+  - pose proof (relative_error_N_FLT_ex radix2 (-1074) 53 ltac:(lia) (fun n => negb (Z.even n)) x) as R.
+    replace (-1074 + 53 - 1)%Z with (-1022)%Z in R by reflexivity. specialize (R H).
+    destruct R as [e [He Hr]]. exists e. split; [| exact Hr].
+    assert (E : / 2 * bpow radix2 (- (53) + 1) = u).
+    { unfold u. replace (- (53) + 1)%Z with (-53 + 1)%Z by reflexivity. rewrite bpow_plus.
+      change (bpow radix2 1) with 2%R. field. }
+    rewrite E in He. exact He.
+Qed.
+
+(** The difference of two binary64 numbers rounds with a relative error, or
+    exactly when it is subnormal. *)
+Lemma rnd_sub_delta a b : fmtF a -> fmtF b ->
+  exists d, Rabs d <= u /\ rndF (a - b) = (a - b) * (1 + d).
+Proof.
+  intros Fa Fb.
+  destruct (Rle_or_lt (bpow radix2 (-1022)) (Rabs (a - b))) as [H | H].
+  - apply rnd_delta. right. exact H.
+  - exists 0. split; [rewrite Rabs_R0; apply Rlt_le, u_pos |].
+    assert (Fs : fmtF (a - b)).
+    { unfold Rminus. apply FLT_format_plus_small; auto with typeclass_instances.
+      - exact Fa.
+      - apply generic_format_opp. exact Fb.
+      - unfold Rminus in H. left. eapply Rlt_le_trans; [exact H |]. apply bpow_le. lia. }
+    rewrite round_generic by (auto with typeclass_instances || exact Fs). ring.
+Qed.
+
+(** Halving a normal binary64 number is exact. *)
+Lemma rnd_half w : fmtF w -> bpow radix2 (-1021) <= Rabs w -> rndF (w / 2) = w / 2.
+Proof.
+  intros Fw Hw.
+  apply FLT_format_generic in Fw; [| lia].
+  destruct Fw as [[m e] E1 E2 E3]. simpl in E1, E2, E3.
+  assert (He : (-1073 <= e)%Z).
+  { destruct (Z_le_dec (-1073) e) as [H | H]; [exact H |].
+    assert (e = -1074)%Z by lia. subst e. exfalso.
+    assert (Hm : Rabs (IZR m) < bpow radix2 53).
+    { rewrite <- abs_IZR. change (bpow radix2 53) with (IZR (Zpower radix2 53)).
+      apply IZR_lt. exact E2. }
+    assert (Hw2 : Rabs w < bpow radix2 (-1021)).
+    { rewrite E1. unfold F2R; simpl. rewrite Rabs_mult, (Rabs_pos_eq (bpow radix2 (-1074))) by (apply Rlt_le, bpow_gt_0).
+      replace (-1021)%Z with (53 + -1074)%Z by reflexivity. rewrite bpow_plus.
+      apply Rmult_lt_compat_r; [apply bpow_gt_0 | exact Hm]. }
+    lra. }
+  apply round_generic; [auto with typeclass_instances |].
+  apply generic_format_FLT. exists (Float radix2 m (e - 1)).
+  - rewrite E1. unfold F2R; simpl. replace (e - 1)%Z with (e + -1)%Z by lia. rewrite bpow_plus.
+    change (bpow radix2 (-1)) with (/ 2). field.
+  - simpl. exact E2.
+  - simpl. lia.
 Qed.
