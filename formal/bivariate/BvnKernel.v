@@ -27,10 +27,10 @@ Open Scope Z_scope.
 
 Definition aw (z : Z) : f64 := b64_of_bits z.
 
-Infix "+." := fadd (at level 50, left associativity).
-Infix "-." := fsub (at level 50, left associativity).
-Infix "*." := fmul (at level 40, left associativity).
-Infix "/." := fdiv (at level 40, left associativity).
+Infix "+f" := fadd (at level 50, left associativity).
+Infix "-f" := fsub (at level 50, left associativity).
+Infix "*f" := fmul (at level 40, left associativity).
+Infix "/f" := fdiv (at level 40, left associativity).
 
 (** The Rust constants, as binary64 encodings. *)
 Definition k0 := aw 0x0000000000000000.
@@ -130,16 +130,22 @@ Fixpoint low_rule_index (m : f64) (limits : list Z) : nat :=
 Definition low_correlation_rule (rho : f64) : list Z * list Z :=
   nth (low_rule_index (fabs rho) low_rule_limits) low_rules ([], []).
 
+(** The angle of a node: [asr * (sign * x + 1) / 2]. *)
+Definition node_angle (asr sign x : f64) : f64 := asr *f (sign *f x +f k1) /f k2.
+
 (** One node of the table: [(kw, p, q)] of the node's angle's sine [s]. *)
 Definition node_entry (L : lib) (asr k w x sign : f64) : f64 * f64 * f64 :=
-  let s := lib_sin L (asr *. (sign *. x +. k1) /. k2) in
-  (w *. k, kquarter /. (k1 -. s), kquarter /. (k1 +. s)).
+  let s := lib_sin L (node_angle asr sign x) in
+  (w *f k, kquarter /f (k1 -f s), kquarter /f (k1 +f s)).
 
-(** The table's [(kw, p, q)] of each node, in node order: for each abscissa its
-    positive node then its mirror. *)
+(** The table's [(kw, p, q)] of each node, in node order: for each stored
+    abscissa and weight its positive node then its mirror. *)
+Definition low_pairs (L : lib) (asr k : f64) (xw : list (Z * Z)) : list (f64 * f64 * f64) :=
+  flat_map (fun p => let x := aw (fst p) in let w := aw (snd p) in
+    [node_entry L asr k w x k1; node_entry L asr k w x kneg1]) xw.
+
 Definition low_nodes (L : lib) (asr k : f64) (xs ws : list Z) : list (f64 * f64 * f64) :=
-  flat_map (fun xw => let x := aw (fst xw) in let w := aw (snd xw) in
-    [node_entry L asr k w x k1; node_entry L asr k w x kneg1]) (combine xs ws).
+  low_pairs L asr k (combine xs ws).
 
 Record table := mk_table {
   t_rho : f64;
@@ -156,7 +162,7 @@ Definition build_table (L : lib) (rho : f64) : option table :=
   | Some Low =>
       let asr := lib_asin L rho in
       let '(xs, ws) := low_correlation_rule rho in
-      let k := asr /. (k2 *. ktau) in
+      let k := asr /f (k2 *f ktau) in
       Some (mk_table rho Low asr (low_nodes L asr k xs ws))
   | Some r => Some (mk_table rho r k0 [])
   end.
@@ -168,28 +174,39 @@ Definition degenerate_limit (L : lib) (x y : f64) : option f64 :=
   else if fge y ksaturated then Some (lib_norm_cdf L x)
   else None.
 
+(** One node's term: [kw * exp(-(d p + m q))], [d = (x - y)^2], [m = (x + y)^2]. *)
+Definition low_term (L : lib) (d m kw p q : f64) : f64 :=
+  kw *f lib_exp L (fneg (d *f p +f m *f q)).
+
 (** The low quadrature's accumulation of the terms, as a double-word: [two_sum]
     per term, the low parts added in order. *)
 Fixpoint low_sum (L : lib) (d m : f64) (nodes : list (f64 * f64 * f64)) (high low : f64) : f64 * f64 :=
   match nodes with
   | [] => (high, low)
   | (kw, p, q) :: rest =>
-      let term := kw *. lib_exp L (fneg (d *. p +. m *. q)) in
-      let '(s, e) := two_sum64 high term in
-      low_sum L d m rest s (low +. e)
+      let '(s, e) := two_sum64 high (low_term L d m kw p q) in
+      low_sum L d m rest s (low +f e)
   end.
 
-(** [BivariateNormal::low] for ordered [x <= y]. *)
-Definition low_branch (L : lib) (t : table) (x y : f64) : f64 :=
-  let e1 := x -. y in
-  let d := e1 *. e1 in
-  let e2 := x +. y in
-  let m := e2 *. e2 in
-  let '(high, low) := low_sum L d m (t_nodes t) k0 k0 in
-  let '(hi, lo) := two_prod64 (lib_norm_cdf L x) (lib_norm_cdf L y) in
+(** [d = (x - y)^2] and [m = (x + y)^2]. *)
+Definition sq_diff (x y : f64) : f64 := let e := x -f y in e *f e.
+Definition sq_sum (x y : f64) : f64 := let e := x +f y in e *f e.
+
+(** The low branch's last stage: the product of the two distribution functions
+    kept as a double-word (its error word dropped below [PRODUCT_EXACT_FLOOR]),
+    its sum with the quadrature's high word, one rounding and the clamp. *)
+Definition low_finish (px py high low : f64) : f64 :=
+  let '(hi, lo) := two_prod64 px py in
   let lo := if fge hi kproduct_floor then lo else k0 in
   let '(sum, err) := two_sum64 hi high in
-  clamp_to_probability (sum +. (err +. (low +. lo))).
+  clamp_to_probability (sum +f (err +f (low +f lo))).
+
+(** [BivariateNormal::low] for ordered [x <= y]. *)
+Definition kernel_low (L : lib) (t : table) (x y : f64) : f64 :=
+  let d := sq_diff x y in
+  let m := sq_sum x y in
+  let '(high, low) := low_sum L d m (t_nodes t) k0 k0 in
+  low_finish (lib_norm_cdf L x) (lib_norm_cdf L y) high low.
 
 (** [PanelRule]: the weights, the unit squares of the abscissas [t] as
     [((3 + t)/4)^2] and [((3 - t)/4)^2], and the centre node's weight. *)
@@ -199,9 +216,9 @@ Definition panel_rule (s : f64) : list Z * list Z * list Z * option Z :=
 
 (** [integrand_term]. *)
 Definition integrand_term (L : lib) (xs w bs hk : f64) : f64 :=
-  let rs := fsqrt (k1 -. xs) in
-  let phi := bs /. (k2 *. xs) +. hk /. (k1 +. rs) in
-  if flt phi k100 then w *. (lib_exp L (fneg phi) /. rs) else k0.
+  let rs := fsqrt (k1 -f xs) in
+  let phi := bs /f (k2 *f xs) +f hk /f (k1 +f rs) in
+  if flt phi k100 then w *f (lib_exp L (fneg phi) /f rs) else k0.
 
 (** The panel nodes of a scale in order, each as its unit square and weight:
     the pair of each abscissa, then the centre. *)
@@ -220,15 +237,15 @@ Fixpoint panel_sum (L : lib) (fuel : nat) (s bs hk high low : f64) : f64 * f64 *
   | O => (high, low, s)
   | S fuel' =>
       if fgt s kpanel_floor then
-        let half_width := s /. k4 in
-        let s2 := s *. s in
+        let half_width := s /f k4 in
+        let s2 := s *f s in
         let '(high, low) :=
           fold_left (fun st xw =>
-              let term := half_width *. integrand_term L (s2 *. fst xw) (snd xw) bs hk in
+              let term := half_width *f integrand_term L (s2 *f fst xw) (snd xw) bs hk in
               let '(sum, err) := two_sum64 (fst st) term in
-              (sum, snd st +. err))
+              (sum, snd st +f err))
             (panel_nodes (panel_rule s)) (high, low) in
-        panel_sum L fuel' (s /. k2) bs hk high low
+        panel_sum L fuel' (s /f k2) bs hk high low
       else (high, low, s)
   end.
 
@@ -236,40 +253,40 @@ Fixpoint panel_sum (L : lib) (fuel : nat) (s bs hk high low : f64) : f64 * f64 *
     where [b >= 20 s]. *)
 Definition closed_form (L : lib) (s bs hk c d : f64) : f64 :=
   let b := fsqrt bs in
-  if flt b (k20 *. s) then
-    let ass := s *. s in
-    let asr := fneg (bs /. ass +. hk) /. k2 in
-    let bvn := s *. lib_exp L asr
-               *. (k1 -. c *. (bs -. ass) *. (k1 -. d *. bs /. k5) /. k3 +. c *. d *. ass *. ass /. k5) in
-    bvn -. lib_exp L (fneg hk /. k2) *. ksqrt_tau *. lib_norm_cdf L (fneg b /. s) *. b
-           *. (k1 -. c *. bs *. (k1 -. d *. bs /. k5) /. k3)
+  if flt b (k20 *f s) then
+    let ass := s *f s in
+    let asr := fneg (bs /f ass +f hk) /f k2 in
+    let bvn := s *f lib_exp L asr
+               *f (k1 -f c *f (bs -f ass) *f (k1 -f d *f bs /f k5) /f k3 +f c *f d *f ass *f ass /f k5) in
+    bvn -f lib_exp L (fneg hk /f k2) *f ksqrt_tau *f lib_norm_cdf L (fneg b /f s) *f b
+           *f (k1 -f c *f bs *f (k1 -f d *f bs /f k5) /f k3)
   else k0.
 
 (** The integral [-J] accumulates, before its scaling: [bvn] of [high_correlation]
     after the panels and the closed form. *)
 Definition high_integral (L : lib) (dh k hk bs rho : f64) : f64 :=
   if flt hk khk_cutoff then
-    let ass := (k1 -. fabs rho) *. (k1 +. fabs rho) in
+    let ass := (k1 -f fabs rho) *f (k1 +f fabs rho) in
     let a := fsqrt ass in
-    let c := (k4 -. hk) /. k8 in
-    let d := (k12 -. hk) /. k16 in
+    let c := (k4 -f hk) /f k8 in
+    let d := (k12 -f hk) /f k16 in
     let '(high, low, s) := panel_sum L 64%nat a bs hk k0 k0 in
-    let panels := high +. low in
-    closed_form L s bs hk c d +. panels
+    let panels := high +f low in
+    closed_form L s bs hk c d +f panels
   else k0.
 
 (** [high_correlation]: [dh] and [dk] are the negated thresholds. *)
 Definition high_correlation (L : lib) (dh dk rho : f64) : f64 :=
-  let '(k, hk) := if flt rho k0 then (fneg dk, fneg (dh *. dk)) else (dk, dh *. dk) in
-  let bs := (dh -. k) *. (dh -. k) in
+  let '(k, hk) := if flt rho k0 then (fneg dk, fneg (dh *f dk)) else (dk, dh *f dk) in
+  let bs := (dh -f k) *f (dh -f k) in
   let bvn := high_integral L dh k hk bs rho in
-  let bvn := fneg bvn /. ktau in
+  let bvn := fneg bvn /f ktau in
   let result :=
-    if fgt rho k0 then bvn +. lib_norm_cdf L (fneg (fmax dh dk))
+    if fgt rho k0 then bvn +f lib_norm_cdf L (fneg (fmax dh dk))
     else if fgt (fneg dh) dk then
       let g := fneg bvn in
       let '(hi, lo) := two_sum64 (lib_norm_cdf L (fneg dh)) (fneg (lib_norm_cdf L dk)) in
-      hi +. (lo +. g)
+      hi +f (lo +f g)
     else fneg bvn in
   clamp_to_probability result.
 
@@ -280,10 +297,10 @@ Definition cdf (L : lib) (t : table) (x y : f64) : f64 :=
   | Some limit => limit
   | None =>
       match t_regime t with
-      | Independent => lib_norm_cdf L x *. lib_norm_cdf L y
+      | Independent => lib_norm_cdf L x *f lib_norm_cdf L y
       | Comonotone => lib_norm_cdf L x
-      | Countermonotone => fmax0 (lib_norm_cdf L x -. lib_norm_cdf L (fneg y))
-      | Low => low_branch L t x y
+      | Countermonotone => fmax0 (lib_norm_cdf L x -f lib_norm_cdf L (fneg y))
+      | Low => kernel_low L t x y
       | High => high_correlation L (fneg x) (fneg y) (t_rho t)
       end
   end.
