@@ -18,7 +18,7 @@ use super::tables::{GL20_W, GL20_X};
 use super::{BivariateNormal, Regime, SATURATED_THRESHOLD, SQRT_TAU, bivariate_norm_cdf};
 use crate::elementary::sqrt;
 use crate::exp::lanes::Exp;
-use crate::lanes::{Kernel, mask_from};
+use crate::lanes::{Kernel, mask_from, two_sum};
 use crate::normal_distribution::lanes::Normal;
 
 /// The widest backend's lane count: the tables a chunk reads.
@@ -97,7 +97,7 @@ fn low<K: Simd>(
         .map(|lane| tables[lane].nodes)
         .max()
         .unwrap_or(0);
-    let mut sum = k.splat(0.0);
+    let (mut high, mut low) = (k.splat(0.0), k.splat(0.0));
     for node in 0..widest {
         let (mut weight, mut sn, mut den) = (
             K::Array::default(),
@@ -119,7 +119,9 @@ fn low<K: Simd>(
         let active = mask_from(k, active);
         let arg = k.div(k.sub(k.mul(k.load(sn), xy), hs), k.load(den));
         let term = k.mul(k.load(weight), exp_lanes(k, live_or_zero(k, active, arg)));
-        sum = k.select(active, k.add(sum, term), sum);
+        let (s, e) = two_sum(k, high, term);
+        high = k.select(active, s, high);
+        low = k.select(active, k.add(low, e), low);
     }
     let mut asr = K::Array::default();
     for lane in 0..K::LANES {
@@ -127,7 +129,7 @@ fn low<K: Simd>(
             asr.as_mut()[lane] = tables[lane].asr;
         }
     }
-    let sum = k.mul(sum, k.div(k.load(asr), k.splat(2.0 * TAU)));
+    let sum = k.mul(k.add(high, low), k.div(k.load(asr), k.splat(2.0 * TAU)));
     clamp_lanes(
         k,
         k.add(sum, k.mul(norm_cdf_lanes(k, x), norm_cdf_lanes(k, y))),
