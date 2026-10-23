@@ -847,3 +847,17 @@ Print Assumptions BvnTruncation.certified_14.
 Print Assumptions BvnTruncation.certified_16.
 Print Assumptions BvnTruncation.certified_20.
 Print Assumptions BvnTruncation.certified_24.
+
+Require BvnHighAlgebra BvnHighAssembly BvnHighPanels.
+Print Assumptions BvnHighAlgebra.plackett_exponent.
+Print Assumptions BvnHighAlgebra.smooth_exponent.
+Print Assumptions BvnHighAlgebra.subtraction_identity.
+Print Assumptions BvnHighAlgebra.moment_closed_form.
+Print Assumptions BvnHighAlgebra.reflection_phi_terms.
+Print Assumptions BvnHighAssembly.clamp_lipschitz.
+Print Assumptions BvnHighAssembly.round_clamp.
+Print Assumptions BvnHighAssembly.pos_assembly.
+Print Assumptions BvnHighAssembly.pos_assembly_weak.
+Print Assumptions BvnHighAssembly.neg_assembly.
+Print Assumptions BvnHighAssembly.neg_assembly_dw.
+Print Assumptions BvnHighPanels.panel_design.

@@ -274,10 +274,10 @@ Qed.
 (** Negative correlation with the difference of the two [norm_cdf] results kept as
     a double-word: [s = rnd (p1 - p2)], its exact error [e = (p1 - p2) - s], and the
     sum [rnd (s + rnd (e + g))] -- one rounding of the result plus a rounding of
-    the small [e + g], for [p2 <= p1] and a float [g] of size at most [1/10]. *)
+    the small [e + g], for [p2 <= p1] and a float [g] with [|g| <= 1/10]. *)
 Theorem neg_assembly_dw P1 P2 G g D :
   0 <= P1 <= 1 -> 0 <= P2 <= 1 -> 0 <= G -> Rabs (g - G) <= D ->
-  generic_format radix2 fexp g -> 0 <= g <= / 10 ->
+  generic_format radix2 fexp g -> - / 10 <= g <= / 10 ->
   0 <= G + Rmax 0 (P1 - P2) <= 1 -> rnd P2 <= rnd P1 ->
   let p1 := rnd P1 in let p2 := rnd P2 in
   let s := rnd (p1 - p2) in let e := (p1 - p2) - s in
