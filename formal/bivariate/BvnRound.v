@@ -50,6 +50,11 @@ Proof.
   intros H. destruct H as [H | H]; [left; apply exp_increasing; exact H | right; rewrite H; reflexivity].
 Qed.
 
+Lemma Rabs_div_abs a b : b <> 0 -> Rabs (a / b) = Rabs a / Rabs b.
+Proof.
+  intros H. unfold Rdiv. rewrite Rabs_mult, Rabs_Rinv by exact H. reflexivity.
+Qed.
+
 Lemma u_pos : 0 < u.
 Proof. unfold u. apply bpow_gt_0. Qed.
 

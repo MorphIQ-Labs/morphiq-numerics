@@ -4,7 +4,7 @@
 From Coq Require Import Reals ZArith Lia Lra Psatz.
 From Flocq Require Import Core.
 From Interval Require Import Tactic.
-Require Import BvnRound.
+Require Import BvnRound BvnQ.
 Open Scope R_scope.
 
 (** Rust's [TAU] (binary64, [0x401921FB54442D18]). *)
@@ -131,4 +131,85 @@ Proof.
       assert (Rabs (1 - P) = 1 - P) by (rewrite Rabs_pos_eq by lra; reflexivity).
       assert (Rabs (s - P) = s - P) by (rewrite Rabs_pos_eq by lra; reflexivity).
       lra.
+Qed.
+
+(** The per-node weight [Kw = rndF (rndF W * Kh)] against [Kex W]. *)
+Definition ew : R := (1 + u) * (1 + u) * (1 + ETAK) - 1.
+
+Lemma kw_close W wh Kw Kh Kex :
+  / 4096 <= W -> W <= 1 -> wh = rndF W -> Kw = rndF (wh * Kh) ->
+  Rabs (Kh - Kex) <= ETAK * Rabs Kex -> bpow radix2 (-57) <= Rabs Kex -> Rabs Kex <= / 10 ->
+  Rabs (Kw - Kex * W) <= ew * Rabs (Kex * W) /\ Rabs Kw <= 1.
+Proof.
+  intros HW1 HW2 Hwh HKw HKh Hk1 Hk2.
+  pose proof u_pos as Hu. pose proof u_val as Huv.
+  assert (HWn : bpow radix2 (-1022) <= Rabs W).
+  { rewrite Rabs_pos_eq by lra. eapply Rle_trans; [| exact HW1].
+    replace (/ 4096) with (bpow radix2 (-12)) by reflexivity. apply bpow_le. lia. }
+  destruct (rnd_delta W (or_intror HWn)) as [d1 [Hd1 E1]]. rewrite <- Hwh in E1.
+  assert (HE : ETAK = 17 / 10 ^ 17) by reflexivity.
+  assert (Hkne : Kex <> 0) by (intro H0; rewrite H0, Rabs_R0 in Hk1; pose proof (bpow_gt_0 radix2 (-57)); lra).
+  set (eta := (Kh - Kex) / Kex).
+  assert (Heta : Rabs eta <= ETAK).
+  { unfold eta. rewrite Rabs_div_abs by exact Hkne.
+    apply Rmult_le_reg_r with (Rabs Kex); [apply Rabs_pos_lt; exact Hkne |].
+    unfold Rdiv. rewrite Rmult_assoc, Rinv_l by (apply Rabs_no_R0; exact Hkne). lra. }
+  assert (EKh : Kh = Kex * (1 + eta)) by (unfold eta; field; exact Hkne).
+  assert (Hwhn : bpow radix2 (-1022) <= Rabs (wh * Kh)).
+  { rewrite Rabs_mult. apply Rabs_le_between in Hd1.
+    assert (Hwh1 : / 8192 <= Rabs wh).
+    { rewrite E1. rewrite Rabs_mult, (Rabs_pos_eq W) by lra. rewrite (Rabs_pos_eq (1 + d1)) by lra. nra. }
+    assert (HKh1 : bpow radix2 (-58) <= Rabs Kh).
+    { rewrite EKh. rewrite Rabs_mult. rewrite (Rabs_pos_eq (1 + eta)).
+      - assert (bpow radix2 (-57) = 2 * bpow radix2 (-58)) by (replace (-57)%Z with (-58 + 1)%Z by reflexivity; rewrite bpow_plus; change (bpow radix2 1) with 2; ring).
+        apply Rabs_le_between in Heta. rewrite HE in Heta.
+        assert (Hm : Rabs Kex * (1 / 2) <= Rabs Kex * (1 + eta)) by (apply Rmult_le_compat_l; [apply Rabs_pos | lra]).
+        lra.
+      - apply Rabs_le_between in Heta. rewrite HE in Heta. lra. }
+    assert (Hb : bpow radix2 (-1022) <= / 8192 * bpow radix2 (-58)).
+    { replace (/ 8192) with (bpow radix2 (-13)) by reflexivity. rewrite <- bpow_plus. apply bpow_le. lia. }
+    pose proof (bpow_gt_0 radix2 (-58)).
+    assert (/ 8192 * bpow radix2 (-58) <= Rabs wh * Rabs Kh) by (apply Rmult_le_compat; lra).
+    lra. }
+  destruct (rnd_delta (wh * Kh) (or_intror Hwhn)) as [d2 [Hd2 E2]]. rewrite <- HKw in E2.
+  assert (Eq : Kw - Kex * W = Kex * W * ((1 + d1) * (1 + eta) * (1 + d2) - 1)) by (rewrite E2, E1, EKh; ring).
+  assert (Hmain : Rabs (Kw - Kex * W) <= ew * Rabs (Kex * W)).
+  { rewrite Eq, Rabs_mult.
+    assert (Hr : Rabs ((1 + d1) * (1 + eta) * (1 + d2) - 1) <= ew).
+    { unfold ew. apply Rabs_le_between in Hd1. apply Rabs_le_between in Hd2. apply Rabs_le_between in Heta.
+      destruct Hd1 as [a1 a2]. destruct Hd2 as [b1 b2]. destruct Heta as [c1 c2].
+      assert (HE' : ETAK = 17 / 10 ^ 17) by exact HE.
+      assert (Hp1 : (1 + d1) * (1 + eta) <= (1 + u) * (1 + ETAK)) by (apply Rmult_le_compat; lra).
+      assert (Hp2 : (1 + d1) * (1 + eta) * (1 + d2) <= (1 + u) * (1 + ETAK) * (1 + u)).
+      { apply Rmult_le_compat; [apply Rmult_le_pos; lra | lra | exact Hp1 | lra]. }
+      assert (Hq1 : (1 - u) * (1 - ETAK) <= (1 + d1) * (1 + eta)) by (apply Rmult_le_compat; lra).
+      assert (Hq2 : (1 - u) * (1 - ETAK) * (1 - u) <= (1 + d1) * (1 + eta) * (1 + d2)).
+      { apply Rmult_le_compat; [apply Rmult_le_pos; lra | lra | exact Hq1 | lra]. }
+      apply Rabs_le. split; [| nra].
+      rewrite HE' in Hq2. rewrite HE'. rewrite Huv in *. nra. }
+    assert (Hm : Rabs (Kex * W) * Rabs ((1 + d1) * (1 + eta) * (1 + d2) - 1) <= Rabs (Kex * W) * ew) by (apply Rmult_le_compat_l; [apply Rabs_pos | exact Hr]).
+    lra. }
+  split; [exact Hmain |].
+  assert (HKW : Rabs (Kex * W) <= / 10) by (rewrite Rabs_mult, (Rabs_pos_eq W) by lra; assert (Rabs Kex * W <= / 10 * 1) by (apply Rmult_le_compat; [apply Rabs_pos | lra | exact Hk2 | lra]); lra).
+  assert (Hew : ew <= / 1000) by (unfold ew; rewrite HE, Huv; nra).
+  assert (E3 : Kw = Kex * W + (Kw - Kex * W)) by ring.
+  assert (Rabs Kw <= Rabs (Kex * W) + Rabs (Kw - Kex * W)) by (rewrite E3 at 1; apply Rabs_triang).
+  pose proof (Rabs_pos (Kex * W)).
+  nra.
+Qed.
+
+(** The product of the two rounded distribution functions against the exact
+    one, from the contract [|Phi' - Phi| <= eP], [Phi'] in [[0, 1]]. *)
+Definition eP : R := bpow radix2 (-54) + bpow radix2 (-112).
+
+Lemma phi_prod a b ah bh : 0 <= a <= 1 -> 0 <= b <= 1 -> 0 <= ah <= 1 -> 0 <= bh <= 1 ->
+  Rabs (ah - a) <= eP -> Rabs (bh - b) <= eP -> Rabs (ah * bh - a * b) <= 2 * eP.
+Proof.
+  intros Ha Hb Hah Hbh Ea Eb.
+  assert (E : ah * bh - a * b = ah * (bh - b) + b * (ah - a)) by ring.
+  rewrite E. eapply Rle_trans; [apply Rabs_triang |]. rewrite !Rabs_mult.
+  rewrite (Rabs_pos_eq ah (proj1 Hah)), (Rabs_pos_eq b (proj1 Hb)).
+  assert (Hm1 : ah * Rabs (bh - b) <= 1 * eP) by (apply Rmult_le_compat; [lra | apply Rabs_pos | lra | exact Eb]).
+  assert (Hm2 : b * Rabs (ah - a) <= 1 * eP) by (apply Rmult_le_compat; [lra | apply Rabs_pos | lra | exact Ea]).
+  lra.
 Qed.
