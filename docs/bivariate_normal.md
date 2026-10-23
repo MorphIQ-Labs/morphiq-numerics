@@ -313,13 +313,15 @@ while consecutive correlations are bit-equal), which costs the same `asin` and
 **Vectorised.** After the scalar ordering `x <= y`, a lane is served by the
 vector code when neither argument is NaN, `x > -39`, `y < 39`, and its
 correlation selects the low-correlation quadrature (`EPSILON <= |rho| < 0.925`):
-`hs`, `x y`, the node loop in node order with
-`weight[j] * exp((sn[j] x y - hs) / den[j])` accumulated as the scalar
-double-word (`two_sum` per term, the low parts added in order), the scale
-`(high + low) * (asr / (2 TAU))`, `Phi(x) Phi(y)` and the clamp. A lane whose
-rule has fewer nodes than the chunk's longest (rules of 4 to 24 nodes) is
-masked on the extra nodes (its sums are untouched and its `exp` argument is
-`0`), so no lane accumulates a node the scalar code does not. `exp` and
+`d = (x-y)^2`, `m = (x+y)^2`, the node loop in node order with
+`kw[j] * exp(-(d p[j] + m q[j]))` accumulated as the scalar double-word
+(`two_sum` per term, the low parts added in order), `two_prod(Phi(x), Phi(y))`
+with its error term dropped below `PRODUCT_EXACT_FLOOR`, `two_sum(hi, high)`,
+the final `sum + (err + (low + lo))` and the clamp. A lane whose rule has fewer
+nodes than the chunk's longest (rules of 4 to 24 nodes) is masked on the extra
+nodes (its sums are untouched and its `exp` argument is `0`), so no lane
+accumulates a node the scalar code does not. The lane `two_prod` returns
+`eft::two_prod`'s bits (docs/lanes.md section 2). `exp` and
 `norm_cdf` are the library's lane kernels (`Exp`, `Normal<1>`), each equal to
 its scalar function bit for bit, so no new transcendental is introduced and
 no platform libm is called. Every operation is an individual lane add,

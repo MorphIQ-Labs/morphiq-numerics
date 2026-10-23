@@ -10,13 +10,13 @@
 //!
 //! [`docs/lanes.md`]: https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/lanes.md
 
-use core::f64::consts::TAU;
-
 use morphiq_numerics_arch::{Simd, WithSimd};
 
-use super::{BivariateNormal, Regime, SATURATED_THRESHOLD, bivariate_norm_cdf};
+use super::{
+    BivariateNormal, PRODUCT_EXACT_FLOOR, Regime, SATURATED_THRESHOLD, bivariate_norm_cdf,
+};
 use crate::exp::lanes::Exp;
-use crate::lanes::{Kernel, mask_from, two_sum};
+use crate::lanes::{Kernel, mask_from, two_prod, two_sum};
 use crate::normal_distribution::lanes::Normal;
 
 /// The widest backend's lane count: the tables a chunk reads.
@@ -78,8 +78,10 @@ fn low<K: Simd>(
 ) -> K::F {
     let live = mask_from(k, live_bits);
     let (x, y) = (live_or_zero(k, live, x), live_or_zero(k, live, y));
-    let hs = k.div(k.add(k.mul(x, x), k.mul(y, y)), k.splat(2.0));
-    let xy = k.mul(x, y);
+    let e1 = k.sub(x, y);
+    let d = k.mul(e1, e1);
+    let e2 = k.add(x, y);
+    let m = k.mul(e2, e2);
     let widest = (0..K::LANES)
         .filter(|&lane| live_bits >> lane & 1 == 1)
         .map(|lane| tables[lane].nodes)
@@ -87,7 +89,7 @@ fn low<K: Simd>(
         .unwrap_or(0);
     let (mut high, mut low) = (k.splat(0.0), k.splat(0.0));
     for node in 0..widest {
-        let (mut weight, mut sn, mut den) = (
+        let (mut kw, mut p, mut q) = (
             K::Array::default(),
             K::Array::default(),
             K::Array::default(),
@@ -96,31 +98,22 @@ fn low<K: Simd>(
         for (lane, table) in tables.iter().enumerate().take(K::LANES) {
             if live_bits >> lane & 1 == 1 && node < table.nodes {
                 active |= 1 << lane;
-                weight.as_mut()[lane] = table.weight[node];
-                sn.as_mut()[lane] = table.sn[node];
-                den.as_mut()[lane] = table.den[node];
-            } else {
-                den.as_mut()[lane] = 1.0;
+                kw.as_mut()[lane] = table.kw[node];
+                p.as_mut()[lane] = table.p[node];
+                q.as_mut()[lane] = table.q[node];
             }
         }
         let active = mask_from(k, active);
-        let arg = k.div(k.sub(k.mul(k.load(sn), xy), hs), k.load(den));
-        let term = k.mul(k.load(weight), exp_lanes(k, live_or_zero(k, active, arg)));
+        let arg = k.neg(k.add(k.mul(d, k.load(p)), k.mul(m, k.load(q))));
+        let term = k.mul(k.load(kw), exp_lanes(k, live_or_zero(k, active, arg)));
         let (s, e) = two_sum(k, high, term);
         high = k.select(active, s, high);
         low = k.select(active, k.add(low, e), low);
     }
-    let mut asr = K::Array::default();
-    for (lane, table) in tables.iter().enumerate().take(K::LANES) {
-        if live_bits >> lane & 1 == 1 {
-            asr.as_mut()[lane] = table.asr;
-        }
-    }
-    let sum = k.mul(k.add(high, low), k.div(k.load(asr), k.splat(2.0 * TAU)));
-    clamp_lanes(
-        k,
-        k.add(sum, k.mul(norm_cdf_lanes(k, x), norm_cdf_lanes(k, y))),
-    )
+    let (hi, lo) = two_prod(k, norm_cdf_lanes(k, x), norm_cdf_lanes(k, y));
+    let lo = k.select(k.le(k.splat(PRODUCT_EXACT_FLOOR), hi), lo, k.splat(0.0));
+    let (sum, err) = two_sum(k, hi, high);
+    clamp_lanes(k, k.add(sum, k.add(err, k.add(low, lo))))
 }
 
 /// `table.cdf(x, y)` for every lane of one chunk, each lane's bits, and the
