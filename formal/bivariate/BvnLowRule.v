@@ -7,7 +7,7 @@ From Double Require Import DWPlus.
 From Binary64 Require Import Binary64Add.
 From Interval Require Import Tactic.
 From Coquelicot Require Import Coquelicot.
-Require Import BvnRound BvnArg BvnNode BvnTrig BvnLow BvnSum BvnChain BvnQuadG BvnRule BvnTail BvnIntegral BvnTop.
+Require Import BvnRound BvnQ BvnArg BvnNode BvnTrig BvnLow BvnSum BvnQuadG BvnTail BvnRule BvnIntegral BvnFinal BvnTop.
 Open Scope R_scope.
 
 Lemma asin_le_A rho L A : Rabs rho <= L -> L + 2 / 10 ^ 4 <= sin A -> 0 <= A -> A <= 3 / 2 ->
@@ -45,68 +45,82 @@ Proof.
       rewrite Hs in H. lra.
 Qed.
 
-(** The multiplicative constant of one term: weight, [exp], product, sum,
-    the constant [asr / (2 TAU)] and its multiplication, as an upper bound
-    of [(1 + psi) (1 + u)^3 exp z - 1]. *)
-Definition B0 : R := 73 / 10 ^ 17.
 
-Lemma B0_ok : 0 <= B0 /\ bq ETAK <= B0.
+(** The multiplicative constant of one term: folded weight, [exp], product,
+    the accumulation, as an upper bound of [bq]. *)
+Definition B0 : R := 62 / 10 ^ 17.
+
+Lemma B0_ok : 0 <= B0 /\ bq <= B0.
 Proof.
   split; [unfold B0; lra |].
-  unfold bq, psi, ETAK, u, z. simpl. interval with (i_prec 120).
+  unfold bq, psi2, ew, rx, ue, ETAK, u, z. simpl. interval with (i_prec 120).
 Qed.
 
-Theorem low_rule (x y rho asr L A Tr E T S Bd Phix Phiy : R) (kA : Z) (nodes : list NodeS) (dats : list Dat) :
-  L + 2 / 10 ^ 4 <= sin A -> 0 <= A -> A <= 6 / 5 -> (-1021 <= kA)%Z -> (kA <= 1)%Z ->
-  A <= bpow radix2 kA ->
+Theorem low_rule (expI sinI : R -> R) (x y rho asr L A Tr E T S Bd : R) (kA : Z) (pxI pyI Phix Phiy : R)
+  (nodes : list NodeS) (dats : list Dat) :
+  exp_contract expI -> sin_contract sinI ->
+  L + 2 / 10 ^ 4 <= sin A -> 0 <= A -> A <= 6 / 5 -> (-1021 <= kA)%Z -> (kA <= 1)%Z -> A <= bpow radix2 kA ->
   List.Forall (dat_ok A) dats -> List.Forall (br_ok A B0) dats ->
-  A / (4 * PI) * sumD (gcl A B0) dats <= E ->
-  Tr / (2 * PI) <= T -> bpow radix2 (kA - 54) / (2 * PI) <= S ->
-  4 * bpow radix2 (-54) + E + 1000 * z + T + S <= Bd ->
+  A / (4 * PI) * sumD (gcl A B0) dats <= E -> E <= 1 ->
+  Tr / (2 * PI) <= T -> (bpow radix2 (kA - 54) + bpow radix2 (-62) * bpow radix2 kA) / (2 * PI) <= S ->
+  bpow radix2 (-54) + bpow radix2 (-900) + bpow radix2 (-90) + 2 * eP + E + 200 * z + T + S <= Bd ->
   Rabs rho <= L -> bpow radix2 (-52) <= Rabs rho ->
-  dom x -> dom y -> 0 <= Phix <= 1 -> 0 <= Phiy <= 1 -> asr = rndF (asin rho) ->
-  List.Forall2 node_enc nodes dats -> (length nodes <= 24)%nat ->
+  fmtF x -> fmtF y -> Rabs x <= 64 -> Rabs y <= 64 ->
+  0 <= Phix <= 1 -> 0 <= Phiy <= 1 -> fmtF pxI -> fmtF pyI -> 0 <= pxI <= 1 -> 0 <= pyI <= 1 ->
+  Rabs (pxI - Phix) <= eP -> Rabs (pyI - Phiy) <= eP ->
+  (exists Za, asr = rndF Za /\ Rabs (Za - asin rho) <= bpow radix2 (-62) * Rabs (asin rho)) ->
+  List.Forall2 (ok A (rndF (asr / (2 * TAU)))) nodes dats -> (length nodes <= 24)%nat ->
   0 <= Phix * Phiy + Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI) <= 1 ->
-  Rabs (Iint (x * x + y * y) (x * y) asr - asr / 2 * sumR (map (vn x y asr) nodes)) <= Tr ->
-  Rabs (Rhat x y asr nodes Phix Phiy - (Phix * Phiy + Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI)))
+  Rabs (Iint (x * x + y * y) (x * y) asr
+        - asr / 2 * sumR (map (fun n => nW n * exp (- Qn x y asr n)) nodes)) <= Tr ->
+  Rabs (Rhat expI sinI x y asr nodes pxI pyI - (Phix * Phiy + Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI)))
     <= Bd.
 Proof.
-  intros HL HA0 HA1 Hk1 Hk2 HAk Hdat Hbr Hsum HT HS HBd Hrho Hrlow Hx Hy HPx HPy Hasr Hnodes Hlen Hprob HT1.
+  intros Hexp Hsin HL HA0 HA1 Hk1 Hk2 HAk Hdat Hbr Hsum HE1 HT HS HBd Hrho Hrlow Fx Fy Hx Hy HPx HPy Fpx Fpy Hpx Hpy Epx Epy Hasin Hall Hlen Hprob HT1.
   pose proof u_pos as Hu. pose proof u_val as Huv. pose proof z_pos as Hz.
   destruct B0_ok as [HB00 HB0q].
-  assert (Hasin : Rabs (asin rho) <= A - 1 / 10 ^ 4) by (apply (asin_le_A rho L A); lra).
-  assert (Hshift : Rabs (asin rho - asr) <= bpow radix2 (kA - 54)).
-  { rewrite Hasr, Rabs_minus_sym. apply rnd_pow; [exact Hk1 | lra]. }
-  assert (Hsh53 : bpow radix2 (kA - 54) <= bpow radix2 (-53)) by (apply bpow_le; lia).
-  assert (Hasr1 : Rabs asr <= A).
-  { assert (Eq0 : asr = asin rho + (asr - asin rho)) by ring.
-    assert (Rabs asr <= Rabs (asin rho) + Rabs (asr - asin rho)) by (rewrite Eq0 at 1; apply Rabs_triang).
-    rewrite Rabs_minus_sym in H. fold u in Huv. assert (bpow radix2 (-53) = u) by reflexivity.
-    assert (u <= 1 / 10 ^ 4) by (rewrite Huv; lra). lra. }
-  assert (Hasr2 : bpow radix2 (-53) <= Rabs asr).
-  { assert (Hge : bpow radix2 (-52) <= Rabs (asin rho)).
-    { assert (Hs : Rabs (sin (asin rho) - sin 0) <= Rabs (asin rho - 0)) by apply sin_lip.
-      rewrite sin_0 in Hs. rewrite Rminus_0_r in Hs. rewrite Rminus_0_r in Hs.
-      assert (Hrr : -1 <= rho <= 1).
-      { apply Rabs_le_between. assert (sin A <= 1) by (pose proof (SIN_bound A) as [_ H]; exact H). lra. }
-      rewrite (sin_asin rho Hrr) in Hs. lra. }
-    pose proof (rnd_rel_z (asin rho)) as Hr. rewrite <- Hasr in Hr.
-    assert (Hb52 : bpow radix2 (-52) = 2 * bpow radix2 (-53)).
-    { replace (-52)%Z with (-53 + 1)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 1) with 2. ring. }
-    assert (Hz' : z <= bpow radix2 (-53) / 4).
-    { unfold z. assert (bpow radix2 (-1075) <= bpow radix2 (-55)) by (apply bpow_le; lia).
-      assert (bpow radix2 (-53) = 4 * bpow radix2 (-55)) by (replace (-53)%Z with (-55 + 2)%Z by reflexivity; rewrite bpow_plus; replace (bpow radix2 2) with 4 by reflexivity; ring).
-      lra. }
-    assert (Hu1 : u * Rabs (asin rho) <= Rabs (asin rho) / 4) by (rewrite Huv; pose proof (Rabs_pos (asin rho)); nra).
-    assert (Eq0 : asin rho = asr - (asr - asin rho)) by ring.
-    assert (Rabs (asin rho) <= Rabs asr + Rabs (asr - asin rho)) by (rewrite Eq0 at 1; eapply Rle_trans; [apply Rabs_triang |]; rewrite Rabs_Ropp; lra).
-    assert (bpow radix2 (-53) = u) by reflexivity.
-    pose proof (bpow_gt_0 radix2 (-53)). nra. }
-  assert (Hask : Rabs (asin rho) <= bpow radix2 kA) by lra.
-  assert (Hasin32 : Rabs (asin rho) <= 3 / 2) by lra.
-  assert (HAll : List.Forall2 (node_ok asr A) nodes dats) by (apply Forall2_node_ok; assumption).
-  pose proof (low_branch x y rho asr A Tr B0 kA Phix Phiy nodes dats HB00 HB0q Hk1 Hask Hx Hy HPx HPy Hasr Hasr2 Hasr1 HA1 Hasin32 HAll Hlen Hprob HT1) as Hb.
-  pose proof (sumD_gcl A B0 dats Hbr) as Hg.
-  assert (Hm : A / (4 * PI) * sumD (gdat A B0) dats <= E) by (rewrite Hg; exact Hsum).
-  eapply Rle_trans; [exact Hb |]. lra.
+  assert (Hrng : Rabs (asin rho) <= A - 1 / 10 ^ 4) by (apply (asin_le_A rho L A); lra).
+  destruct Hasin as [Za [Eas HZa]].
+  assert (Hasin1 : Rabs (asin rho) >= bpow radix2 (-52)).
+  { assert (Hs : Rabs (sin (asin rho) - sin 0) <= Rabs (asin rho - 0)) by apply sin_lip.
+    rewrite sin_0, Rminus_0_r, Rminus_0_r in Hs.
+    assert (Hrr : -1 <= rho <= 1).
+    { apply Rabs_le_between. assert (sin A <= 1) by (pose proof (SIN_bound A) as [_ H]; exact H). lra. }
+    rewrite (sin_asin rho Hrr) in Hs. lra. }
+  assert (Hb62 : bpow radix2 (-62) <= / 1000000) by (apply Rle_trans with (bpow radix2 (-20)); [apply bpow_le; lia | change (bpow radix2 (-20)) with (/ 1048576); lra]).
+  assert (HZ1 : Rabs Za <= (1 + bpow radix2 (-62)) * Rabs (asin rho)).
+  { assert (Eq0 : Za = asin rho + (Za - asin rho)) by ring.
+    assert (Rabs Za <= Rabs (asin rho) + Rabs (Za - asin rho)) by (rewrite Eq0 at 1; apply Rabs_triang). lra. }
+  assert (HZ2 : Rabs Za >= (1 - bpow radix2 (-62)) * Rabs (asin rho)).
+  { assert (Eq0 : asin rho = Za + (asin rho - Za)) by ring.
+    assert (Rabs (asin rho) <= Rabs Za + Rabs (asin rho - Za)) by (rewrite Eq0 at 1; apply Rabs_triang).
+    rewrite Rabs_minus_sym in HZa. lra. }
+  pose proof (rnd_rel_z Za) as Hr. rewrite <- Eas in Hr.
+  assert (Hz' : z <= bpow radix2 (-100)) by (unfold z; apply bpow_le; lia).
+  assert (Hb100 : bpow radix2 (-100) <= bpow radix2 (-53) / 1000000) by (replace (bpow radix2 (-53) / 1000000) with (bpow radix2 (-53) * / 1000000) by reflexivity; apply Rle_trans with (bpow radix2 (-53) * bpow radix2 (-20)); [rewrite <- bpow_plus; apply bpow_le; lia | apply Rmult_le_compat_l; [apply Rlt_le, bpow_gt_0 | change (bpow radix2 (-20)) with (/ 1048576); lra]]).
+  assert (Hb53 : bpow radix2 (-52) = 2 * bpow radix2 (-53)) by (replace (-52)%Z with (-53 + 1)%Z by reflexivity; rewrite bpow_plus; change (bpow radix2 1) with 2; ring).
+  assert (Hasr1 : bpow radix2 (-53) <= Rabs asr).
+  { assert (Eq1 : Za = asr - (asr - Za)) by ring.
+    assert (Rabs Za <= Rabs asr + Rabs (asr - Za)) by (rewrite Eq1 at 1; eapply Rle_trans; [apply Rabs_triang |]; rewrite Rabs_Ropp; lra).
+    assert (Hm : u * Rabs Za <= u * 2) by nra.
+    pose proof (bpow_gt_0 radix2 (-53)).
+    assert (Hm2 : (1 - bpow radix2 (-62)) * Rabs (asin rho) >= (1 - / 1000000) * bpow radix2 (-52)).
+    { apply Rle_ge. apply Rmult_le_compat; [lra | apply Rlt_le; apply bpow_gt_0 | lra | lra]. }
+    pose proof (Rabs_pos Za). nra. }
+  assert (Hasr2 : Rabs asr <= A).
+  { assert (Eq1 : asr = Za + (asr - Za)) by ring.
+    assert (Rabs asr <= Rabs Za + Rabs (asr - Za)) by (rewrite Eq1 at 1; apply Rabs_triang).
+    assert (Hm : u * Rabs Za <= u * 2).
+    { apply Rmult_le_compat_l; [lra |]. assert (Rabs (asin rho) <= 6 / 5) by lra. nra. }
+    assert (HZA : Rabs Za <= A - 1 / 10 ^ 4 / 2).
+    { assert (Hm3 : bpow radix2 (-62) * Rabs (asin rho) <= / 1000000 * 2) by (apply Rmult_le_compat; [apply Rlt_le, bpow_gt_0 | apply Rabs_pos | lra | lra]). lra. }
+    assert (Hm4 : (1 + bpow radix2 (-62)) * Rabs (asin rho) <= Rabs (asin rho) + / 1000000 * 2) by nra.
+    assert (u <= / 1000000) by (rewrite Huv; lra). nra. }
+  assert (HAll : List.Forall2 (ok A (rndF (asr / (2 * TAU)))) nodes dats) by exact Hall.
+  assert (Hshift : Rabs (asin rho) <= A - 1 / 10 ^ 4) by exact Hrng.
+  assert (HgS : A / (4 * PI) * sumD (gdat A B0) dats <= E) by (rewrite (sumD_gcl A B0 dats Hbr); exact Hsum).
+  assert (Hsd : bpow radix2 (kA - 54) <= bpow radix2 (kA - 54)) by lra.
+  pose proof (low_branch expI sinI x y rho asr A Tr B0 E kA pxI pyI Phix Phiy nodes dats Hexp Hsin Fx Fy Hx Hy HPx HPy Fpx Fpy Hpx Hpy Epx Epy
+    (ex_intro _ Za (conj Eas HZa)) Hasr1 Hasr2 HA1 Hshift HAk Hk1 Hk2 HB00 HB0q HAll Hlen HgS HE1 Hprob HT1) as Hb.
+  lra.
 Qed.
