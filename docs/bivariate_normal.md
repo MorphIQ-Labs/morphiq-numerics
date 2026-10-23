@@ -229,7 +229,11 @@ and cases with 0 to 7 panels 979, 222, 238, 263, 269, 377, 374 and 332, includin
 scale crosses `0.095 2^j` and `0.003 2^j` and the counterexample `bivariate_norm_cdf(-0.21101192279835226,
 -0.0014549743776884816, 0.925)`. A random corpus cannot tell apart two orderings whose results differ with
 probability below about `2^-37` per case: the association of `c d ass^2 / 5` in the closed form's `p1`, a term about
-`1e-11` of the sum it joins, is one such, and a mutant that reassociates it is not killed.
+`1e-11` of the sum it joins, and of the closed form's `exp(-hk/2) sqrt(tau) Phi(-b/s) b p2` product are two such, and a
+mutant that reassociates either is not killed by the corpus (it is by the proofs only through the reading of those
+two lines, which `closed_form_ok` states operation by operation). Of thirteen single-fault mutants of `BvnKernel.v`
+(a constant, an association, a comparison's direction or strictness, a node order, a dropped factor) run against a
+quarter of the corpus, ten are killed, one is an equivalent change (`e + low` for `low + e`), and these two survive.
 
 **The kernel against the proofs.** `BvnLift.v` relates each binary64 operation to the real-valued rounding
 the error proofs are written in (`B (fadd a b) = rndF (B a + B b)` when no operation overflows), with crude

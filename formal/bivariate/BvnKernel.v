@@ -16,7 +16,9 @@
     function's operation sequence: formal/extraction/BvnCrosscheck.v extracts it and
     scripts/check_formal.sh runs it, with the library functions given by the
     results the Rust recorded for each call it made, against the Rust's results on
-    the internal cross-check corpus, bit for bit. *)
+    the internal cross-check corpus, bit for bit. formal/bivariate/BvnRefineLow.v
+    and BvnRefineHigh.v prove its pieces equal the real-valued functions the error
+    proofs are written over (docs/bivariate_normal.md section 6.5). *)
 
 From Coq Require Import ZArith List.
 From Flocq Require Import IEEE754.Binary IEEE754.Bits.
