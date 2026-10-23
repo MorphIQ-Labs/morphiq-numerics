@@ -178,8 +178,8 @@ impl WithSimd for PerLane<'_> {
             ax.as_mut().copy_from_slice(&self.x[start..end]);
             ay.as_mut().copy_from_slice(&self.y[start..end]);
             let (out, served) = chunk(k, ax, ay, &tables);
-            for lane in 0..K::LANES {
-                let Some(table) = &owned[lane] else {
+            for (lane, table) in owned.iter().enumerate() {
+                let Some(table) = table else {
                     continue;
                 };
                 let (x, y) = (self.x[start + lane], self.y[start + lane]);
@@ -281,8 +281,8 @@ fn lanes_return_the_scalar_bits_at_one_correlation() {
     }
 }
 
-/// Which lanes the vector code serves: the quadrature regimes on a pair that
-/// is not NaN and not saturated, and no others.
+/// Which lanes the vector code serves: the low-correlation quadrature on a
+/// pair that is not NaN and not saturated, and no others.
 struct Served;
 
 impl WithSimd for Served {
@@ -293,8 +293,8 @@ impl WithSimd for Served {
         let classes: [(f64, f64, f64, bool); 12] = [
             (0.3, -0.4, 0.5, true),
             (1.0, 2.0, -0.3, true),
-            (0.3, -0.4, 0.95, true),
-            (-1.0, 0.0, -0.97, true),
+            (0.3, -0.4, 0.95, false),
+            (-1.0, 0.0, -0.97, false),
             (0.3, -0.4, 0.0, false),
             (0.3, -0.4, 1.0, false),
             (0.3, -0.4, -1.0, false),
@@ -324,12 +324,10 @@ impl WithSimd for Served {
             }
             let (out, served) = chunk(k, ax, ay, &tables);
             assert_eq!(served, expected, "rotation {rotate} on {}", K::NAME);
-            for lane in 0..K::LANES {
+            for (lane, table) in owned.iter().enumerate() {
                 assert_eq!(
                     out.as_ref()[lane].to_bits(),
-                    owned[lane]
-                        .cdf(ax.as_ref()[lane], ay.as_ref()[lane])
-                        .to_bits()
+                    table.cdf(ax.as_ref()[lane], ay.as_ref()[lane]).to_bits()
                 );
             }
         }
@@ -337,7 +335,7 @@ impl WithSimd for Served {
 }
 
 #[test]
-fn only_quadrature_lanes_that_are_not_nan_or_saturated_are_served_by_the_vector_code() {
+fn only_low_correlation_lanes_that_are_not_nan_or_saturated_are_served_by_the_vector_code() {
     for backend in backends() {
         backend.vectorize(Served);
     }

@@ -318,10 +318,10 @@ four forms (each only if some lane takes it), and the rounding test at
 (`bivariate_normal/lanes.rs`) take pairs, or triples with a correlation per
 lane, through the same backend cascade; the kernel carries per-lane tables, so
 it is a function of a context and not a `Kernel2`. The low-correlation node
-loop and Genz's high-correlation series run in lanes with the scalar operation
-order, on the library's lane `exp` and `norm_cdf` and the scalar `sqrt` per
-lane; the closed-form correlations, NaN and saturated pairs, and any lane whose
-result is NaN call the scalar evaluator. The argument and the checks are in
+loop runs in lanes with the scalar operation order, on the library's lane
+`exp` and `norm_cdf`; the high-correlation series, the closed-form
+correlations, NaN and saturated pairs, and any lane whose result is NaN call
+the scalar evaluator. The argument and the checks are in
 [bivariate_normal.md](bivariate_normal.md) section 12.
 
 ## 6. Checked by

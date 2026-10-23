@@ -19,7 +19,7 @@ what remains; nothing below claims more than the checks named here establish.
 | Generator for the quadrature rules, replayed by `check_generators.sh` | done |
 | Correctly rounded `asin` (#41) | done: the table's angle is `elementary::asin(rho)` (section 5) |
 | Relative accuracy of small probabilities (FerroRisk's tail construction) | not ported: refused instead (section 8) |
-| ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits, with slice and paired entry points (section 12) | done: bit equality, digest and mutation witnesses (section 12); AVX2 and AVX-512F not yet run here (CI) |
+| ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits, with slice and paired entry points (section 12) | done for the low-correlation quadrature: bit equality, digest and mutation witnesses (section 12); AVX2 and AVX-512F not yet run here (CI) |
 | Gappa/Coq proof of the error budget | truncation of the low-correlation rules **proved** (`formal/bivariate/`); the other terms and the high-correlation branch not done |
 | Same-host scalar and batch performance against the FerroRisk baseline | measured (section 9); lanes **unmeasured** |
 
@@ -304,31 +304,25 @@ while consecutive correlations are bit-equal), which costs the same `asin` and
 
 **Vectorised.** After the scalar ordering `x <= y`, a lane is served by the
 vector code when neither argument is NaN, `x > -39`, `y < 39`, and its
-correlation selects a quadrature regime:
+correlation selects the low-correlation quadrature (`EPSILON <= |rho| < 0.925`):
+`hs`, `x y`, the node loop in node order with
+`weight[j] * exp((sn[j] x y - hs) / den[j])` accumulated as the scalar
+double-word (`two_sum` per term, the low parts added in order), the scale
+`(high + low) * (asr / (2 TAU))`, `Phi(x) Phi(y)` and the clamp. A lane whose
+rule has fewer nodes than the chunk's longest (rules of 4 to 24 nodes) is
+masked on the extra nodes (its sums are untouched and its `exp` argument is
+`0`), so no lane accumulates a node the scalar code does not. `exp` and
+`norm_cdf` are the library's lane kernels (`Exp`, `Normal<1>`), each equal to
+its scalar function bit for bit, so no new transcendental is introduced and
+no platform libm is called. Every operation is an individual lane add,
+multiply or divide; nothing is fused or reassociated.
 
-* *Low correlation.* `hs`, `x y`, the node loop in node order with
-  `weight[j] * exp((sn[j] x y - hs) / den[j])` accumulated as the scalar
-  double-word (`two_sum` per term, the low parts added in order), the scale
-  `(high + low) * (asr / (2 TAU))`, `Phi(x) Phi(y)` and the clamp. A lane
-  whose rule has fewer nodes than the chunk's longest is masked on the extra
-  nodes (its sum is untouched, its `exp` argument is `0`), so no lane sums a
-  node the scalar code does not.
-* *High correlation* (`|rho| >= 0.925`). Genz's series with the same grouping
-  as `high_correlation`: the leading term and the `Phi` term under their
-  `asr > -100` and `-hk < 100` conditions as masks, the 20-point quadrature
-  with each node's pair in the scalar order, the reflection by the sign of
-  `rho`, and the clamp. The scalar `sqrt` is taken per lane.
-
-`exp` and `norm_cdf` are the library's lane kernels (`Exp`, `Normal<1>`), each
-equal to its scalar function bit for bit, so no new transcendental is
-introduced and no platform libm is called. Every operation is an individual
-lane add, multiply or divide; nothing is fused or reassociated.
-
-**Scalar per lane.** The closed-form regimes (independent, comonotone,
-countermonotone), a NaN argument, a saturated argument (`x <= -39` or
-`y >= 39`), and a lane whose vector result is NaN are evaluated by
-`BivariateNormal::cdf`. A lane that is masked out of a regime's computation
-carries a harmless argument (`0`) and its result is discarded.
+**Scalar per lane.** The high-correlation series (`|rho| >= 0.925`) is **not**
+vectorised: its lanes call `BivariateNormal::cdf`. So are the closed-form
+regimes (independent, comonotone, countermonotone), a NaN argument, a
+saturated argument (`x <= -39` or `y >= 39`), and a lane whose vector result is
+NaN. A lane that is masked out of the quadrature carries a harmless argument
+(`0`) and its result is discarded.
 
 **Checked by** (`bivariate_normal/lanes/tests.rs`, with `src/lanes/tests.rs`'
 backends and `MORPHIQ_LANE_CASES`): bit equality of every lane on every

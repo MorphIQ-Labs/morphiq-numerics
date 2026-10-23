@@ -230,8 +230,8 @@ impl BivariateNormal {
     /// with or without the `simd` feature.
     ///
     /// With `simd` the pairs are evaluated in SIMD lanes when the correlation
-    /// selects a quadrature regime (`EPSILON <= |rho| < 1`), each
-    /// lane performing the scalar operation sequence; a closed-form
+    /// selects the low-correlation quadrature, each lane performing the
+    /// scalar operation sequence; a high-correlation or closed-form
     /// correlation, a NaN or saturated pair is the scalar function's, per lane
     /// (`docs/bivariate_normal.md` section 12).
     ///
