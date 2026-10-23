@@ -208,6 +208,29 @@ fn the_bound_follows_the_selected_rule() {
     assert!(absolute_error_bound(0.5) <= ABSOLUTE_ERROR_BOUND);
 }
 
+/// The high-correlation branch carries its own proved bound for each sign, and
+/// the whole function's bound is the largest of all of them.
+#[test]
+fn the_high_branch_bound_depends_on_the_sign_of_the_correlation() {
+    for rho in [0.925, 0.95, 0.999, 1.0 - f64::EPSILON] {
+        assert_eq!(absolute_error_bound(rho), HIGH_BOUND_POSITIVE);
+        assert_eq!(absolute_error_bound(-rho), HIGH_BOUND_NEGATIVE);
+        let table = BivariateNormal::new(-rho).unwrap();
+        assert_eq!(table.absolute_error_bound(), HIGH_BOUND_NEGATIVE);
+    }
+    let largest = LOW_RULE_BOUNDS
+        .iter()
+        .copied()
+        .chain([
+            HIGH_BOUND_POSITIVE,
+            HIGH_BOUND_NEGATIVE,
+            CLOSED_FORM_BOUND,
+            SINGLE_PHI_BOUND,
+        ])
+        .fold(0.0, f64::max);
+    assert_eq!(largest, ABSOLUTE_ERROR_BOUND);
+}
+
 /// A tail value that underflows still bounds the positive probability it lost.
 #[test]
 fn underflowed_tail_keeps_a_positive_bound() {

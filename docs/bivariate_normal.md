@@ -12,15 +12,15 @@ what remains; nothing below claims more than the checks named here establish.
 | Item | State |
 | --- | --- |
 | Public scalar API, domains, special values, refusals (section 2) | done |
-| Genz (2004) algorithm, both regimes, ported from FerroRisk (section 3) | done |
+| Genz (2004) low-correlation quadrature and the high-correlation panel scheme (section 3) | done |
 | Per-correlation evaluator, no allocation, bit-identical to the one-shot function | done |
-| Absolute bound per correlation, `1.9e-16` to `3.72e-16` for `|rho| < 0.925` | **proved** (section 6); the high-correlation branch's bound is provisional |
+| Absolute bound per correlation: `1.9e-16` to `3.72e-16` for `|rho| < 0.925`, `2.708e-16` (`rho > 0`) and `3.333e-16` (`rho < 0`) for `0.925 <= |rho| < 1` | **proved** (section 6) |
 | Independent MPFR/mpmath reference, two precisions, second route (section 7) | done |
 | Generator for the quadrature rules, replayed by `check_generators.sh` | done |
 | Correctly rounded `asin` (#41) | done: the table's angle is `elementary::asin(rho)` (section 5) |
 | Relative accuracy of small probabilities (FerroRisk's tail construction) | not ported: refused instead (section 8) |
 | ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits, with slice and paired entry points (section 12) | done for the low-correlation quadrature: bit equality, digest and mutation witnesses (section 12); AVX2 and AVX-512F not yet run here (CI) |
-| Gappa/Coq proof of the error budget | truncation of the low-correlation rules **proved** (`formal/bivariate/`); the other terms and the high-correlation branch not done |
+| Coq proof of the error budget | **proved** for both branches (`formal/bivariate/`), from the named hypotheses of section 6; the Coq transcription is by reading, not extracted (section 11) |
 | Same-host scalar and batch performance against the FerroRisk baseline | measured (section 9); lanes **unmeasured** |
 
 ## 2. Specification
@@ -78,23 +78,27 @@ rule's nodes, which come in `+-` pairs about the interval's centre and are
 summed in node order as a double-word (`two_sum` of each term, the
 low parts added in order), which rounds once rather than once per node.
 
-Two regimes (Genz 2004, ported from FerroRisk at commit `72db248c`):
+Two regimes (Genz 2004 for the split and the low branch; FerroRisk at commit
+`72db248c` for the structure):
 
 * **Low correlation, `|rho| < 0.925`.** The Gauss-Legendre sum above. The
   rule has 4 to 24 nodes depending on `|rho|` (section 4).
-* **High correlation, `0.925 <= |rho| < 1`.** Genz's `BVND` series: the
-  integral is rewritten in `s = sqrt(1 - rho^2)`, whose small size narrows the
-  integrand, with a Taylor-corrected subtraction and a 20-node rule. It is
-  transcribed in Genz's own variable names so it can be checked line by line;
-  FerroRisk's earlier transcription was wrong in five places at once
-  (NU-0003) and read plausibly throughout, so this port reads the published
-  algorithm and was verified against the reference at the classifier's
-  adjacent doubles (section 7).
+* **High correlation, `0.925 <= |rho| < 1`.** Plackett's integral in
+  `s = sqrt(1 - rho^2)`, whose small size narrows the integrand: graded
+  Gauss-Legendre panels (16 nodes above `s = 0.095`, 15 below) integrate the
+  integrand directly, with a double-word sum of the node terms, and below
+  `s = 0.003` Genz's closed-form moments replace the last panel. This is not
+  Genz's `BVND` series: FerroRisk's transcription of that series (20 nodes
+  and a Taylor-corrected subtraction) was `2.58e-16` from the exact value at
+  `(-0.21101192279835226, -0.0014549743776884816, 0.925)` against a published
+  `2.5e-16`, because the series' integrand is flat at zero with an essential
+  singularity there, so no quadrature rule has a proved remainder for it.
+  The kernel and its proof are in `docs/bivariate_normal_high.md`.
 
 The split at `0.925` is Genz's. FerroRisk measured the reflection residual of
-the low branch at `1.11e-16` through `|rho| = 0.95` and `1.2e-13` at `0.97`,
-and the high branch at `1.11e-16` from `0.90` upward, so the split is
-conservative with a margin of about `0.025` on the side that matters.
+the low branch at `1.11e-16` through `|rho| = 0.95` and `1.2e-13` at `0.97`;
+the high branch is proved up to `|rho| < 1`, so the split's margin is the
+low branch's, about `0.025`, on the side that matters.
 
 ## 4. Domain splits and quadrature orders
 
@@ -171,8 +175,18 @@ was false (section 3: `bivariate_norm_cdf(-0.21101192279835226, -0.0014549743776
 was `2.58e-16` from the exact value). The closed-form regimes (independent,
 countermonotone: `1.7e-16`; comonotone and the saturated limits: `5.7e-17`) are
 derived from the same `norm_cdf` contract by a few lines, not machine-checked.
-The high-correlation branch's bound is provisionally the low branch's largest,
-`3.721e-16`, until its proof is complete (`docs/bivariate_normal_high.md`).
+The high-correlation branch is proved at `2.708e-16` for `rho > 0` and
+`3.333e-16` for `rho < 0` (`formal/bivariate/BvnHighEnd.v`: `high_pos_end`,
+`high_neg_end_diff`, `high_neg_end_zero`; rounded up in the fourth digit in
+`absolute_error_bound`), with no sampled hypothesis. The `rho < 0` value
+carries a looser last step (a second `norm_cdf` rounding counted in full) that
+a finer argument would reduce by about `2.8e-17`. Its hypotheses are the same
+kind as the low branch's: the library contracts (`exp`, `sqrt`, `norm_cdf`,
+`two_sum`), classical analysis (Plackett's identity, the Gauss-Legendre
+remainder, the skip bounds for `hk >= 100` and `b >= 20 s`) cited and not
+machine-checked, and the stored tables' fidelity; the Coq transcription of
+the operation sequence matches `mod.rs` by reading. `docs/bivariate_normal_high.md`
+lists each.
 
 **Measured.** Over the fixture's 3,495 cases (section 7) the worst absolute error
 is `1.11e-16`, within the bound of each case's own correlation; the proved figures
@@ -261,14 +275,14 @@ The implementation, the rule structure, the semantics of the bounded form and
 the contract constants are ported from FerroRisk, commit `72db248c`
 (`origin/main`, v0.41.4, MorphIQ Labs, same ownership and licensing as this
 repository; see `docs/PROVENANCE.md`). Genz (2004) is the published algorithm.
-The code is a fresh transcription of Genz's published algorithm in this library's idiom (the pull request records the consultation as `docs/PROVENANCE.md` asks; FerroRisk's own origin for its transcription is in-house, and the owner should confirm it before the FerroRisk copy is deleted): correctly rounded
+The low branch is a fresh transcription of Genz's published algorithm in this library's idiom, and the high branch is this library's own panel scheme (the pull request records the consultation as `docs/PROVENANCE.md` asks; FerroRisk's own origin for its transcription is in-house, and the owner should confirm it before the FerroRisk copy is deleted): correctly rounded
 `exp`, `sincos`, `sqrt` and `norm_cdf` replace the platform libm and
 FerroRisk's, the nodes are generated rather than pasted, and `asin` is not
 taken from libm. Item by item (the list FerroRisk's deletion cites):
 
 | FerroRisk item | Disposition |
 | --- | --- |
-| `numerics/bivariate_normal.rs`: Genz low and high regimes, regime classifier, saturation limits, degenerate limits, probability clamp | **ported** (this module) |
+| `numerics/bivariate_normal.rs`: Genz low regime, regime classifier, (the high regime is replaced, section 3), saturation limits, degenerate limits, probability clamp | **ported** (this module) |
 | `BoundedProbability`, `bivariate_norm_cdf_bounded` semantics | **ported** with a correlation-dependent proved bound; the `2.5e-16`, `1e-3` and `1e-13` constants are **not** carried over (section 6); the sub-floor relative construction is **refused**, not deferred (section 8) |
 | `BvnQuadrature` per-correlation reuse | **ported** as `BivariateNormal` (fallible construction, `Copy`, no allocation, bit-identical to the one-shot function) |
 | SIMD (`pulp`) fused Genz sum and its x86 padding | **replaced** by the lanes of section 12, which keep the scalar summation order and so return the scalar bits |
@@ -277,19 +291,16 @@ taken from libm. Item by item (the list FerroRisk's deletion cites):
 | `tests/bivariate_normal_reference.rs`, `testing/bivariate_normal_support.rs` | **ported as test-only**: the reference test reads the fixture and applies the absolute, relative and reported-bound checks |
 | `testing/data/bivariate_normal_reference.json` (3 762 rows) | **ported as test-only**: 1 158 rows (BS2002 families dropped, the body and tail families thinned to every tenth row) re-evaluated by this oracle; the other 2 604 rows are in git history at `72db248c` and were **not ported** because the thinned set covers every family and regime edge |
 | `testing/calibration/generate_bivariate_normal_reference.py` | **not ported**: replaced by `generators/bivariate_normal_reference.py` (a different route; the earlier script is the cross-check source) |
-| `testing/mutations/bivariate_normal.toml` (21 faults) | **not ported**: this library has no mutation harness; the faults map to tests here: the split (`B1`) and every rule limit are held by `results_are_continuous_across_every_rule_limit` and by fixture rows on both sides; the second high-correlation term's sign (`B3`) and the high-regime accumulation by the high-correlation fixture rows; the unit-edge snap (`B24`) by `reflection_holds_at_the_unit_correlation_edge`; NaN handling by `nan_and_out_of_range_inputs_*` |
+| `testing/mutations/bivariate_normal.toml` (21 faults) | **not ported**: this library has no mutation harness; the faults map to tests here: the split (`B1`) and every rule limit are held by `results_are_continuous_across_every_rule_limit` and by fixture rows on both sides; the high regime's node terms, `two_sum` accumulation, closed form and reflection branch by the high-correlation fixture rows (including rows at the counterexample) and the proof's operation sequence; the unit-edge snap (`B24`) by `reflection_holds_at_the_unit_correlation_edge`; NaN handling by `nan_and_out_of_range_inputs_*` |
 | SPEC section 7.3 and ferro-risk #380 cancellation analysis | **ported** as section 8; the corner is a required fixture case |
 | `formal/lean-math/FerroRisk/AmericanBivariate.lean` (5 laws: Gaussian marginal, two complement identities, comonotone and countermonotone closed forms) | **not ported**: this repository's proofs are Coq/Gappa, not Lean. Their statements are the proof targets of the remaining work; their runtime counterparts are tested: reflection (the two complements) and the degenerate closed forms |
 | `benches/numerics.rs` bivariate entries (`bivariate_norm_cdf`, `_high_correlation`, `_hoisted_golden_rho`) | **ported** as the measurement matrix of section 9 (one-shot at several correlations, repeated-`rho`, table construction) |
 
 ## 11. Remaining work, in order
 
-1. The high-correlation branch's rounding proof (`docs/bivariate_normal_high.md`),
-   after which its bound replaces the provisional one (section 6).
-2. The Coq transcription of the kernel, extracted and compared bit for bit with the
+1. The Coq transcription of the kernel, extracted and compared bit for bit with the
    Rust, and mutation witnesses for the scalar kernel (issue #87's pipeline).
-3. Vector lanes for the high-correlation branch from the final kernel (section 12).
-4. Measure the lanes on ARM and native x86 (#216) and re-measure against the
+2. Measure the lanes on ARM and native x86 (#216) and re-measure against the
    performance bar on a quiet host (section 9); this slice's numbers are one noisy
    shared host.
 
@@ -330,7 +341,7 @@ its scalar function bit for bit, so no new transcendental is introduced and
 no platform libm is called. Every operation is an individual lane add,
 multiply or divide; nothing is fused or reassociated.
 
-**Scalar per lane.** The high-correlation series (`|rho| >= 0.925`) is **not**
+**Scalar per lane.** The high-correlation branch (`|rho| >= 0.925`) is **not**
 vectorised: its lanes call `BivariateNormal::cdf`. So are the closed-form
 regimes (independent, comonotone, countermonotone), a NaN argument, a
 saturated argument (`x <= -39` or `y >= 39`), and a lane whose vector result is

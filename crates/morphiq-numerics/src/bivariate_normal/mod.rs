@@ -56,10 +56,14 @@ const CLOSED_FORM_BOUND: f64 = 1.7e-16;
 /// within `2^-54 + 2^-112`.
 const SINGLE_PHI_BOUND: f64 = 5.7e-17;
 
-/// The bound for the high-correlation branch. Provisional: the branch's proof
-/// is not complete (`docs/bivariate_normal_high.md`); this is the low branch's
-/// largest bound, above the 2.6e-16 the unfinished derivation expects.
-const HIGH_BOUND: f64 = 3.721e-16;
+/// The proved bound of the high-correlation branch for `rho > 0`: `2708e-19`
+/// (`formal/bivariate/BvnHighEnd.v`, `high_pos_end`), rounded up in the fourth
+/// digit.
+const HIGH_BOUND_POSITIVE: f64 = 2.709e-16;
+
+/// The proved bound of the high-correlation branch for `rho < 0`: `3333e-19`
+/// (`high_neg_end_diff`, `high_neg_end_zero`), rounded up in the fourth digit.
+const HIGH_BOUND_NEGATIVE: f64 = 3.334e-16;
 
 /// `|rho|` at which the low-correlation quadrature gives way to the
 /// high-correlation series (Genz's value; `docs/bivariate_normal.md` section 4).
@@ -248,7 +252,7 @@ impl BivariateNormal {
     /// threshold pair; see [`absolute_error_bound`].
     #[must_use]
     pub fn absolute_error_bound(&self) -> f64 {
-        regime_bound(self.regime, self.nodes)
+        regime_bound(self.regime, self.nodes, self.rho)
     }
 
     /// [`Self::cdf`] of every pair `(x[i], y[i])`, written to `out`:
@@ -434,17 +438,18 @@ fn panel_rule(s: f64) -> PanelRule {
 pub fn absolute_error_bound(rho: f64) -> f64 {
     match Regime::of(rho) {
         None => f64::NAN,
-        Some(regime) => regime_bound(regime, 2 * low_correlation_rule(rho).0.len()),
+        Some(regime) => regime_bound(regime, 2 * low_correlation_rule(rho).0.len(), rho),
     }
 }
 
-/// The bound of a regime; `nodes` is the low rule's length.
-fn regime_bound(regime: Regime, nodes: usize) -> f64 {
+/// The bound of a regime; `nodes` is the low rule's length, `rho` the correlation.
+fn regime_bound(regime: Regime, nodes: usize, rho: f64) -> f64 {
     match regime {
         Regime::Independent | Regime::Countermonotone => CLOSED_FORM_BOUND,
         Regime::Comonotone => SINGLE_PHI_BOUND,
         Regime::Low => LOW_RULE_BOUNDS[rule_index(nodes)],
-        Regime::High => HIGH_BOUND,
+        Regime::High if rho < 0.0 => HIGH_BOUND_NEGATIVE,
+        Regime::High => HIGH_BOUND_POSITIVE,
     }
 }
 
