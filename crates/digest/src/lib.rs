@@ -1769,6 +1769,14 @@ fn bivariate_normal_section(r: &mut Recorder) {
             }
         }
     }
+    // The correlation whose panel scales halve to exactly the closed form's
+    // floor (`0.003`), so the loop's stopping test is exercised at equality.
+    for i in 0..400 {
+        let x = batched_input(&mut words, &[0x7ff8_0000_0000_0000], i, -9.0, 9.0);
+        let y = batched_input(&mut words, &[1 << 63], i + 1, -9.0, 9.0);
+        r.f64(bivariate_norm_cdf(x, y, 0.995_381_333_962_014_8));
+        r.f64(bivariate_norm_cdf(x, y, -0.995_381_333_962_014_8));
+    }
     for i in 0..4_000 {
         let x = batched_input(&mut words, &[0x7ff8_0000_0000_0000, 1 << 63], i, -9.0, 9.0);
         let y = batched_input(&mut words, &[0x7ff0_0000_0000_0000, 0], i + 1, -9.0, 9.0);

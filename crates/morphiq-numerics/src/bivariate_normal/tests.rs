@@ -231,6 +231,65 @@ fn the_high_branch_bound_depends_on_the_sign_of_the_correlation() {
     assert_eq!(largest, ABSOLUTE_ERROR_BOUND);
 }
 
+/// The integrand is zero from `phi = 100` on, and positive just below it.
+#[test]
+fn the_integrand_stops_at_the_exponent_cutoff() {
+    // `xs = 0.75` gives `rs = 0.5`; with `bs = 0`, `phi = hk / 1.5`.
+    assert_eq!(integrand_term(0.75, 1.0, 0.0, 150.0), 0.0);
+    assert!(integrand_term(0.75, 1.0, 0.0, 149.999).is_sign_positive());
+    assert!(integrand_term(0.75, 1.0, 0.0, 149.999) > 0.0);
+}
+
+/// A refused correlation says so when displayed.
+#[test]
+fn the_refusal_describes_the_correlation() {
+    use core::fmt::Write;
+    struct Buffer([u8; 64], usize);
+    impl Write for Buffer {
+        fn write_str(&mut self, s: &str) -> core::fmt::Result {
+            let end = self.1 + s.len();
+            self.0
+                .get_mut(self.1..end)
+                .ok_or(core::fmt::Error)?
+                .copy_from_slice(s.as_bytes());
+            self.1 = end;
+            Ok(())
+        }
+    }
+    let mut buffer = Buffer([0; 64], 0);
+    write!(buffer, "{}", BivariateNormal::new(1.5).unwrap_err()).unwrap();
+    let message = core::str::from_utf8(&buffer.0[..buffer.1]).unwrap();
+    assert!(message.contains("correlation"), "{message}");
+}
+
+/// The panel rule has 16 nodes above `s = 0.095` and 15 at it and below.
+#[test]
+fn the_panel_rule_changes_just_above_its_threshold() {
+    let at = panel_rule(0.095);
+    let above = panel_rule(f64::from_bits(0.095_f64.to_bits() + 1));
+    let nodes = |rule: &PanelRule| 2 * rule.w.len() + usize::from(rule.centre.is_some());
+    assert_eq!(nodes(&at), 15);
+    assert_eq!(nodes(&above), 16);
+}
+
+/// The paired batch reports each pair's own correlation's bound, across blocks.
+#[test]
+fn the_paired_batch_bounds_every_pair_across_blocks() {
+    const N: usize = 200;
+    const RHOS: [f64; 5] = [0.03, -0.5, 0.85, 0.97, -0.97];
+    let rhos: [f64; N] = core::array::from_fn(|i| RHOS[i % 5]);
+    let x = [0.3; N];
+    let y = [-0.4; N];
+    let mut out = [BoundedProbability {
+        value: 0.0,
+        error: 0.0,
+    }; N];
+    bivariate_norm_cdf_bounded_slice(&x, &y, &rhos, &mut out);
+    for (o, &rho) in out.iter().zip(&rhos) {
+        assert_eq!(o.error, absolute_error_bound(rho));
+    }
+}
+
 /// A tail value that underflows still bounds the positive probability it lost.
 #[test]
 fn underflowed_tail_keeps_a_positive_bound() {

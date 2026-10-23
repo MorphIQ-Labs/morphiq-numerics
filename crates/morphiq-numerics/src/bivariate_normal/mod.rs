@@ -448,7 +448,7 @@ fn regime_bound(regime: Regime, nodes: usize, rho: f64) -> f64 {
         Regime::Independent | Regime::Countermonotone => CLOSED_FORM_BOUND,
         Regime::Comonotone => SINGLE_PHI_BOUND,
         Regime::Low => LOW_RULE_BOUNDS[rule_index(nodes)],
-        Regime::High if rho < 0.0 => HIGH_BOUND_NEGATIVE,
+        Regime::High if rho.is_sign_negative() => HIGH_BOUND_NEGATIVE,
         Regime::High => HIGH_BOUND_POSITIVE,
     }
 }
@@ -585,7 +585,8 @@ pub fn bivariate_norm_cdf_bounded_slice(
 /// `docs/bivariate_normal_high.md` derives each line.
 fn high_correlation(dh: f64, dk: f64, rho: f64) -> f64 {
     // Genz reflects `k` and `hk` together for negative correlation.
-    let (k, hk) = if rho < 0.0 {
+    let negative = rho.is_sign_negative();
+    let (k, hk) = if negative {
         (-dk, -(dh * dk))
     } else {
         (dk, dh * dk)
@@ -646,7 +647,7 @@ fn high_correlation(dh: f64, dk: f64, rho: f64) -> f64 {
     }
 
     bvn = -bvn / TAU;
-    let result = if rho > 0.0 {
+    let result = if !negative {
         bvn + norm_cdf(-dh.max(dk))
     } else if -dh > dk {
         // `-bvn` is the integral's share, `g`. The second term is
