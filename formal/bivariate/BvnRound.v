@@ -198,3 +198,11 @@ Proof.
   intros H. apply round_ge_generic; [auto with typeclass_instances | auto with typeclass_instances | |  exact H].
   apply generic_format_0.
 Qed.
+
+(** Rounding does not leave a binade boundary that is itself a binary64 number. *)
+Lemma rnd_abs_le_pow k x : (-1073 <= k)%Z -> Rabs x <= bpow radix2 k -> Rabs (rndF x) <= bpow radix2 k.
+Proof.
+  intros Hk Hx.
+  apply abs_round_le_generic; [auto with typeclass_instances | auto with typeclass_instances | | exact Hx].
+  apply generic_format_bpow. unfold FLT_exp. apply Z.max_lub; lia.
+Qed.

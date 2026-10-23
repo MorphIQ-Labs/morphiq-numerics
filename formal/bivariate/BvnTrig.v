@@ -5,7 +5,7 @@ From Interval Require Import Tactic.
 Require Import BvnRound.
 Open Scope R_scope.
 
-Lemma sin_ge_half x : 0 <= x <= 1 -> x / 2 <= sin x.
+Lemma sin_ge_half x : 0 <= x <= 3 / 2 -> x / 2 <= sin x.
 Proof.
   intros [H0 H1].
   pose proof (sin_bound x 0 H0 ltac:(pose proof PI_RGT_0; interval)) as [Hl _].
@@ -13,8 +13,8 @@ Proof.
   assert (E : sin_approx x 1 = x - x * x * x / 6).
   { unfold sin_approx. simpl. unfold sin_term. simpl. field. }
   rewrite E in Hl.
-  assert (Hxx : x * x <= 1) by nra.
-  assert (Hx3 : x * x * x <= x) by nra.
+  assert (Hxx : x * x <= 9 / 4) by nra.
+  assert (Hx3 : x * x * x <= 9 / 4 * x) by nra.
   nra.
 Qed.
 
