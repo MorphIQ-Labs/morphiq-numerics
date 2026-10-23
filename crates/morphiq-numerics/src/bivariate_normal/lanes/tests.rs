@@ -338,6 +338,26 @@ fn only_quadrature_lanes_that_are_not_nan_or_saturated_are_served_by_the_vector_
     assert_eq!(BivariateNormal::new(0.95).unwrap().regime, Regime::High);
 }
 
+/// A correlation repeated across lanes, valid or not, is evaluated or NaN in
+/// each of them.
+#[test]
+fn repeated_correlations_keep_their_validity_in_every_lane() {
+    for rho in [f64::NAN, 1.5, -1.0_f64.next_down(), 0.5, 0.95] {
+        let rho = [rho; 40];
+        let x: Vec<f64> = (0..40).map(|i| f64::from(i) / 7.0 - 2.0).collect();
+        let y: Vec<f64> = (0..40).map(|i| 1.0 - f64::from(i) / 9.0).collect();
+        let mut out = [0.0; 40];
+        bivariate_norm_cdf_slice(&x, &y, &rho, &mut out);
+        for i in 0..40 {
+            assert!(
+                same(out[i], bivariate_norm_cdf(x[i], y[i], rho[i])),
+                "{} at {i}",
+                rho[i]
+            );
+        }
+    }
+}
+
 /// The driver on one backend: whole chunks vector, the scalar function for
 /// the rest, every length 0 to 17 at every offset.
 struct Driver<'a> {

@@ -370,6 +370,7 @@ impl WithSimd for Chunks<'_> {
                         let r = rho[start + lane];
                         if lane > 0 && r.to_bits() == rho[start + lane - 1].to_bits() {
                             owned[lane] = owned[lane - 1];
+                            invalid |= (invalid >> (lane - 1) & 1) << lane;
                         } else if let Ok(table) = BivariateNormal::new(r) {
                             owned[lane] = table;
                         } else {
