@@ -76,3 +76,21 @@ Proof.
   eapply Rle_trans; [exact Hstep |].
   right. rewrite Hden. field. split; [lra | split; [lra | lra]].
 Qed.
+
+Lemma Qf_nonneg r p s : 0 <= r -> Rabs p <= r / 2 -> Rabs s < 1 -> 0 <= Qf r p s.
+Proof.
+  intros Hr Hp Hs. unfold Qf.
+  assert (Hs1 : -1 < s < 1) by (apply Rabs_lt_between; exact Hs).
+  destruct Hs1 as [Hs1a Hs1b].
+  apply Rmult_le_pos; [| apply Rlt_le, Rinv_0_lt_compat; nra].
+  assert (Hps : Rabs (p * s) <= r / 2).
+  { rewrite Rabs_mult. pose proof (Rabs_pos p). pose proof (Rabs_pos s). nra. }
+  apply Rabs_le_inv in Hps. lra.
+Qed.
+
+Lemma exp_two_sided D : 0 <= D -> (1 + u) * exp D + (1 - u) * exp (- D) >= 2.
+Proof.
+  intros HD. pose proof u_pos as Hu. pose proof u_val as Huv.
+  pose proof (exp_ineq1_le D) as H1. pose proof (exp_ineq1_le (- D)) as H2.
+  nra.
+Qed.
