@@ -324,10 +324,6 @@ const PANEL_FLOOR: f64 = 0.003;
 /// is not computed (`docs/bivariate_normal_high.md` section 1.7, A3).
 const HK_CUTOFF: f64 = 100.0;
 
-/// `hk` and `bs` below this are taken as zero, which keeps every rounded
-/// intermediate of the quadrature a normal number (section 4.1).
-const TINY: f64 = 1.0e-200;
-
 /// A Gauss-Legendre rule of the panels: the positive abscissas' weights, the
 /// unit squares `((3 + t)/4)^2` and `((3 - t)/4)^2` of the abscissas `t`, and
 /// the weight of the centre node at 0 (`None` for an even order).
@@ -387,8 +383,6 @@ fn high_correlation(dh: f64, dk: f64, rho: f64) -> f64 {
         (dk, dh * dk)
     };
     let bs = (dh - k) * (dh - k);
-    let hk = if hk.abs() < TINY { 0.0 } else { hk };
-    let bs = if bs < TINY { 0.0 } else { bs };
 
     // `J`, the quantity `bvn` below accumulates (its negative over `TAU`).
     let mut bvn = 0.0;
@@ -425,15 +419,15 @@ fn high_correlation(dh: f64, dk: f64, rho: f64) -> f64 {
         let panels = high + low;
 
         // Genz's closed form for `int_0^s E T dx` on the rest, `s <= 0.003`.
-        let ass = s * s;
-        let asr = -(bs / ass + hk) / 2.0;
-        if asr > -100.0 {
+        // From `b = 20 s` on, `E <= e^-200` there and the integral is below
+        // `1e-46`: the closed form is not evaluated.
+        let b = sqrt(bs);
+        if b < 20.0 * s {
+            let ass = s * s;
+            let asr = -(bs / ass + hk) / 2.0;
             bvn = s
                 * exp(asr)
                 * (1.0 - c * (bs - ass) * (1.0 - d * bs / 5.0) / 3.0 + c * d * ass * ass / 5.0);
-        }
-        if -hk < 100.0 {
-            let b = sqrt(bs);
             bvn -= exp(-hk / 2.0)
                 * SQRT_TAU
                 * norm_cdf(-b / s)
