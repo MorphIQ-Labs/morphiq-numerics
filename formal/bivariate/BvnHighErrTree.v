@@ -1,7 +1,7 @@
 From Coq Require Import Reals Lra Psatz ZArith Lia.
 From Interval Require Import Tactic.
 From Flocq Require Import Core.
-Require Import BvnHighAssembly BvnHighRound N1head N5a.
+Require Import BvnHighAssembly BvnHighRound BvnHighSteps BvnHighErr.
 Open Scope R_scope.
 
 (** A verified forward-error calculator for straight-line arithmetic: a tree of

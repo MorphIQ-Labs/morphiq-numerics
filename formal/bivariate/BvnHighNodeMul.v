@@ -1,7 +1,7 @@
 From Coq Require Import Reals Lra Psatz ZArith Lia.
 From Interval Require Import Tactic.
 From Flocq Require Import Core.
-Require Import BvnHighAssembly BvnHighRound N1head N2.
+Require Import BvnHighAssembly BvnHighRound BvnHighSteps BvnHighNodeExp.
 Open Scope R_scope.
 
 Lemma mul_stage s w wT F fT th2 :
