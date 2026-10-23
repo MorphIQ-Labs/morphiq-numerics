@@ -288,3 +288,31 @@ Proof.
   rewrite E3 in HA. destruct HA as [_ HA]. exact HA.
 Qed.
 End CF.
+
+(** The kernel's guard [b < 20 s] bounds [bs] by [400.1 s^2] (so [bs <= 3.6e-3]). *)
+Lemma guard_bsq (sqrtT : R -> R) (s bs bsT e0 : R) :
+  (forall x, 0 <= x -> rel (sqrt x) (sqrtT x) u) ->
+  1 / 10 ^ 8 <= s <= 3 / 1000 -> 0 <= bs -> 0 <= bsT -> 0 <= e0 <= / 10 ^ 200 ->
+  rela bs bsT (31 / 10 * u) e0 -> sqrtT bsT < 20 * s -> bs <= 4001 / 10 * (s * s).
+Proof.
+  intros Hsq0 Hs Hbs HbsT He0 Hbs2 Hg.
+  pose proof u_pos as Hu. pose proof u_lt as Hu2.
+  unfold rela in Hbs2. rewrite (Rabs_right bs) in Hbs2 by lra.
+  pose proof (b_rel sqrtT Hsq0 bs bsT e0 Hbs HbsT He0 Hbs2) as He.
+  pose proof (sqrt_pos bs) as Hb0. pose proof (sqrt_sqrt bs Hbs) as Eb.
+  destruct Hs as [Hs1 Hs2]. apply Rabs_le_inv in He. destruct He as [He1 He2].
+  assert (Hb : sqrt bs * (1 - 43 / 10 * u) <= 20 * s + 3 / 10 ^ 100) by nra.
+  assert (H8 : 1 <= 10 ^ 8 * s) by (assert (10 ^ 8 * (1 / 10 ^ 8) = 1) by field; nra).
+  assert (Htiny : 3 / 10 ^ 100 <= 3 / 10 ^ 92 * s).
+  { assert (3 / 10 ^ 92 * s >= 3 / 10 ^ 92 * (1 / 10 ^ 8)) by (apply Rle_ge; apply Rmult_le_compat_l; [interval | lra]).
+    assert (3 / 10 ^ 92 * (1 / 10 ^ 8) = 3 / 10 ^ 100) by field. lra. }
+  assert (Hc : sqrt bs <= 2001 / 100 * s).
+  { assert (Hl : 20 * s + 3 / 10 ^ 92 * s <= (2001 / 100) * s * (1 - 43 / 10 * u)).
+    { assert (u <= 1112 / 10 ^ 19) by (apply Rlt_le; apply u_small).
+      assert (2001 / 100 * (1 - 43 / 10 * u) >= 20 + 3 / 10 ^ 92) by (rewrite u_value; interval).
+      nra. }
+    assert (Hpos : 0 < 1 - 43 / 10 * u) by lra.
+    apply Rmult_le_reg_r with (1 - 43 / 10 * u); [exact Hpos|]. nra. }
+  assert (Hq : sqrt bs * sqrt bs <= (2001 / 100 * s) * (2001 / 100 * s)) by (apply Rmult_le_compat; lra).
+  nra.
+Qed.

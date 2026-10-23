@@ -108,8 +108,8 @@ Qed.
 Definition dJ : R := 94 / 10 ^ 17.
 Definition D_div : R := 1593 / 10000 * dJ + 1 / 10 ^ 17.
 
-Lemma bound_pos_value : D_div + (c54 + tz) + c54 <= 28 / 10 ^ 17 * 10.
+Lemma bound_pos_value : D_div + (c54 + tz) + c54 <= 2708 / 10 ^ 19.
 Proof. unfold D_div, dJ, tz. rewrite c54_value. interval. Qed.
 
-Lemma bound_neg_value : D_div + 2 * (c54 + tz) + 9 / 8 * c54 <= 34 / 10 ^ 17 * 10.
+Lemma bound_neg_value : D_div + 2 * (c54 + tz) + 9 / 8 * c54 <= 3333 / 10 ^ 19.
 Proof. unfold D_div, dJ, tz. rewrite c54_value. interval. Qed.

@@ -94,3 +94,78 @@ Proof.
     lra.
 Qed.
 End ASetup.
+
+(** The branch's two inputs to the integrand as the kernel forms them.  With [d = dh - k]
+    ([k = dk] for positive correlation, [-dk] for negative) and [d1 = rnd d], the computed
+    [bs] is [rnd (d1 d1)]; the computed [hk] is [rnd (dh dk)], negated for negative
+    correlation.  [|d| <= 0.061] is the range where the integral is evaluated at all
+    ([bs <= 400.1 s^2 <= 3.6e-3]). *)
+Lemma bs_rela d :
+  Rabs d <= 61 / 1000 -> rela (d * d) (rnd (rnd d * rnd d)) (31 / 10 * u) (1 / 10 ^ 200).
+Proof.
+  intros Hd.
+  pose proof u_pos as Hu. pose proof u_lt as Hu2. pose proof eta_small as Hη.
+  pose proof (rnd_abs d) as H1. set (d1 := rnd d) in *.
+  assert (He : eta <= 1 / 10 ^ 250) by (assert (/ 10 ^ 300 <= 1 / 10 ^ 250) by interval; lra).
+  pose proof (Rabs_pos d) as Hd0.
+  assert (Hd1 : Rabs d1 <= 62 / 1000).
+  { pose proof (Rabs_triang (d1 - d) d) as T. replace (d1 - d + d) with d1 in T by ring.
+    assert (u * Rabs d <= u * (61 / 1000)) by (apply Rmult_le_compat_l; lra).
+    assert (u * (61 / 1000) + 1 / 10 ^ 250 <= 1 / 1000) by (rewrite u_value; interval). lra. }
+  pose proof (rnd_abs (d1 * d1)) as H2.
+  assert (Hq : Rabs (d1 * d1 - d * d) <= (2 * u + u * u) * (d * d) + 4 / 10 ^ 250 * Rabs d + (1 / 10 ^ 250) * (1 / 10 ^ 250) + 2 * u * (1 / 10 ^ 250) * Rabs d).
+  { replace (d1 * d1 - d * d) with ((d1 - d) * (d1 + d)) by ring.
+    rewrite Rabs_mult.
+    pose proof (Rabs_triang (d1 - d) (2 * d)) as T3. 
+    assert (Hs : Rabs (d1 + d) <= (2 + u) * Rabs d + 1 / 10 ^ 250).
+    { replace (d1 + d) with ((d1 - d) + 2 * d) by ring.
+      pose proof (Rabs_triang (d1 - d) (2 * d)) as T4. rewrite Rabs_mult in T4. rewrite (Rabs_right 2) in T4 by lra. lra. }
+    assert (Hp : Rabs (d1 - d) * Rabs (d1 + d) <= (u * Rabs d + 1 / 10 ^ 250) * ((2 + u) * Rabs d + 1 / 10 ^ 250)).
+    { apply Rmult_le_compat; [apply Rabs_pos | apply Rabs_pos | lra | lra]. }
+    assert (Hdd : Rabs d * Rabs d = d * d) by (rewrite <- Rabs_mult; apply Rabs_right; nra).
+    nra. }
+  unfold rela. rewrite (Rabs_right (d * d)) by nra.
+  assert (Hdd : Rabs d * Rabs d = d * d) by (rewrite <- Rabs_mult; apply Rabs_right; nra).
+  assert (Hdd0 : 0 <= d * d) by nra.
+  assert (Hpr : Rabs (d1 * d1) <= (1 + 2 * u + u * u) * (d * d) + 5 / 10 ^ 250).
+  { pose proof (Rabs_triang (d1 * d1 - d * d) (d * d)) as T. replace (d1 * d1 - d * d + d * d) with (d1 * d1) in T by ring.
+    rewrite (Rabs_right (d * d)) in T by nra.
+    assert (4 / 10 ^ 250 * Rabs d <= 4 / 10 ^ 250 * (61 / 1000)) by (apply Rmult_le_compat_l; [interval | lra]).
+    assert (2 * u * (1 / 10 ^ 250) * Rabs d <= 1 / 10 ^ 260) by (rewrite u_value; assert (0 <= 1 / 10 ^ 250 * Rabs d) by (apply Rmult_le_pos; [interval | lra]); nra).
+    assert (4 / 10 ^ 250 * (61 / 1000) + 1 / 10 ^ 260 + (1 / 10 ^ 250) * (1 / 10 ^ 250) <= 5 / 10 ^ 250) by interval. lra. }
+  assert (Hfin : Rabs (rnd (d1 * d1) - d * d) <= 31 / 10 * u * (d * d) + 1 / 10 ^ 200).
+  { pose proof (Rabs_triang (rnd (d1 * d1) - d1 * d1) (d1 * d1 - d * d)) as T.
+    replace (rnd (d1 * d1) - d1 * d1 + (d1 * d1 - d * d)) with (rnd (d1 * d1) - d * d) in T by ring.
+    assert (u * Rabs (d1 * d1) <= u * ((1 + 2 * u + u * u) * (d * d) + 5 / 10 ^ 250)) by (apply Rmult_le_compat_l; lra).
+    assert (E : u * ((1 + 2 * u + u * u) * (d * d) + 5 / 10 ^ 250) = u * (d * d) + 2 * (u * u) * (d * d) + (u * u * u) * (d * d) + u * (5 / 10 ^ 250)) by ring.
+    assert (Hu3 : u * u <= u / 1000) by (rewrite u_value; interval).
+    assert (Hu4 : u * u * u <= u / 1000) by (rewrite u_value; interval).
+    assert (Hz : 0 <= u * (d * d)) by nra.
+    assert (Hm1 : (u * u) * (d * d) <= u / 1000 * (d * d)) by (apply Rmult_le_compat_r; [exact Hdd0 | exact Hu3]).
+    assert (Hm2 : (u * u * u) * (d * d) <= u / 1000 * (d * d)) by (apply Rmult_le_compat_r; [exact Hdd0 | exact Hu4]).
+    assert (Hm3 : u * (5 / 10 ^ 250) <= 1 / 10 ^ 260) by (rewrite u_value; interval).
+    assert (Hs1 : (2 * u + u * u) * (d * d) = 2 * (u * (d * d)) + (u * u) * (d * d)) by ring.
+    assert (Hs2 : 4 / 10 ^ 250 * Rabs d <= 4 / 10 ^ 250 * (61 / 1000)) by (apply Rmult_le_compat_l; [interval | lra]).
+    assert (Hs3 : 2 * u * (1 / 10 ^ 250) * Rabs d <= 1 / 10 ^ 260) by (rewrite u_value; assert (0 <= 1 / 10 ^ 250 * Rabs d) by (apply Rmult_le_pos; [interval | lra]); nra).
+    assert (Hs4 : 4 / 10 ^ 250 * (61 / 1000) + 1 / 10 ^ 260 + (1 / 10 ^ 250) * (1 / 10 ^ 250) + 1 / 10 ^ 260 + 1 / 10 ^ 250 + 1 / 10 ^ 250 <= 1 / 10 ^ 200) by interval.
+    assert (Hs5 : u * (d * d) = 1 * (u * (d * d))) by ring.
+    assert (Ha : (u * u) * (d * d) >= 0) by nra.
+    nra. }
+  exact Hfin.
+Qed.
+
+Lemma hk_rela x : rela x (rnd x) u (1 / 10 ^ 200).
+Proof.
+  unfold rela. pose proof (rnd_abs x) as H. pose proof eta_small as Hη.
+  assert (/ 10 ^ 300 <= 1 / 10 ^ 200) by interval. lra.
+Qed.
+
+Lemma hk_rela_neg x : rela (- x) (- rnd x) u (1 / 10 ^ 200).
+Proof.
+  pose proof (hk_rela x) as H. unfold rela in *.
+  replace (- rnd x - - x) with (- (rnd x - x)) by ring. rewrite Rabs_Ropp, Rabs_Ropp. exact H.
+Qed.
+
+(** The identity behind [bs >= -4 hk]: [(dh - k)^2 + 4 dh k = (dh + k)^2]. *)
+Lemma bs_hk_identity dh k : (dh - k) * (dh - k) + 4 * (dh * k) = (dh + k) * (dh + k).
+Proof. ring. Qed.

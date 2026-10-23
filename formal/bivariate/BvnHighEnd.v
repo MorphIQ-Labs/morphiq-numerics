@@ -4,34 +4,8 @@
 From Coq Require Import Reals Lra Psatz ZArith Lia.
 From Interval Require Import Tactic.
 From Flocq Require Import Core.
-Require Import BvnHighAssembly BvnHighRound BvnHighSteps BvnHighBudget BvnHighFinal.
+Require Import BvnHighAssembly BvnHighRound BvnHighSteps BvnHighBudget BvnHighPanels BvnHighFinal.
 Open Scope R_scope.
-
-(** The truncation certificate of a panel: the Gauss-Legendre remainder
-    [l 64 M / (15 (1 - rho^-2) rho^(2 N))] with [l = s/4], [rho = 7/2], [M = 1.134]
-    is at most [63e-18 s] for every rule with [N >= 15] nodes ([N = 16] for the
-    wide panels is smaller still), and [M] bounds [|1 / rs|] where
-    [|z|^2 <= 0.22]. *)
-Lemma panel_constant :
-  1 / 4 * (64 / (15 * ((1 - / ((7 / 2) * (7 / 2))) * (7 / 2) ^ (2 * 15)))) * (1134 / 1000) <= 63 / 10 ^ 18.
-Proof. interval with (i_prec 80). Qed.
-
-Lemma panel_constant_16 :
-  1 / 4 * (64 / (15 * ((1 - / ((7 / 2) * (7 / 2))) * (7 / 2) ^ (2 * 16)))) * (1134 / 1000) <= 63 / 10 ^ 18.
-Proof. interval with (i_prec 80). Qed.
-
-Lemma modulus_constant : 1 / sqrt (1 - 22 / 100) <= 1134 / 1000.
-Proof. interval. Qed.
-
-(** The tail below the last scale: [kappa s^7 / 7] with [kappa = 7.2], [s <= 0.003]. *)
-Lemma tail_constant : 72 / 10 * (3 / 1000) ^ 7 / 7 <= 23 / 10 ^ 19.
-Proof. interval. Qed.
-
-Lemma tail_monotone s : 0 <= s -> s <= 3 / 1000 -> 72 / 10 * s ^ 7 / 7 <= 72 / 10 * (3 / 1000) ^ 7 / 7.
-Proof.
-  intros H0 H1. assert (s ^ 7 <= (3 / 1000) ^ 7) by (apply pow_incr; lra).
-  unfold Rdiv. assert (0 <= / 7) by (left; apply Rinv_0_lt_compat; lra). nra.
-Qed.
 
 (** The closed form's value [Cl] (zero where the kernel skips it) against the integral over
     [[0, s]]. *)
@@ -73,7 +47,7 @@ Qed.
 (** [rho > 0]: [P = Phi(-max) - J / 2 pi]; the result [clamp (rnd (-Jk / TAU + nc (-max)))]. *)
 Theorem high_pos_end xm Jk J :
   0 <= J <= 21 / 50 -> Rabs (Jk - J) <= dJ -> 0 <= Phi xm - J / (2 * PI) <= 1 ->
-  Rabs (clamp (rnd (rnd (- Jk / TAU) + nc xm)) - (Phi xm - J / (2 * PI))) <= 28 / 10 ^ 17 * 10.
+  Rabs (clamp (rnd (rnd (- Jk / TAU) + nc xm)) - (Phi xm - J / (2 * PI))) <= 2708 / 10 ^ 19.
 Proof.
   intros HJ Hd HP.
   assert (HdJ : dJ <= 1 / 1000) by (unfold dJ; interval).
@@ -89,7 +63,7 @@ Theorem high_neg_end_diff dh dk Jk J :
   0 <= J / (2 * PI) + (Phi (- dh) - Phi dk) <= 1 ->
   let g := - rnd (- Jk / TAU) in
   let hl := ts (nc (- dh)) (- nc dk) in
-  Rabs (clamp (rnd (fst hl + rnd (snd hl + g))) - (J / (2 * PI) + (Phi (- dh) - Phi dk))) <= 34 / 10 ^ 17 * 10.
+  Rabs (clamp (rnd (fst hl + rnd (snd hl + g))) - (J / (2 * PI) + (Phi (- dh) - Phi dk))) <= 3333 / 10 ^ 19.
 Proof.
   intros HJ Hd Hm HP g hl.
   assert (HdJ : dJ <= 1 / 1000) by (unfold dJ; interval).
@@ -112,7 +86,7 @@ Qed.
 Theorem high_neg_end_zero dh dk Jk J :
   0 <= J <= 21 / 50 -> Rabs (Jk - J) <= dJ -> Phi (- dh) <= Phi dk ->
   0 <= J / (2 * PI) <= 1 ->
-  Rabs (clamp (- rnd (- Jk / TAU)) - (J / (2 * PI) + Rmax 0 (Phi (- dh) - Phi dk))) <= 34 / 10 ^ 17 * 10.
+  Rabs (clamp (- rnd (- Jk / TAU)) - (J / (2 * PI) + Rmax 0 (Phi (- dh) - Phi dk))) <= 3333 / 10 ^ 19.
 Proof.
   intros HJ Hd Hm HP.
   assert (HdJ : dJ <= 1 / 1000) by (unfold dJ; interval).

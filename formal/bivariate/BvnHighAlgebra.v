@@ -9,7 +9,7 @@
 From Coq Require Import Reals Lra Field.
 Open Scope R_scope.
 
-(** Section 1.2.  With [x^2 = 1 - s^2] (so [s] is the correlation of the
+(** The exponent split.  With [x^2 = 1 - s^2] (so [s] is the correlation of the
     substituted variable), the exponent of Plackett's integrand splits into the
     part that narrows the integrand and the part that is smooth:
     [(h^2 + k^2 - 2 h k s) / (2 (1 - s^2)) = (h - k)^2 / (2 x^2) + h k / (1 + s)]. *)
@@ -26,24 +26,7 @@ Proof.
   field. split; assumption.
 Qed.
 
-(** The same exponent with Genz's own grouping: the factor [e^(-h k / 2)] taken
-    out, the remainder [exp(-h k x^2 / (2 (1 + s)^2))] being the argument of
-    the smooth factor [G] of section 1.3. *)
-Lemma smooth_exponent h k s x :
-  1 + s <> 0 -> x * x = 1 - s * s ->
-  - (h * k) / 2 - (h * k) * (x * x) / (2 * ((1 + s) * (1 + s))) = - (h * k) / (1 + s).
-Proof.
-  intros Hs Hx. rewrite Hx. field. assumption.
-Qed.
-
-(** Section 1.4: the Taylor-corrected subtraction.  The integrand [F = E G]
-    splits as [E T + E (G - T)] for ANY polynomial [T]; [c] and [d] only decide
-    how small [G - T] is, never whether the identity holds. *)
-Lemma subtraction_identity E G c d xs :
-  E * G = E * (1 + c * xs * (1 + d * xs)) + E * (G - (1 + c * xs * (1 + d * xs))).
-Proof. ring. Qed.
-
-(** Section 1.5: the analytic part.  [E0, E2, E4] stand for the moments
+(** The closed form: the analytic part.  [E0, E2, E4] stand for the moments
     [int_0^a e^(-bs/(2 x^2)) x^m dx], [m = 0, 2, 4], with [bs = b^2];
     [R = sqrt(2 pi) Phi(-b / a)] and [ea = e^(-bs/(2 a^2))].  The base moment is
     [E0 = a ea - b R]; integration by parts gives
@@ -64,7 +47,7 @@ Proof.
   rewrite HE4, HE2, H0. field.
 Qed.
 
-(** Section 1.6, the reflection used for negative correlation.  With
+(** The reflection used for negative correlation.  With
     [P+ = Phi(-max(h, k')) - J'/(2 pi)] for the reflected pair,
     [P(h, k; -r) = Phi(-h) - P+(h, -k; r)]: the three Phi terms combine as
     [Phi(-h) - Phi(-max(h, -k)) = max(0, Phi(-h) - Phi(k))] when
