@@ -40,14 +40,14 @@ Definition zt_of (A : R) (d : Dat) : R :=
 Definition node_ok (asr A : R) (n : NodeS) (d : Dat) : Prop :=
   (nsgn n = 1 \/ nsgn n = -1) /\ 0 < nxs n < 1 /\
   dtaulo d <= tau_of n <= dtauhi d /\ / 4096 <= dtaulo d /\ dtauhi d <= 1 /\
-  nxh n = rndF (nxs n) /\ / 4096 <= nW n <= dwhi d /\ dwhi d <= / 2 /\ nwh n = rndF (nW n) /\
+  nxh n = rndF (nxs n) /\ / 4096 <= nW n <= dwhi d /\ dwhi d <= 1 /\ nwh n = rndF (nW n) /\
   (-1000 <= dk d)%Z /\ (dk d <= 0)%Z /\
   sin (A * dtauhi d + u * A * (dtauhi d + 76 / 100)) <= bpow radix2 (dk d) /\
   zt_of A d <= / 2 /\ 0 < theta_of A d < 1.
 
 (** The part of [node_ok] about the enclosure data alone. *)
 Definition dat_ok (A : R) (d : Dat) : Prop :=
-  / 4096 <= dtaulo d /\ dtauhi d <= 1 /\ dwhi d <= / 2 /\
+  / 4096 <= dtaulo d /\ dtauhi d <= 1 /\ dwhi d <= 1 /\
   (-1000 <= dk d)%Z /\ (dk d <= 0)%Z /\
   sin (A * dtauhi d + u * A * (dtauhi d + 76 / 100)) <= bpow radix2 (dk d) /\
   zt_of A d <= / 2 /\ 0 < theta_of A d < 1.
@@ -104,7 +104,7 @@ Lemma node_facts n d :
 Proof.
   intros Hbp Hbq Hx Hy Ha1 Ha2 HA Hok.
   destruct Hok as [Hsg [Hxs [Htau [Hlo [Hhi [Hxh [HW [Hwd [Hwh [Hk1 [Hk2 [Hsgk [Hzt Hth]]]]]]]]]]]]].
-  destruct HW as [HW1 HW2']. assert (HW2 : nW n <= / 2) by lra.
+  destruct HW as [HW1 HW2']. assert (HW2 : nW n <= 1) by lra.
   pose proof u_pos as Hu. pose proof u_val as Huv. pose proof z_pos as Hz.
   pose proof (node_full x y asr (nsgn n) (nxs n) (nxh n) (nW n) (nwh n) A (dtauhi d) (dtaulo d) (dk d)
     Hx Hy Ha1 Ha2 HA Hsg Hxs (proj1 Htau) (proj2 Htau) Hlo Hhi Hxh HW1 HW2 Hwh Hk1 Hk2 Hsgk Hzt) as Hnf.

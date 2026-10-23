@@ -110,7 +110,7 @@ Lemma node_full x y asr sgn xs xh W wh A tauhi taulo k :
   bpow radix2 (-53) <= Rabs asr -> Rabs asr <= A -> A <= 6 / 5 ->
   (sgn = 1 \/ sgn = -1) -> 0 < xs < 1 ->
   taulo <= (sgn * xs + 1) / 2 -> (sgn * xs + 1) / 2 <= tauhi -> / 4096 <= taulo -> tauhi <= 1 ->
-  xh = rndF xs -> / 4096 <= W -> W <= / 2 -> wh = rndF W ->
+  xh = rndF xs -> / 4096 <= W -> W <= 1 -> wh = rndF W ->
   (-1000 <= k)%Z -> (k <= 0)%Z ->
   sin (A * tauhi + u * A * (tauhi + 76 / 100)) <= bpow radix2 k ->
   let tau := (sgn * xs + 1) / 2 in
