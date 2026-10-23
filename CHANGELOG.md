@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.11](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.10...v0.0.11) - 2026-10-23
+
+### Added
+
+- *(linalg)* add reusable Thomas factors with checked domains and SIMD solves ([#220](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/220))
+
 ## [0.0.10](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.9...v0.0.10) - 2026-10-21
 
 ### Added
