@@ -276,6 +276,25 @@ What is **not** established by these theorems, and stays a hypothesis of them or
 6. The hypotheses of `J_bound` on the panels' node terms (`Hnodes`, `Hsum`) are those of BvnHighPanels.v and
    `node_error`; the kernel's list of node terms is `panel_terms`, which is what they are applied to by reading.
 
+### 6.6 Mutation witnesses for the scalar kernel
+
+cargo-mutants (`-j1`, aarch64 host) over `bivariate_normal/mod.rs` generated 308 mutants: 271 caught,
+21 do not compile, 3 time out (non-terminating loops from `s /= 2.0` becoming `%=` or `*=`, and the panel
+loop's comparison reversed; a hang is a detection), and 13 survived the first run. Nine were killed by tests
+added for them (the `Display` text, the panel rule's threshold, the per-sign bound selection, the batch's
+block offsets, the integrand's exponent cutoff, the reflection's sign test, and the panel floor, which the
+determinism digest pins at the correlation whose scales halve to exactly `0.003`). The other four survive and are argued equivalent:
+
+  - `hk < HK_CUTOFF` against `<=`: at `hk = 100` the integral is at most about `1.5e-44`, below any
+    visible ulp of a result that is not itself subnormal, and the cutoff's proved skip bound is `8e-23`.
+  - `b < 20 s` against `<=`, and `20 * s` against `20 + s`: the term skipped or kept is below the proved
+    `1.2e-46` bound, or underflows.
+  - `-dh > dk` against `>=`: on a tie both `norm_cdf` values are equal, so both branches return the same
+    bits, signed zero included.
+
+The two association-order mutants named in section 6.5 cannot be seen by any corpus and stay pinned by
+reading. The lanes' own run is in section 12.
+
 ## 7. Evidence
 
 * **Reference fixture** `crates/reference/fixtures/bivariate_normal.json`,
@@ -377,9 +396,7 @@ taken from libm. Item by item (the list FerroRisk's deletion cites):
 
 ## 11. Remaining work, in order
 
-1. Mutation witnesses for the scalar kernel (issue #87's pipeline); the extracted
-   comparison is built (section 6.5), the mutation lane is not.
-2. Measure the lanes on ARM and native x86 (#216) and re-measure against the
+1. Measure the lanes on ARM and native x86 (#216) and re-measure against the
    performance bar on a quiet host (section 9); this slice's numbers are one noisy
    shared host.
 
