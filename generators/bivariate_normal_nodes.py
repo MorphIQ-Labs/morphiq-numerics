@@ -20,7 +20,7 @@ import mpmath as mp
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'crates/morphiq-numerics/src/bivariate_normal/tables.rs'
-ORDERS = (4, 6, 8, 10, 12, 14, 16, 20)
+ORDERS = (4, 6, 8, 10, 12, 14, 16, 20, 24)
 DPS = 120
 
 

@@ -275,13 +275,14 @@ fn degenerate_correlations_take_their_closed_forms() {
 #[test]
 fn results_are_continuous_across_every_rule_limit() {
     let limits = [
-        0.06,
-        0.22,
-        0.40,
-        0.55,
-        0.70,
-        0.80,
-        0.85,
+        0.055,
+        0.20,
+        0.38,
+        0.54,
+        0.66,
+        0.75,
+        0.81,
+        0.89,
         GENZ_CORRELATION_SPLIT,
     ];
     let points = [

@@ -14,13 +14,13 @@ what remains; nothing below claims more than the checks named here establish.
 | Public scalar API, domains, special values, refusals (section 2) | done |
 | Genz (2004) algorithm, both regimes, ported from FerroRisk (section 3) | done |
 | Per-correlation evaluator, no allocation, bit-identical to the one-shot function | done |
-| Absolute bound `2.5e-16` and relative bound above `1e-3` | **measured, not proved** (section 6) |
+| Absolute bound `2.5e-16` and relative bound above `1e-3` | **measured, not proved** (section 6); the quadrature truncation term is proved (section 4) |
 | Independent MPFR/mpmath reference, two precisions, second route (section 7) | done |
 | Generator for the quadrature rules, replayed by `check_generators.sh` | done |
 | Correctly rounded `asin` (#41) | done: the table's angle is `elementary::asin(rho)` (section 5) |
 | Relative accuracy of small probabilities (FerroRisk's tail construction) | not ported: refused instead (section 8) |
 | ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits, with slice and paired entry points (section 12) | done: bit equality, digest and mutation witnesses (section 12); AVX2 and AVX-512F not yet run here (CI) |
-| Gappa/Coq proof of the error budget | not done |
+| Gappa/Coq proof of the error budget | truncation of the low-correlation rules **proved** (`formal/bivariate/`); the other terms and the high-correlation branch not done |
 | Same-host scalar and batch performance against the FerroRisk baseline | measured (section 9); lanes **unmeasured** |
 
 ## 2. Specification
@@ -50,8 +50,8 @@ what remains; nothing below claims more than the checks named here establish.
   identical bits.
 * **Construction.** `BivariateNormal::new(rho)` is fallible: it returns
   `Err(InvalidCorrelation)` for NaN or `|rho| > 1`, so a table can never be
-  built for a correlation it cannot serve. It holds three arrays of 20 `f64`
-  and a few scalars (about 530 bytes), copies freely, never allocates, and
+  built for a correlation it cannot serve. It holds three arrays of 24 `f64`
+  and a few scalars (about 600 bytes), copies freely, never allocates, and
   builds in `n` `sincos` evaluations plus one `asin` for the `n`-node rule of
   the low-correlation regime and in no work otherwise. The one-shot functions
   are the evaluator behind a freshly built table, so the two are the same
@@ -79,7 +79,7 @@ summed in node order.
 Two regimes (Genz 2004, ported from FerroRisk at commit `72db248c`):
 
 * **Low correlation, `|rho| < 0.925`.** The Gauss-Legendre sum above. The
-  rule has 4 to 20 nodes depending on `|rho|` (section 4).
+  rule has 4 to 24 nodes depending on `|rho|` (section 4).
 * **High correlation, `0.925 <= |rho| < 1`.** Genz's `BVND` series: the
   integral is rewritten in `s = sqrt(1 - rho^2)`, whose small size narrows the
   integrand, with a Taylor-corrected subtraction and a 20-node rule. It is
@@ -102,46 +102,29 @@ rounded once to nearest-even binary64, with the root residual and the weight
 sum checked at generation time. The generator is replayed by
 `scripts/check_generators.sh`.
 
-The rule order is the smallest keeping the *truncation* error of the quadrature
-at or below `2e-17`, one fifth of the published absolute bound. Truncation was
-measured in exact arithmetic (mpmath, 40 digits) as the difference between the
-`n`-node sum and the integral, over 24 thresholds per correlation including
-the equal-threshold, opposite-threshold and `|x|, |y| <= 8` corners where the
-integrand is least smooth. Worst absolute truncation error of the sum divided
-by `2 pi`:
+The rule order is the smallest whose *proved* truncation bound is at or below
+`2e-17`, one fifth of the published absolute bound. The proof is a
+Bernstein-ellipse estimate of the Gauss-Legendre remainder, with one
+certificate per rule that covers every `|rho|` up to its limit, either sign and
+every pair of thresholds (`docs/bivariate_normal_truncation.md`: the derivation,
+the classical theorems it assumes, and what is machine-checked in
+`formal/bivariate/`). The limits are
 
-| `|rho|` | 4 nodes | 6 | 8 | 10 | 12 | 14 | 16 | 20 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0.05 | 2.3e-19 | | | | | | | |
-| 0.09 | 4.4e-17 | 4.5e-24 | | | | | | |
-| 0.30 | 4.9e-12 | 1.3e-16 | 3.7e-21 | | | | | |
-| 0.50 | 1.1e-09 | 4.5e-13 | 1.3e-16 | 4.2e-20 | | | | |
-| 0.65 | 2.2e-08 | 2.9e-11 | 6.5e-14 | 1.5e-16 | 2.6e-19 | | | |
-| 0.75 | 9.5e-08 | 8.3e-10 | 3.3e-12 | 1.3e-14 | 6.3e-17 | 3.1e-19 | | |
-| 0.80 | 3.7e-07 | 2.4e-09 | 1.2e-11 | 1.7e-13 | 1.6e-15 | 1.2e-17 | | |
-| 0.85 | 9.6e-07 | 1.1e-08 | 1.6e-10 | 2.8e-12 | 3.7e-14 | 4.9e-16 | 6.8e-18 | |
-| 0.925 | 1.3e-05 | 4.1e-07 | 1.6e-09 | 1.5e-10 | 3.9e-12 | 8.9e-14 | 4.0e-15 | 4.8e-18 |
+| `|rho|` up to | 0.055 | 0.20 | 0.38 | 0.54 | 0.66 | 0.75 | 0.81 | 0.89 | below 0.925 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| nodes | 4 | 6 | 8 | 10 | 12 | 14 | 16 | 20 | 24 |
 
-The error falls geometrically in `n` and grows steeply in `|rho|` (the
-singularity nearest the interval is the essential one at `t = pi/2`, and the
-interval end `asin rho` approaches it). The limits chosen are
-
-| `|rho|` up to | 0.06 | 0.22 | 0.40 | 0.55 | 0.70 | 0.80 | 0.85 | below 0.925 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| nodes | 4 | 6 | 8 | 10 | 12 | 14 | 16 | 20 |
-
-Each limit sits where the neighbouring row of the table is `2e-17` or less,
-with margin for the unmeasured interior; the test
+Each limit is the largest round value for which the certificate closes with a
+small margin; the bound divided by `2 pi` is between `1.2e-17` and `1.6e-17` at
+every limit. A larger limit needs the next rule. The test
 `results_are_continuous_across_every_rule_limit` walks every limit at adjacent
 doubles, and the reference fixture has rows on both sides of each.
 
-**This is a measurement over a finite set of thresholds, not a supremum.** A
-proved bound is a Bernstein-ellipse estimate of the Gauss-Legendre remainder
-for the integrand's analytic extension; it has to maximise
-`|exp(-Q(t))|` over the ellipse, which grows with `|x|, |y|`, and does not
-close here without a restriction on the thresholds (the saturating range
-beyond 39 is excluded, but the integrand is not small on the ellipse until the
-thresholds are). That analysis is not done.
+The estimate is not tight: the truncation measured in exact arithmetic (mpmath,
+40 digits, 24 thresholds per correlation) is three to four times smaller than
+the proved bound at the limits, so the rules are somewhat longer than the
+measurement alone would need. The proof's assumptions, the exact Gauss-Legendre
+nodes and weights among them, are listed in the truncation document.
 
 ## 5. `asin` of the correlation
 
@@ -164,12 +147,12 @@ The terms, with their status:
 
 | Term | Bound | Status |
 | --- | --- | --- |
-| Quadrature truncation | `<= 2e-17` (section 4) | measured on 24 thresholds per correlation |
+| Quadrature truncation | `<= 2e-17` (section 4) | **proved** for the low-correlation rules (Bernstein ellipse, certificates in `formal/bivariate/`, with the classical theorems the truncation document lists as its assumptions) |
 | Rule rounding: nodes and weights rounded once | each relative `<= 2^-53`; effect `<= 2^-53 * (asr/4 pi) * sum w_i * 1 <= 2.2e-17 * 0.19 = 4e-18` | derived; the integrand is at most 1 |
 | `asin` | `<= 1.8e-17` (section 5) | derived from `asin`'s correct rounding (half an ulp) |
 | Node angle `t_i = asr (1 +- x_i)/2` and its `sincos` | angle error `<= 1.2e-16` moves the integrand by `|f'| * 1.2e-16`, `|f'| <= 3` where `f` is not negligible | derived by inspection of `f'`, **not proved**; folded into the measurement |
 | Exponent `(sn x y - hs)/cos^2`: a few rounding errors on a quantity of size `|arg|` | `exp` relative error `<= 3 eps |arg|`, and `max_{arg <= 0} e^{arg} |arg| = 1/e`: `<= 3 eps/e * 0.19 = 2.5e-17` | derived |
-| `exp` (correctly rounded) and the weighted sum | `<= 0.5 ulp` each, summed with `n <= 20` additions: `<= 20 * 1.1e-16 * 0.19 / 2 = 2e-16` worst case if all rounding errors aligned; observed `<= 3e-17` | derived worst case far above the observed; **not tight** |
+| `exp` (correctly rounded) and the weighted sum | `<= 0.5 ulp` each, summed with `n <= 24` additions: `<= 24 * 1.1e-16 * 0.19 / 2 = 2.5e-16` worst case if all rounding errors aligned, which alone equals the published bound; observed `<= 3e-17` | derived worst case far above the observed; **not tight, and too loose to close the budget**: a proof of `2.5e-16` needs a tighter accumulation analysis |
 | `Phi(x)`, `Phi(y)` | each within the library's proved normal-CDF bound (`docs/normal.md`) | referenced |
 | Product, sum and the clamp to `[0, 1]` | `<= 1.5 ulp(value)` | derived |
 
@@ -179,9 +162,10 @@ against the reference over a finite set (section 7): worst error `2.22e-16`
 on the fixture and `1.97e-16` over 20 000 random low-regime cases and `1.11e-16`
 over 3 000 random high-regime cases, all in the region where the value is near
 1 and one unit in the last place is `1.1e-16`. The margin is thin (11 per cent
-on the fixture). A **proof** of `2.5e-16` needs the terms above bounded with
-interval or Gappa arithmetic and the truncation term discharged by the
-Bernstein estimate; that is the proof obligation this slice leaves open.
+on the fixture). A **proof** of `2.5e-16` needs the remaining terms above bounded with
+interval or Gappa arithmetic, the sum's rounding by a tighter analysis than the
+worst case above (the truncation term is proved, section 4); that is the proof
+obligation this slice leaves open.
 
 At or above `RELATIVE_FLOOR = 1e-3`, the bounded forms report
 `min(1e-13 * value, 2.5e-16)`; measured worst relative error there is
@@ -290,8 +274,9 @@ taken from libm. Item by item (the list FerroRisk's deletion cites):
 
 1. The relative construction below the floor (section 8), with a proved
    remainder bound, or an explicit refusal API; resolves the #380 corner.
-2. The Bernstein-ellipse proof of the truncation term and interval/Gappa
-   bounds for the rest, then the Coq pipeline of #87.
+2. Interval/Gappa bounds for the remaining budget terms (with a tighter
+   accumulation analysis for the weighted sum) and for the high-correlation
+   branch, whose truncation is a separate analysis, then the Coq pipeline of #87.
 3. Measure the lanes (section 12) on ARM and native x86.
 4. Re-measure against the performance bar on a quiet host; this slice's
    numbers are one noisy shared host (section 9).
