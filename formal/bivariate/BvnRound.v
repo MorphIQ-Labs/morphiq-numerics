@@ -206,3 +206,30 @@ Proof.
   apply abs_round_le_generic; [auto with typeclass_instances | auto with typeclass_instances | | exact Hx].
   apply generic_format_bpow. unfold FLT_exp. apply Z.max_lub; lia.
 Qed.
+
+(** A rounding as a relative perturbation plus an absolute one at the
+    subnormal scale. *)
+Lemma rnd_split v : exists d e, Rabs d <= u /\ Rabs e <= z /\ rndF v = v * (1 + d) + e.
+Proof.
+  pose proof (rnd_rel_z v) as H. pose proof u_pos as Hu. pose proof z_pos as Hz.
+  set (w := rndF v - v) in *.
+  set (den := u * Rabs v + z).
+  assert (Hden : 0 < den) by (unfold den; apply Rplus_le_lt_0_compat; [apply Rmult_le_pos; [lra | apply Rabs_pos] | exact Hz]).
+  set (th := w / den).
+  assert (Hth : Rabs th <= 1).
+  { unfold th. rewrite Rabs_div_pos by exact Hden. apply Rmult_le_reg_r with den; [exact Hden |].
+    unfold Rdiv. rewrite Rmult_assoc, Rinv_l by (apply Rgt_not_eq; exact Hden). assert (H' : Rabs w <= den) by exact H. lra. }
+  set (sg := if Rle_dec 0 v then 1 else -1).
+  assert (Hsg : Rabs sg = 1 /\ v * sg = Rabs v).
+  { unfold sg. destruct (Rle_dec 0 v) as [h | h].
+    - split; [apply Rabs_R1 | rewrite Rabs_pos_eq by exact h; ring].
+    - split; [unfold Rabs; destruct (Rcase_abs (-1)); lra | rewrite Rabs_left by lra; ring]. }
+  destruct Hsg as [Hs1 Hs2].
+  exists (th * u * sg), (th * z). split; [| split].
+  - rewrite !Rabs_mult, Hs1. rewrite (Rabs_pos_eq u) by lra. pose proof (Rabs_pos th). nra.
+  - rewrite Rabs_mult. rewrite (Rabs_pos_eq z) by lra. pose proof (Rabs_pos th). nra.
+  - assert (E : v * (th * u * sg) + th * z = th * den) by (unfold den; nra).
+    assert (E2 : th * den = w) by (unfold th; field; apply Rgt_not_eq; exact Hden).
+    assert (E3 : v * (1 + th * u * sg) + th * z = v + (v * (th * u * sg) + th * z)) by ring.
+    rewrite E3, E, E2. unfold w. ring.
+Qed.
