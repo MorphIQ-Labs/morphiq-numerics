@@ -198,7 +198,8 @@ Lemma rule_bound nodes dats :
   0 <= bp -> bq <= bp -> List.Forall2 ok nodes dats -> (length nodes <= 24)%nat ->
   Rabs (fst (acc (map tn nodes) (0, 0)) + snd (acc (map tn nodes) (0, 0)) - sumR (map vn nodes))
     <= sum2 gn nodes dats + 200 * z /\
-  fmtF (fst (acc (map tn nodes) (0, 0))) /\ Rabs (snd (acc (map tn nodes) (0, 0))) <= 24 * (3 * u * (Rabs (sumR (map vn nodes)) + sum2 vbn nodes dats + 72 * z) + 2 * z).
+  fmtF (fst (acc (map tn nodes) (0, 0))) /\ Rabs (snd (acc (map tn nodes) (0, 0))) <= 24 * (3 * u * (Rabs (sumR (map vn nodes)) + sum2 vbn nodes dats + 72 * z) + 2 * z) /\
+  Rabs (sumR (map vn nodes)) <= INR (length nodes) / 10 /\ sum2 vbn nodes dats <= sum2 gn nodes dats.
 Proof.
   intros Hbp Hbq Hall Hlen.
   destruct (rule_facts nodes dats Hbp Hbq Hall) as [I1 [I2 [I3 [I4 [I5 [I6 [I7 I8]]]]]]].
@@ -224,7 +225,9 @@ Proof.
   { assert (E : T = V + (T - V)) by ring. assert (Rabs T <= Rabs V + Rabs (T - V)) by (rewrite E at 1; apply Rabs_triang). lra. }
   assert (E2 : fst (acc (map tn nodes) (0, 0)) + snd (acc (map tn nodes) (0, 0)) - V
                = (fst (acc (map tn nodes) (0, 0)) + snd (acc (map tn nodes) (0, 0)) - T) + (T - V)) by ring.
-  refine (conj _ (conj Fh _)).
+  refine (conj _ (conj Fh (conj _ (conj _ _)))).
+  3: { lra. }
+  3: { assert (Hps2 : 0 <= psi2) by (unfold psi2; nra). nra. }
   2: { eapply Rle_trans; [exact HaccL |]. assert (Hm : 3 * u * Rabs T <= 3 * u * (Rabs V + B1 + 72 * z)) by (apply Rmult_le_compat_l; [lra | assert (Rabs T <= Rabs V + Rabs (T - V)) by (assert (E3 : T = V + (T - V)) by ring; rewrite E3 at 1; apply Rabs_triang); lra]). lra. }
   rewrite E2. eapply Rle_trans; [apply Rabs_triang |].
   assert (Hs : 2000 * u * u * Rabs T <= 2000 * u * u * (Va + B1 + 72 * z)) by (apply Rmult_le_compat_l; [nra | exact HTa]).
