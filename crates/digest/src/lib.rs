@@ -17,6 +17,7 @@ use morphiq_numerics::elementary::{
     sqrt, tan,
 };
 use morphiq_numerics::interval::{FiniteInterval, IntervalError};
+use morphiq_numerics::linalg::tridiagonal::{DominantTridiagonal, Error as TridiagonalError};
 use morphiq_numerics::log_space::{
     NormalizeError, log_diff_exp, log_sum_exp, log_sum_exp_and_normalize, log_sum_exp_pairs,
     normalize_log_weights,
@@ -1119,8 +1120,151 @@ pub fn corpus_digest() -> [u8; 32] {
     // Append the new surface after the existing corpus so no older input
     // stream changes. Independent inputs also keep future extension local.
     log_normalization_section(&mut r);
+    tridiagonal_section(&mut r);
+    tridiagonal_batch_section(&mut r);
+    tridiagonal_sign_section(&mut r);
 
     r.0.finalize().into()
+}
+
+fn tridiagonal_error(r: &mut Recorder, error: TridiagonalError) {
+    match error {
+        TridiagonalError::Shape => r.u64(1),
+        TridiagonalError::NonFinite => r.u64(2),
+        TridiagonalError::NotDominant(row) => {
+            r.u64(3);
+            r.u64(u64::try_from(row).unwrap());
+        }
+        TridiagonalError::ZeroPivot(row) => {
+            r.u64(4);
+            r.u64(u64::try_from(row).unwrap());
+        }
+        TridiagonalError::Range => r.u64(5),
+        TridiagonalError::NonPositiveDiagonal(row) => {
+            r.u64(6);
+            r.u64(row as u64);
+        }
+        TridiagonalError::SameSignLink(link) => {
+            r.u64(7);
+            r.u64(link as u64);
+        }
+    }
+}
+
+fn tridiagonal_system<const N: usize>(r: &mut Recorder, scale: f64) {
+    let mut lower = [0.0; N];
+    let mut diagonal = [0.0; N];
+    let mut upper = [0.0; N];
+    let mut rhs = [0.0; N];
+    for i in 0..N {
+        let sign = if i % 2 == 0 { 1.0 } else { -1.0 };
+        lower[i] = sign * scale;
+        diagonal[i] = sign * 4.0 * scale;
+        upper[i] = -sign * 0.5 * scale;
+    }
+    let off = N.saturating_sub(1);
+    let a = match DominantTridiagonal::new(&lower[..off], &diagonal, &upper[..off]) {
+        Ok(a) => a,
+        Err(e) => {
+            tridiagonal_error(r, e);
+            return;
+        }
+    };
+    r.u64(0);
+    r.u64(u64::try_from(a.len()).unwrap());
+    r.u64(u64::from(a.is_empty()));
+    r.f64(a.dominance_margin());
+    let mut pivots = [0.0; N];
+    let mut normalized = [0.0; N];
+    let f = match a.factor_into(&mut pivots, &mut normalized[..off]) {
+        Ok(f) => f,
+        Err(e) => {
+            tridiagonal_error(r, e);
+            return;
+        }
+    };
+    r.u64(0);
+    for offset in 0..3 {
+        for (i, x) in rhs.iter_mut().enumerate() {
+            *x = f64::from(u32::try_from((i + offset) % 7).unwrap()) * scale;
+        }
+        let mut out = [0.0; N];
+        match f.solve_into(&rhs, &mut out) {
+            Ok(()) => {
+                r.u64(0);
+                for x in out {
+                    r.f64(x);
+                }
+                match f.certify(&rhs, &out) {
+                    Ok(c) => {
+                        r.u64(0);
+                        r.f64(c.max_residual());
+                        r.f64(c.max_solution_error());
+                    }
+                    Err(e) => tridiagonal_error(r, e),
+                }
+            }
+            Err(e) => tridiagonal_error(r, e),
+        }
+    }
+}
+
+fn tridiagonal_section(r: &mut Recorder) {
+    r.label("linalg::tridiagonal");
+    for scale in [
+        f64::from_bits(16),
+        f64::MIN_POSITIVE,
+        0.125,
+        1.0,
+        1e200,
+        f64::MAX,
+    ] {
+        tridiagonal_system::<0>(r, scale);
+        tridiagonal_system::<1>(r, scale);
+        tridiagonal_system::<2>(r, scale);
+        tridiagonal_system::<3>(r, scale);
+        tridiagonal_system::<17>(r, scale);
+        tridiagonal_system::<64>(r, scale);
+    }
+    for d in [0.0, -0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        tridiagonal_error(r, DominantTridiagonal::new(&[], &[d], &[]).unwrap_err());
+    }
+    tridiagonal_error(r, DominantTridiagonal::new(&[1.0], &[], &[]).unwrap_err());
+    for d in [1.0, 1.0_f64.next_up(), 2.0] {
+        match DominantTridiagonal::new(&[1.0, 1.0], &[2.0, d, 2.0], &[1.0, 1.0]) {
+            Ok(a) => {
+                r.u64(0);
+                r.f64(a.dominance_margin());
+            }
+            Err(e) => tridiagonal_error(r, e),
+        }
+    }
+    let diagonal = [f64::from_bits(1)];
+    let a = DominantTridiagonal::new(&[], &diagonal, &[]).unwrap();
+    tridiagonal_error(r, a.factor_into(&mut [], &mut []).unwrap_err());
+    let mut pivots = [0.0];
+    let f = a.factor_into(&mut pivots, &mut []).unwrap();
+    for rhs in [f64::NAN, 1.0] {
+        tridiagonal_error(r, f.solve_into(&[rhs], &mut [0.0]).unwrap_err());
+        tridiagonal_error(r, f.certify(&[rhs], &[0.0]).unwrap_err());
+    }
+    tridiagonal_error(r, f.solve_into(&[], &mut []).unwrap_err());
+    tridiagonal_error(r, f.certify(&[], &[]).unwrap_err());
+    let a = DominantTridiagonal::new(&[-f64::MAX / 2.0], &[2.0, f64::MAX], &[1.0]).unwrap();
+    tridiagonal_error(r, a.factor_into(&mut [0.0; 2], &mut [0.0]).unwrap_err());
+    let a = DominantTridiagonal::new(&[1.0], &[f64::MAX; 2], &[1.0]).unwrap();
+    r.f64(a.dominance_margin());
+    let mut p = [0.0; 2];
+    let mut c = [0.0];
+    let f = a.factor_into(&mut p, &mut c).unwrap();
+    let mut out = [0.0; 2];
+    f.solve_into(&[1.0; 2], &mut out).unwrap();
+    for value in out {
+        r.f64(value);
+    }
+    let certificate = f.certify(&[1.0; 2], &out).unwrap();
+    r.f64(certificate.max_residual());
+    r.f64(certificate.max_solution_error());
 }
 
 fn log_normalization_record(r: &mut Recorder, x: &[f64], output: &mut [f64]) {
@@ -1426,6 +1570,129 @@ fn normal_distribution_section(r: &mut Recorder, words: &mut Words) {
                     r.f64(y);
                 }
             }
+        }
+    }
+}
+
+fn tridiagonal_batch_section(r: &mut Recorder) {
+    r.label("linalg::tridiagonal::solve_many_into");
+    for scale in [1.0, -1.0, f64::MIN_POSITIVE / 16.0, 1e270] {
+        let lower = [-scale; 16];
+        let diagonal = [4.0 * scale; 17];
+        let upper = [0.5 * scale; 16];
+        for n in [0_usize, 1, 2, 3, 17] {
+            let a = DominantTridiagonal::new(
+                &lower[..n.saturating_sub(1)],
+                &diagonal[..n],
+                &upper[..n.saturating_sub(1)],
+            )
+            .unwrap();
+            let mut p = [0.0; 17];
+            let mut c = [0.0; 16];
+            let f = a
+                .factor_into(&mut p[..n], &mut c[..n.saturating_sub(1)])
+                .unwrap();
+            let mut rhs = [0.0; 17 * 17];
+            let mut out = [0.0; 17 * 17];
+            for count in [0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17] {
+                for (i, x) in rhs[..n * count].iter_mut().enumerate() {
+                    *x = f64::from(i32::try_from((i * 7) % 19).unwrap() - 9) * scale;
+                }
+                f.solve_many_into(count, &rhs[..n * count], &mut out[..n * count])
+                    .unwrap();
+                for &x in &out[..n * count] {
+                    r.f64(x);
+                }
+            }
+            if n > 0 {
+                tridiagonal_error(r, f.solve_many_into(1, &rhs[..n], &mut []).unwrap_err());
+                tridiagonal_error(r, f.solve_many_into(usize::MAX, &[], &mut []).unwrap_err());
+                rhs[n * 9 - 1] = f64::NAN;
+                tridiagonal_error(
+                    r,
+                    f.solve_many_into(9, &rhs[..n * 9], &mut out[..n * 9])
+                        .unwrap_err(),
+                );
+            }
+        }
+    }
+    let mut pivots = [0.0];
+    let diagonal = [f64::from_bits(1)];
+    let f = DominantTridiagonal::new(&[], &diagonal, &[])
+        .unwrap()
+        .factor_into(&mut pivots, &mut [])
+        .unwrap();
+    for column in 0..9 {
+        let mut rhs = [0.0; 9];
+        rhs[column] = 1.0;
+        tridiagonal_error(r, f.solve_many_into(9, &rhs, &mut [0.0; 9]).unwrap_err());
+    }
+}
+
+fn tridiagonal_sign_section(r: &mut Recorder) {
+    use morphiq_numerics::linalg::tridiagonal::SignTridiagonal;
+    r.label("linalg::tridiagonal::sign_domain");
+    for scale in [f64::from_bits(16), f64::MIN_POSITIVE, 1.0, 1e270] {
+        for n in [0_usize, 1, 2, 3, 17] {
+            let lower = [-2.0 * scale; 16];
+            let upper = [scale; 16];
+            let mut diagonal = [scale; 17];
+            diagonal[0] = 2.0 * scale;
+            let mut p = [0.0; 17];
+            let mut c = [0.0; 16];
+            let off = n.saturating_sub(1);
+            let f = SignTridiagonal::new(&lower[..off], &diagonal[..n], &upper[..off])
+                .unwrap()
+                .factor_into(&mut p[..n], &mut c[..off])
+                .unwrap();
+            for count in [0, 1, 2, 3, 4, 7, 8, 9, 17] {
+                let mut rhs = [0.0; 289];
+                let mut out = [0.0; 289];
+                for (i, v) in rhs[..n * count].iter_mut().enumerate() {
+                    *v = f64::from(i32::try_from(i % 13).unwrap() - 6) * scale;
+                }
+                f.solve_many_into(count, &rhs[..n * count], &mut out[..n * count])
+                    .unwrap();
+                for &v in &out[..n * count] {
+                    r.f64(v);
+                }
+                if count > 0 {
+                    let mut b = [0.0; 17];
+                    let mut x = [0.0; 17];
+                    for i in 0..n {
+                        b[i] = rhs[i * count];
+                        x[i] = out[i * count];
+                    }
+                    match f.certify_residual(&b[..n], &x[..n]) {
+                        Ok(c) => r.f64(c.max_residual()),
+                        Err(e) => tridiagonal_error(r, e),
+                    }
+                }
+            }
+        }
+    }
+    for d in [0.0, -0.0, -1.0, f64::NAN] {
+        tridiagonal_error(r, SignTridiagonal::new(&[], &[d], &[]).unwrap_err());
+    }
+    for link in [f64::from_bits(1), -f64::from_bits(1), f64::MAX] {
+        tridiagonal_error(
+            r,
+            SignTridiagonal::new(&[link], &[1.0; 2], &[link]).unwrap_err(),
+        );
+    }
+    for (l, u) in [(0.0, -1.0), (-0.0, 1.0), (-1.0, -0.0), (1.0, 0.0)] {
+        let mut p = [0.0; 2];
+        let mut c = [0.0];
+        let lower = [l];
+        let upper = [u];
+        let f = SignTridiagonal::new(&lower, &[1.0; 2], &upper)
+            .unwrap()
+            .factor_into(&mut p, &mut c)
+            .unwrap();
+        let mut out = [0.0; 2];
+        f.solve_into(&[-0.0, 0.0], &mut out).unwrap();
+        for v in out {
+            r.f64(v);
         }
     }
 }

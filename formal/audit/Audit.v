@@ -78,3 +78,21 @@ Print Assumptions FiniteInterval.square_enclosure.
 Print Assumptions FiniteInterval.exp_enclosure.
 Print Assumptions FiniteInterval.sqrt_enclosure.
 Print Assumptions FiniteInterval.ln_enclosure.
+
+From Binary64 Require Tridiagonal.
+Print Assumptions Tridiagonal.margin_step.
+Print Assumptions Tridiagonal.dominant_row.
+Print Assumptions Tridiagonal.finite_abs_max.
+Print Assumptions Tridiagonal.tridiagonal_error_bound.
+Print Assumptions Tridiagonal.tridiagonal_zero_kernel.
+Print Assumptions Tridiagonal.rounded_error_bound.
+
+Print Assumptions Tridiagonal.sign_rounded_zero.
+Print Assumptions Tridiagonal.sign_rounded_monotone.
+Print Assumptions Tridiagonal.sign_rounded_nonnegative.
+Print Assumptions Tridiagonal.sign_rounded_nonpositive.
+Print Assumptions Tridiagonal.sign_normalized_product.
+Print Assumptions Tridiagonal.sign_rounded_pivot_step.
+Print Assumptions Tridiagonal.sign_exact_pivots_positive.
+Print Assumptions Tridiagonal.sign_finite_pivots_positive.
+Print Assumptions Tridiagonal.sign_continuants_positive.

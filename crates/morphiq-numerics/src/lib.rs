@@ -30,6 +30,8 @@
 //!   with compensated variants as accurate as twice the working precision;
 //! - [`interval`]: finite conservative outward enclosures with typed domain and
 //!   range failures; these are not tight directed-rounding operations;
+//! - [`linalg::tridiagonal`]: reusable allocation-free Thomas factors for
+//!   strictly row-dominant matrices, with optional absolute error certificates;
 //! - [`ulp`]: units in the last place, and distances measured in them.
 //!
 //! The crate is `no_std`, forbids `unsafe` and never calls a platform math
@@ -59,6 +61,7 @@ mod internal_crosscheck;
 pub mod interval;
 #[cfg(feature = "simd")]
 mod lanes;
+pub mod linalg;
 mod ln;
 mod log2;
 mod log_norm_pdf;

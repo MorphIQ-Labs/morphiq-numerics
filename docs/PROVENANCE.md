@@ -84,9 +84,10 @@ third-party code, recorded and noticed as below.
 
 ## Third-party notices
 
-No third-party code is vendored yet, so `THIRD_PARTY_NOTICES.md` doesn't exist.
-The first vendored source adds it, and the repository-hygiene gate's license
-check extends to it then.
+The Thomas recurrence in `linalg::tridiagonal` is adapted from the original
+MIT FerroRisk kernel. [The crate's notices](../crates/morphiq-numerics/THIRD_PARTY_NOTICES.md)
+record its exact source, hash, changes and license. The repository-hygiene gate
+checks that the notice is included in the library package.
 
 Published dependencies of the library crate: `morphiq-numerics-arch`, this
 repository's own crate under the same license, optional behind `simd`; it has
