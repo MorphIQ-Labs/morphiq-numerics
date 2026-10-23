@@ -38,6 +38,13 @@ Proof.
   intros H. unfold Rdiv. rewrite Rabs_mult, Rabs_Rinv by lra. rewrite (Rabs_pos_eq D) by lra. reflexivity.
 Qed.
 
+Lemma Rabs_lt_between x y : Rabs x < y <-> -y < x < y.
+Proof.
+  split; intros H.
+  - destruct (Rabs_def2 x y H) as [H1 H2]. lra.
+  - apply Rabs_def1; lra.
+Qed.
+
 Lemma u_pos : 0 < u.
 Proof. unfold u. apply bpow_gt_0. Qed.
 

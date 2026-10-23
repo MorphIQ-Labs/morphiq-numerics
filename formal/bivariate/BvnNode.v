@@ -9,27 +9,21 @@ Require Import BvnRound BvnArg.
 Open Scope R_scope.
 
 (** [sin] is 1-Lipschitz. *)
+Lemma sin_lip_lt a b : a < b -> Rabs (sin b - sin a) <= Rabs (b - a).
+Proof.
+  intros H.
+  destruct (MVT_cor2 sin cos a b H (fun c _ => derivable_pt_lim_sin c)) as [c [E _]].
+  rewrite E, Rabs_mult.
+  assert (Hc : Rabs (cos c) <= 1) by (apply Rabs_le; apply COS_bound).
+  pose proof (Rabs_pos (b - a)). nra.
+Qed.
+
 Lemma sin_lip a b : Rabs (sin a - sin b) <= Rabs (a - b).
 Proof.
-  rewrite form4. rewrite Rabs_mult, Rabs_mult.
-  assert (H2 : Rabs 2 = 2) by (apply Rabs_pos_eq; lra). rewrite H2.
-  pose proof (Rabs_pos (cos ((a + b) / 2))). pose proof (Rabs_pos (sin ((a - b) / 2))).
-  assert (Hc : Rabs (cos ((a + b) / 2)) <= 1) by (apply Rabs_le; apply COS_bound).
-  assert (Hs : Rabs (sin ((a - b) / 2)) <= Rabs ((a - b) / 2)).
-  { set (d := (a - b) / 2).
-    destruct (Rle_or_lt 0 d) as [Hd | Hd].
-    - rewrite (Rabs_pos_eq d Hd).
-      destruct Hd as [Hd | Hd].
-      + pose proof (sin_lt_x d Hd) as Hl. pose proof (SIN_bound d) as [Hb1 Hb2].
-        rewrite Rabs_le_between. split; lra.
-      + rewrite <- Hd. rewrite sin_0, Rabs_R0. lra.
-    - rewrite (Rabs_left d Hd).
-      pose proof (sin_lt_x (- d) ltac:(lra)) as Hl. pose proof (SIN_bound d) as [Hb1 Hb2].
-      rewrite sin_neg in Hl.
-      rewrite Rabs_le_between. split; lra. }
-  assert (Hd2 : Rabs ((a - b) / 2) = Rabs (a - b) / 2).
-  { unfold Rdiv. rewrite Rabs_mult, (Rabs_pos_eq (/ 2)) by lra. reflexivity. }
-  rewrite Hd2 in Hs. nra.
+  destruct (Rtotal_order a b) as [H | [H | H]].
+  - pose proof (sin_lip_lt a b H). rewrite Rabs_minus_sym. rewrite (Rabs_minus_sym a b). exact H0.
+  - subst. replace (sin b - sin b) with 0 by ring. rewrite Rabs_R0. apply Rabs_pos.
+  - exact (sin_lip_lt b a H).
 Qed.
 
 (** The exponent at a perturbed [S] against the exponent at [s], relative to
@@ -51,32 +45,34 @@ Proof.
   assert (Ha1 : 0 <= a1) by (unfold a1; lra).
   assert (Ha2 : 0 <= a2) by (unfold a2; lra).
   assert (HA : A = a1 * (1 + S) * (1 + s) / 2 - a2 * (1 - S) * (1 - s) / 2).
-  { unfold A, a1, a2. ring. }
+  { unfold A, a1, a2. field. }
   assert (HN : r / 2 - p * s = a1 * (1 + s) / 2 + a2 * (1 - s) / 2).
-  { unfold a1, a2. ring. }
+  { unfold a1, a2. field. }
+  assert (Hs1p : 0 <= 1 + s) by lra.
+  assert (Hs1m : 0 <= 1 - s) by lra.
+  assert (HSa1 : 0 <= Rabs S - S) by (pose proof (Rle_abs S); lra).
+  assert (HSa2 : 0 <= Rabs S + S) by (pose proof (Rle_abs (- S)); rewrite Rabs_Ropp in H; lra).
+  assert (T1 : 0 <= a1 * (1 + s) * (Rabs S - S)) by (apply Rmult_le_pos; [apply Rmult_le_pos |]; assumption).
+  assert (T2 : 0 <= a2 * (1 - s) * (2 + Rabs S - S)) by (apply Rmult_le_pos; [apply Rmult_le_pos | lra]; assumption).
+  assert (T3 : 0 <= a1 * (1 + s) * (2 + Rabs S + S)) by (apply Rmult_le_pos; [apply Rmult_le_pos | lra]; assumption).
+  assert (T4 : 0 <= a2 * (1 - s) * (Rabs S + S)) by (apply Rmult_le_pos; [apply Rmult_le_pos |]; assumption).
   assert (HAb : Rabs A <= (1 + Rabs S) * (r / 2 - p * s)).
   { rewrite HN. rewrite HA.
-    assert (Hm : 1 + Rabs S >= 1 + S /\ 1 + Rabs S >= 1 - S).
-    { split; [pose proof (Rle_abs S) | pose proof (Rle_abs (- S)); rewrite Rabs_Ropp in H]; lra. }
-    destruct Hm as [Hm1 Hm2].
     rewrite Rabs_le_between. split; nra. }
-  assert (HNp : 0 < r / 2 - p * s \/ r / 2 - p * s = 0).
-  { assert (0 <= r / 2 - p * s) by (rewrite HN; nra). lra. }
   assert (HQ : Qf r p s = (r / 2 - p * s) / (1 - s * s)) by reflexivity.
-  assert (HNN : 0 <= r / 2 - p * s) by (rewrite HN; nra).
+  assert (HNN : 0 <= r / 2 - p * s).
+  { rewrite HN. assert (0 <= a1 * (1 + s)) by (apply Rmult_le_pos; assumption).
+    assert (0 <= a2 * (1 - s)) by (apply Rmult_le_pos; assumption). lra. }
   rewrite Hdiff, HQ.
-  rewrite Rabs_div by nra. rewrite Rabs_mult.
-  rewrite (Rabs_pos_eq ((1 - S * S) * (1 - s * s))) by nra.
+  assert (HD : 0 < (1 - S * S) * (1 - s * s)) by nra.
+  rewrite Rabs_div_pos by exact HD. rewrite Rabs_mult.
   assert (H1S : 0 < 1 - Rabs S) by lra.
-  assert (Hden : (1 - S * S) = (1 - Rabs S) * (1 + Rabs S)).
+  assert (Hden : 1 - S * S = (1 - Rabs S) * (1 + Rabs S)).
   { pose proof (Rabs_sq S). nra. }
-  (* |S-s| |A| / ((1-S^2)(1-s^2)) <= |S-s|/(1-|S|) * N/(1-s^2) *)
-  apply Rmult_le_reg_r with ((1 - S * S) * (1 - s * s)); [nra |].
-  unfold Rdiv. rewrite Rmult_assoc, Rinv_l by nra. rewrite Rmult_1_r.
-  assert (E : Rabs (S - s) * (1 / (1 - Rabs S)) * ((r / 2 - p * s) * / (1 - s * s)) * ((1 - S * S) * (1 - s * s))
-            = Rabs (S - s) * (r / 2 - p * s) * (1 + Rabs S)).
-  { rewrite Hden. field. split; lra. }
-  replace (Rabs (S - s) / (1 - Rabs S)) with (Rabs (S - s) * (1 / (1 - Rabs S))) by (field; lra).
-  rewrite E.
-  pose proof (Rabs_pos (S - s)). nra.
+  assert (Hstep : Rabs (S - s) * Rabs A / ((1 - S * S) * (1 - s * s))
+                  <= Rabs (S - s) * ((1 + Rabs S) * (r / 2 - p * s)) / ((1 - S * S) * (1 - s * s))).
+  { unfold Rdiv. apply Rmult_le_compat_r; [apply Rlt_le, Rinv_0_lt_compat; exact HD |].
+    apply Rmult_le_compat_l; [apply Rabs_pos | exact HAb]. }
+  eapply Rle_trans; [exact Hstep |].
+  right. rewrite Hden. field. split; [lra | split; [lra | lra]].
 Qed.
