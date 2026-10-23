@@ -349,7 +349,23 @@ digest's `bivariate_normal` and `bivariate_normal_slice` sections, scalar and
 `simd`.
 
 **Mutation.** cargo-mutants over `bivariate_normal/lanes.rs`, built with
-`simd`: not yet complete for the current lane kernel; the run is repeated once the scalar low-correlation kernel is final.
+`simd`: cargo-mutants 27.1.0 (`-j1`, per-job target directories, aarch64 NEON host) generated 98 mutants:
+69 are caught, 7 do not compile and 22 survive. None of the survivors changes a result:
+  - `&&` against `||` and `<` against `<=` at the node-activity test in `low` (2): a lane that
+    reads a node past its rule's end reads the table's zero padding (`kw = 0`), whose term is an
+    exact `+0` that `two_sum` and the low-part sum pass through unchanged, and an inactive lane is discarded.
+  - `>>` against `<<` where `chunk` decides which lanes the scalar function recomputes (1): the scalar
+    function returns the lane's own bits, so recomputing more lanes costs time only.
+  - `lane > 0` against `lane < 0` in the table reuse (1): reuse only avoids rebuilding an identical table.
+  - `>>` against `<<` in the propagation of an invalid correlation to a repeated neighbour (1): equivalent
+    on a two-lane backend, where only lane 1 repeats lane 0; on four- and eight-lane backends
+    `repeated_correlations_keep_their_validity_in_every_lane` (40 repeats) is expected to kill it, which this host cannot confirm.
+  - The cascade's width test and counter on NEON (2): they select which backend runs which elements,
+    which `lanes.md` section 6 records as speed only.
+  - The x86-64 cascade lines (15) are not compiled on this host, so cargo-mutants reports them as
+    survivors without running them. The mutation run must be repeated on x86-64 (AVX2, AVX-512F under SDE)
+    to classify them; the `done +=` and subtraction mutants there should be killed by
+    `the_cascade_returns_the_scalar_bits`, and the width tests are speed only.
 
 **Not measured.** The lanes' speed, and whether a regime-mixed batch or the
 per-lane table construction pays for itself, are not measured here;
