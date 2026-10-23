@@ -19,7 +19,7 @@ use core::f64::consts::TAU;
 mod tables;
 use tables::{
     GL4_W, GL4_X, GL6_W, GL6_X, GL8_W, GL8_X, GL10_W, GL10_X, GL12_W, GL12_X, GL14_W, GL14_X,
-    GL16_W, GL16_X, GL20_W, GL20_X,
+    GL16_W, GL16_X, GL20_W, GL20_X, GL24_W, GL24_X,
 };
 
 #[cfg(test)]
@@ -48,7 +48,7 @@ const SATURATED_THRESHOLD: f64 = 39.0;
 const SQRT_TAU: f64 = f64::from_bits(0x4004_0d93_1ff6_2706);
 
 /// The largest rule, and so the length of the per-correlation tables.
-const MAX_NODES: usize = 20;
+const MAX_NODES: usize = 24;
 
 /// A probability with a bound on its absolute error.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -103,26 +103,29 @@ impl Regime {
     }
 }
 
-/// The least rule that keeps the quadrature truncation error at or below
-/// `2e-17` for `|rho|` up to its limit (`docs/bivariate_normal.md` section 4).
+/// The least rule whose proved Bernstein-ellipse truncation bound is at or
+/// below `2e-17` for `|rho|` up to its limit (`docs/bivariate_normal.md`
+/// section 4, `docs/bivariate_normal_truncation.md`).
 fn low_correlation_rule(rho: f64) -> (&'static [f64], &'static [f64]) {
     let m = rho.abs();
-    if m <= 0.06 {
+    if m <= 0.055 {
         (&GL4_X, &GL4_W)
-    } else if m <= 0.22 {
+    } else if m <= 0.20 {
         (&GL6_X, &GL6_W)
-    } else if m <= 0.40 {
+    } else if m <= 0.38 {
         (&GL8_X, &GL8_W)
-    } else if m <= 0.55 {
+    } else if m <= 0.54 {
         (&GL10_X, &GL10_W)
-    } else if m <= 0.70 {
+    } else if m <= 0.66 {
         (&GL12_X, &GL12_W)
-    } else if m <= 0.80 {
+    } else if m <= 0.75 {
         (&GL14_X, &GL14_W)
-    } else if m <= 0.85 {
+    } else if m <= 0.81 {
         (&GL16_X, &GL16_W)
-    } else {
+    } else if m <= 0.89 {
         (&GL20_X, &GL20_W)
+    } else {
+        (&GL24_X, &GL24_W)
     }
 }
 

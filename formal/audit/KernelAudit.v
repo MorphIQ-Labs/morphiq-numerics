@@ -836,3 +836,14 @@ Print Assumptions Atan2Entry.table_y_inf_x_inf.
 Print Assumptions Atan2Entry.entry_nan.
 Print Assumptions Atan2Entry.entry_y_zero_x_pos.
 Print Assumptions Atan2Entry.pair_classes.
+
+Require BvnEllipse BvnRules BvnTruncation.
+Print Assumptions BvnTruncation.certified_4.
+Print Assumptions BvnTruncation.certified_6.
+Print Assumptions BvnTruncation.certified_8.
+Print Assumptions BvnTruncation.certified_10.
+Print Assumptions BvnTruncation.certified_12.
+Print Assumptions BvnTruncation.certified_14.
+Print Assumptions BvnTruncation.certified_16.
+Print Assumptions BvnTruncation.certified_20.
+Print Assumptions BvnTruncation.certified_24.

@@ -5,7 +5,7 @@
     Gauss-Legendre bound is within the budget. *)
 From Coq Require Import Reals Lra.
 From Interval Require Import Tactic.
-From Bvn Require Import BvnEllipse.
+Require Import BvnEllipse.
 Open Scope R_scope.
 
 (** [N = 4], [|rho| <= 55/1000]. *)

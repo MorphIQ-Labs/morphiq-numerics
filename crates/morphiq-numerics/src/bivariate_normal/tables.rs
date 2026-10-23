@@ -142,3 +142,33 @@ pub(super) const GL20_W: [f64; 10] = [
     f64::from_bits(0x3fc31819b52c5992),
     f64::from_bits(0x3fc38d6c490a3370),
 ];
+/// The 12 positive abscissas of the 24-point rule
+pub(super) const GL24_X: [f64; 12] = [
+    f64::from_bits(0x3fefd892de691982),
+    f64::from_bits(0x3fef30f9f0cbf876),
+    f64::from_bits(0x3fee06585a70aa4d),
+    f64::from_bits(0x3fec5d841864d0f5),
+    f64::from_bits(0x3fea3d74ce0d3700),
+    f64::from_bits(0x3fe7af18edb9ddd6),
+    f64::from_bits(0x3fe4bd2ee5fa1086),
+    f64::from_bits(0x3fe17417bac4d72b),
+    f64::from_bits(0x3fdbc345d81e24b5),
+    f64::from_bits(0x3fd429a8c588e910),
+    f64::from_bits(0x3fc8769542b94f8d),
+    f64::from_bits(0x3fb0660853eda2e8),
+];
+/// Their weights, summing to 1 over the 12 positive nodes
+pub(super) const GL24_W: [f64; 12] = [
+    f64::from_bits(0x3f89465bd3112202),
+    f64::from_bits(0x3f9d375514486f1d),
+    f64::from_bits(0x3fa6ab884f57c979),
+    f64::from_bits(0x3fae5c6255d25eda),
+    f64::from_bits(0x3fb2c6d5c2eff064),
+    f64::from_bits(0x3fb6108ef504463a),
+    f64::from_bits(0x3fb8fd8936444b16),
+    f64::from_bits(0x3fbb8177ba4a68dc),
+    f64::from_bits(0x3fbd91c78acb1b2d),
+    f64::from_bits(0x3fbf25cbce1d1ff6),
+    f64::from_bits(0x3fc01b7117cf8bd8),
+    f64::from_bits(0x3fc060475e763736),
+];

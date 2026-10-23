@@ -2,7 +2,7 @@
     for each rule of the low-correlation table, collected in one predicate. *)
 From Coq Require Import Reals Lra.
 From Interval Require Import Tactic.
-From Bvn Require Import BvnEllipse BvnRules.
+Require Import BvnEllipse BvnRules.
 Open Scope R_scope.
 
 (** [certified N L A rho]: the [N]-node rule, for every angle [a] with
