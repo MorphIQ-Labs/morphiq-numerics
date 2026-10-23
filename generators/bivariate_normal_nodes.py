@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """The Gauss-Legendre rules of the bivariate normal (docs/bivariate_normal.md).
 
-Writes crates/morphiq-numerics/src/bivariate_normal/tables.rs; with --check,
-fails if the committed file differs from a fresh generation. Needs mpmath
+Writes crates/morphiq-numerics/src/bivariate_normal/tables.rs and the same
+binary64 encodings as Coq lists, formal/bivariate/BvnTables.v, which the
+transcription of the kernel (formal/bivariate/BvnKernel.v) reads; with --check,
+fails if either committed file differs from a fresh generation. Needs mpmath
 (generators/requirements.txt).
 
 For each order n in ORDERS (and ODD_ORDERS) the n/2 positive abscissas and their weights come
@@ -20,6 +22,7 @@ import mpmath as mp
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'crates/morphiq-numerics/src/bivariate_normal/tables.rs'
+COQ_OUTPUT = ROOT / 'formal/bivariate/BvnTables.v'
 ORDERS = (4, 6, 8, 10, 12, 14, 16, 20, 24)
 # The odd order of the high-correlation panels (docs/bivariate_normal_high.md):
 # the (n - 1)/2 positive abscissas and weights as above, and the centre node's
@@ -74,6 +77,15 @@ def generate():
         '//! `docs/bivariate_normal.md` gives the derivation.',
         '',
     ]
+    coq = [
+        '(** The binary64 encodings of the Gauss-Legendre rules of the bivariate normal, the',
+        '    same values as crates/morphiq-numerics/src/bivariate_normal/tables.rs, written by',
+        '    generators/bivariate_normal_nodes.py; do not edit. *)',
+        'From Coq Require Import ZArith List.',
+        'Import ListNotations.',
+        'Open Scope Z_scope.',
+        '',
+    ]
     for n in sorted(ORDERS + ODD_ORDERS, key=lambda n: (n % 2, n)):
         xs, ws, centre = rule(n)
         m = n // 2
@@ -86,6 +98,8 @@ def generate():
                 lines.append(f'/// Their weights, summing to 1 over the {m} positive nodes')
             else:
                 lines.append(f'/// Their weights; with the centre weight, `2 * sum + centre = 2`')
+            coq.append(f'Definition gl{n}_{name.lower()} : list Z := ['
+                       + '; '.join(f'0x{to_bits(float(v)):016x}' for v in values) + '].')
             if m == 1:
                 # rustfmt keeps a one-element array on one line.
                 lines.append(f'pub(super) const GL{n}_{name}: [f64; 1] = '
@@ -98,6 +112,8 @@ def generate():
         if n in PANEL_ORDERS:
             for name, sign in (('XP', 1), ('XM', -1)):
                 squares = [float(((3 + sign * v) / 4) ** 2) for v in xs]
+                coq.append(f'Definition gl{n}_{name.lower()} : list Z := ['
+                           + '; '.join(f'0x{to_bits(v):016x}' for v in squares) + '].')
                 lines.append(f'/// `((3 {"+" if sign > 0 else "-"} t) / 4)^2` for the abscissas of the {n}-point rule')
                 if m == 1:
                     lines.append(f'pub(super) const GL{n}_{name}: [f64; 1] = '
@@ -108,19 +124,22 @@ def generate():
                     lines.append(f'    f64::from_bits(0x{to_bits(v):016x}),')
                 lines.append('];')
         if centre is not None:
+            coq.append(f'Definition gl{n}_w0 : Z := 0x{to_bits(float(centre)):016x}.')
             lines.append(f'/// The weight of the {n}-point rule\'s centre node, abscissa 0')
             lines.append(f'pub(super) const GL{n}_W0: f64 = f64::from_bits(0x{to_bits(float(centre)):016x});')
-    return '\n'.join(lines) + '\n'
+    return '\n'.join(lines) + '\n', '\n'.join(coq) + '\n'
 
 
 def main():
-    text = generate()
+    text, coq_text = generate()
     if '--check' in sys.argv[1:]:
-        if OUTPUT.read_text() != text:
-            sys.exit(f'{OUTPUT} differs from a fresh generation')
+        for path, fresh in ((OUTPUT, text), (COQ_OUTPUT, coq_text)):
+            if path.read_text() != fresh:
+                sys.exit(f'{path} differs from a fresh generation')
     else:
         OUTPUT.parent.mkdir(parents=True, exist_ok=True)
         OUTPUT.write_text(text)
+        COQ_OUTPUT.write_text(coq_text)
     print(f'bivariate_normal_nodes: {len(ORDERS) + len(ODD_ORDERS)} rules')
 
 
