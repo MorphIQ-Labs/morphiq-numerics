@@ -171,3 +171,69 @@ Proof.
                 <= 24 * (80 * u * u * sumR ts + 2 * z)) by nra.
   nra.
 Qed.
+
+(** Rounding is odd, so a list of non-positive terms accumulates as the
+    negation of the list of their negations. *)
+Lemma two_sum_opp a b : two_sum (- a) (- b) = (- fst (two_sum a b), - snd (two_sum a b)).
+Proof.
+  unfold two_sum.
+  replace (- a + - b) with (- (a + b)) by ring. rewrite rnd_opp.
+  set (s := rndF (a + b)).
+  replace (- s - - b) with (- (s - b)) by ring. rewrite rnd_opp.
+  set (a' := rndF (s - b)).
+  replace (- s - - a') with (- (s - a')) by ring. rewrite rnd_opp.
+  set (b' := rndF (s - a')).
+  replace (- a - - a') with (- (a - a')) by ring. rewrite rnd_opp.
+  replace (- b - - b') with (- (b - b')) by ring. rewrite rnd_opp.
+  replace (- rndF (a - a') + - rndF (b - b')) with (- (rndF (a - a') + rndF (b - b'))) by ring.
+  rewrite rnd_opp. reflexivity.
+Qed.
+
+Lemma step_opp h l t : step (- h, - l) (- t) = (- fst (step (h, l) t), - snd (step (h, l) t)).
+Proof.
+  unfold step. rewrite two_sum_opp.
+  destruct (two_sum h t) as [s e]. simpl.
+  replace (- l + - e) with (- (l + e)) by ring. rewrite rnd_opp. reflexivity.
+Qed.
+
+Lemma acc_cons t ts hl : acc (t :: ts) hl = acc ts (step hl t).
+Proof. reflexivity. Qed.
+
+Lemma acc_opp ts : forall h l,
+  acc (map Ropp ts) (- h, - l) = (- fst (acc ts (h, l)), - snd (acc ts (h, l))).
+Proof.
+  induction ts as [| t ts IH]; intros h l.
+  - reflexivity.
+  - rewrite map_cons, !acc_cons, step_opp.
+    destruct (step (h, l) t) as [s l2] eqn:Hs. simpl. apply IH.
+Qed.
+
+Lemma sumR_opp ts : sumR (map Ropp ts) = - sumR ts.
+Proof. induction ts as [| t ts IH]; simpl; [ring | rewrite IH; ring]. Qed.
+
+Lemma acc_final_neg ts :
+  (forall t, In t ts -> fmtF t /\ t <= 0) -> (length ts <= 24)%nat ->
+  fmtF (fst (acc ts (0, 0))) /\ fmtF (snd (acc ts (0, 0))) /\
+  Rabs (fst (acc ts (0, 0)) + snd (acc ts (0, 0)) - sumR ts) <= 2000 * u * u * Rabs (sumR ts) + 30 * z.
+Proof.
+  intros Hts Hn.
+  assert (Hts' : forall t, In t (map Ropp ts) -> fmtF t /\ 0 <= t).
+  { intros t Ht. apply in_map_iff in Ht. destruct Ht as [t0 [E Ht0]]. subst t.
+    destruct (Hts t0 Ht0) as [F H0]. split; [apply generic_format_opp; exact F | lra]. }
+  assert (Hn' : (length (map Ropp ts) <= 24)%nat) by (rewrite map_length; exact Hn).
+  destruct (acc_final (map Ropp ts) Hts' Hn') as [F1 [F2 Hb]].
+  assert (E : acc ts (0, 0) = (- fst (acc (map Ropp ts) (0, 0)), - snd (acc (map Ropp ts) (0, 0)))).
+  { assert (Hz : acc (map Ropp (map Ropp ts)) (- 0, - 0) = (- fst (acc (map Ropp ts) (0, 0)), - snd (acc (map Ropp ts) (0, 0)))) by (apply acc_opp).
+    rewrite map_map in Hz. rewrite (map_ext (fun x => Ropp (Ropp x)) (fun x => x)) in Hz by (intros; ring).
+    rewrite map_id in Hz. replace (- 0) with 0 in Hz by ring. exact Hz. }
+  rewrite E. simpl.
+  rewrite sumR_opp in Hb.
+  assert (Hsn : sumR (map Ropp ts) = - sumR ts) by apply sumR_opp.
+  assert (Hnn : 0 <= sumR (map Ropp ts)) by (apply sumR_nonneg; intros t Ht; apply (Hts' t Ht)).
+  rewrite Hsn in Hnn.
+  split; [apply generic_format_opp; exact F1 |]. split; [apply generic_format_opp; exact F2 |].
+  rewrite (Rabs_left1 (sumR ts)) by lra.
+  assert (Ee : - fst (acc (map Ropp ts) (0, 0)) + - snd (acc (map Ropp ts) (0, 0)) - sumR ts
+               = - (fst (acc (map Ropp ts) (0, 0)) + snd (acc (map Ropp ts) (0, 0)) - - sumR ts)) by ring.
+  rewrite Ee, Rabs_Ropp. exact Hb.
+Qed.
