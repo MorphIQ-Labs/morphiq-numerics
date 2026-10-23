@@ -234,3 +234,97 @@ Proof.
   exact Hgoal.
 Qed.
 
+
+Lemma prod_ok x y : dom x -> dom y -> x * y = 0 \/ bpow radix2 (-800) <= Rabs (x * y).
+Proof.
+  intros Hx Hy.
+  assert (H800 : bpow radix2 (-800) = bpow radix2 (-400) * bpow radix2 (-400)).
+  { rewrite <- bpow_plus. reflexivity. }
+  pose proof (bpow_gt_0 radix2 (-400)) as Hp.
+  destruct Hx as [Hx0 | Hxn]; [left; subst; ring |].
+  destruct Hy as [Hy0 | Hyn]; [left; subst; ring |].
+  right. rewrite Rabs_mult, H800.
+  pose proof (Rabs_pos x). pose proof (Rabs_pos y). nra.
+Qed.
+
+Lemma arg_err x y sh S C ch sg hs_ hc_ zt Eh :
+  dom x -> dom y -> bpow radix2 (-100) <= Rabs sh -> Rabs sh <= 1 ->
+  S * S + C * C = 1 -> 0 < C -> Rabs S <= sg -> sg < 1 ->
+  Rabs (sh - S) <= hs_ -> Rabs (ch - C) <= hc_ -> 0 <= hs_ -> 0 <= hc_ ->
+  bpow radix2 (-100) <= ch ->
+  zt = hc_ * (2 + hc_) / (1 - sg * sg) -> zt <= / 2 ->
+  Eh = hs_ + 2 * (2 * u + u * u) ->
+  Rabs (argf x y sh ch + Qf (x * x + y * y) (x * y) S)
+    <= (ar0 zt Eh sg * (1 + u) + u) * Qf (x * x + y * y) (x * y) S + z.
+Proof.
+  intros Hx Hy Hsh1 Hsh2 HSC HC HS Hsg Hshe Hche Hhs Hhc Hch Hzt Hzh HEh.
+  pose proof u_pos as Hu. pose proof u_val as Huv.
+  set (r := x * x + y * y). set (p := x * y).
+  assert (Hr : 0 <= r) by (unfold r; nra).
+  assert (Hp : Rabs p <= r / 2).
+  { unfold p, r. apply Rabs_le. split; nra. }
+  (* p-hat *)
+  destruct (rnd_delta p (prod_ok x y Hx Hy)) as [b1 [Hb1 E1]].
+  (* n1 *)
+  assert (Hn1ok : sh * rndF p = 0 \/ bpow radix2 (-1022) <= Rabs (sh * rndF p)).
+  { rewrite E1.
+    destruct (prod_ok x y Hx Hy) as [H0 | H1].
+    - left. fold p in H0. rewrite H0. ring.
+    - right. fold p in H1. rewrite Rabs_mult, Rabs_mult.
+      assert (Hb : Rabs (1 + b1) >= 1 / 2) by (apply Rabs_le in Hb1; rewrite Rabs_pos_eq by nra; nra).
+      assert (Hpp : bpow radix2 (-800) <= Rabs p) by exact H1.
+      assert (E : bpow radix2 (-1022) = bpow radix2 (-100) * (bpow radix2 (-800) * (1 / 2)) * bpow radix2 (-122)).
+      { replace (1 / 2) with (bpow radix2 (-1)) by reflexivity.
+        rewrite <- !bpow_plus. reflexivity. }
+      pose proof (bpow_gt_0 radix2 (-100)). pose proof (bpow_gt_0 radix2 (-800)). pose proof (bpow_gt_0 radix2 (-122)).
+      assert (bpow radix2 (-122) <= 1) by (replace 1 with (bpow radix2 0) by reflexivity; apply bpow_le; lia).
+      pose proof (Rabs_pos sh). pose proof (Rabs_pos p).
+      assert (bpow radix2 (-100) * (bpow radix2 (-800) * (1 / 2)) <= Rabs sh * (Rabs p * Rabs (1 + b1))) by nra.
+      nra. }
+  destruct (rnd_delta (sh * rndF p) Hn1ok) as [b2 [Hb2 E2]].
+  set (n1 := rndF (sh * rndF p)).
+  assert (Hn1 : n1 = sh * p * (1 + ((1 + b1) * (1 + b2) - 1))).
+  { unfold n1. rewrite E2, E1. ring. }
+  assert (Hphi : Rabs ((1 + b1) * (1 + b2) - 1) <= 2 * u + u * u).
+  { apply Rabs_le in Hb1. apply Rabs_le in Hb2. apply Rabs_le. split; nra. }
+  (* n2 *)
+  assert (Fn1 : fmtF n1) by apply fmtF_rnd.
+  assert (Fhs : fmtF (hsf x y)) by apply fmtF_rnd.
+  destruct (rnd_sub_delta n1 (hsf x y) Fn1 Fhs) as [b3 [Hb3 E3]].
+  set (n2 := rndF (n1 - hsf x y)).
+  (* denominator *)
+  assert (Hdok : bpow radix2 (-1022) <= Rabs (ch * ch)).
+  { rewrite Rabs_pos_eq by nra.
+    assert (E : bpow radix2 (-1022) = bpow radix2 (-100) * bpow radix2 (-100) * bpow radix2 (-822)).
+    { rewrite <- !bpow_plus. reflexivity. }
+    pose proof (bpow_gt_0 radix2 (-822)). pose proof (bpow_gt_0 radix2 (-100)).
+    assert (bpow radix2 (-822) <= 1) by (replace 1 with (bpow radix2 0) by reflexivity; apply bpow_le; lia).
+    assert (bpow radix2 (-100) * bpow radix2 (-100) <= ch * ch) by nra. nra. }
+  destruct (rnd_delta (ch * ch) (or_intror Hdok)) as [b4 [Hb4 E4]].
+  set (dh := rndF (ch * ch)).
+  assert (Hdh : dh = ch * ch * (1 + b4)) by (unfold dh; rewrite E4; ring).
+  assert (Hn2 : n2 = (n1 - hsf x y) * (1 + b3)) by (unfold n2; rewrite E3; ring).
+  pose proof (arg_core r p S C sh ch (hsf x y) n1 n2 dh sg hs_ hc_ zt Eh ((1 + b1) * (1 + b2) - 1) b3 b4
+    Hr Hp HSC HC HS Hsg ltac:(lra) Hshe Hche Hhs Hhc Hzt Hzh HEh Hphi (hs_err x y Hx Hy) Hn1 Hn2 Hb3 Hdh Hb4) as Hcore.
+  (* the last rounding *)
+  unfold argf. fold n1. fold n2. fold dh.
+  pose proof (rnd_rel_z (n2 / dh)) as Hz.
+  set (v := n2 / dh) in *.
+  set (Q := Qf r p S) in *.
+  set (ar := ar0 zt Eh sg) in *.
+  assert (HQ0 : 0 <= Q).
+  { unfold Q, Qf. apply Rmult_le_pos; [| apply Rlt_le, Rinv_0_lt_compat; nra].
+    assert (Hpa : Rabs (p * S) <= r / 2 * sg).
+    { rewrite Rabs_mult. pose proof (Rabs_pos p). pose proof (Rabs_pos S). nra. }
+    apply Rabs_le in Hpa. assert (0 <= sg) by (pose proof (Rabs_pos S); lra). nra. }
+  assert (Hvq : Rabs v <= Q + ar * Q).
+  { assert (Hs : Rabs v <= Rabs (v + Q) + Rabs Q).
+    { assert (E0 : v = (v + Q) + - Q) by ring.
+      rewrite E0 at 1. eapply Rle_trans; [apply Rabs_triang |]. rewrite Rabs_Ropp. lra. }
+    rewrite (Rabs_pos_eq Q HQ0) in Hs. lra. }
+  assert (E : rndF v + Q = (rndF v - v) + (v + Q)) by ring.
+  rewrite E. eapply Rle_trans; [apply Rabs_triang |].
+  assert (Hu0 : 0 <= u * Rabs v) by (apply Rmult_le_pos; [lra | apply Rabs_pos]).
+  assert (Hu1 : u * Rabs v <= u * (Q + ar * Q)) by (apply Rmult_le_compat_l; lra).
+  nra.
+Qed.
