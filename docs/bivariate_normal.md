@@ -168,6 +168,11 @@ interval or Gappa arithmetic, the sum's rounding by a tighter analysis than the
 worst case above (the truncation term is proved, section 4); that is the proof
 obligation this slice leaves open.
 
+**Proved bound.** `docs/bivariate_normal_budget.md` proves, for the kernel as
+written, `5.3e-16` over the whole low-correlation branch (`2.5e-16` holds only for
+`|rho| <= 0.055`); the published `2.5e-16` is a measurement, not a proved bound,
+for `|rho|` above that.
+
 At or above `RELATIVE_FLOOR = 1e-3`, the bounded forms report
 `min(1e-13 * value, 2.5e-16)`; measured worst relative error there is
 `3.2e-15`. Below the floor only the absolute bound is reported, so a caller
