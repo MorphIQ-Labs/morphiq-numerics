@@ -167,9 +167,10 @@ fn the_reusable_evaluator_returns_the_one_shot_bits() {
     }
 }
 
-/// At and above the relative floor the bound is the published contract.
+/// The reported bound is the bound of the correlation, whatever the value, and
+/// no value is given a relative bound.
 #[test]
-fn the_bound_is_the_published_contract() {
+fn the_reported_bound_is_the_correlations() {
     let mut rng = SplitMix64::new(0x3d);
     for _ in 0..4000 {
         let (a, b, rho) = (
@@ -178,15 +179,33 @@ fn the_bound_is_the_published_contract() {
             correlation(&mut rng),
         );
         let p = bounded(a, b, rho);
-        if p.value >= RELATIVE_FLOOR {
-            assert_eq!(
-                p.error,
-                (RELATIVE_ERROR_BOUND * p.value).min(ABSOLUTE_ERROR_BOUND)
-            );
-        } else {
-            assert_eq!(p.error, ABSOLUTE_ERROR_BOUND);
-        }
+        assert_eq!(p.error, absolute_error_bound(rho));
+        assert!(p.error <= ABSOLUTE_ERROR_BOUND);
+        assert_eq!(
+            BivariateNormal::new(rho).unwrap().absolute_error_bound(),
+            absolute_error_bound(rho)
+        );
     }
+}
+
+/// The bound is the proved bound of the rule `|rho|` selects: it grows with the
+/// rule, is the same for both signs, and is NaN where the correlation is invalid.
+#[test]
+fn the_bound_follows_the_selected_rule() {
+    let mut last = 0.0;
+    for limit in LOW_RULE_LIMITS {
+        let inside = absolute_error_bound(limit);
+        assert!(inside > last, "rule bounds increase with the rule");
+        assert_eq!(inside, absolute_error_bound(-limit));
+        last = inside;
+    }
+    let top = absolute_error_bound(0.9);
+    assert!(top > last);
+    assert_eq!(top, LOW_RULE_BOUNDS[LOW_RULE_BOUNDS.len() - 1]);
+    for rho in [f64::NAN, 1.5, -1.5, f64::INFINITY] {
+        assert!(absolute_error_bound(rho).is_nan());
+    }
+    assert!(absolute_error_bound(0.5) <= ABSOLUTE_ERROR_BOUND);
 }
 
 /// A tail value that underflows still bounds the positive probability it lost.

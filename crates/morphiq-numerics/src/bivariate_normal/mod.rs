@@ -7,10 +7,11 @@
 //! `docs/bivariate_normal.md`.
 //!
 //! The contract is an absolute error bound, not correct rounding: the result
-//! is within [`ABSOLUTE_ERROR_BOUND`] of the exact probability, and
-//! [`BoundedProbability`] carries that bound with the value. A relative
-//! guarantee is not made below [`RELATIVE_FLOOR`]; a caller that divides by a
-//! small probability must carry the absolute bound itself.
+//! is within [`absolute_error_bound`]`(rho)` of the exact probability, which is
+//! at most [`ABSOLUTE_ERROR_BOUND`], and [`BoundedProbability`] carries that
+//! bound with the value. No relative guarantee is made: a caller that divides
+//! by a small probability must carry the absolute bound itself, and refuse the
+//! quotient where the bound is not far below the value.
 
 use crate::eft::{two_prod, two_sum};
 use crate::elementary::{asin, exp, sin, sqrt};
@@ -29,15 +30,36 @@ use tables::{
 #[cfg(test)]
 mod tests;
 
-/// The bound on `|result - exact|` that every finite evaluation meets.
-pub const ABSOLUTE_ERROR_BOUND: f64 = 2.5e-16;
+/// The bound on `|result - exact|` that every finite evaluation meets, at any
+/// correlation: the largest of [`absolute_error_bound`]'s values.
+pub const ABSOLUTE_ERROR_BOUND: f64 = 3.721e-16;
 
-/// A result at or above this value is also accurate relative to itself, to
-/// [`RELATIVE_ERROR_BOUND`]; below it only the absolute bound holds.
-pub const RELATIVE_FLOOR: f64 = 1.0e-3;
+/// The proved bound of each low-correlation rule, indexed like
+/// [`LOW_RULE_LIMITS`]: `190, 207, 231, 257, 276, 295, 309, 348, 372` times
+/// `1e-18` (`formal/bivariate/BvnBudget.v`, `low_4` to `low_24`), each rounded
+/// up in the fourth digit.
+const LOW_RULE_BOUNDS: [f64; 9] = [
+    1.901e-16, 2.071e-16, 2.311e-16, 2.571e-16, 2.761e-16, 2.951e-16, 3.091e-16, 3.481e-16,
+    3.721e-16,
+];
 
-/// The relative error of a result at or above [`RELATIVE_FLOOR`].
-pub const RELATIVE_ERROR_BOUND: f64 = 1.0e-13;
+/// The largest `|rho|` each low-correlation rule serves; the last rule serves up
+/// to the Genz split.
+const LOW_RULE_LIMITS: [f64; 8] = [0.055, 0.20, 0.38, 0.54, 0.66, 0.75, 0.81, 0.89];
+
+/// The bound of the closed-form regimes: the independent product
+/// `Phi(x) Phi(y)` and the countermonotone difference carry two `norm_cdf`
+/// errors and one rounding, `3 * 2^-54` plus the contract's `2^-112` terms.
+const CLOSED_FORM_BOUND: f64 = 1.7e-16;
+
+/// The comonotone value and the saturated limits are one `norm_cdf` result,
+/// within `2^-54 + 2^-112`.
+const SINGLE_PHI_BOUND: f64 = 5.7e-17;
+
+/// The bound for the high-correlation branch. Provisional: the branch's proof
+/// is not complete (`docs/bivariate_normal_high.md`); this is the low branch's
+/// largest bound, above the 2.6e-16 the unfinished derivation expects.
+const HIGH_BOUND: f64 = 3.721e-16;
 
 /// `|rho|` at which the low-correlation quadrature gives way to the
 /// high-correlation series (Genz's value; `docs/bivariate_normal.md` section 4).
@@ -115,26 +137,23 @@ impl Regime {
 /// below `2e-17` for `|rho|` up to its limit (`docs/bivariate_normal.md`
 /// section 4, `docs/bivariate_normal_truncation.md`).
 fn low_correlation_rule(rho: f64) -> (&'static [f64], &'static [f64]) {
+    const RULES: [(&[f64], &[f64]); 9] = [
+        (&GL4_X, &GL4_W),
+        (&GL6_X, &GL6_W),
+        (&GL8_X, &GL8_W),
+        (&GL10_X, &GL10_W),
+        (&GL12_X, &GL12_W),
+        (&GL14_X, &GL14_W),
+        (&GL16_X, &GL16_W),
+        (&GL20_X, &GL20_W),
+        (&GL24_X, &GL24_W),
+    ];
     let m = rho.abs();
-    if m <= 0.055 {
-        (&GL4_X, &GL4_W)
-    } else if m <= 0.20 {
-        (&GL6_X, &GL6_W)
-    } else if m <= 0.38 {
-        (&GL8_X, &GL8_W)
-    } else if m <= 0.54 {
-        (&GL10_X, &GL10_W)
-    } else if m <= 0.66 {
-        (&GL12_X, &GL12_W)
-    } else if m <= 0.75 {
-        (&GL14_X, &GL14_W)
-    } else if m <= 0.81 {
-        (&GL16_X, &GL16_W)
-    } else if m <= 0.89 {
-        (&GL20_X, &GL20_W)
-    } else {
-        (&GL24_X, &GL24_W)
-    }
+    let index = LOW_RULE_LIMITS
+        .iter()
+        .position(|&limit| m <= limit)
+        .unwrap_or(LOW_RULE_LIMITS.len());
+    RULES[index]
 }
 
 /// A bivariate normal distribution function at one correlation, with the
@@ -219,16 +238,17 @@ impl BivariateNormal {
         }
     }
 
-    /// [`Self::cdf`] with its absolute error bound.
-    ///
-    /// The bound is [`ABSOLUTE_ERROR_BOUND`] everywhere, and
-    /// `RELATIVE_ERROR_BOUND * value` where that is smaller, which holds for a
-    /// result at or above [`RELATIVE_FLOOR`]. The closed-form regimes
-    /// (independent, comonotone, countermonotone) are within a few units in the
-    /// last place of the exact value, which the same bound covers.
+    /// [`Self::cdf`] with its absolute error bound, [`Self::absolute_error_bound`].
     #[must_use]
     pub fn cdf_bounded(&self, x: f64, y: f64) -> BoundedProbability {
-        bounded(self.cdf(x, y))
+        bounded(self.cdf(x, y), self.absolute_error_bound())
+    }
+
+    /// The bound on `|cdf(x, y) - P|` at this correlation, for every finite
+    /// threshold pair; see [`absolute_error_bound`].
+    #[must_use]
+    pub fn absolute_error_bound(&self) -> f64 {
+        regime_bound(self.regime, self.nodes)
     }
 
     /// [`Self::cdf`] of every pair `(x[i], y[i])`, written to `out`:
@@ -268,7 +288,14 @@ impl BivariateNormal {
             x.len() == y.len() && y.len() == out.len(),
             "cdf_bounded_slice: slices of different lengths"
         );
-        bounded_in_blocks(x, y, out, |_, x, y, values| self.cdf_slice(x, y, values));
+        let bound = self.absolute_error_bound();
+        bounded_in_blocks(
+            x,
+            y,
+            out,
+            |_| bound,
+            |_, x, y, values| self.cdf_slice(x, y, values),
+        );
     }
 
     /// The Genz low-correlation quadrature for ordered `x <= y`:
@@ -397,20 +424,57 @@ fn panel_rule(s: f64) -> PanelRule {
     }
 }
 
-/// [`BivariateNormal::cdf_bounded`]'s bound for a value.
-fn bounded(value: f64) -> BoundedProbability {
+/// The bound on `|bivariate_norm_cdf(x, y, rho) - P|` for every finite pair of
+/// thresholds, or NaN where `rho` is NaN or outside `[-1, 1]`.
+///
+/// For `|rho| < 0.925` it is the proved bound of the quadrature rule that
+/// `|rho|` selects, from `1.9e-16` to `3.72e-16` (`docs/bivariate_normal_budget.md`);
+/// the closed-form regimes carry at most `1.7e-16`.
+#[must_use]
+pub fn absolute_error_bound(rho: f64) -> f64 {
+    match Regime::of(rho) {
+        None => f64::NAN,
+        Some(regime) => regime_bound(regime, 2 * low_correlation_rule(rho).0.len()),
+    }
+}
+
+/// The bound of a regime; `nodes` is the low rule's length.
+fn regime_bound(regime: Regime, nodes: usize) -> f64 {
+    match regime {
+        Regime::Independent | Regime::Countermonotone => CLOSED_FORM_BOUND,
+        Regime::Comonotone => SINGLE_PHI_BOUND,
+        Regime::Low => LOW_RULE_BOUNDS[rule_index(nodes)],
+        Regime::High => HIGH_BOUND,
+    }
+}
+
+/// The index of the low rule with this many nodes.
+fn rule_index(nodes: usize) -> usize {
+    match nodes {
+        4 => 0,
+        6 => 1,
+        8 => 2,
+        10 => 3,
+        12 => 4,
+        14 => 5,
+        16 => 6,
+        20 => 7,
+        _ => 8,
+    }
+}
+
+/// [`BivariateNormal::cdf_bounded`]'s result for a value and its bound.
+fn bounded(value: f64, bound: f64) -> BoundedProbability {
     if value.is_nan() {
         return BoundedProbability {
             value,
             error: f64::NAN,
         };
     }
-    let error = if value >= RELATIVE_FLOOR {
-        (RELATIVE_ERROR_BOUND * value).min(ABSOLUTE_ERROR_BOUND)
-    } else {
-        ABSOLUTE_ERROR_BOUND
-    };
-    BoundedProbability { value, error }
+    BoundedProbability {
+        value,
+        error: bound,
+    }
 }
 
 /// Fill `out` with the bound of each value `fill` writes for the pairs,
@@ -419,6 +483,7 @@ fn bounded_in_blocks(
     x: &[f64],
     y: &[f64],
     out: &mut [BoundedProbability],
+    bound: impl Fn(usize) -> f64,
     fill: impl Fn(usize, &[f64], &[f64], &mut [f64]),
 ) {
     const BLOCK: usize = 64;
@@ -431,8 +496,8 @@ fn bounded_in_blocks(
     {
         let values = &mut values[..x.len()];
         fill(block * BLOCK, x, y, values);
-        for (o, &v) in out.iter_mut().zip(values.iter()) {
-            *o = bounded(v);
+        for (i, (o, &v)) in out.iter_mut().zip(values.iter()).enumerate() {
+            *o = bounded(v, bound(block * BLOCK + i));
         }
     }
 }
@@ -495,9 +560,15 @@ pub fn bivariate_norm_cdf_bounded_slice(
         x.len() == y.len() && y.len() == rho.len() && rho.len() == out.len(),
         "bivariate_norm_cdf_bounded_slice: slices of different lengths"
     );
-    bounded_in_blocks(x, y, out, |start, x, y, values| {
-        bivariate_norm_cdf_slice(x, y, &rho[start..start + x.len()], values);
-    });
+    bounded_in_blocks(
+        x,
+        y,
+        out,
+        |i| absolute_error_bound(rho[i]),
+        |start, x, y, values| {
+            bivariate_norm_cdf_slice(x, y, &rho[start..start + x.len()], values);
+        },
+    );
 }
 
 /// Genz's upper-tail high-correlation algorithm (BVND, `|rho| >= 0.925`), with
