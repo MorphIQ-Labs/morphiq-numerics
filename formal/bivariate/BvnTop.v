@@ -1,14 +1,18 @@
 (** The absolute error of the low-correlation branch, from the table of one
     rule: [|R - P| <= B] for the computed result [R] and
-    [P = Phi(x) Phi(y) + (1/2 pi) int_0^{asin rho} f]. Every classical or
-    library fact the statement uses is a hypothesis of the theorem:
+    [P = Phi(x) Phi(y) + (1/2 pi) int_0^{asin rho} f]. The library functions
+    enter through their documented contracts, stated as hypotheses:
 
-    - the normal distribution function, [asin], [sin], [cos] and [exp] are
-      correctly rounded ([Phi_cr] below and the definitions of the node
-      terms), as their derivation documents prove;
-    - [Plackett]: the exact value is a probability, so the clamp cannot raise
-      the error;
-    - [T1]: the Gauss-Legendre remainder, the cited theorem of
+    - [exp_contract], [sin_contract] (BvnLow.v): [exp] is a rounding of a value
+      within [2^-100] relatively of [e^v] (docs/exp.md proves correct rounding);
+      [sin] is within [(1/2 + 2^-144)] ulp (docs/sin_cos.md, on [|theta| <= 2.5]);
+    - the normal distribution function: a rounding of a value within [2^-112] of
+      [Phi] (docs/normal.md, table of relative errors before the final rounding),
+      so within [eP = 2^-54 + 2^-112] of [Phi] and in [[0, 1]];
+    - [asin]: a rounding of a value within [2^-62] relatively of [asin rho]
+      (docs/asin.md: fast path below [2^-63], accurate path [2^-124]);
+    - Plackett: the exact value is a probability;
+    - T1: the Gauss-Legendre remainder, the cited theorem of
       docs/bivariate_normal_truncation.md section 2. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz List.
 Import ListNotations.
@@ -17,114 +21,135 @@ From Double Require Import DWPlus.
 From Binary64 Require Import Binary64Add.
 From Interval Require Import Tactic.
 From Coquelicot Require Import Coquelicot.
-Require Import BvnRound BvnArg BvnNode BvnTrig BvnLow BvnSum BvnChain BvnQuadG BvnRule BvnTail BvnIntegral.
+Require Import BvnRound BvnQ BvnArg BvnNode BvnTrig BvnLow BvnSum BvnQuadG BvnTail BvnRule BvnIntegral BvnFinal.
 Open Scope R_scope.
 
-(** The corrected sum with a constant of either sign: rounding is odd. *)
-Lemma rule_bound_signed x y asr A etaK bp nodes dats Kex Kh :
-  0 <= etaK -> 0 <= bp -> bq etaK <= bp -> dom x -> dom y -> bpow radix2 (-53) <= Rabs asr -> Rabs asr <= A -> A <= 6 / 5 ->
-  Forall2 (node_ok asr A) nodes dats -> (length nodes <= 24)%nat ->
-  Rabs Kex <= 1 -> Rabs (Kh - Kex) <= etaK * Rabs Kex -> etaK <= / 1000 ->
-  Rabs (rndF (rndF (fst (acc (map (tn x y asr) nodes) (0, 0)) + snd (acc (map (tn x y asr) nodes) (0, 0))) * Kh)
-        - Kex * sumR (map (vn x y asr) nodes))
-    <= Rabs Kex * sum2 (gn A bp) nodes dats + 1000 * z.
+Definition Rhat (expI sinI : R -> R) (x y asr : R) (nodes : list NodeS) (pxI pyI : R) : R :=
+  finish pxI pyI (fst (acc (map (tn expI sinI x y asr) nodes) (0, 0))) (snd (acc (map (tn expI sinI x y asr) nodes) (0, 0))).
+
+Lemma sumR_vn x y asr Kex nodes :
+  sumR (map (vn x y asr Kex) nodes) = Kex * sumR (map (fun n => nW n * exp (- Qn x y asr n)) nodes).
 Proof.
-  intros Heta Hbp Hbq Hx Hy Ha1 Ha2 HA Hall Hlen HK1 HKh Heta1.
-  set (hh := rndF (fst (acc (map (tn x y asr) nodes) (0, 0)) + snd (acc (map (tn x y asr) nodes) (0, 0)))).
-  destruct (Rle_dec 0 Kex) as [Hk | Hk].
-  - rewrite (Rabs_pos_eq Kex Hk) in *.
-    exact (rule_bound x y asr A etaK bp Heta nodes dats Kex Kh Hbp Hbq Hx Hy Ha1 Ha2 HA Hall Hlen Hk HK1 HKh Heta1).
-  - assert (Hk' : 0 <= - Kex) by lra.
-    rewrite (Rabs_left Kex ltac:(lra)) in *.
-    pose proof (rule_bound x y asr A etaK bp Heta nodes dats (- Kex) (- Kh) Hbp Hbq Hx Hy Ha1 Ha2 HA Hall Hlen Hk' HK1
-      ltac:(replace (- Kh - - Kex) with (- (Kh - Kex)) by ring; rewrite Rabs_Ropp; exact HKh) Heta1) as H.
-    fold hh in H.
-    replace (hh * Kh) with (- (hh * - Kh)) by ring. rewrite rnd_opp.
-    replace (- rndF (hh * - Kh) - Kex * sumR (map (vn x y asr) nodes))
-      with (- (rndF (hh * - Kh) - - Kex * sumR (map (vn x y asr) nodes))) by ring.
-    rewrite Rabs_Ropp. exact H.
+  induction nodes as [| n ns IH]; simpl; [ring |].
+  rewrite IH. unfold vn. ring.
 Qed.
 
-(** The result of the low-correlation branch for one rule: the correction
-    [Chat], the product of the rounded distribution functions, their sum and
-    the clamp, as the Rust forms them. *)
-Definition Chat (x y asr : R) (nodes : list NodeS) : R :=
-  rndF (rndF (fst (acc (map (tn x y asr) nodes) (0, 0)) + snd (acc (map (tn x y asr) nodes) (0, 0))) * rndF (asr / (2 * TAU))).
-
-Definition Rhat (x y asr : R) (nodes : list NodeS) (Phix Phiy : R) : R :=
-  clampf (rndF (Chat x y asr nodes + rndF (rndF Phix * rndF Phiy))).
-
-Theorem low_branch x y rho asr A Tr b0 kA Phix Phiy nodes dats :
-  0 <= b0 -> bq ETAK <= b0 -> (-1021 <= kA)%Z -> Rabs (asin rho) <= bpow radix2 kA ->
-  dom x -> dom y ->
-  0 <= Phix <= 1 -> 0 <= Phiy <= 1 ->
-  asr = rndF (asin rho) -> bpow radix2 (-53) <= Rabs asr -> Rabs asr <= A -> A <= 6 / 5 ->
-  Rabs (asin rho) <= 3 / 2 ->
-  Forall2 (node_ok asr A) nodes dats -> (length nodes <= 24)%nat ->
-  (* Plackett: the exact value is a probability *)
+Theorem low_branch (expI sinI : R -> R) (x y rho asr A Tr b0 E : R) (kA : Z) (pxI pyI Phix Phiy : R)
+  (nodes : list NodeS) (dats : list Dat) :
+  exp_contract expI -> sin_contract sinI ->
+  fmtF x -> fmtF y -> Rabs x <= 64 -> Rabs y <= 64 ->
+  0 <= Phix <= 1 -> 0 <= Phiy <= 1 -> fmtF pxI -> fmtF pyI -> 0 <= pxI <= 1 -> 0 <= pyI <= 1 ->
+  Rabs (pxI - Phix) <= eP -> Rabs (pyI - Phiy) <= eP ->
+  (exists Za, asr = rndF Za /\ Rabs (Za - asin rho) <= bpow radix2 (-62) * Rabs (asin rho)) ->
+  bpow radix2 (-53) <= Rabs asr -> Rabs asr <= A -> A <= 6 / 5 ->
+  Rabs (asin rho) <= A - 1 / 10 ^ 4 -> A <= bpow radix2 kA -> (-1021 <= kA)%Z -> (kA <= 1)%Z ->
+  0 <= b0 -> bq <= b0 ->
+  List.Forall2 (ok A (rndF (asr / (2 * TAU)))) nodes dats -> (length nodes <= 24)%nat ->
+  A / (4 * PI) * sumD (gdat A b0) dats <= E -> E <= 1 ->
   0 <= Phix * Phiy + Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI) <= 1 ->
-  (* T1: the Gauss-Legendre remainder at the rounded angle *)
-  Rabs (Iint (x * x + y * y) (x * y) asr - asr / 2 * sumR (map (vn x y asr) nodes)) <= Tr ->
-  Rabs (Rhat x y asr nodes Phix Phiy - (Phix * Phiy + Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI)))
-    <= 4 * bpow radix2 (-54) + A / (4 * PI) * sumD (gdat A b0) dats + 1000 * z
-       + Tr / (2 * PI) + bpow radix2 (kA - 54) / (2 * PI).
+  Rabs (Iint (x * x + y * y) (x * y) asr
+        - asr / 2 * sumR (map (fun n => nW n * exp (- Qn x y asr n)) nodes)) <= Tr ->
+  Rabs (Rhat expI sinI x y asr nodes pxI pyI
+        - (Phix * Phiy + Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI)))
+    <= bpow radix2 (-54) + bpow radix2 (-900) + bpow radix2 (-90) + 2 * eP + E + 200 * z
+       + Tr / (2 * PI) + (bpow radix2 (kA - 54) + bpow radix2 (-62) * bpow radix2 kA) / (2 * PI).
 Proof.
-  intros Hb0 Hbq0 HkA Hask Hx Hy HPx HPy Hasr Ha1 Ha2 HA Hasin Hall Hlen Hprob HT1.
-  pose proof u_pos as Hu. pose proof z_pos as Hz.
+  intros Hexp Hsin Fx Fy Hx Hy HPx HPy Fpx Fpy Hpx Hpy Epx Epy Hasin Ha1 Ha2 HA Hrho HAk Hk1 Hk2 Hb0 Hbq Hall Hlen HE HE1 Hprob HT1.
+  pose proof u_pos as Hu. pose proof u_val as Huv. pose proof z_pos as Hz.
   assert (HPI : 3 < PI < 315 / 100) by (pose proof PI_RGT_0; split; interval).
   destruct HPI as [HPI1 HPI2].
-  set (r := x * x + y * y). set (p := x * y).
-  assert (Hr : 0 <= r) by (unfold r; nra).
-  assert (Hp : Rabs p <= r / 2).
-  { unfold p, r. pose proof (Rle_0_sqr (x - y)) as h1. pose proof (Rle_0_sqr (x + y)) as h2. unfold Rsqr in h1, h2.
-    apply Rabs_le. split; nra. }
-  set (Kex := asr / (4 * PI)).
   set (Kh := rndF (asr / (2 * TAU))).
-  set (V := sumR (map (vn x y asr) nodes)).
-  assert (HKex1 : Rabs Kex <= 1).
+  set (Kex := asr / (4 * PI)).
+  assert (HKex2 : Rabs Kex <= / 10).
   { unfold Kex. rewrite Rabs_div_pos by lra. apply Rmult_le_reg_r with (4 * PI); [lra |].
     unfold Rdiv. rewrite Rmult_assoc, Rinv_l by lra. lra. }
+  assert (HKex1 : bpow radix2 (-57) <= Rabs Kex).
+  { unfold Kex. rewrite Rabs_div_pos by lra.
+    apply Rmult_le_reg_r with (4 * PI); [lra |].
+    unfold Rdiv. rewrite Rmult_assoc, Rinv_l by lra.
+    assert (Hb : bpow radix2 (-53) = 16 * bpow radix2 (-57)) by (replace (-53)%Z with (-57 + 4)%Z by reflexivity; rewrite bpow_plus; replace (bpow radix2 4) with 16 by reflexivity; ring).
+    pose proof (bpow_gt_0 radix2 (-57)). nra. }
   assert (HKh : Rabs (Kh - Kex) <= ETAK * Rabs Kex) by (apply K_close; lra).
-  assert (HETAK : 0 <= ETAK /\ ETAK <= / 1000) by (unfold ETAK; split; lra).
-  destruct HETAK as [HE0 HE1].
-  assert (HAbs : Rabs asr <= A) by exact Ha2.
-  (* the rounded correction *)
-  pose proof (rule_bound_signed x y asr A ETAK b0 nodes dats Kex Kh HE0 Hb0 Hbq0 Hx Hy Ha1 Ha2 HA Hall Hlen HKex1 HKh HE1) as HC.
-  change (Rabs (Chat x y asr nodes - Kex * V) <= Rabs Kex * sum2 (gn A b0) nodes dats + 1000 * z) in HC.
-  pose proof (sum_g_le asr A b0 nodes dats Hb0 Hall) as Hg.
+  assert (HAn : Rabs asr <= 6 / 5) by lra.
+  destruct (rule_bound expI sinI x y asr A Kex Kh b0 Hexp Hsin Fx Fy Hx Hy Ha1 Ha2 HA HKh HKex1 HKex2 nodes dats Hb0 Hbq Hall Hlen)
+    as [HC [FH [HL [HV HB]]]].
+  pose proof (sum_g_le A Kex Kh b0 nodes dats Hb0 Hall) as Hg.
+  pose proof (sum_g_nonneg A Kex Kh b0 nodes dats Hb0 Hall) as Hg0.
+  assert (HKpos : 0 < Rabs Kex) by (pose proof (bpow_gt_0 radix2 (-57)); lra).
+  assert (HSD : 0 <= sumD (gdat A b0) dats).
+  { destruct (Rle_dec 0 (sumD (gdat A b0) dats)) as [H | H]; [exact H |].
+    exfalso. assert (Rabs Kex * sumD (gdat A b0) dats < 0) by nra. lra. }
   assert (HKA : Rabs Kex <= A / (4 * PI)).
   { unfold Kex. rewrite Rabs_div_pos by lra. unfold Rdiv. apply Rmult_le_compat_r; [apply Rlt_le, Rinv_0_lt_compat; lra | exact Ha2]. }
-  pose proof (sum_g_nonneg asr A b0 nodes dats Hb0 Hall) as Hg0.
-  assert (HCb : Rabs (Chat x y asr nodes - Kex * V) <= A / (4 * PI) * sumD (gdat A b0) dats + 1000 * z).
-  { eapply Rle_trans; [exact HC |].
-    assert (Hm : Rabs Kex * sum2 (gn A b0) nodes dats <= A / (4 * PI) * sumD (gdat A b0) dats).
-    { apply Rmult_le_compat; [apply Rabs_pos | exact Hg0 | exact HKA | exact Hg]. }
+  assert (Hgn : sum2 (gn A Kex b0) nodes dats <= E).
+  { assert (Hm : Rabs Kex * sumD (gdat A b0) dats <= A / (4 * PI) * sumD (gdat A b0) dats) by (apply Rmult_le_compat_r; [exact HSD | exact HKA]).
     lra. }
-  (* the integral *)
-  assert (HIn : Rabs (Iint r p asr / (2 * PI) - Kex * V) <= Tr / (2 * PI)).
-  { assert (E : Iint r p asr / (2 * PI) - Kex * V = (Iint r p asr - asr / 2 * V) / (2 * PI)).
-    { unfold Kex. field. lra. }
-    rewrite E. rewrite Rabs_div_pos by lra. unfold Rdiv. apply Rmult_le_compat_r; [apply Rlt_le, Rinv_0_lt_compat; lra | exact HT1]. }
-  assert (Hshift : Rabs (asin rho - asr) <= bpow radix2 (kA - 54)).
-  { rewrite Hasr. rewrite Rabs_minus_sym. apply rnd_pow; [exact HkA | exact Hask]. }
-  assert (HIl : Rabs (Iint r p (asin rho) / (2 * PI) - Iint r p asr / (2 * PI)) <= bpow radix2 (kA - 54) / (2 * PI)).
-  { assert (E : Iint r p (asin rho) / (2 * PI) - Iint r p asr / (2 * PI) = (Iint r p (asin rho) - Iint r p asr) / (2 * PI)) by (field; lra).
-    rewrite E. rewrite Rabs_div_pos by lra. unfold Rdiv. apply Rmult_le_compat_r; [apply Rlt_le, Rinv_0_lt_compat; lra |].
+  set (V := sumR (map (vn x y asr Kex) nodes)) in *.
+  set (Wsum := sumR (map (fun n => nW n * exp (- Qn x y asr n)) nodes)).
+  assert (HVe : V = Kex * Wsum) by (unfold V, Wsum; apply sumR_vn).
+  set (H := fst (acc (map (tn expI sinI x y asr) nodes) (0, 0))) in *.
+  set (L := snd (acc (map (tn expI sinI x y asr) nodes) (0, 0))) in *.
+  assert (Hlen' : INR (length nodes) <= 24) by (replace 24 with (INR 24) by (simpl; lra); apply le_INR; exact Hlen).
+  assert (HVb : Rabs V <= 12 / 5) by lra.
+  assert (HB1 : sum2 (vbn x y asr A Kex) nodes dats <= 1) by lra.
+  assert (HLs : Rabs L <= bpow radix2 (-40)).
+  { eapply Rle_trans; [exact HL |].
+    assert (Hm : 3 * u * (Rabs V + sum2 (vbn x y asr A Kex) nodes dats + 72 * z) <= 3 * u * (12 / 5 + 1 + 72 * z)).
+    { apply Rmult_le_compat_l; [lra |]. lra. }
+    assert (Hn : 24 * (3 * u * (12 / 5 + 1 + 72 * z) + 2 * z) <= bpow radix2 (-40)) by (unfold u, z; simpl; interval).
+    lra. }
+  assert (HHb : Rabs H <= 4).
+  { assert (E1 : Rabs H = Rabs (V + (H + L - V) + - L)) by (f_equal; ring).
+    assert (Hb2 : Rabs H <= Rabs V + Rabs (H + L - V) + Rabs L).
+    { rewrite E1. eapply Rle_trans; [apply Rabs_triang |]. eapply Rle_trans; [apply Rplus_le_compat_r; apply Rabs_triang |].
+      rewrite Rabs_Ropp. lra. }
+    assert (Hz1 : 200 * z <= / 1000) by (unfold z; simpl; interval).
+    assert (Hb40 : bpow radix2 (-40) <= / 1000) by (replace (/ 1000) with (/ 1000) by reflexivity; apply Rle_trans with (bpow radix2 (-10)); [apply bpow_le; lia | change (bpow radix2 (-10)) with (/ 1024); lra]).
+    lra. }
+  (* the integral and its angle *)
+  assert (HIn : Rabs (Iint (x * x + y * y) (x * y) asr / (2 * PI) - V) <= Tr / (2 * PI)).
+  { assert (Eq : Iint (x * x + y * y) (x * y) asr / (2 * PI) - V
+                 = (Iint (x * x + y * y) (x * y) asr - asr / 2 * Wsum) / (2 * PI)).
+    { rewrite HVe. unfold Kex. field. lra. }
+    rewrite Eq. rewrite Rabs_div_pos by lra. unfold Rdiv. apply Rmult_le_compat_r; [apply Rlt_le, Rinv_0_lt_compat; lra | exact HT1]. }
+  assert (Hr : 0 <= x * x + y * y) by nra.
+  assert (Hp : Rabs (x * y) <= (x * x + y * y) / 2).
+  { pose proof (Rle_0_sqr (x - y)) as h1. pose proof (Rle_0_sqr (x + y)) as h2. unfold Rsqr in h1, h2.
+    apply Rabs_le. split; nra. }
+  assert (Hshift : Rabs (asin rho - asr) <= bpow radix2 (kA - 54) + bpow radix2 (-62) * bpow radix2 kA).
+  { destruct Hasin as [Za [Eas HZa]].
+    assert (HZb : Rabs Za <= bpow radix2 kA).
+    { assert (Eq9 : Za = asin rho + (Za - asin rho)) by ring.
+      assert (Rabs Za <= Rabs (asin rho) + Rabs (Za - asin rho)) by (rewrite Eq9 at 1; apply Rabs_triang).
+      assert (bpow radix2 (-62) <= / 1000000) by (apply Rle_trans with (bpow radix2 (-20)); [apply bpow_le; lia | change (bpow radix2 (-20)) with (/ 1048576); lra]).
+      assert (bpow radix2 kA <= 2) by (replace 2 with (bpow radix2 1) by reflexivity; apply bpow_le; lia).
+      assert (Hm : bpow radix2 (-62) * Rabs (asin rho) <= bpow radix2 (-62) * 2) by (apply Rmult_le_compat_l; [apply Rlt_le, bpow_gt_0 | lra]).
+      assert (Rabs (asin rho) <= A) by lra. lra. }
+    assert (Hr1 : Rabs (rndF Za - Za) <= bpow radix2 (kA - 54)) by (apply rnd_pow; assumption).
+    rewrite <- Eas in Hr1.
+    assert (Eq9 : asin rho - asr = (asin rho - Za) + (Za - asr)) by ring.
+    rewrite Eq9. eapply Rle_trans; [apply Rabs_triang |].
+    rewrite Rabs_minus_sym in HZa.
+    assert (Rabs (Za - asr) <= bpow radix2 (kA - 54)) by (rewrite Rabs_minus_sym; exact Hr1).
+    assert (Hm : bpow radix2 (-62) * Rabs (asin rho) <= bpow radix2 (-62) * bpow radix2 kA) by (apply Rmult_le_compat_l; [apply Rlt_le, bpow_gt_0 | lra]).
+    lra. }
+  assert (Hl2 : Rabs (Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI) - Iint (x * x + y * y) (x * y) asr / (2 * PI))
+                <= (bpow radix2 (kA - 54) + bpow radix2 (-62) * bpow radix2 kA) / (2 * PI)).
+  { assert (Eq : Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI) - Iint (x * x + y * y) (x * y) asr / (2 * PI)
+                 = (Iint (x * x + y * y) (x * y) (asin rho) - Iint (x * x + y * y) (x * y) asr) / (2 * PI)) by (field; lra).
+    rewrite Eq. rewrite Rabs_div_pos by lra. unfold Rdiv. apply Rmult_le_compat_r; [apply Rlt_le, Rinv_0_lt_compat; lra |].
     eapply Rle_trans; [apply Iint_lip; try assumption; lra |]. exact Hshift. }
-  set (c := Iint r p (asin rho) / (2 * PI)) in *.
-  assert (Hasrb : Rabs asr <= 3 / 2) by lra.
-  assert (HChat : Rabs (Chat x y asr nodes - c) <= A / (4 * PI) * sumD (gdat A b0) dats + 1000 * z + Tr / (2 * PI) + bpow radix2 (kA - 54) / (2 * PI)).
-  { assert (E : Chat x y asr nodes - c = (Chat x y asr nodes - Kex * V) + (Kex * V - Iint r p asr / (2 * PI)) + (Iint r p asr / (2 * PI) - c)) by ring.
-    rewrite E. eapply Rle_trans; [apply Rabs_triang |]. eapply Rle_trans; [apply Rplus_le_compat_r; apply Rabs_triang |].
-    rewrite (Rabs_minus_sym (Kex * V)). rewrite (Rabs_minus_sym (Iint r p asr / (2 * PI)) c). lra. }
-  (* the product of the distribution functions *)
-  pose proof (phi_part Phix Phiy (rndF Phix) (rndF Phiy) HPx HPy eq_refl eq_refl) as HPh.
-  (* the sum and the clamp *)
-  unfold Rhat.
-  set (s := Chat x y asr nodes + rndF (rndF Phix * rndF Phiy)).
-  pose proof (clamp_round s (Phix * Phiy + c) Hprob) as Hcl.
-  assert (Hs : Rabs (s - (Phix * Phiy + c)) <= Rabs (Chat x y asr nodes - c) + 3 * bpow radix2 (-54)).
-  { assert (E : s - (Phix * Phiy + c) = (Chat x y asr nodes - c) + (rndF (rndF Phix * rndF Phiy) - Phix * Phiy)) by (unfold s; ring).
-    rewrite E. eapply Rle_trans; [apply Rabs_triang |]. lra. }
+  set (c := Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI)) in *.
+  assert (Hc : Rabs (H + L - c) <= E + 200 * z + Tr / (2 * PI) + (bpow radix2 (kA - 54) + bpow radix2 (-62) * bpow radix2 kA) / (2 * PI)).
+  { assert (Eq : H + L - c = (H + L - V) + (V - Iint (x * x + y * y) (x * y) asr / (2 * PI)) + (Iint (x * x + y * y) (x * y) asr / (2 * PI) - c)) by ring.
+    rewrite Eq. eapply Rle_trans; [apply Rabs_triang |]. eapply Rle_trans; [apply Rplus_le_compat_r; apply Rabs_triang |].
+    rewrite (Rabs_minus_sym V). rewrite (Rabs_minus_sym (Iint (x * x + y * y) (x * y) asr / (2 * PI)) c). lra. }
+  (* the distribution functions and the last stage *)
+  pose proof (phi_prod Phix Phiy pxI pyI HPx HPy (conj (proj1 Hpx) (proj2 Hpx)) (conj (proj1 Hpy) (proj2 Hpy)) Epx Epy) as Hpp.
+  unfold Rhat. fold H. fold L.
+  pose proof (finish_bound pxI pyI H L (Phix * Phiy + c) Fpx Fpy Hpx Hpy FH HHb HLs Hprob) as Hfin.
+  assert (Hfin2 : Rabs (pxI * pyI + H + L - (Phix * Phiy + c)) <= 2 * eP + Rabs (H + L - c)).
+  { assert (Eq : pxI * pyI + H + L - (Phix * Phiy + c) = (pxI * pyI - Phix * Phiy) + (H + L - c)) by ring.
+    rewrite Eq. eapply Rle_trans; [apply Rabs_triang |]. lra. }
   lra.
 Qed.
