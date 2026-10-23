@@ -14,11 +14,29 @@ Open Scope R_scope.
 
 Notation rndF := (round radix2 (FLT_exp (-1074) 53) (Znearest (fun n => negb (Z.even n)))).
 
+#[export] Instance prec53_gt_0 : Prec_gt_0 53.
+Proof. unfold Prec_gt_0. lia. Qed.
+
 Definition u : R := bpow radix2 (-53).
 Definition z : R := bpow radix2 (-1075).
 
 Lemma u_val : u = / 9007199254740992.
 Proof. unfold u. reflexivity. Qed.
+
+Lemma Rabs_sq x : Rabs x * Rabs x = x * x.
+Proof.
+  rewrite <- Rabs_mult. apply Rabs_pos_eq. apply Rle_0_sqr.
+Qed.
+
+Lemma Rabs_le_between x y : Rabs x <= y <-> -y <= x <= y.
+Proof.
+  split; [apply Rabs_le_inv | apply Rabs_le].
+Qed.
+
+Lemma Rabs_div_pos T D : 0 < D -> Rabs (T / D) = Rabs T / D.
+Proof.
+  intros H. unfold Rdiv. rewrite Rabs_mult, Rabs_Rinv by lra. rewrite (Rabs_pos_eq D) by lra. reflexivity.
+Qed.
 
 Lemma u_pos : 0 < u.
 Proof. unfold u. apply bpow_gt_0. Qed.
@@ -28,7 +46,7 @@ Proof. unfold z. apply bpow_gt_0. Qed.
 
 Lemma rnd_opp x : rndF (- x) = - rndF x.
 Proof.
-  apply round_N_opp. auto with typeclass_instances.
+  apply round_NE_opp.
 Qed.
 
 Lemma rnd_rel_z x : Rabs (rndF x - x) <= u * Rabs x + z.
@@ -43,7 +61,7 @@ Proof.
   - pose proof (error_le_half_ulp radix2 (FLT_exp (-1074) 53) (fun n => negb (Z.even n)) x) as E.
     assert (Hu : ulp radix2 (FLT_exp (-1074) 53) x <= bpow radix2 (-1074)).
     { destruct (Req_dec x 0) as [H0 | H0].
-      - subst x. rewrite ulp_FLT_0 by lia. apply Rle_refl.
+      - subst x. rewrite ulp_FLT_0; [apply Rle_refl | apply prec53_gt_0].
       - rewrite ulp_neq_0 by exact H0. unfold cexp. apply bpow_le.
         assert (mag radix2 x <= -1022)%Z.
         { apply mag_le_bpow; assumption. }
@@ -65,7 +83,7 @@ Proof.
   - pose proof (error_le_half_ulp radix2 (FLT_exp (-1074) 53) (fun n => negb (Z.even n)) x) as E.
     assert (Hu : ulp radix2 (FLT_exp (-1074) 53) x <= bpow radix2 (k - 53)).
     { destruct (Req_dec x 0) as [H0 | H0].
-      - subst x. rewrite ulp_FLT_0 by lia. apply bpow_le. lia.
+      - subst x. rewrite ulp_FLT_0; [apply bpow_le; lia | apply prec53_gt_0].
       - rewrite ulp_neq_0 by exact H0. unfold cexp. apply bpow_le.
         assert (mag radix2 x <= k)%Z by (apply mag_le_bpow; assumption).
         unfold FLT_exp. apply Z.max_lub; lia. }
@@ -115,10 +133,11 @@ Proof.
   - apply rnd_delta. right. exact H.
   - exists 0. split; [rewrite Rabs_R0; apply Rlt_le, u_pos |].
     assert (Fs : fmtF (a - b)).
-    { unfold Rminus. apply FLT_format_plus_small; auto with typeclass_instances.
-      - exact Fa.
-      - apply generic_format_opp. exact Fb.
-      - unfold Rminus in H. left. eapply Rlt_le_trans; [exact H |]. apply bpow_le. lia. }
+    { unfold Rminus.
+      assert (Fb' : fmtF (- b)) by (apply generic_format_opp; exact Fb).
+      assert (Hs : Rabs (a + - b) <= bpow radix2 (53 + -1074)).
+      { unfold Rminus in H. left. eapply Rlt_le_trans; [exact H |]. apply bpow_le. lia. }
+      exact (FLT_format_plus_small radix2 (-1074) 53 a (- b) Fa Fb' Hs). }
     rewrite round_generic by (auto with typeclass_instances || exact Fs). ring.
 Qed.
 
@@ -126,8 +145,8 @@ Qed.
 Lemma rnd_half w : fmtF w -> bpow radix2 (-1021) <= Rabs w -> rndF (w / 2) = w / 2.
 Proof.
   intros Fw Hw.
-  apply FLT_format_generic in Fw; [| lia].
-  destruct Fw as [[m e] E1 E2 E3]. simpl in E1, E2, E3.
+  pose proof (FLT_format_generic radix2 (-1074) 53 w Fw) as Fw'.
+  destruct Fw' as [[m e] E1 E2 E3]. simpl in E1, E2, E3.
   assert (He : (-1073 <= e)%Z).
   { destruct (Z_le_dec (-1073) e) as [H | H]; [exact H |].
     assert (e = -1074)%Z by lia. subst e. exfalso.
@@ -135,13 +154,13 @@ Proof.
     { rewrite <- abs_IZR. change (bpow radix2 53) with (IZR (Zpower radix2 53)).
       apply IZR_lt. exact E2. }
     assert (Hw2 : Rabs w < bpow radix2 (-1021)).
-    { rewrite E1. unfold F2R; simpl. rewrite Rabs_mult, (Rabs_pos_eq (bpow radix2 (-1074))) by (apply Rlt_le, bpow_gt_0).
+    { rewrite E1. unfold F2R; cbn [Fnum Fexp]. rewrite Rabs_mult, (Rabs_pos_eq (bpow radix2 (-1074))) by (apply Rlt_le, bpow_gt_0).
       replace (-1021)%Z with (53 + -1074)%Z by reflexivity. rewrite bpow_plus.
       apply Rmult_lt_compat_r; [apply bpow_gt_0 | exact Hm]. }
     lra. }
   apply round_generic; [auto with typeclass_instances |].
   apply generic_format_FLT. exists (Float radix2 m (e - 1)).
-  - rewrite E1. unfold F2R; simpl. replace (e - 1)%Z with (e + -1)%Z by lia. rewrite bpow_plus.
+  - rewrite E1. unfold F2R; cbn [Fnum Fexp]. replace (e - 1)%Z with (e + -1)%Z by lia. rewrite bpow_plus.
     change (bpow radix2 (-1)) with (/ 2). field.
   - simpl. exact E2.
   - simpl. lia.

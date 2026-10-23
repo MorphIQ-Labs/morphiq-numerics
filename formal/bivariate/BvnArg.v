@@ -9,7 +9,9 @@
     [1 - kappa S] included), plus [z] for a subnormal final quotient. The
     inputs are zero or at least [2^-400] in magnitude, so no operation but the
     last underflows (a nonzero [x] below that is outside this statement). *)
-From Coq Require Import Reals Lra Psatz.
+From Coq Require Import Reals Lra Psatz ZArith Lia.
+From Flocq Require Import Core.
+From Flocq Require Import Relative.
 Require Import BvnRound.
 Open Scope R_scope.
 
@@ -55,12 +57,11 @@ Lemma hs_err x y : dom x -> dom y ->
 Proof.
   intros Hx Hy. pose proof u_pos as Hu. pose proof u_val as Huv.
   destruct (M_ok x y Hx Hy) as [M0 | M1].
-  - assert (x = 0) by nra. assert (y = 0) by nra. subst x y. unfold hsf.
-    replace (0 * 0) with 0 by ring.
-    rewrite round_0 by auto with typeclass_instances.
-    replace (0 + 0) with 0 by ring. rewrite round_0 by auto with typeclass_instances.
-    replace (0 / 2) with 0 by ring. rewrite round_0 by auto with typeclass_instances.
-    replace (0 - (0 * 0 + 0 * 0) / 2) with 0 by ring. rewrite Rabs_R0. right. ring.
+  - assert (x = 0) by nra. assert (y = 0) by nra. subst x y.
+    assert (Hr0 : rndF 0 = 0) by (apply round_0; auto with typeclass_instances).
+    unfold hsf. rewrite !Rmult_0_l, Hr0, Rplus_0_l, Hr0.
+    unfold Rdiv. rewrite Rmult_0_l, Hr0.
+    replace (0 - 0) with 0 by ring. rewrite Rabs_R0. nra.
   - unfold hsf.
     destruct (rnd_delta (x * x) (sq_ok x Hx)) as [a1 [Ha1 E1]].
     destruct (rnd_delta (y * y) (sq_ok y Hy)) as [a2 [Ha2 E2]].
@@ -69,23 +70,33 @@ Proof.
     set (w := x * x * (1 + a1) + y * y * (1 + a2)).
     assert (Hx2 : 0 <= x * x) by apply Rle_0_sqr.
     assert (Hy2 : 0 <= y * y) by apply Rle_0_sqr.
-    apply Rabs_le in Ha1. apply Rabs_le in Ha2.
+    apply Rabs_le_inv in Ha1. apply Rabs_le_inv in Ha2.
+    destruct Ha1 as [Ha1l Ha1u]. destruct Ha2 as [Ha2l Ha2u].
+    assert (h1 : 0 <= x * x * (a1 + u)) by (apply Rmult_le_pos; lra).
+    assert (h2 : 0 <= y * y * (a2 + u)) by (apply Rmult_le_pos; lra).
+    assert (h3 : 0 <= x * x * (u - a1)) by (apply Rmult_le_pos; lra).
+    assert (h4 : 0 <= y * y * (u - a2)) by (apply Rmult_le_pos; lra).
     assert (Hwl : (1 - u) * M <= w) by (unfold w, M; nra).
     assert (Hwu : w <= (1 + u) * M) by (unfold w, M; nra).
     assert (H800 : bpow radix2 (-1022) <= bpow radix2 (-800)) by (apply bpow_le; lia).
+    assert (HuH : u < / 2) by (rewrite Huv; lra).
+    assert (HM0 : 0 <= M) by (unfold M; nra).
+    assert (HmM : / 2 * M <= (1 - u) * M).
+    { assert (0 <= (/ 2 - u) * M) by (apply Rmult_le_pos; lra). nra. }
+    assert (Hb2 : 4 * bpow radix2 (-1022) <= bpow radix2 (-800)).
+    { replace 4 with (bpow radix2 2) by reflexivity. rewrite <- bpow_plus. apply bpow_le. lia. }
+    pose proof (bpow_gt_0 radix2 (-1022)) as Hb0.
     assert (Hw : bpow radix2 (-1022) <= Rabs w).
     { rewrite Rabs_pos_eq by nra. nra. }
     destruct (rnd_delta w (or_intror Hw)) as [a3 [Ha3 E3]].
-    rewrite E3. apply Rabs_le in Ha3.
+    rewrite E3. apply Rabs_le_inv in Ha3.
     assert (Hw3 : bpow radix2 (-1021) <= Rabs (w * (1 + a3))).
     { assert (bpow radix2 (-1021) = 2 * bpow radix2 (-1022)).
       { replace (-1021)%Z with (-1022 + 1)%Z by reflexivity. rewrite bpow_plus.
         change (bpow radix2 1) with 2%R. ring. }
-      assert (bpow radix2 (-800) = bpow radix2 (-1022) * bpow radix2 222).
-      { rewrite <- bpow_plus. reflexivity. }
-      assert (bpow radix2 222 >= 4).
-      { replace 4 with (bpow radix2 2) by reflexivity. apply Rle_ge, bpow_le. lia. }
-      pose proof (bpow_gt_0 radix2 (-1022)).
+      destruct Ha3 as [Ha3l Ha3u].
+      assert (Hww : 0 <= w) by nra.
+      assert (H1a : / 4 * w <= w * (1 + a3)) by nra.
       rewrite Rabs_pos_eq by nra. nra. }
     assert (Hf : fmtF (rndF w)) by apply fmtF_rnd.
     rewrite E3 in Hf.
@@ -125,10 +136,13 @@ Proof.
   (* Nabs >= (r/2)(1 - sg) *)
   assert (HpS : Rabs (p * S) <= r / 2 * sg).
   { rewrite Rabs_mult. pose proof (Rabs_pos p). nra. }
-  apply Rabs_le in HpS.
+  apply Rabs_le_inv in HpS.
   assert (HNabs : r / 2 * (1 - sg) <= Nabs) by (unfold Nabs; nra).
   assert (Hr2 : r / 2 <= Nabs / (1 - sg)).
-  { apply Rmult_le_reg_r with (1 - sg); [exact H1s |]. field_simp. nra. }
+  { assert (E : Nabs / (1 - sg) = r / 2 + (Nabs - r / 2 * (1 - sg)) / (1 - sg)) by (field; lra).
+    rewrite E. assert (0 <= (Nabs - r / 2 * (1 - sg)) / (1 - sg)).
+    { apply Rmult_le_pos; [lra | apply Rlt_le, Rinv_0_lt_compat; lra]. }
+    lra. }
   assert (HNabs0 : 0 <= Nabs) by nra.
   (* E0 *)
   set (E0 := n1 - hs + Nabs).
@@ -161,16 +175,17 @@ Proof.
     assert (Hs2 : Rabs (ch - C) * Rabs (ch + C) <= hc_ * (2 + hc_)).
     { pose proof (Rabs_pos (ch - C)). pose proof (Rabs_pos (ch + C)). nra. }
     assert (Hz : hc_ * (2 + hc_) <= zt * (C * C)).
-    { rewrite Hzt. assert (hc_ * (2 + hc_) / (1 - sg * sg) * (1 - sg * sg) = hc_ * (2 + hc_)) by (field; lra).
-      pose proof (Rmult_le_compat_l (hc_ * (2 + hc_) / (1 - sg * sg)) (1 - sg * sg) (C * C)) as M.
-      assert (0 <= hc_ * (2 + hc_) / (1 - sg * sg)) by (apply Rmult_le_pos; [nra | apply Rlt_le, Rinv_0_lt_compat; lra]).
-      rewrite <- HC2 in HC2lb |- *. nra. }
+    { assert (Ez : zt * (1 - sg * sg) = hc_ * (2 + hc_)) by (rewrite Hzt; field; lra).
+      assert (Hzt0' : 0 <= zt).
+      { rewrite Hzt. apply Rmult_le_pos; [nra | apply Rlt_le, Rinv_0_lt_compat; lra]. }
+      assert (zt * (1 - sg * sg) <= zt * C2) by (apply Rmult_le_compat_l; [exact Hzt0' | exact HC2lb]).
+      rewrite HC2 in H. lra. }
     nra. }
   assert (Hzt0 : 0 <= zt).
   { rewrite Hzt. apply Rmult_le_pos; [nra | apply Rlt_le, Rinv_0_lt_compat; lra]. }
-  assert (Hch2l : C2 * (1 - zt) <= ch * ch) by (apply Rabs_le in Hch2; nra).
+  assert (Hch2l : C2 * (1 - zt) <= ch * ch) by (apply Rabs_le_inv in Hch2; nra).
   assert (Hdhl : C2 * (1 - zt) * (1 - u) <= dh).
-  { rewrite Hdh. apply Rabs_le in Hb4. assert (0 <= ch * ch) by nra. nra. }
+  { rewrite Hdh. apply Rabs_le_inv in Hb4. assert (0 <= ch * ch) by nra. nra. }
   assert (Hdhp : 0 < dh) by (assert (0 < C2 * (1 - zt) * (1 - u)) by (apply Rmult_lt_0_compat; [apply Rmult_lt_0_compat; lra | lra]); lra).
   (* v + Nabs/C2 = [n2 C2 + Nabs dh] / (dh C2) *)
   set (T := n2 * C2 + Nabs * dh).
@@ -185,23 +200,24 @@ Proof.
       { assert (E : ch * ch * (1 + b4) - C2 * (1 + b3) = (ch * ch - C2) * (1 + b4) + C2 * (b4 - b3)) by ring.
         rewrite E. eapply Rle_trans; [apply Rabs_triang |].
         rewrite !Rabs_mult.
-        assert (Rabs (1 + b4) <= 1 + u) by (apply Rabs_le in Hb4; apply Rabs_le; split; nra).
+        assert (Rabs (1 + b4) <= 1 + u) by (apply Rabs_le_inv in Hb4; apply Rabs_le; split; nra).
         assert (Rabs C2 = C2) by (apply Rabs_pos_eq; lra). rewrite H0.
-        assert (Rabs (b4 - b3) <= 2 * u) by (apply Rabs_le in Hb4; apply Rabs_le in Hb3; apply Rabs_le; split; nra).
+        assert (Rabs (b4 - b3) <= 2 * u) by (apply Rabs_le_inv in Hb4; apply Rabs_le_inv in Hb3; apply Rabs_le; split; nra).
         pose proof (Rabs_pos (ch * ch - C2)). pose proof (Rabs_pos (1 + b4)). pose proof (Rabs_pos (b4 - b3)).
         nra. }
       nra.
     - rewrite !Rabs_mult.
-      assert (Rabs (1 + b3) <= 1 + u) by (apply Rabs_le in Hb3; apply Rabs_le; split; nra).
+      assert (Rabs (1 + b3) <= 1 + u) by (apply Rabs_le_inv in Hb3; apply Rabs_le; split; nra).
       assert (Rabs C2 = C2) by (apply Rabs_pos_eq; lra). rewrite H0.
-      pose proof (Rabs_pos E0). pose proof (Rabs_pos (1 + b3)). nra. }
+      assert (Hq1 : Rabs E0 * Rabs (1 + b3) <= Rabs E0 * (1 + u))
+        by (apply Rmult_le_compat_l; [apply Rabs_pos | exact H]).
+      apply Rmult_le_compat_r; [lra | exact Hq1]. }
   assert (Hv : n2 / dh + Nabs / C2 = T / (dh * C2)).
   { unfold T. field. split; lra. }
   unfold Qf. fold Nabs. fold C2.
-  rewrite Hv. rewrite Rabs_div by (apply Rgt_not_eq; nra).
-  rewrite (Rabs_pos_eq (dh * C2)) by nra.
+  rewrite Hv. rewrite Rabs_div_pos by nra.
   apply Rmult_le_reg_r with (dh * C2); [nra |].
-  unfold Rdiv. rewrite Rmult_assoc, Rinv_l by (apply Rgt_not_eq; nra). rewrite Rmult_1_r.
+  unfold Rdiv at 1. rewrite Rmult_assoc, Rinv_l by (apply Rgt_not_eq; nra). rewrite Rmult_1_r.
   unfold ar0.
   assert (Hden : 0 < (1 - zt) * (1 - u)) by (apply Rmult_lt_0_compat; lra).
   assert (Hgoal : Rabs T <= (zt * (1 + u) + 2 * u + (1 + u) * Eh / (1 - sg)) / ((1 - zt) * (1 - u)) * (Nabs / C2) * (dh * C2)).
@@ -262,31 +278,39 @@ Proof.
   set (r := x * x + y * y). set (p := x * y).
   assert (Hr : 0 <= r) by (unfold r; nra).
   assert (Hp : Rabs p <= r / 2).
-  { unfold p, r. apply Rabs_le. split; nra. }
+  { unfold p, r. pose proof (Rle_0_sqr (x - y)) as h1. pose proof (Rle_0_sqr (x + y)) as h2.
+    unfold Rsqr in h1, h2. apply Rabs_le. split; nra. }
   (* p-hat *)
-  destruct (rnd_delta p (prod_ok x y Hx Hy)) as [b1 [Hb1 E1]].
+  assert (Hp1022 : p = 0 \/ bpow radix2 (-1022) <= Rabs p).
+  { destruct (prod_ok x y Hx Hy) as [H | H]; [left; exact H | right].
+    eapply Rle_trans; [| exact H]. apply bpow_le. lia. }
+  destruct (rnd_delta p Hp1022) as [b1 [Hb1 E1]].
   (* n1 *)
   assert (Hn1ok : sh * rndF p = 0 \/ bpow radix2 (-1022) <= Rabs (sh * rndF p)).
   { rewrite E1.
     destruct (prod_ok x y Hx Hy) as [H0 | H1].
     - left. fold p in H0. rewrite H0. ring.
     - right. fold p in H1. rewrite Rabs_mult, Rabs_mult.
-      assert (Hb : Rabs (1 + b1) >= 1 / 2) by (apply Rabs_le in Hb1; rewrite Rabs_pos_eq by nra; nra).
+      assert (Hb : Rabs (1 + b1) >= 1 / 2) by (apply Rabs_le_inv in Hb1; rewrite Rabs_pos_eq by nra; nra).
       assert (Hpp : bpow radix2 (-800) <= Rabs p) by exact H1.
-      assert (E : bpow radix2 (-1022) = bpow radix2 (-100) * (bpow radix2 (-800) * (1 / 2)) * bpow radix2 (-122)).
-      { replace (1 / 2) with (bpow radix2 (-1)) by reflexivity.
-        rewrite <- !bpow_plus. reflexivity. }
-      pose proof (bpow_gt_0 radix2 (-100)). pose proof (bpow_gt_0 radix2 (-800)). pose proof (bpow_gt_0 radix2 (-122)).
-      assert (bpow radix2 (-122) <= 1) by (replace 1 with (bpow radix2 0) by reflexivity; apply bpow_le; lia).
+      assert (Hq : bpow radix2 (-1022) <= bpow radix2 (-100) * (bpow radix2 (-800) * (1 / 2))).
+      { assert (E1' : bpow radix2 (-100) * bpow radix2 (-800) = bpow radix2 (-900)) by (rewrite <- bpow_plus; reflexivity).
+        assert (E2' : bpow radix2 (-900) = 2 * bpow radix2 (-901)).
+        { replace (-900)%Z with (-901 + 1)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 1) with 2%R. ring. }
+        assert (bpow radix2 (-1022) <= bpow radix2 (-901)) by (apply bpow_le; lia).
+        nra. }
+      pose proof (bpow_gt_0 radix2 (-100)). pose proof (bpow_gt_0 radix2 (-800)).
       pose proof (Rabs_pos sh). pose proof (Rabs_pos p).
-      assert (bpow radix2 (-100) * (bpow radix2 (-800) * (1 / 2)) <= Rabs sh * (Rabs p * Rabs (1 + b1))) by nra.
-      nra. }
+      assert (Hbd : bpow radix2 (-100) * (bpow radix2 (-800) * (1 / 2)) <= Rabs sh * (Rabs p * Rabs (1 + b1))).
+      { apply Rmult_le_compat; [lra | nra | exact Hsh1 | ].
+        apply Rmult_le_compat; [lra | lra | lra | lra]. }
+      lra. }
   destruct (rnd_delta (sh * rndF p) Hn1ok) as [b2 [Hb2 E2]].
   set (n1 := rndF (sh * rndF p)).
   assert (Hn1 : n1 = sh * p * (1 + ((1 + b1) * (1 + b2) - 1))).
   { unfold n1. rewrite E2, E1. ring. }
   assert (Hphi : Rabs ((1 + b1) * (1 + b2) - 1) <= 2 * u + u * u).
-  { apply Rabs_le in Hb1. apply Rabs_le in Hb2. apply Rabs_le. split; nra. }
+  { apply Rabs_le_inv in Hb1. apply Rabs_le_inv in Hb2. apply Rabs_le. split; nra. }
   (* n2 *)
   assert (Fn1 : fmtF n1) by apply fmtF_rnd.
   assert (Fhs : fmtF (hsf x y)) by apply fmtF_rnd.
@@ -316,12 +340,13 @@ Proof.
   { unfold Q, Qf. apply Rmult_le_pos; [| apply Rlt_le, Rinv_0_lt_compat; nra].
     assert (Hpa : Rabs (p * S) <= r / 2 * sg).
     { rewrite Rabs_mult. pose proof (Rabs_pos p). pose proof (Rabs_pos S). nra. }
-    apply Rabs_le in Hpa. assert (0 <= sg) by (pose proof (Rabs_pos S); lra). nra. }
+    apply Rabs_le_inv in Hpa. assert (0 <= sg) by (pose proof (Rabs_pos S); lra). nra. }
   assert (Hvq : Rabs v <= Q + ar * Q).
   { assert (Hs : Rabs v <= Rabs (v + Q) + Rabs Q).
     { assert (E0 : v = (v + Q) + - Q) by ring.
       rewrite E0 at 1. eapply Rle_trans; [apply Rabs_triang |]. rewrite Rabs_Ropp. lra. }
     rewrite (Rabs_pos_eq Q HQ0) in Hs. lra. }
+  change (Rabs (rndF v + Q) <= (ar * (1 + u) + u) * Q + z).
   assert (E : rndF v + Q = (rndF v - v) + (v + Q)) by ring.
   rewrite E. eapply Rle_trans; [apply Rabs_triang |].
   assert (Hu0 : 0 <= u * Rabs v) by (apply Rmult_le_pos; [lra | apply Rabs_pos]).
