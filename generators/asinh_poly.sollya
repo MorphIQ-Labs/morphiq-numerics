@@ -1,0 +1,23 @@
+// The fast path's series for asinh (docs/asinh.md, section 3).
+//
+// z in [0, T]: asinh z = z + z^3 P(z^2), P of degree 3 in s = z^2 (relative).
+// The series asinh z = z + sum_(n >= 1) (-1)^n c_n z^(2n+1), c_n = (2n)! /
+// (4^n (n!)^2 (2n+1)), is truncated after n = 20; its terms alternate in sign
+// and shrink (c_(n+1)/c_n < 1, s <= T^2 < 2^-13), so the remainder is below the
+// first omitted term over 1 - s, printed as w000 relative to the first term,
+// and added to the supnorm v000 of the fit against the truncated series.
+//
+// Run in the pinned image (scripts/check_certificates.sh).
+prec = 500;
+display = hexadecimal;
+procedure fact(k) { var r, i; r = 1; for i from 2 to k do r = r * i; return r; };
+T = 0.0078126;
+procedure binom_term(n) { return (-1)^n * fact(2 * n) / (4^n * fact(n)^2 * (2 * n + 1)); };
+P = 0;
+for n from 20 to 1 by -1 do P = P * x + binom_term(n);
+q = fpminimax(P, 3, [|D, D, D, D|], [0; T^2], relative);
+digits = [|"0", "1", "2", "3"|];
+for j from 0 to 3 do print("p00" @ digits[j], coeff(q, j));
+print("v000", round(sup(supnorm(q, P, [0; T^2], relative, 2^-40)), 24, RU));
+print("w000", round(abs(binom_term(21)) * (T^2)^20 / (1 - T^2) / abs(binom_term(1)), 24, RU));
+quit;

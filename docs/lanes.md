@@ -1,6 +1,6 @@
 # Batched functions and lane evaluation
 
-`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice}` apply
+`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice, asin_slice, asinh_slice, atan2_slice}` apply
 [`exp`](exp.md), [`exp2`](exp2.md), [`expm1`](expm1.md), [`ln` and `ln_1p`](ln.md) to every element of a slice. The
 lane kernels are `crates/morphiq-numerics/src/lanes/`, `exp/lanes.rs`, `exp2/lanes.rs`, `expm1/lanes.rs` and
 `ln/lanes.rs`; the SIMD backends are the `morphiq-numerics-arch` crate
@@ -272,6 +272,46 @@ undecided arguments across lanes and mix them with decided and special
 arguments. The scalar fallback and public-entry proofs are in `docs/ln.md`;
 intermediate-word tests and the cross-target digest check lane equivalence.
 
+## `asin`
+
+`asin_slice` (`asin/lanes.rs`) runs `asin`'s whole fast path in lanes: the
+screen (a NaN, `|x| ≥ 1` and `|x| < ASIN_IS_X` are the scalar function's own
+results), `Reduced::of` (the complement's `u = (1 − x)/2`, `s = √u`, the
+`two_prod` residual and `two_sum`), `series` (the shifter index, the small
+series and the 45-segment table branch, both computed on every lane and
+selected by whether the index is zero), `Reduced::fast` (`2·series` as
+`mul_f64` rounds it, then `π/2 − δ`) and the rounding test at
+`EPS = 2^-62(1 + 2^-50)`. Table rows are read a lane at a time, as `ln`'s
+are. `√u` is the scalar `sqrt`, per lane, exactly as `Reduced::of` calls it.
+A lane the screen or the test doesn't settle calls `asin` itself, from the
+start. Every operation is the scalar operation in the scalar order, with
+`two_prod` as §2 states, on its domain: the arguments are `s` (at least
+`2^-27`), `t_hi` (zero or at least `2^-900`: `docs/asin.md` §4) and `2`.
+
+## `asinh`
+
+`asinh_slice` (`asinh/lanes.rs`) runs `asinh`'s fast path in lanes: the screen
+(a NaN, `±0`, `±∞` and `|x|` up to the threshold are the scalar function's own
+results), the series below `2^-7`, the logarithm of `x + √(x² + 1)` (the exact
+square, the double-word `u`, `√u` and its Newton correction, `v`, then `ln`'s
+double-word fast value through the shared fallback of §5 and `RN(v_lo/v_hi)`),
+the large form `ln x + ln 2 + 1/(4x²)` from `2^28`, and the rounding test at
+`EPS = 2^-63(1 + 2^-50)`. Each region runs only if some live lane is in it and
+is selected by mask. `√u` is the scalar `sqrt`, per lane. A lane the screen or
+the test doesn't settle calls `asinh` itself.
+
+## `atan2`
+
+`atan2_slice` (`atan2/lanes.rs`) takes paired arguments (`y[i]`, `x[i]`) through
+the `Kernel2` form of the framework (`lanes::map2`, the same backend cascade). Each
+lane runs `atan2`'s fast path: the screen (NaNs, zeros, infinities, and the pairs
+whose larger magnitude is outside `[2^-900, 2^900]` or whose ratio is below `2^-900`
+are the scalar function's), the smaller-over-larger ratio scaled by the exact power
+of two read from the larger's exponent field, the double-word quotient with
+`two_prod`'s residual, `atan t`'s table and series (as `asin`'s, with 64 rows), the
+four forms (each only if some lane takes it), and the rounding test at
+`EPS = 2^-62(1 + 2^-50)`. A lane the screen or the test doesn't settle calls `atan2`.
+
 ## 6. Checked by
 
 - **Bit equality on every backend** (`src/lanes/tests.rs`): each kernel
@@ -387,6 +427,11 @@ itself, whose fallback takes its accurate path for the subnormal ones.
 than it did over the double-word path. On log-uniform arguments, the lanes
 stage H screens out (`|x|` below `2^−46` or from `2^53`) take stage B or the
 fallback, so they gain least.
+
+`asin`, `asinh` and `atan2` on the same Apple M1 Pro, with their findings (a lane
+kernel first slower than the scalar loop, the software square root's cost) and what
+was not measured, are in
+[measurements](../crates/reference/measurements/asin-asinh-atan2-m1pro/README.md).
 
 SSE2, AVX2 and AVX-512F were timed natively on one Intel i9-10920X (Cascade
 Lake), each backend alone and through the cascade, for every lane kernel and

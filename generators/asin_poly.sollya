@@ -1,0 +1,71 @@
+// The fast path's polynomials for asin (docs/asin.md, section 4).
+//
+// Segments a = k/64, k = 1..45, on |t| <= T:
+//   asin(a + t) = asin(a) + t/sqrt(1 - a^2) + t^2 G_k(t),
+// G_k of degree 8 with binary64 coefficients (fpminimax, absolute). Segment 0,
+// z in [0, T]: asin z = z + z^3 P(z^2), P of degree 3 in s = z^2 (relative).
+//
+// The Taylor coefficients of asin about a come from its derivative
+// u(a + t) = sum_m b_m t^m, u = (1 - z^2)^(-1/2), whose ODE (1 - z^2) u' = z u
+// gives, with s0 = 1 - a^2,
+//   b_0 = s0^(-1/2),  b_1 = a b_0 / s0,
+//   b_(m+1) = ((2m + 1) a b_m + m b_(m-1)) / (s0 (m + 1)),
+// (each term rounded to 500 bits, which is far below every bound here, and
+// which keeps Sollya from carrying the recurrence as an expression tree) and
+// G_k(t) = sum_(j >= 0) b_(j+1) t^j / (j + 2). It is truncated after the
+// degree-20 term. The nearest singularity of u is at t = 1 - a, so Cauchy's
+// estimate on |t| = rho = (1 - a)/2 gives |b_m| <= M rho^(-m) with
+//   M = 1 / sqrt(rho (1 + a - rho)),
+// since |1 - a - t| >= rho and |1 + a + t| >= 1 + a - rho there. The omitted
+// terms are then below M/rho (T/rho)^21 / (23 (1 - T/rho)), printed as
+// r<k> and added to the supnorm u<k> of the fit against the truncated series.
+// Both bound sup |p - G_k|, so t^2 times them bounds the polynomial's absolute
+// error.
+//
+// Segment 0 is written as its series asin z = z + sum_(n >= 1) c_n z^(2n+1),
+// c_n = (2n)! / (4^n (n!)^2 (2n+1)), truncated after n = 20. The terms
+// alternate in neither sign nor decrease fast, but c_(n+1)/c_n < 1 and
+// s <= T^2 < 2^-13, so the remainder is below the first omitted term over
+// 1 - s: printed as pr, with the supnorm pe of the fit.
+//
+// Run in the pinned image (scripts/check_certificates.sh).
+prec = 500;
+display = hexadecimal;
+procedure fact(k) { var r, i; r = 1; for i from 2 to k do r = r * i; return r; };
+T = 0.0078126;
+DEG = 8;
+TRUNC = 20;
+digits = [|"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"|];
+procedure name(prefix, k, j) {
+  return prefix @ digits[floor(k / 10)] @ digits[k - 10 * floor(k / 10)] @ digits[j];
+};
+
+for k from 1 to 45 do {
+  a = k / 64;
+  s0 = 1 - a^2;
+  b = [||];
+  b = b :. round(1 / sqrt(s0), prec, RN);
+  b = b :. round(a * b[0] / s0, prec, RN);
+  for m from 1 to TRUNC do
+    b = b :. round(((2 * m + 1) * a * b[m] + m * b[m - 1]) / (s0 * (m + 1)), prec, RN);
+  G = 0;
+  for j from TRUNC to 0 by -1 do G = G * x + b[j + 1] / (j + 2);
+  p = fpminimax(G, DEG, [|D, D, D, D, D, D, D, D, D|], [-T; T], absolute);
+  rho = (1 - a) / 2;
+  M = 1 / sqrt(rho * (1 + a - rho));
+  rem = M / rho * (T / rho)^(TRUNC + 1) / ((TRUNC + 3) * (1 - T / rho));
+  for j from 0 to DEG do
+    print(name("g", k, j), coeff(p, j));
+  print(name("u", k, 0), round(sup(supnorm(p, G, [-T; T], absolute, 2^-40)), 24, RU));
+  print(name("r", k, 0), round(rem, 24, RU));
+};
+
+// Segment 0.
+procedure binom_term(n) { return fact(2 * n) / (4^n * fact(n)^2 * (2 * n + 1)); };
+P = 0;
+for n from 20 to 1 by -1 do P = P * x + binom_term(n);
+q = fpminimax(P, 3, [|D, D, D, D|], [0; T^2], relative);
+for j from 0 to 3 do print(name("p", 0, j), coeff(q, j));
+print(name("v", 0, 0), round(sup(supnorm(q, P, [0; T^2], relative, 2^-40)), 24, RU));
+print(name("w", 0, 0), round(binom_term(21) * (T^2)^20 / (1 - T^2) / binom_term(1), 24, RU));
+quit;

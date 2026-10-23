@@ -13,9 +13,13 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use morphiq_numerics::elementary::{
-    exp, exp_slice, exp2, exp2_slice, expm1, expm1_slice, ln, ln_1p, ln_1p_slice, ln_slice,
+    asin, asin_slice, asinh, asinh_slice, atan2, atan2_slice, exp, exp_slice, exp2, exp2_slice,
+    expm1, expm1_slice, ln, ln_1p, ln_1p_slice, ln_slice,
 };
 use morphiq_numerics_reference::Words;
+
+/// A batched function over paired arguments.
+type PairedFn<'a> = &'a dyn Fn(&[f64], &[f64], &mut [f64]);
 
 const N: usize = 4096;
 const ROUNDS: usize = 31;
@@ -68,6 +72,44 @@ fn row(
     println!("| `{name}` | {range} | {s:.2} | {b:.2} | {:.2}× |", s / b);
 }
 
+/// [`row`] for `atan2` over paired arguments.
+fn row2(name: &str, range: &str, ys: &[f64], xs: &[f64]) {
+    let mut out = vec![0.0; xs.len()];
+    let pairs = |f: PairedFn<'_>, ys: &[f64], xs: &[f64], out: &mut [f64]| {
+        let start = Instant::now();
+        f(black_box(ys), black_box(xs), out);
+        let once = start.elapsed().as_secs_f64().max(1e-7);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let reps = ((0.01 / once) as usize).max(1);
+        let mut times: Vec<f64> = (0..ROUNDS)
+            .map(|_| {
+                let start = Instant::now();
+                for _ in 0..reps {
+                    f(black_box(ys), black_box(xs), out);
+                    black_box(&mut *out);
+                }
+                #[allow(clippy::cast_precision_loss)]
+                let per = start.elapsed().as_secs_f64() * 1e9 / (reps * xs.len()) as f64;
+                per
+            })
+            .collect();
+        times.sort_by(f64::total_cmp);
+        times[ROUNDS / 2]
+    };
+    let s = pairs(
+        &|ys, xs, out| {
+            for ((o, &y), &x) in out.iter_mut().zip(ys).zip(xs) {
+                *o = atan2(y, x);
+            }
+        },
+        ys,
+        xs,
+        &mut out,
+    );
+    let b = pairs(&|ys, xs, out| atan2_slice(ys, xs, out), ys, xs, &mut out);
+    println!("| `{name}` | {range} | {s:.2} | {b:.2} | {:.2}× |", s / b);
+}
+
 fn main() {
     if let Some(arg) = std::env::args().nth(1) {
         if arg == "--help" || arg == "-h" {
@@ -109,6 +151,25 @@ fn main() {
     let ln1p_large: Vec<f64> = (0..N)
         .map(|_| f64::from_bits(0x7fb0_0000_0000_0000 + words.next_word() % (1 << 54)))
         .collect();
+    let asin_domain: Vec<f64> = (0..N).map(|_| 2.0 * unit(&mut words) - 1.0).collect();
+    let asin_complement: Vec<f64> = (0..N).map(|_| 0.71 + 0.29 * unit(&mut words)).collect();
+    let asin_series: Vec<f64> = (0..N).map(|_| 0.0078 * unit(&mut words) + 1e-7).collect();
+    let asinh_series: Vec<f64> = (0..N).map(|_| 0.0078 * unit(&mut words) + 1e-7).collect();
+    let asinh_middle: Vec<f64> = (0..N)
+        .map(|_| morphiq_numerics::elementary::exp2(-7.0 + 35.0 * unit(&mut words)))
+        .collect();
+    let asinh_large: Vec<f64> = (0..N)
+        .map(|_| morphiq_numerics::elementary::exp2(28.0 + 990.0 * unit(&mut words)))
+        .collect();
+    let asinh_signed: Vec<f64> = (0..N).map(|_| 16.0 * unit(&mut words) - 8.0).collect();
+    let atan_x: Vec<f64> = (0..N).map(|_| 2.0 * unit(&mut words) - 1.0).collect();
+    let atan_y: Vec<f64> = (0..N).map(|_| 2.0 * unit(&mut words) - 1.0).collect();
+    let atan_far_x: Vec<f64> = (0..N)
+        .map(|_| morphiq_numerics::elementary::exp2(-60.0 + 120.0 * unit(&mut words)))
+        .collect();
+    let atan_far_y: Vec<f64> = (0..N)
+        .map(|_| morphiq_numerics::elementary::exp2(-60.0 + 120.0 * unit(&mut words)))
+        .collect();
     println!("| Function | Arguments | Scalar loop (ns) | Batched (ns) | Speed-up |");
     println!("|---|---|---|---|---|");
     row("exp", "`[−30, 0]`", &d, exp, exp_slice);
@@ -131,4 +192,42 @@ fn main() {
     row("expm1", "`[−30, 0]`", &d, expm1, expm1_slice);
     row("expm1", "`[−1/32, 1/32]`", &small, expm1, expm1_slice);
     row("expm1", "`[−37.4, 709]`", &expm1_domain, expm1, expm1_slice);
+    row("asin", "`[−1, 1]`", &asin_domain, asin, asin_slice);
+    row(
+        "asin",
+        "`[0.71, 1]`, the complement",
+        &asin_complement,
+        asin,
+        asin_slice,
+    );
+    row("asin", "`[10^-7, 0.0078]`", &asin_series, asin, asin_slice);
+    row(
+        "asinh",
+        "`[10^-7, 0.0078]`, the series",
+        &asinh_series,
+        asinh,
+        asinh_slice,
+    );
+    row(
+        "asinh",
+        "`[2^-7, 2^28]`, log-uniform",
+        &asinh_middle,
+        asinh,
+        asinh_slice,
+    );
+    row(
+        "asinh",
+        "`[2^28, 2^1018]`, log-uniform",
+        &asinh_large,
+        asinh,
+        asinh_slice,
+    );
+    row("asinh", "`[−8, 8]`", &asinh_signed, asinh, asinh_slice);
+    row2("atan2", "`y, x ∈ [−1, 1]`", &atan_y, &atan_x);
+    row2(
+        "atan2",
+        "`y, x` log-uniform in `[2^-60, 2^60]`",
+        &atan_far_y,
+        &atan_far_x,
+    );
 }
