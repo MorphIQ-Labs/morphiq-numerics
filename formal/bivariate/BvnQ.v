@@ -1,0 +1,99 @@
+(** The exponent function of the Plackett integrand,
+    [Qf r p S = (r/2 - p S) / (1 - S^2)], and the facts about it that the node
+    error lemmas use. *)
+From Coq Require Import Reals Lra Psatz ZArith Lia.
+From Flocq Require Import Core.
+Require Import BvnRound.
+Open Scope R_scope.
+
+Definition Qf (r p S : R) : R := (r / 2 - p * S) / (1 - S * S).
+
+(** [sin] is 1-Lipschitz. *)
+Lemma sin_lip_lt a b : a < b -> Rabs (sin b - sin a) <= Rabs (b - a).
+Proof.
+  intros H.
+  destruct (MVT_cor2 sin cos a b H (fun c _ => derivable_pt_lim_sin c)) as [c [E _]].
+  rewrite E, Rabs_mult.
+  assert (Hc : Rabs (cos c) <= 1) by (apply Rabs_le; apply COS_bound).
+  pose proof (Rabs_pos (b - a)). nra.
+Qed.
+
+Lemma sin_lip a b : Rabs (sin a - sin b) <= Rabs (a - b).
+Proof.
+  destruct (Rtotal_order a b) as [H | [H | H]].
+  - pose proof (sin_lip_lt a b H). rewrite Rabs_minus_sym. rewrite (Rabs_minus_sym a b). exact H0.
+  - subst. replace (sin b - sin b) with 0 by ring. rewrite Rabs_R0. apply Rabs_pos.
+  - exact (sin_lip_lt b a H).
+Qed.
+
+(** The exponent at a perturbed [S] against the exponent at [s], relative to
+    the latter, for every [p] with [|p| <= r/2]. *)
+Lemma Q_diff r p S s : 0 <= r -> Rabs p <= r / 2 -> Rabs S < 1 -> Rabs s < 1 ->
+  Rabs (Qf r p S - Qf r p s) <= Rabs (S - s) / (1 - Rabs S) * Qf r p s.
+Proof.
+  intros Hr Hp HS Hs.
+  apply Rabs_le_inv in Hp.
+  pose proof (Rabs_pos S) as HSa. pose proof (Rabs_pos s) as Hsa.
+  assert (HS1 : -1 < S < 1) by (apply Rabs_lt_between; exact HS).
+  assert (Hs1 : -1 < s < 1) by (apply Rabs_lt_between; exact Hs).
+  assert (HD1 : 0 < 1 - S * S) by nra.
+  assert (HD2 : 0 < 1 - s * s) by nra.
+  set (A := r / 2 * (S + s) - p * (1 + S * s)).
+  assert (Hdiff : Qf r p S - Qf r p s = (S - s) * A / ((1 - S * S) * (1 - s * s))).
+  { unfold Qf, A. field. split; lra. }
+  set (a1 := r / 2 - p). set (a2 := r / 2 + p).
+  assert (Ha1 : 0 <= a1) by (unfold a1; lra).
+  assert (Ha2 : 0 <= a2) by (unfold a2; lra).
+  assert (HA : A = a1 * (1 + S) * (1 + s) / 2 - a2 * (1 - S) * (1 - s) / 2).
+  { unfold A, a1, a2. field. }
+  assert (HN : r / 2 - p * s = a1 * (1 + s) / 2 + a2 * (1 - s) / 2).
+  { unfold a1, a2. field. }
+  assert (Hs1p : 0 <= 1 + s) by lra.
+  assert (Hs1m : 0 <= 1 - s) by lra.
+  assert (HSa1 : 0 <= Rabs S - S) by (pose proof (Rle_abs S); lra).
+  assert (HSa2 : 0 <= Rabs S + S) by (pose proof (Rle_abs (- S)); rewrite Rabs_Ropp in H; lra).
+  assert (T1 : 0 <= a1 * (1 + s) * (Rabs S - S)) by (apply Rmult_le_pos; [apply Rmult_le_pos |]; assumption).
+  assert (T2 : 0 <= a2 * (1 - s) * (2 + Rabs S - S)) by (apply Rmult_le_pos; [apply Rmult_le_pos | lra]; assumption).
+  assert (T3 : 0 <= a1 * (1 + s) * (2 + Rabs S + S)) by (apply Rmult_le_pos; [apply Rmult_le_pos | lra]; assumption).
+  assert (T4 : 0 <= a2 * (1 - s) * (Rabs S + S)) by (apply Rmult_le_pos; [apply Rmult_le_pos |]; assumption).
+  assert (HAb : Rabs A <= (1 + Rabs S) * (r / 2 - p * s)).
+  { rewrite HN. rewrite HA.
+    rewrite Rabs_le_between. split; nra. }
+  assert (HQ : Qf r p s = (r / 2 - p * s) / (1 - s * s)) by reflexivity.
+  assert (HNN : 0 <= r / 2 - p * s).
+  { rewrite HN. assert (0 <= a1 * (1 + s)) by (apply Rmult_le_pos; assumption).
+    assert (0 <= a2 * (1 - s)) by (apply Rmult_le_pos; assumption). lra. }
+  rewrite Hdiff, HQ.
+  assert (HD : 0 < (1 - S * S) * (1 - s * s)) by nra.
+  rewrite Rabs_div_pos by exact HD. rewrite Rabs_mult.
+  assert (H1S : 0 < 1 - Rabs S) by lra.
+  assert (Hden : 1 - S * S = (1 - Rabs S) * (1 + Rabs S)).
+  { pose proof (Rabs_sq S). nra. }
+  assert (Hstep : Rabs (S - s) * Rabs A / ((1 - S * S) * (1 - s * s))
+                  <= Rabs (S - s) * ((1 + Rabs S) * (r / 2 - p * s)) / ((1 - S * S) * (1 - s * s))).
+  { unfold Rdiv. apply Rmult_le_compat_r; [apply Rlt_le, Rinv_0_lt_compat; exact HD |].
+    apply Rmult_le_compat_l; [apply Rabs_pos | exact HAb]. }
+  eapply Rle_trans; [exact Hstep |].
+  right. rewrite Hden. field. split; [lra | split; [lra | lra]].
+Qed.
+
+Lemma Qf_nonneg r p s : 0 <= r -> Rabs p <= r / 2 -> Rabs s < 1 -> 0 <= Qf r p s.
+Proof.
+  intros Hr Hp Hs. unfold Qf.
+  assert (Hs1 : -1 < s < 1) by (apply Rabs_lt_between; exact Hs).
+  destruct Hs1 as [Hs1a Hs1b].
+  apply Rmult_le_pos; [| apply Rlt_le, Rinv_0_lt_compat; nra].
+  assert (Hps : Rabs (p * s) <= r / 2).
+  { rewrite Rabs_mult. pose proof (Rabs_pos p). pose proof (Rabs_pos s). nra. }
+  apply Rabs_le_inv in Hps. lra.
+Qed.
+
+Lemma exp_two_sided e D : 0 <= e -> e <= 1 -> 0 <= D -> (1 + e) * exp D + (1 - e) * exp (- D) >= 2.
+Proof.
+  intros He He1 HD.
+  pose proof (exp_ineq1_le D) as H1. pose proof (exp_ineq1_le (- D)) as H2.
+  assert (h1 : (1 + e) * (1 + D) <= (1 + e) * exp D) by (apply Rmult_le_compat_l; lra).
+  assert (h2 : (1 - e) * (1 + - D) <= (1 - e) * exp (- D)) by (apply Rmult_le_compat_l; lra).
+  assert (h3 : 0 <= e * D) by (apply Rmult_le_pos; lra).
+  nra.
+Qed.
