@@ -33,7 +33,7 @@ OUT = ROOT / 'crates/reference/fixtures/bivariate_normal.json'
 
 PRECISIONS = (280, 360)
 DIGITS = 36
-RULE_LIMITS = (0.055, 0.20, 0.38, 0.54, 0.66, 0.75, 0.81, 0.89)
+RULE_LIMITS = (0.20, 0.29, 0.66, 0.75, 0.89)
 ONE_MINUS = [2.0 ** -k for k in (20, 30, 40, 50, 52)]
 RHOS = sorted({
     0.0, 2.0 ** -40, 2.0 ** -20, 0.01, 0.09, 0.0900000000000001, 0.1, 0.3, 0.3000000000000001,
@@ -67,6 +67,15 @@ PEAK = [(h, k, rho)
         for h, k in ((-0.21101192279835226, -0.0014549743776884816),
                      (-0.0014549743776884816, -0.21101192279835226),
                      (-0.2, -0.001), (-0.38, 0.0), (0.21101192279835226, 0.0014549743776884816))]
+# Probabilities of 1e-5 to 1e-25 in the lower tails, where the relative accuracy of a
+# result follows the node count of the rule (docs/bivariate_normal.md section 4):
+# the cases on which a rule shorter than the canonical Genz implementation's loses
+# by orders of magnitude. The correlations straddle each rule's band.
+TAIL = [(h, k, rho)
+        for rho in (0.01, 0.05, 0.1, 0.25, 0.3, 0.45, 0.5, 0.6, 0.7, 0.78, 0.85, 0.9,
+                    -0.05, -0.3, -0.5, -0.78, -0.85)
+        for h, k in ((-4.0, -4.0), (-6.0, -6.0), (-8.0, -8.0), (-8.0, 3.0), (-10.0, 2.0),
+                     (-9.0, -4.0), (-12.0, 0.0))]
 FERRO = ROOT / 'generators/bivariate_normal_ferro_inputs.json'
 
 
@@ -192,6 +201,8 @@ def cases():
     for row in json.loads(FERRO.read_text())['rows']:
         h, k, rho = (from_bits(int(row[name], 16)) for name in ('h', 'k', 'rho'))
         out.append((h, k, rho, 'ferro', (row['family'], row['status'], row['value'])))
+    for h, k, rho in TAIL:
+        out.append((h, k, rho, 'tail', None))
     return out
 
 

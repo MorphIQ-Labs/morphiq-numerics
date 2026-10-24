@@ -27,9 +27,8 @@ use trace::{asin, exp, norm_cdf, sin};
 mod lanes;
 mod tables;
 use tables::{
-    GL4_W, GL4_X, GL6_W, GL6_X, GL8_W, GL8_X, GL10_W, GL10_X, GL12_W, GL12_X, GL14_W, GL14_X,
-    GL15_W, GL15_W0, GL15_XM, GL15_XP, GL16_W, GL16_X, GL16_XM, GL16_XP, GL20_W, GL20_X, GL24_W,
-    GL24_X,
+    GL6_W, GL6_X, GL8_W, GL8_X, GL12_W, GL12_X, GL14_W, GL14_X, GL15_W, GL15_W0, GL15_XM, GL15_XP,
+    GL16_W, GL16_XM, GL16_XP, GL20_W, GL20_X, GL24_W, GL24_X,
 };
 
 #[cfg(test)]
@@ -42,17 +41,16 @@ pub(crate) mod trace;
 pub const ABSOLUTE_ERROR_BOUND: f64 = 3.721e-16;
 
 /// The proved bound of each low-correlation rule, indexed like
-/// [`LOW_RULE_LIMITS`]: `190, 207, 231, 257, 276, 295, 309, 348, 372` times
-/// `1e-18` (`formal/bivariate/BvnBudget.v`, `low_4` to `low_24`), each rounded
-/// up in the fourth digit.
-const LOW_RULE_BOUNDS: [f64; 9] = [
-    1.901e-16, 2.071e-16, 2.311e-16, 2.571e-16, 2.761e-16, 2.951e-16, 3.091e-16, 3.481e-16,
-    3.721e-16,
+/// [`LOW_RULE_LIMITS`]: `207, 231, 276, 295, 348, 372` times `1e-18`
+/// (`formal/bivariate/BvnBudget.v`, `low_6` to `low_24`), each rounded up in the
+/// fourth digit.
+const LOW_RULE_BOUNDS: [f64; 6] = [
+    2.071e-16, 2.311e-16, 2.761e-16, 2.951e-16, 3.481e-16, 3.721e-16,
 ];
 
-/// The largest `|rho|` each low-correlation rule serves; the last rule serves up
-/// to the Genz split.
-const LOW_RULE_LIMITS: [f64; 8] = [0.055, 0.20, 0.38, 0.54, 0.66, 0.75, 0.81, 0.89];
+/// The `|rho|` each low-correlation rule stays below; the last rule serves up to
+/// the Genz split.
+const LOW_RULE_LIMITS: [f64; 5] = [0.20, 0.29, 0.66, 0.75, 0.89];
 
 /// The bound of the closed-form regimes: the independent product
 /// `Phi(x) Phi(y)` and the countermonotone difference carry two `norm_cdf`
@@ -144,25 +142,24 @@ impl Regime {
     }
 }
 
-/// The least rule whose proved Bernstein-ellipse truncation bound is at or
-/// below `2e-17` for `|rho|` up to its limit (`docs/bivariate_normal.md`
-/// section 4, `docs/bivariate_normal_truncation.md`).
+/// The least rule that has a proved Bernstein-ellipse truncation bound at or
+/// below `2e-17` for `|rho|` up to its limit and at least as many nodes as the
+/// canonical Genz implementation uses there (6 below 0.3, 12 up to 0.75, 20
+/// above): the tails' relative accuracy follows the node count
+/// (`docs/bivariate_normal.md` section 4, `docs/bivariate_normal_truncation.md`).
 fn low_correlation_rule(rho: f64) -> (&'static [f64], &'static [f64]) {
-    const RULES: [(&[f64], &[f64]); 9] = [
-        (&GL4_X, &GL4_W),
+    const RULES: [(&[f64], &[f64]); 6] = [
         (&GL6_X, &GL6_W),
         (&GL8_X, &GL8_W),
-        (&GL10_X, &GL10_W),
         (&GL12_X, &GL12_W),
         (&GL14_X, &GL14_W),
-        (&GL16_X, &GL16_W),
         (&GL20_X, &GL20_W),
         (&GL24_X, &GL24_W),
     ];
     let m = rho.abs();
     let index = LOW_RULE_LIMITS
         .iter()
-        .position(|&limit| m <= limit)
+        .position(|&limit| m < limit)
         .unwrap_or(LOW_RULE_LIMITS.len());
     RULES[index]
 }
@@ -463,15 +460,12 @@ fn regime_bound(regime: Regime, nodes: usize, rho: f64) -> f64 {
 /// The index of the low rule with this many nodes.
 fn rule_index(nodes: usize) -> usize {
     match nodes {
-        4 => 0,
-        6 => 1,
-        8 => 2,
-        10 => 3,
-        12 => 4,
-        14 => 5,
-        16 => 6,
-        20 => 7,
-        _ => 8,
+        6 => 0,
+        8 => 1,
+        12 => 2,
+        14 => 3,
+        20 => 4,
+        _ => 5,
     }
 }
 

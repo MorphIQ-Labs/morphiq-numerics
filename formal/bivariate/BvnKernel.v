@@ -71,8 +71,8 @@ Definition khk_cutoff := aw 0x4059000000000000.
 
 (** [LOW_RULE_LIMITS]. *)
 Definition low_rule_limits : list Z :=
-  [0x3fac28f5c28f5c29; 0x3fc999999999999a; 0x3fd851eb851eb852; 0x3fe147ae147ae148;
-   0x3fe51eb851eb851f; 0x3fe8000000000000; 0x3fe9eb851eb851ec; 0x3fec7ae147ae147b].
+  [0x3fc999999999999a; 0x3fd28f5c28f5c28f; 0x3fe51eb851eb851f; 0x3fe8000000000000;
+   0x3fec7ae147ae147b].
 
 (** The comparisons of Rust's [f64] operators: false for a NaN operand. *)
 Definition fcmp (x y : f64) : option comparison := Bcompare 53 1024 x y.
@@ -119,14 +119,14 @@ Definition clamp_to_probability (v : f64) : f64 :=
 
 (** The rules, in the order of [low_correlation_rule]. *)
 Definition low_rules : list (list Z * list Z) :=
-  [(gl4_x, gl4_w); (gl6_x, gl6_w); (gl8_x, gl8_w); (gl10_x, gl10_w); (gl12_x, gl12_w);
-   (gl14_x, gl14_w); (gl16_x, gl16_w); (gl20_x, gl20_w); (gl24_x, gl24_w)].
+  [(gl6_x, gl6_w); (gl8_x, gl8_w); (gl12_x, gl12_w); (gl14_x, gl14_w); (gl20_x, gl20_w);
+   (gl24_x, gl24_w)].
 
-(** The index of the first limit [|rho|] is at or below, or the last rule's. *)
+(** The index of the first limit [|rho|] is below, or the last rule's. *)
 Fixpoint low_rule_index (m : f64) (limits : list Z) : nat :=
   match limits with
   | [] => 0
-  | l :: rest => if fle m (aw l) then 0%nat else S (low_rule_index m rest)
+  | l :: rest => if flt m (aw l) then 0%nat else S (low_rule_index m rest)
   end.
 
 Definition low_correlation_rule (rho : f64) : list Z * list Z :=

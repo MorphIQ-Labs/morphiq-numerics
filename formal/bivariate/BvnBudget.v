@@ -22,40 +22,6 @@ Ltac all_brs := repeat (apply List.Forall_cons; [br_goals |]); apply List.Forall
 Ltac sum_goal :=
   unfold gcl, theta_of, B0, u; cbn [dtaulo dtauhi dwhi dk dbr]; simpl; interval with (i_prec 64).
 
-Lemma dat_ok_4 : List.Forall (dat_ok A4) dats_4.
-Proof. unfold dats_4. all_dats. Qed.
-Lemma br_ok_4 : List.Forall (br_ok A4 B0) dats_4.
-Proof. unfold dats_4. all_brs. Qed.
-Lemma sum_4 : A4 / (4 * PI) * sumD (gcl A4 B0) dats_4 <= 583 / 10 ^ 20.
-Proof. unfold dats_4. simpl. unfold A4. sum_goal. Qed.
-Lemma trunc_4 : trunc_bound A4 R4 4 / (2 * PI) <= 161 / 10 ^ 19.
-Proof. unfold trunc_bound, A4, R4. interval with (i_prec 64). Qed.
-Lemma shift_4 : (bpow radix2 (-4 - 54) + bpow radix2 (-62) * bpow radix2 (-4)) / (2 * PI) <= 571 / 10 ^ 21.
-Proof. simpl. interval with (i_prec 64). Qed.
-Lemma bd_4 : bpow radix2 (-54) + bpow radix2 (-900) + bpow radix2 (-90) + 2 * eP + (583 / 10 ^ 20) + 200 * z + (161 / 10 ^ 19) + (571 / 10 ^ 21) <= 190 / 10 ^ 18.
-Proof. unfold eP, z. simpl. interval with (i_prec 100). Qed.
-
-Theorem low_4 (expI sinI : R -> R) (x y rho asr Phix Phiy pxI pyI : R) (nodes : list NodeS) :
-  exp_contract expI -> sin_contract sinI ->
-  Rabs rho <= 55/1000 -> bpow radix2 (-52) <= Rabs rho ->
-  fmtF x -> fmtF y -> Rabs x <= 64 -> Rabs y <= 64 ->
-  0 <= Phix <= 1 -> 0 <= Phiy <= 1 -> fmtF pxI -> fmtF pyI -> 0 <= pxI <= 1 -> 0 <= pyI <= 1 ->
-  Rabs (pxI - Phix) <= eP -> Rabs (pyI - Phiy) <= eP ->
-  (exists Za, asr = rndF Za /\ Rabs (Za - asin rho) <= bpow radix2 (-62) * Rabs (asin rho)) ->
-  List.Forall2 (ok A4 (rndF (asr / (2 * TAU)))) nodes dats_4 -> (length nodes <= 24)%nat ->
-  0 <= Phix * Phiy + Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI) <= 1 ->
-  Rabs (Iint (x * x + y * y) (x * y) asr - asr / 2 * sumR (map (fun n => nW n * exp (- Qn x y asr n)) nodes)) <= trunc_bound A4 R4 4 ->
-  Rabs (Rhat expI sinI x y asr nodes pxI pyI - (Phix * Phiy + Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI))) <= 190 / 10 ^ 18.
-Proof.
-  intros Hexp Hsin Hrho Hrlow Fx Fy Hx Hy HPx HPy Fpx Fpy Hpx Hpy Epx Epy Hasin Hall Hlen Hprob HT1.
-  assert (HAc : sin A4 >= 55/1000 + 2 / 10000) by (destruct (asin_cover_4) as [Hc _]; exact Hc).
-  exact (low_rule expI sinI x y rho asr (55/1000) A4 (trunc_bound A4 R4 4)
-    (583 / 10 ^ 20) (161 / 10 ^ 19) (571 / 10 ^ 21) (190 / 10 ^ 18) (-4)%Z pxI pyI Phix Phiy nodes dats_4
-    Hexp Hsin ltac:(lra) ltac:(unfold A4; lra) ltac:(unfold A4; lra) ltac:(lia) ltac:(lia) ltac:(unfold A4; simpl; lra)
-    dat_ok_4 br_ok_4 sum_4 ltac:(lra) trunc_4 shift_4 bd_4
-    Hrho Hrlow Fx Fy Hx Hy HPx HPy Fpx Fpy Hpx Hpy Epx Epy Hasin Hall Hlen Hprob HT1).
-Qed.
-
 Lemma dat_ok_6 : List.Forall (dat_ok A6) dats_6.
 Proof. unfold dats_6. all_dats. Qed.
 Lemma br_ok_6 : List.Forall (br_ok A6 B0) dats_6.
@@ -124,40 +90,6 @@ Proof.
     Hrho Hrlow Fx Fy Hx Hy HPx HPy Fpx Fpy Hpx Hpy Epx Epy Hasin Hall Hlen Hprob HT1).
 Qed.
 
-Lemma dat_ok_10 : List.Forall (dat_ok A10) dats_10.
-Proof. unfold dats_10. all_dats. Qed.
-Lemma br_ok_10 : List.Forall (br_ok A10 B0) dats_10.
-Proof. unfold dats_10. all_brs. Qed.
-Lemma sum_10 : A10 / (4 * PI) * sumD (gcl A10 B0) dats_10 <= 629 / 10 ^ 19.
-Proof. unfold dats_10. simpl. unfold A10. sum_goal. Qed.
-Lemma trunc_10 : trunc_bound A10 R10 10 / (2 * PI) <= 164 / 10 ^ 19.
-Proof. unfold trunc_bound, A10, R10. interval with (i_prec 64). Qed.
-Lemma shift_10 : (bpow radix2 (0 - 54) + bpow radix2 (-62) * bpow radix2 (0)) / (2 * PI) <= 914 / 10 ^ 20.
-Proof. simpl. interval with (i_prec 64). Qed.
-Lemma bd_10 : bpow radix2 (-54) + bpow radix2 (-900) + bpow radix2 (-90) + 2 * eP + (629 / 10 ^ 19) + 200 * z + (164 / 10 ^ 19) + (914 / 10 ^ 20) <= 257 / 10 ^ 18.
-Proof. unfold eP, z. simpl. interval with (i_prec 100). Qed.
-
-Theorem low_10 (expI sinI : R -> R) (x y rho asr Phix Phiy pxI pyI : R) (nodes : list NodeS) :
-  exp_contract expI -> sin_contract sinI ->
-  Rabs rho <= 54/100 -> bpow radix2 (-52) <= Rabs rho ->
-  fmtF x -> fmtF y -> Rabs x <= 64 -> Rabs y <= 64 ->
-  0 <= Phix <= 1 -> 0 <= Phiy <= 1 -> fmtF pxI -> fmtF pyI -> 0 <= pxI <= 1 -> 0 <= pyI <= 1 ->
-  Rabs (pxI - Phix) <= eP -> Rabs (pyI - Phiy) <= eP ->
-  (exists Za, asr = rndF Za /\ Rabs (Za - asin rho) <= bpow radix2 (-62) * Rabs (asin rho)) ->
-  List.Forall2 (ok A10 (rndF (asr / (2 * TAU)))) nodes dats_10 -> (length nodes <= 24)%nat ->
-  0 <= Phix * Phiy + Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI) <= 1 ->
-  Rabs (Iint (x * x + y * y) (x * y) asr - asr / 2 * sumR (map (fun n => nW n * exp (- Qn x y asr n)) nodes)) <= trunc_bound A10 R10 10 ->
-  Rabs (Rhat expI sinI x y asr nodes pxI pyI - (Phix * Phiy + Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI))) <= 257 / 10 ^ 18.
-Proof.
-  intros Hexp Hsin Hrho Hrlow Fx Fy Hx Hy HPx HPy Fpx Fpy Hpx Hpy Epx Epy Hasin Hall Hlen Hprob HT1.
-  assert (HAc : sin A10 >= 54/100 + 2 / 10000) by (destruct (asin_cover_10) as [Hc _]; exact Hc).
-  exact (low_rule expI sinI x y rho asr (54/100) A10 (trunc_bound A10 R10 10)
-    (629 / 10 ^ 19) (164 / 10 ^ 19) (914 / 10 ^ 20) (257 / 10 ^ 18) (0)%Z pxI pyI Phix Phiy nodes dats_10
-    Hexp Hsin ltac:(lra) ltac:(unfold A10; lra) ltac:(unfold A10; lra) ltac:(lia) ltac:(lia) ltac:(unfold A10; simpl; lra)
-    dat_ok_10 br_ok_10 sum_10 ltac:(lra) trunc_10 shift_10 bd_10
-    Hrho Hrlow Fx Fy Hx Hy HPx HPy Fpx Fpy Hpx Hpy Epx Epy Hasin Hall Hlen Hprob HT1).
-Qed.
-
 Lemma dat_ok_12 : List.Forall (dat_ok A12) dats_12.
 Proof. unfold dats_12. all_dats. Qed.
 Lemma br_ok_12 : List.Forall (br_ok A12 B0) dats_12.
@@ -223,40 +155,6 @@ Proof.
     (101 / 10 ^ 18) (161 / 10 ^ 19) (914 / 10 ^ 20) (295 / 10 ^ 18) (0)%Z pxI pyI Phix Phiy nodes dats_14
     Hexp Hsin ltac:(lra) ltac:(unfold A14; lra) ltac:(unfold A14; lra) ltac:(lia) ltac:(lia) ltac:(unfold A14; simpl; lra)
     dat_ok_14 br_ok_14 sum_14 ltac:(lra) trunc_14 shift_14 bd_14
-    Hrho Hrlow Fx Fy Hx Hy HPx HPy Fpx Fpy Hpx Hpy Epx Epy Hasin Hall Hlen Hprob HT1).
-Qed.
-
-Lemma dat_ok_16 : List.Forall (dat_ok A16) dats_16.
-Proof. unfold dats_16. all_dats. Qed.
-Lemma br_ok_16 : List.Forall (br_ok A16 B0) dats_16.
-Proof. unfold dats_16. all_brs. Qed.
-Lemma sum_16 : A16 / (4 * PI) * sumD (gcl A16 B0) dats_16 <= 116 / 10 ^ 18.
-Proof. unfold dats_16. simpl. unfold A16. sum_goal. Qed.
-Lemma trunc_16 : trunc_bound A16 R16 16 / (2 * PI) <= 153 / 10 ^ 19.
-Proof. unfold trunc_bound, A16, R16. interval with (i_prec 64). Qed.
-Lemma shift_16 : (bpow radix2 (0 - 54) + bpow radix2 (-62) * bpow radix2 (0)) / (2 * PI) <= 914 / 10 ^ 20.
-Proof. simpl. interval with (i_prec 64). Qed.
-Lemma bd_16 : bpow radix2 (-54) + bpow radix2 (-900) + bpow radix2 (-90) + 2 * eP + (116 / 10 ^ 18) + 200 * z + (153 / 10 ^ 19) + (914 / 10 ^ 20) <= 309 / 10 ^ 18.
-Proof. unfold eP, z. simpl. interval with (i_prec 100). Qed.
-
-Theorem low_16 (expI sinI : R -> R) (x y rho asr Phix Phiy pxI pyI : R) (nodes : list NodeS) :
-  exp_contract expI -> sin_contract sinI ->
-  Rabs rho <= 81/100 -> bpow radix2 (-52) <= Rabs rho ->
-  fmtF x -> fmtF y -> Rabs x <= 64 -> Rabs y <= 64 ->
-  0 <= Phix <= 1 -> 0 <= Phiy <= 1 -> fmtF pxI -> fmtF pyI -> 0 <= pxI <= 1 -> 0 <= pyI <= 1 ->
-  Rabs (pxI - Phix) <= eP -> Rabs (pyI - Phiy) <= eP ->
-  (exists Za, asr = rndF Za /\ Rabs (Za - asin rho) <= bpow radix2 (-62) * Rabs (asin rho)) ->
-  List.Forall2 (ok A16 (rndF (asr / (2 * TAU)))) nodes dats_16 -> (length nodes <= 24)%nat ->
-  0 <= Phix * Phiy + Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI) <= 1 ->
-  Rabs (Iint (x * x + y * y) (x * y) asr - asr / 2 * sumR (map (fun n => nW n * exp (- Qn x y asr n)) nodes)) <= trunc_bound A16 R16 16 ->
-  Rabs (Rhat expI sinI x y asr nodes pxI pyI - (Phix * Phiy + Iint (x * x + y * y) (x * y) (asin rho) / (2 * PI))) <= 309 / 10 ^ 18.
-Proof.
-  intros Hexp Hsin Hrho Hrlow Fx Fy Hx Hy HPx HPy Fpx Fpy Hpx Hpy Epx Epy Hasin Hall Hlen Hprob HT1.
-  assert (HAc : sin A16 >= 81/100 + 2 / 10000) by (destruct (asin_cover_16) as [Hc _]; exact Hc).
-  exact (low_rule expI sinI x y rho asr (81/100) A16 (trunc_bound A16 R16 16)
-    (116 / 10 ^ 18) (153 / 10 ^ 19) (914 / 10 ^ 20) (309 / 10 ^ 18) (0)%Z pxI pyI Phix Phiy nodes dats_16
-    Hexp Hsin ltac:(lra) ltac:(unfold A16; lra) ltac:(unfold A16; lra) ltac:(lia) ltac:(lia) ltac:(unfold A16; simpl; lra)
-    dat_ok_16 br_ok_16 sum_16 ltac:(lra) trunc_16 shift_16 bd_16
     Hrho Hrlow Fx Fy Hx Hy HPx HPy Fpx Fpy Hpx Hpy Epx Epy Hasin Hall Hlen Hprob HT1).
 Qed.
 

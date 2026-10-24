@@ -110,20 +110,28 @@ sum checked at generation time. The generator is replayed by
 `scripts/check_generators.sh`.
 
 The rule order is the smallest whose *proved* truncation bound is at or below
-`2e-17`, one fifth of the published absolute bound. The proof is a
+`2e-17`, one fifth of the published absolute bound, and that has at least as many
+nodes as the canonical Genz implementation uses at the same correlation (6 below
+0.3, 12 below 0.75, 20 from 0.75): the relative accuracy of a small probability in
+the tails follows the node count, and measured against an exact reference the
+shorter rules (4 nodes up to 0.055, 10 up to 0.54, 16 up to 0.81) lost to
+QuantLib's `BivariateCumulativeNormalDistributionWe04DP` by up to six orders of
+magnitude in relative error at thresholds near -8 to -10, with no gain in the
+proved absolute bound. The proof is a
 Bernstein-ellipse estimate of the Gauss-Legendre remainder, with one
 certificate per rule that covers every `|rho|` up to its limit, either sign and
 every pair of thresholds (`docs/bivariate_normal_truncation.md`: the derivation,
 the classical theorems it assumes, and what is machine-checked in
 `formal/bivariate/`). The limits are
 
-| `|rho|` up to | 0.055 | 0.20 | 0.38 | 0.54 | 0.66 | 0.75 | 0.81 | 0.89 | below 0.925 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| nodes | 4 | 6 | 8 | 10 | 12 | 14 | 16 | 20 | 24 |
+| `|rho|` below | 0.20 | 0.29 | 0.66 | 0.75 | 0.89 | 0.925 |
+| --- | --- | --- | --- | --- | --- | --- |
+| nodes | 6 | 8 | 12 | 14 | 20 | 24 |
 
-Each limit is the largest round value for which the certificate closes with a
-small margin; the bound divided by `2 pi` is between `1.2e-17` and `1.6e-17` at
-every limit. A larger limit needs the next rule. The test
+A rule serves the correlations below its limit, which its certificate covers
+(the 8-node rule's certificate closes to 0.38 and is used below 0.29, where the
+12-node band starts; the others close at the limit shown, with the bound divided
+by `2 pi` between `1.2e-17` and `1.6e-17`). The 4-, 10- and 16-node rules are not stored. The test
 `results_are_continuous_across_every_rule_limit` walks every limit at adjacent
 doubles, and the reference fixture has rows on both sides of each.
 
@@ -164,14 +172,14 @@ The terms:
 **Proved bounds, low-correlation branch.** The bound of the rule `|rho|`
 selects, for every threshold pair with `|x|, |y| <= 64`:
 
-| rule (nodes), `|rho|` up to | 4, 0.055 | 6, 0.20 | 8, 0.38 | 10, 0.54 | 12, 0.66 | 14, 0.75 | 16, 0.81 | 20, 0.89 | 24, 0.925 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| bound, `1e-16` | 1.90 | 2.07 | 2.31 | 2.57 | 2.76 | 2.95 | 3.09 | 3.48 | 3.72 |
+| rule (nodes), `|rho|` below | 6, 0.20 | 8, 0.29 | 12, 0.66 | 14, 0.75 | 20, 0.89 | 24, 0.925 |
+| --- | --- | --- | --- | --- | --- | --- |
+| bound, `1e-16` | 2.07 | 2.31 | 2.76 | 2.95 | 3.48 | 3.72 |
 
 `absolute_error_bound(rho)` returns that bound (rounded up in the fourth digit),
 `BoundedProbability::error` carries it, and `ABSOLUTE_ERROR_BOUND = 3.721e-16` is
 the largest. FerroRisk's published `2.5e-16` is therefore proved only up to
-`|rho| <= 0.38`; it was a measured figure, and for the high-correlation branch it
+`|rho| < 0.29`; it was a measured figure, and for the high-correlation branch it
 was false (section 3: `bivariate_norm_cdf(-0.21101192279835226, -0.0014549743776884816, 0.925)`
 was `2.58e-16` from the exact value). The closed-form regimes (independent,
 countermonotone: `1.7e-16`; comonotone and the saturated limits: `5.7e-17`) are
@@ -221,7 +229,7 @@ that differs between `-0` and `+0`; a recorded pair that disagrees fails.) The c
 and `q`): 252 tables (6 independent, 1 comonotone, 1 countermonotone, 118 low, 119 high, 7 invalid), 13 966 values,
 0 mismatches. By the writer's own coverage account (a case may count under several): independent 330, comonotone 55,
 countermonotone 55, invalid correlation 511, NaN threshold 542, saturated below 1 540 and above 1 170, swapped
-arguments 3 203, signed-zero threshold 542 and correlation 73; the low rules of 4, 6, 8, 10, 12, 14, 16, 20 and 24
+arguments 3 203, signed-zero threshold 542 and correlation 73; the low rules of 6, 8, 12, 14, 20 and 24
 nodes 495, 660, 660, 990, 935, 660, 385, 660 and 937, each rule limit with the adjacent doubles either side; the high
 branch for `rho > 0` 1 492 and `rho < 0` 1 889 (`Phi(-dh) > Phi(dk)` in 407 of them, `<=` in 1 347), the `hk >= 100` skip 327, the
 closed form evaluated 1 043 and skipped (`sqrt(bs) >= 20 s`) 2 011, 16-node panels 1 400 and 15-node panels 7 616,
@@ -326,6 +334,58 @@ reading. The lanes' own run is in section 12.
   64-node exact-arithmetic evaluation of the same integral (40 digits), and
   3 000 random high-regime cases against the oracle; the worst errors are in
   section 6.
+
+### 7.1 Against the canonical implementations
+
+The published bound is absolute, as is every other implementation's: NAG's
+`g01hac` (Genz 2004) states "a maximum absolute error of less than 5e-16" and
+says nothing of relative accuracy or the tails; QuantLib's
+`BivariateCumulativeNormalDistributionWe04DP` (the same algorithm) and SciPy's
+`multivariate_normal.cdf` (Genz-style integration, absolute tolerance `abseps`)
+state none either. Measured against an exact reference (a 60-digit adaptive
+Gauss-Legendre integral of Plackett's identity, refined until two successive
+results agree to `1e-45`; six representative points re-run at 75 digits agree to `1e-24` or better), QuantLib 1.44's
+`We04DP` and `Dr78` and SciPy 1.18 on three grids (472 points: correlations
+from -0.9999 to 0.9999, thresholds from -2 to -37, mixed-sign and one-sided
+pairs):
+
+* absolute error, worst: this function `8.6e-17`, `We04DP` `1.9e-16`;
+* relative error where the probability is at least `1e-3`: this function
+  `3.6e-16`, `We04DP` `8.2e-15`, SciPy at `abseps = 1e-14` `6.9e-15`;
+* where the probability is at least `1e-30` (261 rows), there is no row in which
+  this function is both more than 3 times worse than `We04DP` and above `1e-14`
+  in relative error, and it is more than 3 times better, with `We04DP` above
+  `1e-14`, in 80. With the rule set before section 4's change there were 41
+  such rows where it was worse, at correlations where a rule had fewer nodes
+  than Genz's (4 nodes below 0.055, 8 from 0.29 to 0.38, 10 from 0.38 to 0.54,
+  16 from 0.75 to 0.81);
+* `Dr78` (Drezner 1978) is orders of magnitude worse everywhere.
+
+Two regions are not at parity or better, and neither implementation promises
+anything there:
+
+* **Negative correlation in a tail, and every cancellation case.** The integral
+  is subtracted from the product, so the result cancels to the rounding floor;
+  every implementation measured is wrong in relative terms, and this one
+  reports a bound that says so (section 8).
+* **Correlation above 0.925 with both thresholds near -12.** `We04DP` stays
+  relatively accurate (`1e-14` to `1e-16`) for `hk = h k` from 100 to about
+  200, where this function skips the correlation integral (`hk >= 100`,
+  absolute bound `8e-23`) and returns the leading term: at
+  `P(-12, -12; 0.99)` it is `1.6` off in relative terms against `We04DP`'s
+  `5.7e-16`, with an absolute error of `1e-33`. From `hk = 200` on `We04DP`
+  fails the same way (its exponent test passes `-100`). Closing this gap means
+  re-proving the high branch's closed-form and node ranges (`BvnHighClosed`,
+  `BvnHighClosed2`, `BvnHighCF`, `BvnRefineHigh`: `hk <= 100` is a hypothesis
+  of each) out to `hk` of about 200, for a result no one specifies; it is not
+  done.
+
+Not run: Genz's own Fortran `bvnu`/`tvpack`, R's `mvtnorm` (not installed),
+and thresholds beyond 64. The fixture's `tail` rows
+(`generators/bivariate_normal_reference.py`) keep the positive-correlation
+relative accuracy from regressing (`4.7e-9` worst, at 6 nodes where Genz's
+rule has 6), and `no_rule_has_fewer_nodes_than_the_canonical_implementation`
+keeps the node count at or above Genz's at every correlation.
 
 ## 8. The deep-tail negative-correlation corner (ferro-risk #380)
 

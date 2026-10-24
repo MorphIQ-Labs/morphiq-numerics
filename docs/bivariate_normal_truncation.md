@@ -98,7 +98,7 @@ tree's audit lists the same families).
 * `BvnRules.v`: for each `N` in the table below, `sin A >= L + 2e-4`
   (so `A >= asin L` plus margin), `inside_N`, `ellipse_N` (interval arithmetic
   with bisection on `th`) and `bound_N` (premise 3).
-* `BvnTruncation.v`: `certified N L A rho` and the nine theorems
+* `BvnTruncation.v`: `certified N L A rho` and the six theorems
   `certified_N`.
 
 **Not machine-checked:** T1 to T4; the identification of Coq's real
@@ -117,13 +117,10 @@ to be compared with `2e-17`.
 
 | `N` | `|rho|` up to `L` | `A` | `rho_E` | max `|Re sin t|` | proved bound / `2 pi` |
 | --- | --- | --- | --- | --- | --- |
-| 4 | 0.055 | 0.0556 | 76.8 | 0.937 | 1.6e-17 |
 | 6 | 0.200 | 0.2019 | 20.2 | 0.948 | 1.5e-17 |
 | 8 | 0.380 | 0.3903 | 9.9 | 0.968 | 1.6e-17 |
-| 10 | 0.540 | 0.5710 | 6.38 | 0.983 | 1.6e-17 |
 | 12 | 0.660 | 0.7214 | 4.73 | 0.986 | 1.6e-17 |
 | 14 | 0.750 | 0.8486 | 3.82 | 0.993 | 1.6e-17 |
-| 16 | 0.810 | 0.9447 | 3.25 | 0.991 | 1.5e-17 |
 | 20 | 0.890 | 1.0979 | 2.59 | 0.996 | 1.3e-17 |
 | 24 | 0.925 | 1.1816 | 2.22 | 0.989 | 1.2e-17 |
 

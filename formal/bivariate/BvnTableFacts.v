@@ -55,13 +55,13 @@ Proof.
 Qed.
 
 Lemma low_rule_index_le m limits : (low_rule_index m limits <= length limits)%nat.
-Proof. induction limits as [| l r IH]; simpl; [lia |]. destruct (fle m (aw l)); [lia | lia]. Qed.
+Proof. induction limits as [| l r IH]; simpl; [lia |]. destruct (flt m (aw l)); [lia | lia]. Qed.
 
 Lemma low_rule_in rho : In (low_correlation_rule rho) low_rules.
 Proof.
   unfold low_correlation_rule. apply nth_In.
   pose proof (low_rule_index_le (fabs rho) low_rule_limits) as H.
-  change (length low_rule_limits) with 8%nat in H. change (length low_rules) with 9%nat. lia.
+  change (length low_rule_limits) with 5%nat in H. change (length low_rules) with 6%nat. lia.
 Qed.
 
 Lemma low_pairs_finite rho xs ws : low_correlation_rule rho = (xs, ws) ->

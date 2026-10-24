@@ -77,17 +77,14 @@ Total, with `eP = 2^-54 + 2^-112` the distribution function's error:
 
 | rule `N`, `|rho| <=` | proved bound `B` |
 | --- | --- |
-| 4, 0.055 | 1.90e-16 |
 | 6, 0.20 | 2.07e-16 |
 | 8, 0.38 | 2.31e-16 |
-| 10, 0.54 | 2.57e-16 |
 | 12, 0.66 | 2.76e-16 |
 | 14, 0.75 | 2.95e-16 |
-| 16, 0.81 | 3.09e-16 |
 | 20, 0.89 | 3.48e-16 |
 | 24, below 0.925 | 3.72e-16 |
 
-The published `2.5e-16` is proved up to `|rho| <= 0.40` (rules 4, 6, 8); the
+The published `2.5e-16` is proved for `|rho| < 0.29` with the rules used (6 and 8 nodes; the 8-node theorem itself covers `|rho| <= 0.38`); the
 smallest bound proved for the whole branch is `3.72e-16`. The three changes
 against the previous kernel (`5.29e-16` at the top rule) bought, in the order
 the derivation meets them:

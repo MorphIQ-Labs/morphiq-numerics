@@ -192,16 +192,24 @@ fn the_reported_bound_is_the_correlations() {
 /// rule, is the same for both signs, and is NaN where the correlation is invalid.
 #[test]
 fn the_bound_follows_the_selected_rule() {
-    let mut last = 0.0;
-    for limit in LOW_RULE_LIMITS {
-        let inside = absolute_error_bound(limit);
-        assert!(inside > last, "rule bounds increase with the rule");
-        assert_eq!(inside, absolute_error_bound(-limit));
-        last = inside;
+    for (index, limit) in LOW_RULE_LIMITS.into_iter().enumerate() {
+        // A rule serves the correlations below its limit; the limit itself is the next rule's.
+        for sign in [1.0, -1.0] {
+            assert_eq!(
+                absolute_error_bound(sign * limit.next_down()),
+                LOW_RULE_BOUNDS[index]
+            );
+            assert_eq!(
+                absolute_error_bound(sign * limit),
+                LOW_RULE_BOUNDS[index + 1]
+            );
+        }
+        assert!(LOW_RULE_BOUNDS[index] < LOW_RULE_BOUNDS[index + 1]);
     }
-    let top = absolute_error_bound(0.9);
-    assert!(top > last);
-    assert_eq!(top, LOW_RULE_BOUNDS[LOW_RULE_BOUNDS.len() - 1]);
+    assert_eq!(
+        absolute_error_bound(0.9),
+        LOW_RULE_BOUNDS[LOW_RULE_BOUNDS.len() - 1]
+    );
     for rho in [f64::NAN, 1.5, -1.5, f64::INFINITY] {
         assert!(absolute_error_bound(rho).is_nan());
     }
@@ -379,17 +387,7 @@ fn degenerate_correlations_take_their_closed_forms() {
 /// to be continuous to the absolute bound.
 #[test]
 fn results_are_continuous_across_every_rule_limit() {
-    let limits = [
-        0.055,
-        0.20,
-        0.38,
-        0.54,
-        0.66,
-        0.75,
-        0.81,
-        0.89,
-        GENZ_CORRELATION_SPLIT,
-    ];
+    let limits = [0.20, 0.29, 0.66, 0.75, 0.89, GENZ_CORRELATION_SPLIT];
     let points = [
         (0.0, 0.0),
         (1.0, 1.0),
@@ -730,4 +728,37 @@ fn paired_bounded_slice_rejects_slices_of_different_lengths() {
             },
         ],
     );
+}
+
+/// The tails' relative accuracy follows the rule's node count, so no rule has
+/// fewer nodes than the canonical Genz implementation uses at the same
+/// correlation: 6 below 0.3, 12 up to 0.75, 20 above (docs/bivariate_normal.md
+/// section 4). Walked over every correlation of a fine grid and the doubles
+/// next to each Genz threshold.
+#[test]
+fn no_rule_has_fewer_nodes_than_the_canonical_implementation() {
+    let genz = |m: f64| {
+        if m < 0.3 {
+            6
+        } else if m < 0.75 {
+            12
+        } else {
+            20
+        }
+    };
+    let edges = [0.3, 0.75]
+        .into_iter()
+        .flat_map(|e: f64| [e.next_down(), e, e.next_up()]);
+    let rhos = (1..925).map(|i| f64::from(i) / 1000.0).chain(edges);
+    for rho in rhos {
+        for signed in [rho, -rho] {
+            let (_, weights) = low_correlation_rule(signed);
+            assert!(
+                2 * weights.len() >= genz(rho),
+                "{} nodes at {signed}, Genz uses {}",
+                2 * weights.len(),
+                genz(rho)
+            );
+        }
+    }
 }

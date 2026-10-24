@@ -23,7 +23,7 @@ import mpmath as mp
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'crates/morphiq-numerics/src/bivariate_normal/tables.rs'
 COQ_OUTPUT = ROOT / 'formal/bivariate/BvnTables.v'
-ORDERS = (4, 6, 8, 10, 12, 14, 16, 20, 24)
+ORDERS = (6, 8, 12, 14, 20, 24)  # the low-correlation rules
 # The odd order of the high-correlation panels (docs/bivariate_normal_high.md):
 # the (n - 1)/2 positive abscissas and weights as above, and the centre node's
 # weight, whose abscissa is exactly 0.
@@ -32,6 +32,8 @@ ODD_ORDERS = (15,)
 # ((3 + t) / 4)^2 and ((3 - t) / 4)^2 of its positive abscissas t, rounded once
 # from the exact root: a node of the panel of scale s has x^2 = s^2 * unit square.
 PANEL_ORDERS = (15, 16)
+# Stored rules: the low rules (abscissas and weights) and the panel rules (weights and the unit squares).
+ALL_ORDERS = tuple(sorted(set(ORDERS) | set(PANEL_ORDERS) | set(ODD_ORDERS)))
 DPS = 120
 
 
@@ -86,12 +88,12 @@ def generate():
         'Open Scope Z_scope.',
         '',
     ]
-    for n in sorted(ORDERS + ODD_ORDERS, key=lambda n: (n % 2, n)):
+    for n in sorted(ALL_ORDERS, key=lambda n: (n % 2, n)):
         xs, ws, centre = rule(n)
         m = n // 2
         for name, values in (('X', xs), ('W', ws)):
-            if name == 'X' and n in ODD_ORDERS:
-                continue  # only the unit squares and weights are used
+            if name == 'X' and n not in ORDERS:
+                continue  # the panel rules use only the unit squares and weights
             if name == 'X':
                 lines.append(f'/// The {m} positive abscissas of the {n}-point rule')
             elif centre is None:
@@ -140,7 +142,7 @@ def main():
         OUTPUT.parent.mkdir(parents=True, exist_ok=True)
         OUTPUT.write_text(text)
         COQ_OUTPUT.write_text(coq_text)
-    print(f'bivariate_normal_nodes: {len(ORDERS) + len(ODD_ORDERS)} rules')
+    print(f'bivariate_normal_nodes: {len(ALL_ORDERS)} rules')
 
 
 if __name__ == '__main__':

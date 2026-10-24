@@ -838,24 +838,18 @@ Print Assumptions Atan2Entry.entry_y_zero_x_pos.
 Print Assumptions Atan2Entry.pair_classes.
 
 Require BvnEllipse BvnRules BvnTruncation.
-Print Assumptions BvnTruncation.certified_4.
 Print Assumptions BvnTruncation.certified_6.
 Print Assumptions BvnTruncation.certified_8.
-Print Assumptions BvnTruncation.certified_10.
 Print Assumptions BvnTruncation.certified_12.
 Print Assumptions BvnTruncation.certified_14.
-Print Assumptions BvnTruncation.certified_16.
 Print Assumptions BvnTruncation.certified_20.
 Print Assumptions BvnTruncation.certified_24.
 
 Require BvnBudget.
-Print Assumptions BvnBudget.low_4.
 Print Assumptions BvnBudget.low_6.
 Print Assumptions BvnBudget.low_8.
-Print Assumptions BvnBudget.low_10.
 Print Assumptions BvnBudget.low_12.
 Print Assumptions BvnBudget.low_14.
-Print Assumptions BvnBudget.low_16.
 Print Assumptions BvnBudget.low_20.
 Print Assumptions BvnBudget.low_24.
 Require BvnHighAlgebra BvnHighAssembly BvnHighPanels BvnHighBudget BvnHighRound BvnHighSteps BvnHighNode BvnHighErr BvnHighErrTree BvnHighSum BvnHighClosed BvnHighClosed2 BvnHighPol BvnHighCF BvnHighJ1 BvnHighJ2 BvnHighFinal BvnHighEnd.

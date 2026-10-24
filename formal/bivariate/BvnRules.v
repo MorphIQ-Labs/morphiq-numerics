@@ -8,21 +8,6 @@ From Interval Require Import Tactic.
 Require Import BvnEllipse.
 Open Scope R_scope.
 
-(** [N = 4], [|rho| <= 55/1000]. *)
-Definition A4 : R := 556/10000.
-Definition R4 : R := 768/10.
-Lemma asin_cover_4 : sin A4 >= 55/1000 + 2 / 10000 /\ A4 < 2.
-Proof. unfold A4. split; interval with (i_prec 40). Qed.
-Lemma inside_4 : ellipse_inside A4 R4.
-Proof. unfold ellipse_inside, A4, R4. split; interval with (i_prec 40). Qed.
-Lemma ellipse_4 : ellipse_ok A4 R4.
-Proof.
-  unfold ellipse_ok, re_sin, cosh', ell_u, ell_v, A4, R4. intros th Hth.
-  split; interval with (i_bisect th, i_depth 18).
-Qed.
-Lemma bound_4 : trunc_bound A4 R4 4 <= budget.
-Proof. unfold trunc_bound, budget, A4, R4. interval. Qed.
-
 (** [N = 6], [|rho| <= 2/10]. *)
 Definition A6 : R := 2019/10000.
 Definition R6 : R := 202/10.
@@ -53,21 +38,6 @@ Qed.
 Lemma bound_8 : trunc_bound A8 R8 8 <= budget.
 Proof. unfold trunc_bound, budget, A8, R8. interval. Qed.
 
-(** [N = 10], [|rho| <= 54/100]. *)
-Definition A10 : R := 571/1000.
-Definition R10 : R := 638/100.
-Lemma asin_cover_10 : sin A10 >= 54/100 + 2 / 10000 /\ A10 < 2.
-Proof. unfold A10. split; interval with (i_prec 40). Qed.
-Lemma inside_10 : ellipse_inside A10 R10.
-Proof. unfold ellipse_inside, A10, R10. split; interval with (i_prec 40). Qed.
-Lemma ellipse_10 : ellipse_ok A10 R10.
-Proof.
-  unfold ellipse_ok, re_sin, cosh', ell_u, ell_v, A10, R10. intros th Hth.
-  split; interval with (i_bisect th, i_depth 18).
-Qed.
-Lemma bound_10 : trunc_bound A10 R10 10 <= budget.
-Proof. unfold trunc_bound, budget, A10, R10. interval. Qed.
-
 (** [N = 12], [|rho| <= 66/100]. *)
 Definition A12 : R := 7214/10000.
 Definition R12 : R := 473/100.
@@ -97,21 +67,6 @@ Proof.
 Qed.
 Lemma bound_14 : trunc_bound A14 R14 14 <= budget.
 Proof. unfold trunc_bound, budget, A14, R14. interval. Qed.
-
-(** [N = 16], [|rho| <= 81/100]. *)
-Definition A16 : R := 9447/10000.
-Definition R16 : R := 325/100.
-Lemma asin_cover_16 : sin A16 >= 81/100 + 2 / 10000 /\ A16 < 2.
-Proof. unfold A16. split; interval with (i_prec 40). Qed.
-Lemma inside_16 : ellipse_inside A16 R16.
-Proof. unfold ellipse_inside, A16, R16. split; interval with (i_prec 40). Qed.
-Lemma ellipse_16 : ellipse_ok A16 R16.
-Proof.
-  unfold ellipse_ok, re_sin, cosh', ell_u, ell_v, A16, R16. intros th Hth.
-  split; interval with (i_bisect th, i_depth 18).
-Qed.
-Lemma bound_16 : trunc_bound A16 R16 16 <= budget.
-Proof. unfold trunc_bound, budget, A16, R16. interval. Qed.
 
 (** [N = 20], [|rho| <= 89/100]. *)
 Definition A20 : R := 10979/10000.

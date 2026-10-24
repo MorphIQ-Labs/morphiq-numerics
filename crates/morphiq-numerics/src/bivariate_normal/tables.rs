@@ -4,16 +4,6 @@
 //! once to nearest-even binary64 from the 120-digit root of `P_n`;
 //! `docs/bivariate_normal.md` gives the derivation.
 
-/// The 2 positive abscissas of the 4-point rule
-pub(super) const GL4_X: [f64; 2] = [
-    f64::from_bits(0x3feb8e6dbcf63985),
-    f64::from_bits(0x3fd5c23fd9dd3dfc),
-];
-/// Their weights, summing to 1 over the 2 positive nodes
-pub(super) const GL4_W: [f64; 2] = [
-    f64::from_bits(0x3fd64340f7e7b66b),
-    f64::from_bits(0x3fe4de5f840c24ca),
-];
 /// The 3 positive abscissas of the 6-point rule
 pub(super) const GL6_X: [f64; 3] = [
     f64::from_bits(0x3fedd6ca4e80a01e),
@@ -39,22 +29,6 @@ pub(super) const GL8_W: [f64; 4] = [
     f64::from_bits(0x3fcc76fb531d2b96),
     f64::from_bits(0x3fd413c50a255615),
     f64::from_bits(0x3fd736360b199343),
-];
-/// The 5 positive abscissas of the 10-point rule
-pub(super) const GL10_X: [f64; 5] = [
-    f64::from_bits(0x3fef2a3e062af2d8),
-    f64::from_bits(0x3febae995e9cb2f3),
-    f64::from_bits(0x3fe5bdb9228de198),
-    f64::from_bits(0x3fdbbcc009016adc),
-    f64::from_bits(0x3fc30e507891e27a),
-];
-/// Their weights, summing to 1 over the 5 positive nodes
-pub(super) const GL10_W: [f64; 5] = [
-    f64::from_bits(0x3fb1115f8b62dc1f),
-    f64::from_bits(0x3fc32138c878efe5),
-    f64::from_bits(0x3fcc0b059d00bc31),
-    f64::from_bits(0x3fd13baa7a559bfe),
-    f64::from_bits(0x3fd2e9de7014d6ef),
 ];
 /// The 6 positive abscissas of the 12-point rule
 pub(super) const GL12_X: [f64; 6] = [
@@ -93,17 +67,6 @@ pub(super) const GL14_W: [f64; 7] = [
     f64::from_bits(0x3fc7bfb8e2a8f57e),
     f64::from_bits(0x3fca43f1796fab09),
     f64::from_bits(0x3fcb8dc415514e34),
-];
-/// The 8 positive abscissas of the 16-point rule
-pub(super) const GL16_X: [f64; 8] = [
-    f64::from_bits(0x3fefa92c264d787e),
-    f64::from_bits(0x3fee39f56616f9b0),
-    f64::from_bits(0x3febb3403514e483),
-    f64::from_bits(0x3fe82c45dda4726b),
-    f64::from_bits(0x3fe3c5a466d5e8b8),
-    f64::from_bits(0x3fdd50259a43a772),
-    f64::from_bits(0x3fd205cae642337c),
-    f64::from_bits(0x3fb852bd6676a9f9),
 ];
 /// Their weights, summing to 1 over the 8 positive nodes
 pub(super) const GL16_W: [f64; 8] = [

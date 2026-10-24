@@ -5,19 +5,14 @@ From Coq Require Import ZArith List.
 Import ListNotations.
 Open Scope Z_scope.
 
-Definition gl4_x : list Z := [0x3feb8e6dbcf63985; 0x3fd5c23fd9dd3dfc].
-Definition gl4_w : list Z := [0x3fd64340f7e7b66b; 0x3fe4de5f840c24ca].
 Definition gl6_x : list Z := [0x3fedd6ca4e80a01e; 0x3fe528a09655c95e; 0x3fce8b12d03675c5].
 Definition gl6_w : list Z := [0x3fc5edf601e2dbf8; 0x3fd716b7b5794c1c; 0x3fddf24d499545e8].
 Definition gl8_x : list Z := [0x3feebab1cb0acc67; 0x3fe97e4ab249f41e; 0x3fe0d129583284b4; 0x3fc77ac94f3c7345].
 Definition gl8_w : list Z := [0x3fb9ea1d04ca0374; 0x3fcc76fb531d2b96; 0x3fd413c50a255615; 0x3fd736360b199343].
-Definition gl10_x : list Z := [0x3fef2a3e062af2d8; 0x3febae995e9cb2f3; 0x3fe5bdb9228de198; 0x3fdbbcc009016adc; 0x3fc30e507891e27a].
-Definition gl10_w : list Z := [0x3fb1115f8b62dc1f; 0x3fc32138c878efe5; 0x3fcc0b059d00bc31; 0x3fd13baa7a559bfe; 0x3fd2e9de7014d6ef].
 Definition gl12_x : list Z := [0x3fef68f1d8e42e81; 0x3fecee874ffb88b4; 0x3fe8a30aeed88f36; 0x3fe2cb4f05c077f9; 0x3fd78a8d20a8b19d; 0x3fc007a5f8f630e4].
 Definition gl12_w : list Z := [0x3fa8275d9dea6d8f; 0x3fbb60602bce6181; 0x3fc47d7258f22d8f; 0x3fca0163e6b1ab72; 0x3fcde3155c256ab5; 0x3fcfe40ce6d4f025].
 Definition gl14_x : list Z := [0x3fef8fa30fddab0b; 0x3fedb5bd12b99e9f; 0x3fea786ee46dd9c4; 0x3fe5fe4db09e0c89; 0x3fe07ceab54ef096; 0x3fd46c564912d702; 0x3fbba97d36de76b0].
 Definition gl14_w : list Z := [0x3fa1fb2d8b27f553; 0x3fb4853d8adc703d; 0x3fbf1bd74ef611c1; 0x3fc41f3bbee2d2f2; 0x3fc7bfb8e2a8f57e; 0x3fca43f1796fab09; 0x3fcb8dc415514e34].
-Definition gl16_x : list Z := [0x3fefa92c264d787e; 0x3fee39f56616f9b0; 0x3febb3403514e483; 0x3fe82c45dda4726b; 0x3fe3c5a466d5e8b8; 0x3fdd50259a43a772; 0x3fd205cae642337c; 0x3fb852bd6676a9f9].
 Definition gl16_w : list Z := [0x3f9bcddab4b7c211; 0x3fafdfb1a2c1265d; 0x3fb85c4ee79cc258; 0x3fbfe7af2bad386a; 0x3fc325f61bca3cbf; 0x3fc5a6ebbb5a75fc; 0x3fc75f8c77e0c00f; 0x3fc83feae80e4dfc].
 Definition gl16_xp : list Z := [0x3fefd4a4cca98683; 0x3fef1e8d57d8a84a; 0x3fede2de9aee34b1; 0x3fec34c493f0b683; 0x3fea2d95256a041c; 0x3fe7ea6f407bd7eb; 0x3fe589b0206a4d68; 0x3fe328801d4fc000].
 Definition gl16_xm : list Z := [0x3fd02b875fded849; 0x3fd0e62a968eda0d; 0x3fd238dce63d129e; 0x3fd427205b6ac166; 0x3fd6b2b3b0932b25; 0x3fd9d8c24d44f240; 0x3fdd8f081422f432; 0x3fe0e0be5bb4a011].

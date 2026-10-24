@@ -117,7 +117,7 @@ fn correlations(rng: &mut SplitMix64) -> Vec<f64> {
         -0.5,
     ];
     rhos.extend(around(f64::EPSILON));
-    for limit in [0.055, 0.20, 0.38, 0.54, 0.66, 0.75, 0.81, 0.89] {
+    for limit in [0.20, 0.29, 0.66, 0.75, 0.89] {
         rhos.extend(around(limit));
     }
     rhos.extend(around(0.925));
@@ -303,13 +303,10 @@ pub(super) fn write(out: &mut String) {
         "independent",
         "comonotone",
         "countermonotone",
-        "low-4",
         "low-6",
         "low-8",
-        "low-10",
         "low-12",
         "low-14",
-        "low-16",
         "low-20",
         "low-24",
         "saturated-lower",

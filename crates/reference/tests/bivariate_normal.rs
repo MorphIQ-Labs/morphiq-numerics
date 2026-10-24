@@ -121,3 +121,51 @@ fn hard_cases_are_bounded_absolutely_and_refuse_relative_use() {
         }
     }
 }
+
+/// A result for a positive correlation that is a probability of at least
+/// `TAIL_FLOOR` in a lower tail is correct in relative terms to
+/// `TAIL_RELATIVE` (for a negative correlation the integral is subtracted from
+/// the product and the result cancels, which the contract refuses for relative
+/// use: section 8): the node count of the rule,
+/// which the canonical Genz implementation's tails also follow, sets the
+/// truncation there, and a shorter rule is orders of magnitude off on these
+/// cases (docs/bivariate_normal.md section 4). The bound is twice the
+/// measured worst case (`4.7e-9` at `P(-8, -8; 0.1)`, where Genz's rule has the
+/// same 6 nodes); it is not a contract of the function, whose published bound
+/// is absolute.
+const TAIL_FLOOR: f64 = 1e-30;
+const TAIL_RELATIVE: f64 = 1e-8;
+
+#[test]
+fn lower_tail_results_keep_their_relative_accuracy() {
+    let mut worst = (0.0_f64, String::new());
+    let mut checked = 0;
+    for case in cases().into_iter().filter(|case| case.kind == "tail") {
+        if case.expected < TAIL_FLOOR || case.rho < 0.0 {
+            continue;
+        }
+        checked += 1;
+        let got = bivariate_norm_cdf(case.x, case.y, case.rho);
+        let relative = ((got - case.expected) / case.expected).abs();
+        if relative > worst.0 {
+            worst = (
+                relative,
+                format!("P({:e}, {:e}; {:e})", case.x, case.y, case.rho),
+            );
+        }
+    }
+    println!(
+        "worst tail relative error {:e} over {checked}: {}",
+        worst.0, worst.1
+    );
+    assert!(
+        checked >= 50,
+        "the tail cases are in the fixture: {checked}"
+    );
+    assert!(
+        worst.0 <= TAIL_RELATIVE,
+        "relative error {:e} at {}",
+        worst.0,
+        worst.1
+    );
+}
