@@ -22,7 +22,7 @@ what remains; nothing below claims more than the checks named here establish.
 | ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits, with slice and paired entry points (section 12) | done for the low-correlation quadrature: bit equality, digest and mutation witnesses (section 12); AVX2 and AVX-512F not yet run here (CI) |
 | Coq proof of the error budget | **proved** for both branches (`formal/bivariate/`), from the named hypotheses of section 6 |
 | The kernel the proofs describe | the scalar kernel is transcribed over the proved binary64 operations (`formal/bivariate/BvnKernel.v`), **extracted and compared bit for bit** with this code on 13 966 cases, and its operations are proved equal to the proofs' rounding model (section 6.5); the hypotheses that remain are listed there |
-| Same-host scalar and batch performance against the FerroRisk baseline | measured (section 9); lanes **unmeasured** |
+| Same-host scalar and batch timings against the FerroRisk baseline | **not measured in this change**: timings belong to the performance epic #149 (native x86 #216, hardware-sqrt #217), and the repository has no bivariate benchmark binary yet; the machine-independent work per call is counted in section 9 |
 
 ## 2. Specification
 
@@ -425,7 +425,41 @@ lacked; this one does not claim it.
 
 ## 9. Performance
 
-(Section filled from the same-host measurement in the pull request.)
+No timing is claimed here: measurements belong to the performance epic (#149),
+which also owns the native x86 runs (#216) and the hardware-`sqrt` re-measurement
+(#217), and this repository has no bivariate benchmark binary yet (the others are
+`crates/reference/src/bin/bench-*.rs`). What the code does per call is countable
+and does not depend on the host.
+
+**Low-correlation branch** (`|rho| < 0.925`), `n` the rule's node count
+(6, 8, 12, 14, 20 or 24 by section 4):
+
+| | `asin` | `sin` | `exp` | `norm_cdf` | other |
+| --- | --- | --- | --- | --- | --- |
+| one call, `bivariate_norm_cdf` | 1 | `n` | `n` | 2 | table: `2n` divisions; sum: `3n` multiplications and `n` `two_sum` (6 flops each) |
+| repeated `rho`, `BivariateNormal::cdf` | 0 | 0 | `n` | 2 | the sum only |
+
+The table is built once per correlation (`BivariateNormal::new`: the `asin`, the
+`n` sines, `2n` divisions) and a batch at one correlation pays it once. Nothing
+allocates; the table is three arrays of 24 binary64.
+
+**High-correlation branch** (`0.925 <= |rho| < 1`): up to 7 panels of 16 or 15
+nodes (at most 107 nodes, section 3), each node one `exp` unless its exponent
+passes the cutoff (the integrand returns 0 without calling `exp`), then the
+closed form for the first panel (two `exp`, one `norm_cdf`), and one or two
+`norm_cdf` for the leading term. It is scalar per lane (section 12).
+
+**Closed forms** (independent, comonotone, countermonotone, saturated): one or
+two `norm_cdf`.
+
+The library calls are the dominant cost and are the same fast-path-then-fallback
+designs as the rest of the crate (`exp` is correctly rounded with a decided fast
+path, `norm_cdf` likewise); a cheaper `exp` or `norm_cdf` is a change to those
+modules and their proofs, and this branch would take it through its own
+`exp_contract` and `norm_cdf` contract. Changes inside this module that keep the
+bits (fusing the table build into the one-shot loop, skipping an `exp` whose
+argument is past underflow) are candidates for the epic to measure; the first
+adds a code path the extracted comparison (section 6.5) does not cover.
 
 ## 10. Provenance and port inventory
 
@@ -452,13 +486,13 @@ taken from libm. Item by item (the list FerroRisk's deletion cites):
 | `testing/mutations/bivariate_normal.toml` (21 faults) | **not ported**: this library has no mutation harness; the faults map to tests here: the split (`B1`) and every rule limit are held by `results_are_continuous_across_every_rule_limit` and by fixture rows on both sides; the high regime's node terms, `two_sum` accumulation, closed form and reflection branch by the high-correlation fixture rows (including rows at the counterexample) and the proof's operation sequence; the unit-edge snap (`B24`) by `reflection_holds_at_the_unit_correlation_edge`; NaN handling by `nan_and_out_of_range_inputs_*` |
 | SPEC section 7.3 and ferro-risk #380 cancellation analysis | **ported** as section 8; the corner is a required fixture case |
 | `formal/lean-math/FerroRisk/AmericanBivariate.lean` (5 laws: Gaussian marginal, two complement identities, comonotone and countermonotone closed forms) | **not ported**: this repository's proofs are Coq/Gappa, not Lean. Their statements are the proof targets of the remaining work; their runtime counterparts are tested: reflection (the two complements) and the degenerate closed forms |
-| `benches/numerics.rs` bivariate entries (`bivariate_norm_cdf`, `_high_correlation`, `_hoisted_golden_rho`) | **ported** as the measurement matrix of section 9 (one-shot at several correlations, repeated-`rho`, table construction) |
+| `benches/numerics.rs` bivariate entries (`bivariate_norm_cdf`, `_high_correlation`, `_hoisted_golden_rho`) | **not ported**: there is no bivariate benchmark binary here yet; the matrix they covered (one-shot at several correlations, repeated-`rho`, table construction) is the one the performance epic runs (section 9) |
 
 ## 11. Remaining work, in order
 
-1. Measure the lanes on ARM and native x86 (#216) and re-measure against the
-   performance bar on a quiet host (section 9); this slice's numbers are one noisy
-   shared host.
+1. Add a bivariate benchmark binary and measure the one-shot, repeated-`rho`
+   and lane paths on ARM and native x86 (#216), against the FerroRisk baseline,
+   on a quiet host: the performance epic (#149).
 
 ## 12. Batch evaluation and lanes
 
