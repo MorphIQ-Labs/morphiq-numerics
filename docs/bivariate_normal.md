@@ -384,6 +384,12 @@ anything there:
   of each) out to `hk` of about 200, for a result no one specifies; it is not
   done.
 
+Provenance of the comparison: QuantLib's `We04DP` source (BSD-style license) was read
+for it. What it contributed to this code is three numbers, the node counts 6, 12
+and 20 below 0.3, below 0.75 and above, which are Genz's (2004, section 2.4) and
+are used as a lower bound on the rules' length; no code, tables or structure were
+taken, and the rules' nodes and weights are generated here (section 3).
+
 Not run: Genz's own Fortran `bvnu`/`tvpack`, R's `mvtnorm` (not installed),
 and thresholds beyond 64. The fixture's `tail` rows
 (`generators/bivariate_normal_reference.py`) keep the positive-correlation
