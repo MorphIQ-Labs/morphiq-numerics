@@ -300,6 +300,10 @@ determinism digest pins at the correlation whose scales halve to exactly `0.003`
   - `-dh > dk` against `>=`: on a tie both `norm_cdf` values are equal, so both branches return the same
     bits, signed zero included.
 
+After the rule set of section 4 changed, the functions that select and bound the rules (`low_correlation_rule`,
+`rule_index`, `regime_bound`) were run again: 10 mutants, 10 caught, including the limit comparison's `<` against
+`<=` and `==` (the bound at each limit is the next rule's: `the_bound_follows_the_selected_rule`).
+
 The two association-order mutants named in section 6.5 cannot be seen by any corpus and stay pinned by
 reading. The lanes' own run is in section 12.
 
