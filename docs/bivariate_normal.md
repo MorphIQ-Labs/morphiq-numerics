@@ -385,10 +385,12 @@ below `1e-22`, while `We04DP` kept it to `hk` of about 200 and then fails the
 same way (its exponent test passes `-100`). The branch now computes the integral
 out to `hk = 1400`, dropping nodes whose `phi` reaches 700 (`exp(-700) = 1e-304`; from
 `hk = 1400` all of them, and the result is at most `1.05e-306`), so a result below about
-`1e-304` is the leading term alone, with the closed form and the node range re-proved over it
+`1e-304` is the leading term alone (the omitted integral is nonnegative, so for `rho > 0` that value can only err high, and
+`results_below_the_integral_cutoff_never_fall_under_the_truth` holds it to that), with the closed form and the node range re-proved over it
 (`docs/bivariate_normal_high.md` sections 1.7 and 4; the proofs bound the
 absolute error, and the relative accuracy below is measured). Against a
-60-digit reference (`generators/bivariate_normal_reference.py`, kind `deep`):
+60-digit reference (`generators/bivariate_normal_reference.py`, kind `deep`, each row
+also evaluated by Plackett's identity, a positive integral over the correlation that shares no integrand with the first route, and held to `1e-28` relative):
 
 | `rho` | `P(-12,-12)` | `P(-17,-17)` | `P(-25,-25)` | `P(-36,-36)` | `We04DP` |
 |---|---|---|---|---|---|

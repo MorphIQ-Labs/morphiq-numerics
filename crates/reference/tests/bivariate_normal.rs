@@ -182,6 +182,33 @@ const DEEP_NEAR: f64 = 5e-7;
 const DEEP_FAR: f64 = 1e-7;
 
 #[test]
+fn results_below_the_integral_cutoff_never_fall_under_the_truth() {
+    // Past `phi = 700` the correlation integral is dropped, so a result that
+    // small is the leading term alone: no relative accuracy is claimed, but the
+    // omitted integral is nonnegative, so the value can only err high.
+    let mut checked = 0;
+    for case in cases().into_iter().filter(|case| case.kind == "deep") {
+        if case.expected >= 1e-300 || case.expected == 0.0 || case.rho <= 0.0 {
+            continue;
+        }
+        checked += 1;
+        let got = bivariate_norm_cdf(case.x, case.y, case.rho);
+        assert!(
+            got >= case.expected * (1.0 - 1e-12),
+            "P({:e}, {:e}; {:e}) = {got:e} fell under {:e}",
+            case.x,
+            case.y,
+            case.rho,
+            case.expected
+        );
+    }
+    assert!(
+        checked >= 5,
+        "rows below 1e-300 are in the fixture: {checked}"
+    );
+}
+
+#[test]
 fn deep_tails_at_high_correlation_keep_their_relative_accuracy() {
     let mut worst = (0.0_f64, String::new());
     let mut checked = 0;

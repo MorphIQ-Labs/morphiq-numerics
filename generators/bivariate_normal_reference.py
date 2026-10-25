@@ -14,7 +14,8 @@ relative terms as well as absolutely.
 Every case is evaluated at two precisions and must agree to 1e-36 relative
 (or 1e-46 absolute; the `deep` cases, down to 1e-290, to 1e-30 relative); a subset is also evaluated by a second route, Owen's
 T function, which shares no integrand with the first, and must agree with the
-first to 1e-30 absolute. The value is written with 36 significant digits.
+first to 1e-30 absolute. Every `deep` case is instead evaluated by Plackett's
+identity, a positive integral over the correlation, and must agree to 1e-28 relative. The value is written with 36 significant digits.
 Replay with --check.
 """
 import math
@@ -184,6 +185,27 @@ def bvn_owen(h, k, rho):
     return phi(h) / 2 + phi(k) / 2 - owen_t(h, ah) - owen_t(k, ak) - delta
 
 
+def bvn_plackett(h, k, rho):
+    """Third route (0 < rho < 1): Plackett's identity,
+
+    P = Phi(h) Phi(k) + int_0^rho exp(-(h^2 - 2 r h k + k^2) / (2 (1 - r^2))) / (2 pi sqrt(1 - r^2)) dr.
+
+    Its integrand is positive, so a result far below 1e-46 is held to its own
+    relative size with no cancellation; r = 1 - e^t puts its peak, which sits
+    within a distance of 1 comparable to 1 - rho, on a scale the quadrature resolves.
+    """
+    h, k, rho = mp.mpf(h), mp.mpf(k), mp.mpf(rho)
+    assert 0 < rho < 1
+
+    def f(r):
+        return mp.exp(-(h * h - 2 * r * h * k + k * k) / (2 * (1 - r * r))) / (2 * mp.pi * mp.sqrt(1 - r * r))
+
+    a, n = mp.log(1 - rho), 1500
+    points = [a - a * mp.mpf(i) / n for i in range(n + 1)]
+    integral = mp.quad(lambda t: f(1 - mp.exp(t)) * mp.exp(t), points, method='gauss-legendre', maxdegree=7)
+    return phi(h) * phi(k) + integral
+
+
 def at(precision, function, *args):
     with mp.workdps(int(precision * 0.30103) + 5):
         return function(*args)
@@ -234,6 +256,15 @@ def beyond_binary64(h, k, rho):
         return mp.exp(-d2 / 2) / 2 < mp.mpf(10) ** -330
 
 
+def second_route(index, h, k, rho, kind):
+    """Whether a second route (Owen's, or Plackett's for the deep cases) also evaluates the case."""
+    if beyond_binary64(h, k, rho):
+        return False
+    if kind == 'deep':
+        return 0 < rho < 1
+    return h * k != 0 and abs(rho) <= 0.99 and index % 3 == 0
+
+
 def evaluate(case):
     """One case at both precisions, plus the second route on a subset."""
     index, (h, k, rho, kind, ferro) = case
@@ -250,7 +281,13 @@ def evaluate(case):
         tolerance = abs(hi) * mp.mpf(10) ** -30
     assert abs(lo - hi) <= tolerance, (h, k, rho, lo, hi)
     crossed = False
-    if kind != 'deep' and h * k != 0 and abs(rho) <= 0.99 and index % 3 == 0:
+    if kind == 'deep' and second_route(index, h, k, rho, kind):
+        # Plackett's identity at working precision 170 bits: the value is held
+        # to 1e-28 relative to a route that shares no integral with the first.
+        other = at(170, bvn_plackett, h, k, rho)
+        assert abs(other - hi) <= abs(hi) * mp.mpf(10) ** -28, (h, k, rho, other, hi)
+        crossed = True
+    elif second_route(index, h, k, rho, kind):
         # Owen's route needs the digits the value lacks: its subtractions
         # cancel to the size of the result.
         depth = 0 if hi == 0 else max(0, int(-mp.log10(abs(hi))))
@@ -283,8 +320,11 @@ def evaluate_indexed(case):
     return case[0], result
 
 
-def generate():
+def generate(shard=None):
+    """Every case, or only those whose index is congruent to `shard[0]` modulo `shard[1]`."""
     work = list(enumerate(cases()))
+    if shard is not None:
+        work = [item for item in work if item[0] % shard[1] == shard[0]]
     results = []
     with Pool(int(os.environ.get('BVN_WORKERS', '3'))) as pool:
         for done, result in enumerate(pool.imap_unordered(evaluate_indexed, work, chunksize=4), 1):
@@ -295,17 +335,50 @@ def generate():
     rows = [row for row, _, _ in results]
     cross = sum(1 for _, crossed, _ in results if crossed)
     disagreements = [d for _, _, d in results if d is not None]
-    assert cross >= 300, cross
     assert not disagreements, disagreements[:5]
+    if shard is None:
+        assert cross >= 300, cross
     return {'generator': 'generators/bivariate_normal_reference.py', 'mpmath': mp.__version__,
             'precision_bits': list(PRECISIONS), 'digits': DIGITS, 'cross_checked': cross,
             'ferro_disagreements': disagreements, 'cases': rows}
 
 
+def check_shard(index, count):
+    """Replays the cases of one shard against the committed fixture.
+
+    The whole replay costs hours of CPU, so CI splits it over `count` jobs; the
+    shards partition the case indices, so together they replay every row. Each
+    shard also holds the header and the cross-checked total, which need no
+    evaluation, to the committed file.
+    """
+    committed = json.loads(OUT.read_text())
+    every = list(enumerate(cases()))
+    if len(committed['cases']) != len(every):
+        sys.exit(f'{OUT} holds {len(committed["cases"])} cases, the generator defines {len(every)}')
+    total = sum(1 for i, (h, k, rho, kind, _) in every if second_route(i, h, k, rho, kind))
+    fresh = generate((index, count))
+    if committed['cross_checked'] != total or committed['ferro_disagreements']:
+        sys.exit(f'{OUT} header differs: cross_checked {committed["cross_checked"]} vs {total}')
+    for name in ('generator', 'mpmath', 'precision_bits', 'digits'):
+        if committed[name] != fresh[name]:
+            sys.exit(f'{OUT} {name} differs from a fresh generation')
+    mine = [i for i, _ in every if i % count == index]
+    for i, row in zip(mine, fresh['cases']):
+        if committed['cases'][i] != row:
+            sys.exit(f'{OUT} case {i} differs from a fresh generation')
+    print(f'bivariate_normal: shard {index}/{count}: {len(mine)} cases replayed')
+
+
 def main():
+    args = sys.argv[1:]
+    if '--shard' in args:
+        index, count = (int(x) for x in args[args.index('--shard') + 1].split('/'))
+        assert 0 <= index < count
+        check_shard(index, count)
+        return
     result = generate()
     out = json.dumps(result, indent=1) + '\n'
-    if '--check' in sys.argv[1:]:
+    if '--check' in args:
         if OUT.read_text() != out:
             sys.exit(f'{OUT} differs from a fresh generation')
     else:

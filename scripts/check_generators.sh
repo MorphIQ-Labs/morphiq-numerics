@@ -20,6 +20,12 @@ generators="generators/interval_reference.py generators/random_streams_reference
 generators="$generators generators/tridiagonal_reference.py generators/tridiagonal_sign_reference.py"
 generators="$generators generators/bivariate_normal_nodes.py generators/bivariate_normal_budget.py generators/bivariate_normal_reference.py"
 for generator in $generators; do
+  # The bivariate fixture's replay costs hours of CPU; CI replays it in shards
+  # (scripts/check_bivariate_shard.sh), which together cover every row.
+  if [ "$generator" = generators/bivariate_normal_reference.py ] && [ -z "${BVN_FULL_REPLAY:-}" ]; then
+    echo "sharded: $generator"
+    continue
+  fi
   "$venv/bin/python" "$generator" --check
   echo "replayed: $generator"
 done

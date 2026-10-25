@@ -178,6 +178,21 @@ jobs:
       - name: Every committed fixture matches a fresh run of its generator
         run: ./scripts/check_generators.sh
 
+  # The bivariate fixture needs hours of multiprecision CPU to replay: eight
+  # shards together replay every row against the committed file.
+  generators-bivariate:
+    name: check / generators-bivariate (${{ matrix.shard }}/8)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Replay this shard of the bivariate-normal reference fixture
+        run: ./scripts/check_bivariate_shard.sh ${{ matrix.shard }} 8
+
   msrv:
     name: check / msrv
     runs-on: ubuntu-24.04
@@ -204,7 +219,7 @@ jobs:
 
   test:
     name: test (${{ matrix.os }})
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, generators-bivariate, msrv, no-std]
     # Skipped checks (commit-convention, secret-scan on push) still let this run.
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     strategy:
@@ -234,7 +249,7 @@ jobs:
   # cross-check corpora byte-identical to the default build's.
   fma:
     name: fma (x86-64)
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, generators-bivariate, msrv, no-std]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-24.04
     steps:
@@ -249,7 +264,7 @@ jobs:
   # suite, digest included (docs/determinism.md); gate logic lives in scripts/.
   digest:
     name: digest (${{ matrix.target }})
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, generators-bivariate, msrv, no-std]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     strategy:
       fail-fast: false
@@ -276,7 +291,7 @@ jobs:
   # (.cargo/sde-version, .cargo/sde-sha256); gate logic in scripts/.
   simd-avx512:
     name: simd (avx512, sde)
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, generators-bivariate, msrv, no-std]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-24.04
     steps:
@@ -297,7 +312,7 @@ jobs:
   # certificates here and their Coq proofs in the formal job below.
   certificates:
     name: certificates (sollya, gappa)
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, generators-bivariate, msrv, no-std]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-24.04
     steps:
@@ -324,7 +339,7 @@ jobs:
   # visible to every pull request, and main reads only its own.
   formal:
     name: formal (coq)
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, msrv, no-std]
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, generators-bivariate, msrv, no-std]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-24.04
     # The erfcx/normal cold build alone took 64 minutes on this runner; the
