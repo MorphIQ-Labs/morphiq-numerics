@@ -173,13 +173,12 @@ fn lower_tail_results_keep_their_relative_accuracy() {
 /// High correlation with both thresholds far below zero, `hk = h k` from 100
 /// to 1400: the correlation integral is most of the result there and the high
 /// branch computes it (docs/bivariate_normal.md section 7.1). Measured, not a
-/// contract: the exponent's rounding (`u phi`, `1e-13` at `phi = 700`) and the
-/// cancellation of `Phi(-max) - J / 2 pi` grow with depth, and faster as `rho`
-/// falls toward the split. The bounds are about 5 times the measured worst:
-/// `DEEP_NEAR` for probabilities of at least `1e-150` (`9.3e-8` at
-/// `P(-25, -25; 0.93)`) and `DEEP_FAR` for the rest at `rho >= 0.97` (`1.5e-8`).
-const DEEP_NEAR: f64 = 5e-7;
-const DEEP_FAR: f64 = 1e-7;
+/// contract: the cancellation of `Phi(-max) - J / 2 pi` grows with depth, and
+/// faster as `rho` falls toward the split. The bounds are about 8 times the
+/// measured worst: `DEEP_NEAR` for probabilities of at least `1e-150` (`6.3e-11`
+/// at `P(-25, -25; 0.93)`) and `DEEP_FAR` for the rest at `rho >= 0.97`.
+const DEEP_NEAR: f64 = 5e-10;
+const DEEP_FAR: f64 = 1e-9;
 
 #[test]
 fn results_below_the_integral_cutoff_never_fall_under_the_truth() {

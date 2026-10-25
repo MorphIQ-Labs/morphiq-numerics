@@ -408,6 +408,17 @@ const HK_CUTOFF: f64 = 1400.0;
 /// bottom of the normal range (`docs/bivariate_normal_high.md` section 1.7, A5).
 const PHI_CUTOFF: f64 = 700.0;
 
+/// From this `hk` on a node's exponent is evaluated as `(hk / 2 + bs / (2 xs))
+/// + hk xs / (2 (1 + rs)^2)`, two exponentials, because `hk / 2` is exact and the
+/// second part is small: the exponent's own rounding, `u phi`, would otherwise
+/// be the node's error (`docs/bivariate_normal_high.md` section 1.8).
+const HK_SPLIT: f64 = 16.0;
+
+/// The closed form's remainder correction is discarded when it exceeds this:
+/// from `HK_SPLIT` on it is below `1e-21` (`docs/bivariate_normal_high.md`
+/// section 1.8), so the bound on the closed form does not depend on it.
+const REMAINDER_CAP: f64 = 1e-20;
+
 /// A Gauss-Legendre rule of the panels: the positive abscissas' weights, the
 /// unit squares `((3 + t)/4)^2` and `((3 - t)/4)^2` of the abscissas `t`, and
 /// the weight of the centre node at 0 (`None` for an even order).
@@ -518,14 +529,55 @@ fn bounded_in_blocks(
 /// times the node's unit square), `rs = sqrt(1 - xs)` and
 /// `phi = bs / (2 xs) + hk / (1 + rs)`; zero where `phi` reaches [`PHI_CUTOFF`].
 /// `phi` is not negative on the branch's domain, so every term is positive.
+/// From [`HK_SPLIT`] on `phi` is the sum of `big = hk / 2 + bs / (2 xs)` and
+/// `small = hk xs / (2 (1 + rs)^2)`, each under its own exponential, and the
+/// cutoff is on `big`, which is at most `phi`.
 fn integrand_term(xs: f64, weight: f64, bs: f64, hk: f64) -> f64 {
     let rs = sqrt(1.0 - xs);
-    let phi = bs / (2.0 * xs) + hk / (1.0 + rs);
-    if phi < PHI_CUTOFF {
-        weight * (exp(-phi) / rs)
+    let d = 1.0 + rs;
+    if hk >= HK_SPLIT {
+        let big = hk * 0.5 + bs / (2.0 * xs);
+        if big < PHI_CUTOFF {
+            let small = hk * xs / (2.0 * d * d);
+            weight * (exp(-big) * exp(-small) / rs)
+        } else {
+            0.0
+        }
     } else {
-        0.0
+        let phi = bs / (2.0 * xs) + hk / d;
+        if phi < PHI_CUTOFF {
+            weight * (exp(-phi) / rs)
+        } else {
+            0.0
+        }
     }
+}
+
+/// Abscissas and weights of the 5-point Gauss-Legendre rule on `[0, 1]`.
+const REMAINDER_NODES: [(f64, f64); 5] = [
+    (0.046_910_077_030_668, 0.118_463_442_528_094_5),
+    (0.230_765_344_947_158_5, 0.239_314_335_249_683_2),
+    (0.5, 0.284_444_444_444_444_4),
+    (0.769_234_655_052_841_5, 0.239_314_335_249_683_2),
+    (0.953_089_922_969_332, 0.118_463_442_528_094_5),
+];
+
+/// `int_0^s exp(-bs/(2 x^2) - hk/2) (G - T) dx`: what Genz's Taylor polynomial
+/// `T = 1 + c x^2 (1 + d x^2)` leaves of `G = exp(-hk (1 - rs)/(2 (1 + rs))) /
+/// rs` on the closed form's scale, by a 5-point rule. It grows like
+/// `hk^3 s^6`, the closed form's relative error from `hk` of a few tens, and is
+/// discarded if it is not within [`REMAINDER_CAP`] (a NaN is not).
+fn closed_form_remainder(s: f64, bs: f64, hk: f64, c: f64, d: f64) -> f64 {
+    let mut sum = 0.0;
+    for (t, w) in REMAINDER_NODES {
+        let xs = (s * t) * (s * t);
+        let rs = sqrt(1.0 - xs);
+        let q = hk * xs / (2.0 * (1.0 + rs) * (1.0 + rs));
+        let g = exp(-q) / rs;
+        let taylor = 1.0 + c * xs * (1.0 + d * xs);
+        sum += w * s * exp(-(bs / xs + hk) / 2.0) * (g - taylor);
+    }
+    if sum.abs() <= REMAINDER_CAP { sum } else { 0.0 }
 }
 
 /// [`bivariate_norm_cdf`] of every triple `(x[i], y[i], rho[i])`, written to
@@ -648,6 +700,9 @@ fn high_correlation(dh: f64, dk: f64, rho: f64) -> f64 {
                 * norm_cdf(-b / s)
                 * b
                 * (1.0 - c * bs * (1.0 - d * bs / 5.0) / 3.0);
+            if hk >= HK_SPLIT {
+                bvn += closed_form_remainder(s, bs, hk, c, d);
+            }
         }
         bvn += panels;
     }

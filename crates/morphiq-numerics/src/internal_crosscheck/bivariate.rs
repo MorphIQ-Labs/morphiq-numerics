@@ -331,6 +331,8 @@ pub(super) fn write(out: &mut String) {
         "negative-zero",
         "hk-skip",
         "hk-large",
+        "hk-split",
+        "closed-remainder",
         "closed-form",
         "closed-form-skip",
         "panel-16-nodes",

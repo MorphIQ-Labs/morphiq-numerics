@@ -21,6 +21,37 @@ Proof.
   assert (Hr : 15 / 10 ^ 17 + 11 / 10 ^ 18 = 161 / 10 ^ 18) by field. lra.
 Qed.
 
+(** The closed form with the remainder correction added ([closed_form] of the kernel from [HK_SPLIT]
+    on): the correction is within [2^-66] (it is discarded otherwise), and its addition rounds. *)
+Lemma closed_total_rem Cl I0 s ck r :
+  0 <= s -> s <= 3 / 1000 ->
+  Rabs (ck - Cl) <= 15 / 10 ^ 17 -> Rabs (I0 - Cl) <= 72 / 10 * s ^ 7 / 7 -> 0 <= I0 <= 4 / 1000 ->
+  Rabs r <= 2 / 10 ^ 20 ->
+  Rabs (rnd (ck + r) - I0) <= 161 / 10 ^ 18.
+Proof.
+  intros H0 H1 Hc Ht [HI0 HI1] Hr.
+  pose proof u_pos as Hu. pose proof u_lt as Hu2. pose proof eta_small as Hη.
+  pose proof (tail_monotone s H0 H1) as Hm. pose proof tail_constant as Hk.
+  pose proof Hr as Hr'.
+  pose proof (Rabs_triang (ck - Cl) (Cl - I0)) as T. replace (ck - Cl + (Cl - I0)) with (ck - I0) in T by ring.
+  rewrite Rabs_minus_sym in Ht.
+  assert (Hck : Rabs (ck - I0) <= 15 / 10 ^ 17 + 23 / 10 ^ 19) by (assert (72 / 10 * s ^ 7 / 7 <= 72 / 10 * (3 / 1000) ^ 7 / 7) by lra; lra).
+  assert (Hck2 : Rabs (ck + r) <= 5 / 1000).
+  { pose proof (Rabs_triang (ck - I0) I0) as T2. replace (ck - I0 + I0) with ck in T2 by ring.
+    rewrite (Rabs_right I0) in T2 by lra.
+    pose proof (Rabs_triang ck r) as T3.
+    assert (15 / 10 ^ 17 + 23 / 10 ^ 19 + 2 / 10 ^ 20 <= 1 / 1000) by interval. lra. }
+  pose proof (rnd_abs (ck + r)) as Hra.
+  assert (Hu5 : u * Rabs (ck + r) <= u * (5 / 1000)) by (apply Rmult_le_compat_l; lra).
+  assert (Hu6 : u * (5 / 1000) <= 1 / 10 ^ 18) by (assert (12 / 10 ^ 17 * (5 / 1000) <= 1 / 10 ^ 18) by interval; nra).
+  assert (Hη2 : eta <= 1 / 10 ^ 290) by (assert (/ 10 ^ 300 <= 1 / 10 ^ 290) by interval; lra).
+  pose proof (Rabs_triang (rnd (ck + r) - (ck + r)) (ck + r - I0)) as T4.
+  replace (rnd (ck + r) - (ck + r) + (ck + r - I0)) with (rnd (ck + r) - I0) in T4 by ring.
+  pose proof (Rabs_triang (ck - I0) r) as T5. replace (ck - I0 + r) with (ck + r - I0) in T5 by ring.
+  assert (Hfin : 15 / 10 ^ 17 + 23 / 10 ^ 19 + 2 / 10 ^ 20 + 1 / 10 ^ 18 + 1 / 10 ^ 290 <= 161 / 10 ^ 18) by interval.
+  lra.
+Qed.
+
 Lemma closed_skip I0 :
   Rabs I0 <= 1 / 10 ^ 45 -> Rabs (0 - I0) <= 161 / 10 ^ 18.
 Proof.

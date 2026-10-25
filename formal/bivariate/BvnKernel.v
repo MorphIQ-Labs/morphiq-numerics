@@ -48,6 +48,14 @@ Definition k16 := aw 0x4030000000000000.
 Definition k20 := aw 0x4034000000000000.
 (** [PHI_CUTOFF = 700]. *)
 Definition kphi_cutoff := aw 0x4085e00000000000.
+(** [0.5], and [REMAINDER_CAP = 1e-20]. [HK_SPLIT = 16] is [k16]. *)
+Definition khalf := aw 0x3fe0000000000000.
+Definition krem_cap := aw 0x3bc79ca10c924223.
+(** [REMAINDER_NODES]: abscissa and weight of the 5-point Gauss-Legendre rule on [0, 1]. *)
+Definition krem_nodes : list (f64 * f64) :=
+  [(aw 0x3fa80498fd662cb5, aw 0x3fbe539ec36e0389); (aw 0x3fcd89b804cc91f8, aw 0x3fcea1da25ae415a);
+   (aw 0x3fe0000000000000, aw 0x3fd23456789abcde); (aw 0x3fe89d91feccdb82, aw 0x3fcea1da25ae415a);
+   (aw 0x3fee7fb670299d35, aw 0x3fbe539ec36e0389)].
 Definition kquarter := aw 0x3fd0000000000000.
 (** [f64::NAN]. *)
 Definition knan := aw 0x7ff8000000000000.
@@ -221,11 +229,21 @@ Definition panel_rule_of (wide : bool) : list Z * list Z * list Z * option Z :=
 Definition panel_rule (s : f64) : list Z * list Z * list Z * option Z :=
   panel_rule_of (fgt s kpanel_wide).
 
-(** [integrand_term]. *)
+(** [integrand_term]: from [HK_SPLIT] on the exponent is the sum of [big = hk / 2 + bs / (2 xs)]
+    and [small = hk xs / (2 (1 + rs)^2)], each under its own exponential, and the cutoff is on
+    [big]. *)
 Definition integrand_term (L : lib) (xs w bs hk : f64) : f64 :=
   let rs := fsqrt (k1 -f xs) in
-  let phi := bs /f (k2 *f xs) +f hk /f (k1 +f rs) in
-  if flt phi kphi_cutoff then w *f (lib_exp L (fneg phi) /f rs) else k0.
+  let d := k1 +f rs in
+  if fge hk k16 then
+    let big := hk *f khalf +f bs /f (k2 *f xs) in
+    if flt big kphi_cutoff then
+      let small := hk *f xs /f (k2 *f d *f d) in
+      w *f (lib_exp L (fneg big) *f lib_exp L (fneg small) /f rs)
+    else k0
+  else
+    let phi := bs /f (k2 *f xs) +f hk /f d in
+    if flt phi kphi_cutoff then w *f (lib_exp L (fneg phi) /f rs) else k0.
 
 (** The panel nodes of a scale in order, each as its unit square and weight:
     the pair of each abscissa, then the centre. *)
@@ -271,20 +289,41 @@ Definition gen_x (c bs ass w : f64) : f64 := c *f (bs -f ass) *f w /f k3.
 Definition gen_p1 (c d ass x : f64) : f64 := k1 -f x +f c *f d *f ass *f ass /f k5.
 Definition gen_p2 (c bs w : f64) : f64 := k1 -f c *f bs *f w /f k3.
 
-(** Genz's closed form for the integral on the last scale [s <= 0.003], zero
-    where [b >= 20 s]. *)
+(** One node of [closed_form_remainder]: [sum + w s exp(-(bs / xs + hk) / 2) (g - taylor)] at
+    [xs = (s t)^2], [g = exp(-q) / rs] and [taylor = 1 + c xs (1 + d xs)]. *)
+Definition remainder_step (L : lib) (s bs hk c d : f64) (sum : f64) (tw : f64 * f64) : f64 :=
+  let xs := (s *f fst tw) *f (s *f fst tw) in
+  let rs := fsqrt (k1 -f xs) in
+  let q := hk *f xs /f (k2 *f (k1 +f rs) *f (k1 +f rs)) in
+  let g := lib_exp L (fneg q) /f rs in
+  let taylor := k1 +f c *f xs *f (k1 +f d *f xs) in
+  sum +f snd tw *f s *f lib_exp L (fneg (bs /f xs +f hk) /f k2) *f (g -f taylor).
+
+(** What Genz's Taylor polynomial leaves of the closed form's integrand, by a 5-point rule,
+    discarded (a NaN included) unless within [REMAINDER_CAP]. *)
+Definition closed_form_remainder (L : lib) (s bs hk c d : f64) : f64 :=
+  let sum := fold_left (remainder_step L s bs hk c d) krem_nodes k0 in
+  if fle (fabs sum) krem_cap then sum else k0.
+
+(** Genz's closed form for the integral on the last scale [s <= 0.003]: [A1 - A2]. *)
+Definition closed_base (L : lib) (s bs hk : f64) : f64 :=
+  let b := fsqrt bs in
+  let ass := s *f s in
+  let c := gen_c hk in
+  let d := gen_d hk in
+  let w := gen_w d bs in
+  let p1 := gen_p1 c d ass (gen_x c bs ass w) in
+  let p2 := gen_p2 c bs w in
+  let a1 := s *f lib_exp L (fneg (bs /f ass +f hk) /f k2) *f p1 in
+  let a2 := lib_exp L (fneg hk /f k2) *f ksqrt_tau *f lib_norm_cdf L (fneg b /f s) *f b *f p2 in
+  a1 -f a2.
+
+(** The closed form, zero where [b >= 20 s]; from [HK_SPLIT] on the remainder correction is added. *)
 Definition closed_form (L : lib) (s bs hk : f64) : f64 :=
   let b := fsqrt bs in
   if flt b (k20 *f s) then
-    let ass := s *f s in
-    let c := gen_c hk in
-    let d := gen_d hk in
-    let w := gen_w d bs in
-    let p1 := gen_p1 c d ass (gen_x c bs ass w) in
-    let p2 := gen_p2 c bs w in
-    let a1 := s *f lib_exp L (fneg (bs /f ass +f hk) /f k2) *f p1 in
-    let a2 := lib_exp L (fneg hk /f k2) *f ksqrt_tau *f lib_norm_cdf L (fneg b /f s) *f b *f p2 in
-    a1 -f a2
+    if fge hk k16 then closed_base L s bs hk +f closed_form_remainder L s bs hk (gen_c hk) (gen_d hk)
+    else closed_base L s bs hk
   else k0.
 
 (** The integral [-J] accumulates, before its scaling: [bvn] of [high_correlation]

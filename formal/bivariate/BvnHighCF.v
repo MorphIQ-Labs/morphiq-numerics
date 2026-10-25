@@ -34,6 +34,11 @@ Definition closed_k (expT sqrtT nc : R -> R) (s bsT hkT : R) : R :=
   let a2 := rnd (rnd (rnd (rnd (expT (- (hkT / 2)) * SQRT_TAU) * nc (rnd (- b / s))) * b) * p2) in
   rnd (a1 - a2).
 
+(** The kernel's value with the remainder correction [r] (within [2e-20], or discarded) added from
+    [hkT >= 16]. *)
+Definition closed_k2 (expT sqrtT nc : R -> R) (s bsT hkT r : R) : R :=
+  if Rle_dec 16 hkT then rnd (closed_k expT sqrtT nc s bsT hkT + r) else closed_k expT sqrtT nc s bsT hkT.
+
 Definition xe_leaf (hk bs s E eh S P b : R) (i : nat) : R :=
   match i with
   | 0 => hk | 1 => bs | 2 => s * s | 3 => 1 | 4 => 4 | 5 => 12 | 6 => s

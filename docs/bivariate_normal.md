@@ -233,7 +233,8 @@ countermonotone 63, invalid correlation 567, NaN threshold 492, saturated below 
 arguments 3 930, signed-zero threshold 492 and correlation 81; the low rules of 6, 8, 12, 14, 20 and 24
 nodes 819, 630, 1 953, 756, 819 and 1 199, each rule limit with the adjacent doubles either side; the high
 branch for `rho > 0` 1 730 and `rho < 0` 2 121 (`Phi(-dh) > Phi(dk)` in 473 of them, `<=` in 1 511), the `hk >= 1400` skip 170,
-`hk` from 100 to 1400 (the integral computed where it used to be skipped) 359,
+`hk` from 100 to 1400 (the integral computed where it used to be skipped) 359, `hk >= 16` (the split exponent) 507,
+the closed form's remainder correction 287,
 the closed form evaluated 1 247 and skipped (`sqrt(bs) >= 20 s`) 2 434, 16-node panels 1 772 and 15-node panels 8 953,
 and cases with 0 to 7 panels 1 298, 194, 276, 240, 416, 312, 580 and 365, including the correlation at which the panel
 scale crosses `0.095 2^j` and `0.003 2^j` and the counterexample `bivariate_norm_cdf(-0.21101192279835226,
@@ -257,8 +258,9 @@ that the kernel's pieces return the proofs' values:
   (`kernel_low_ok`: the kernel's value is `Rhat` of BvnTop.v on a table whose nodes match the proof's `NodeS`
   records), with the table finite (`BvnTableFacts.v`) and `cdf` on ordered unsaturated thresholds equal to the
   branch (`cdf_low`);
-* high branch: a node's term (`node_value_ok`: `node_term` of BvnHighNode.v), Genz's closed form (`closed_form_ok`:
-  `closed_k` of BvnHighCF.v), the panels' accumulation and loop (`panel_fold_ok`, `panel_sum_ok`: `dwsum` over the
+* high branch: a node's term (`node_value_ok`: `node_term` of BvnHighNodeHi.v, the single exponential of BvnHighNode.v
+  or, from `hk >= 16`, the split one), Genz's closed form with its remainder correction (`closed_form_ok`:
+  `closed_k2` of BvnHighCF.v), the panels' accumulation and loop (`panel_fold_ok`, `panel_sum_ok`: `dwsum` over the
   `node_term`s of every panel, the scale halving, the rule choice, at most seven panels), the integral
   (`high_integral_ok`: `rnd (Cl + rnd (Pw + Pl))` of `J_bound`), the three final assemblies of BvnHighEnd.v
   (`high_finish_pos`, `_neg_diff`, `_neg_zero`) and the whole branch for each sign
@@ -394,17 +396,30 @@ also evaluated by Plackett's identity, a positive integral over the correlation 
 
 | `rho` | `P(-12,-12)` | `P(-17,-17)` | `P(-25,-25)` | `P(-36,-36)` | `We04DP` |
 |---|---|---|---|---|---|
-| 0.99 | 1.3e-15 | 1.5e-15 | 3.3e-13 | 3.3e-11 | 5.7e-16 at -12; 3.4 (wrong) at -17; fails after |
-| 0.999 | 8.0e-16 | 1.2e-14 | 2.5e-13 | 4.5e-12 | 1.8e-16 at -12; 0.42 at -17 |
-| 0.97 | 5.4e-15 | 3.8e-15 | 4.3e-12 | 1.5e-8 | 2.4e-15 at -12; 27 at -17 |
-| 0.93 | 7.6e-15 | 1.0e-11 | 9.3e-8 | 0.33 | 1.9e-14 at -12; 860 at -17 |
+| 0.99 | 7.9e-17 | 7.9e-16 | 9.6e-16 | 2.6e-15 | 5.7e-16 at -12; 3.4 (wrong) at -17; fails after |
+| 0.999 | 6.7e-17 | 5.5e-17 | 3.0e-17 | 3.1e-16 | 1.8e-16 at -12; 0.42 at -17 |
+| 0.97 | 9.4e-16 | 2.0e-15 | 4.5e-14 | 1.6e-11 | 2.4e-15 at -12; 27 at -17 |
+| 0.93 | 7.6e-15 | 3.4e-14 | 6.3e-11 | 8.2e-6 | 1.9e-14 at -12; 860 at -17 |
 
-The growth with depth has two causes, neither removable by more nodes: the
-exponent `phi` is rounded to `u phi` (`1e-13` at `phi = 700`) and enters `exp`,
-and the result is `Phi(-max) - J / 2 pi`, which cancels more as `rho` falls
-toward 0.925 (at 0.93 and `-25` the result is `5e5` times smaller than the
-term it is subtracted from). The positive-correlation tail rows of the fixture
-(`deep`, 84 of them) keep it from regressing.
+What is left of the growth with depth is the cancellation in `Phi(-max) - J / 2 pi`, which
+grows as `rho` falls toward 0.925 (at 0.93 and `-25` the result is `5e5` times smaller than the
+term it is subtracted from); more nodes do not remove it. The rounding of the node's exponent,
+which dominated it before (`u phi`, `1e-13` at `phi = 700`), is gone from `hk = 16` on: the node
+evaluates `exp(-(hk/2 + bs/(2 xs))) exp(-small)` and the closed form adds back the Taylor remainder
+it dropped (`docs/bivariate_normal_high.md` section 1.8). The positive-correlation tail rows of the
+fixture (`deep`, 84 of them, each held to `1e-28` by Plackett's identity as well) keep it from
+regressing: the worst over the rows with `rho >= 0.97` is within `1e-9` and the worst over rows at
+least `1e-150` within `5e-10` (`6.3e-11` at `P(-25, -25; 0.93)`).
+
+On the diagonal `h = k`, where `We04DP`'s exponent `-(bs/xs + hk)/2` is exact for round thresholds,
+`We04DP` was ahead of the earlier code by up to 70 times (`4.3e-17` against `3.2e-15` at
+`P(-14, -14; 0.999)`). It is not now: over 153 cells (8 correlations from 0.925 to `1 - 2^-30`, thresholds
+`-6` to `-16` on and off the diagonal) `We04DP` is more than twice as accurate at four: `1.9e-15`
+against `5.1e-15` at `P(-10, -10; 0.93)` (the cancellation above), and `1.2e-16`, `8.0e-17`, `1.6e-16`
+against `8.1e-16`, `3.3e-16`, `3.7e-16` at `hk` of 81 to 121 (about 1 ulp against 3 to 7), where its
+exponent is exact; ours is the more accurate at most of the rest. On inputs that are not round (100 near-diagonal and off-diagonal points at
+correlations 0.93 to 0.9999, thresholds `-8` to `-15`) ours has median relative error `1.1e-16` against
+`4.7e-15` and `We04DP` is more than twice as accurate at one (`1.9e-14` against `2.8e-15`).
 
 Provenance of the comparison: QuantLib's `We04DP` source (BSD-style license) was read
 for it. What it contributed to this code is three numbers, the node counts 6, 12

@@ -135,19 +135,19 @@ Definition node_xsT s2T xuT := rnd (s2T * xuT).
 Definition node_rsT s2T xuT := sqrtT (rnd (1 - node_xsT s2T xuT)).
 Definition node_phiT s2T xuT bsT hkT :=
   rnd (rnd (bsT / (2 * node_xsT s2T xuT)) + rnd (hkT / rnd (1 + node_rsT s2T xuT))).
-Definition node_term s2T xuT wT bsT hkT hw :=
+Definition node_term_lo s2T xuT wT bsT hkT hw :=
   if Rlt_dec (node_phiT s2T xuT bsT hkT) 700
   then rnd (hw * rnd (wT * rnd (expT (- node_phiT s2T xuT bsT hkT) / node_rsT s2T xuT)))
   else 0.
 
-Theorem node_error s xu w bs hk s2T xuT wT bsT hkT e0 :
+Theorem node_error_lo s xu w bs hk s2T xuT wT bsT hkT e0 :
   3 / 1000 < s <= 381 / 1000 -> 1 / 4 <= xu <= 1 -> 1 / 1000 <= w <= 1 / 2 ->
   0 <= bs -> - (4 * hk) <= bs -> 0 <= e0 <= / 10 ^ 200 ->
   rel (s * s) s2T u -> rel xu xuT u -> rel w wT u ->
   rela bs bsT (31 / 10 * u) e0 -> rela hk hkT u e0 ->
   let xs := s * s * xu in
   let F := exp (- (bs / (2 * xs) + hk / (1 + sqrt (1 - xs)))) / sqrt (1 - xs) in
-  Rabs (node_term s2T xuT wT bsT hkT (s / 4) - (s / 4) * w * F)
+  Rabs (node_term_lo s2T xuT wT bsT hkT (s / 4) - (s / 4) * w * F)
   <= (s / 4) * w * (117 / 10 * u + 1 / 10 ^ 39).
 Proof.
   intros Hs Hxu Hw Hbs Hc He0 Hs2 Hxu2 Hw2 Hbs2 Hhk2 xs F.
@@ -190,7 +190,7 @@ Proof.
   assert (H_phi' : Rabs (phiT - phi) <= 85 / 10 * u * pabs + 1 / 10 ^ 189) by exact H_phi.
   assert (H_phi40 : Rabs (phiT - phi) <= 85 / 10 * u * pabs + 1 / 10 ^ 40).
   { assert (1 / 10 ^ 189 <= 1 / 10 ^ 40) by interval. lra. }
-  unfold node_term. fold phiT. fold rsT.
+  unfold node_term_lo. fold phiT. fold rsT.
   assert (Hrs0 : 0 < rs) by lra.
   assert (HFp : 0 < F) by (unfold F; apply Rmult_lt_0_compat; [apply exp_pos | apply Rinv_0_lt_compat; lra]).
   assert (Hpabs0 : 0 <= pabs) by (unfold pabs; pose proof (Rabs_pos r2); lra).

@@ -239,15 +239,72 @@ fn the_high_branch_bound_depends_on_the_sign_of_the_correlation() {
     assert_eq!(largest, ABSOLUTE_ERROR_BOUND);
 }
 
-/// The integrand is zero from `phi = 700` on, and positive just below it.
+/// The integrand is zero from `phi = 700` on (from `hk >= 16`, from `hk / 2 +
+/// bs / (2 xs) = 700`), and positive just below it.
 #[test]
 fn the_integrand_stops_at_the_exponent_cutoff() {
-    // `xs = 0.75` gives `rs = 0.5`; with `bs = 0`, `phi = hk / 1.5`.
-    assert_eq!(integrand_term(0.75, 1.0, 0.0, 1050.0), 0.0);
-    assert!(integrand_term(0.75, 1.0, 0.0, 1049.999).is_sign_positive());
-    assert!(integrand_term(0.75, 1.0, 0.0, 1049.999) > 0.0);
+    // `bs = 0` and `hk >= 16`: the cutoff is on `hk / 2`.
+    assert_eq!(integrand_term(0.0001, 1.0, 0.0, 1400.0), 0.0);
+    assert!(integrand_term(0.0001, 1.0, 0.0, 1399.999).is_sign_positive());
+    assert!(integrand_term(0.0001, 1.0, 0.0, 1399.999) > 0.0);
     // A node past the old cutoff of 100 is computed.
-    assert!(integrand_term(0.75, 1.0, 0.0, 300.0) > 0.0);
+    assert!(integrand_term(0.0001, 1.0, 0.0, 300.0) > 0.0);
+    // Below `HK_SPLIT` the cutoff is on `phi = hk / (1 + rs)`: `xs = 0.75` gives `rs = 0.5`.
+    assert!(integrand_term(0.75, 1.0, 0.0, 15.999) > 0.0);
+    assert_eq!(integrand_term(0.75, 1.0, 1100.0, 15.999), 0.0);
+}
+
+/// From `HK_SPLIT` on the two exponentials are the integrand's one: they agree with
+/// `exp(-phi) / rs` to the single exponential's own rounding.
+#[test]
+fn the_split_exponent_agrees_with_the_single_exponential() {
+    for &(xs, bs, hk) in &[
+        (0.01, 0.0, 16.0),
+        (0.1, 3.0, 40.0),
+        (0.0001, 0.0, 120.0),
+        (0.14, 1.0, 16.0),
+        (0.05, 0.2, 60.0),
+    ] {
+        let rs = sqrt(1.0 - xs);
+        let phi = bs / (2.0 * xs) + hk / (1.0 + rs);
+        let single = exp(-phi) / rs;
+        let split = integrand_term(xs, 1.0, bs, hk);
+        assert!(
+            ((split - single) / single).abs() < 1e-13,
+            "xs {xs:e} bs {bs:e} hk {hk:e}: {split:e} against {single:e}"
+        );
+    }
+}
+
+/// The remainder correction is the integral it names: three values from a 50-digit
+/// quadrature of `exp(-bs/(2 x^2) - hk/2) (G - T)` (the correction is negative: `G < T`), to the
+/// rounding of its evaluation, which is under 5% of the smallest.
+#[test]
+fn the_closed_form_remainder_is_the_taylor_remainder_it_integrates() {
+    for &(s, bs, hk, expected) in &[
+        (0.003, 0.0, 100.0, -1.3241224e-38),
+        (0.003, 1e-6, 100.0, -1.225685e-38),
+        (0.0029, 0.0, 196.0, -1.3706128e-58),
+    ] {
+        let (c, d) = ((4.0 - hk) / 8.0, (12.0 - hk) / 16.0);
+        let got = closed_form_remainder(s, bs, hk, c, d);
+        assert!(
+            ((got - expected) / expected).abs() < 5e-2,
+            "s {s:e} bs {bs:e} hk {hk:e}: {got:e} against {expected:e}"
+        );
+    }
+}
+
+/// The closed form's remainder correction is far below its cap where it is used, and a
+/// correction beyond the cap, or a NaN, is dropped.
+#[test]
+fn the_closed_form_remainder_is_within_its_cap_and_dropped_beyond_it() {
+    let (s, hk) = (0.003, 16.0);
+    let (c, d) = ((4.0 - hk) / 8.0, (12.0 - hk) / 16.0);
+    let r = closed_form_remainder(s, 0.0, hk, c, d);
+    assert!(r != 0.0 && r.abs() < REMAINDER_CAP / 10.0, "{r:e}");
+    assert_eq!(closed_form_remainder(s, 0.0, hk, 1e9, d), 0.0);
+    assert_eq!(closed_form_remainder(s, f64::NAN, hk, c, d), 0.0);
 }
 
 /// Where both thresholds are far below zero and the correlation is high, the
@@ -785,5 +842,24 @@ fn no_rule_has_fewer_nodes_than_the_canonical_implementation() {
                 genz(rho)
             );
         }
+    }
+}
+
+/// The split exponent and the remainder correction are what bring the high branch's relative
+/// error on the diagonal from `3e-15` (`P(-14, -14; 0.999)`) and `3e-11` (`P(-36, -36; 0.99)`) to
+/// the values here; the references are 50-digit quadratures of Plackett's identity.
+#[test]
+fn the_high_branch_keeps_its_relative_accuracy_on_the_diagonal() {
+    for &(x, rho, expected, tolerance) in &[
+        (-14.0, 0.999, 5.868_397_061_334_767e-45, 2e-16),
+        (-36.0, 0.99, 4.455_063_213_036_484e-286, 1e-14),
+        (-25.0, 0.99, 2.319_854_744_485_689_9e-139, 5e-15),
+        (-10.0, 0.99, 3.612_601_676_232_516e-24, 1e-15),
+    ] {
+        let got = bivariate_norm_cdf(x, x, rho);
+        assert!(
+            ((got - expected) / expected).abs() < tolerance,
+            "P({x}, {x}; {rho}) = {got:e}, expected {expected:e}"
+        );
     }
 }

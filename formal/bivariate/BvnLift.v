@@ -328,6 +328,10 @@ Lemma exb_ksaturated : exb ksaturated 39 6. Proof. unfold ksaturated. kconst. Qe
 Lemma exb_kpanel_floor : exb kpanel_floor (3458764513820541 / 1152921504606846976) 0. Proof. unfold kpanel_floor. kconst. Qed.
 Lemma exb_kpanel_wide : exb kpanel_wide (3422735716801577 / 36028797018963968) 0. Proof. unfold kpanel_wide. kconst. Qed.
 
+Lemma exb_khalf : exb khalf (1 / 2) 0. Proof. unfold khalf. kconst. Qed.
+Lemma exb_krem_cap : exb krem_cap (6646139978924579 / 664613997892457936451903530140172288) (-66).
+Proof. unfold krem_cap. kconst. Qed.
+
 Lemma exb_k0' : exb k0 0 0. Proof. eapply exb_weak; [exact exb_k0 | lia]. Qed.
 
 Create HintDb exb.
@@ -365,6 +369,33 @@ Proof.
   - apply bnd_exb; [exact F2 | exact P2 | ].
     unfold bnd in B2; unfold bnd. rewrite <- P2. rewrite bpow_plus. change (bpow radix2 4) with 16.
     change (IZR 1) with 1. change (IZR 10) with 10 in B2. pose proof (bpow_ge_0 radix2 (Ea + Eb)). lra.
+Qed.
+
+(** The remainder correction is kept only when it is within [REMAINDER_CAP]: whatever
+    the sum was, even a NaN, the kept value is finite and under [2^-66]. *)
+Lemma bcmp_inf_finite y : finite y -> Bcompare 53 1024 (B754_infinity 53 1024 false) y = Some Gt.
+Proof. destruct y; simpl; intros H; try discriminate; reflexivity. Qed.
+
+Lemma finite_of_fle_cap x : fle (fabs x) krem_cap = true -> finite x.
+Proof.
+  intros E. destruct x as [s|s|s pl H|s m e H]; [reflexivity | | exfalso | reflexivity].
+  - unfold fle, fcmp, fabs, b64_abs in E. cbn [Babs] in E.
+    rewrite (bcmp_inf_finite krem_cap (proj1 exb_krem_cap)) in E. discriminate E.
+  - unfold fle, fcmp, fabs, b64_abs in E. cbn [Babs] in E. discriminate E.
+Qed.
+
+Lemma exb_rem_clamp x : exists r, exb (if fle (fabs x) krem_cap then x else k0) r (-66).
+Proof.
+  destruct (fle (fabs x) krem_cap) eqn:E.
+  - pose proof (finite_of_fle_cap x E) as Fx.
+    apply (fle_iff (fabs x) krem_cap) in E; [| unfold fabs, b64_abs; rewrite is_finite_Babs; exact Fx | exact (proj1 exb_krem_cap)].
+    exists (B x). unfold exb. refine (conj Fx (conj eq_refl _)).
+    unfold fabs, b64_abs in E. rewrite B2R_Babs in E.
+    rewrite (proj1 (proj2 exb_krem_cap)) in E.
+    pose proof (proj2 (proj2 exb_krem_cap)) as Hc. rewrite Rabs_pos_eq in Hc.
+    + lra.
+    + apply Rle_trans with (Rabs (B x)); [apply Rabs_pos | exact E].
+  - exists 0. eapply exb_weak; [exact exb_k0 | lia].
 Qed.
 
 (** The probability clamp. *)

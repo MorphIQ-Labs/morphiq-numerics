@@ -71,3 +71,30 @@ Proof.
   rewrite (Rabs_right I0) in T2 by lra.
   assert (1 / 10 ^ 32 + 1 / 10 ^ 24 + 1 / 10 ^ 24 <= 161 / 10 ^ 18) by interval. lra.
 Qed.
+
+(** The same with the remainder correction added. *)
+Lemma closed_total_big_rem ck Cx I0 r :
+  Rabs (ck - Cx) <= 1 / 10 ^ 32 -> Rabs Cx <= 1 / 10 ^ 24 -> 0 <= I0 <= 1 / 10 ^ 24 ->
+  Rabs r <= 2 / 10 ^ 20 ->
+  Rabs (rnd (ck + r) - I0) <= 161 / 10 ^ 18.
+Proof.
+  intros H1 H2 [H3 H4] Hr.
+  pose proof u_pos as Hu. pose proof u_lt as Hu2. pose proof eta_small as Hη.
+  pose proof Hr as Hr'.
+  pose proof (Rabs_triang (ck - Cx) Cx) as T1. replace (ck - Cx + Cx) with ck in T1 by ring.
+  assert (Hck : Rabs ck <= 2 / 10 ^ 24 + 1 / 10 ^ 32) by (assert (1 / 10 ^ 32 + 1 / 10 ^ 24 = 1 / 10 ^ 32 + 1 / 10 ^ 24) by reflexivity; lra).
+  assert (Hck' : Rabs ck <= 1 / 10 ^ 23) by (assert (2 / 10 ^ 24 + 1 / 10 ^ 32 <= 1 / 10 ^ 23) by interval; lra).
+  pose proof (Rabs_triang ck r) as T7.
+  assert (Hck2 : Rabs (ck + r) <= 3 / 10 ^ 20) by (assert (1 / 10 ^ 23 + 2 / 10 ^ 20 <= 3 / 10 ^ 20) by interval; lra).
+  pose proof (rnd_abs (ck + r)) as Hra.
+  assert (Hu5 : u * Rabs (ck + r) <= u * (3 / 10 ^ 20)) by (apply Rmult_le_compat_l; lra).
+  assert (Hu6 : u * (3 / 10 ^ 20) <= 1 / 10 ^ 30) by (assert (12 / 10 ^ 17 * (3 / 10 ^ 20) <= 1 / 10 ^ 30) by interval; nra).
+  assert (Hη2 : eta <= 1 / 10 ^ 290) by (assert (/ 10 ^ 300 <= 1 / 10 ^ 290) by interval; lra).
+  pose proof (Rabs_triang (rnd (ck + r) - (ck + r)) (ck + r - I0)) as T4.
+  replace (rnd (ck + r) - (ck + r) + (ck + r - I0)) with (rnd (ck + r) - I0) in T4 by ring.
+  pose proof (Rabs_triang (ck + r) (- I0)) as T6. rewrite Rabs_Ropp in T6.
+  replace (ck + r + - I0) with (ck + r - I0) in T6 by ring.
+  rewrite (Rabs_right I0) in T6 by lra.
+  assert (Hfin : 3 / 10 ^ 20 + 1 / 10 ^ 24 + 1 / 10 ^ 30 + 1 / 10 ^ 290 <= 161 / 10 ^ 18) by interval.
+  lra.
+Qed.

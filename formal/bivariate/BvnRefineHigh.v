@@ -8,9 +8,10 @@
 From Coq Require Import Reals ZArith Lia Lra List.
 Import ListNotations.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
+From Interval Require Import Tactic.
 From Binary64 Require Import Binary64Add Binary64Mul IEEE64 IEEE64Add IEEE64Mul IEEE64Sqrt IEEE64Div.
 Require Import BvnKernel BvnLift BvnTableFacts.
-Require Import BvnHighAssembly BvnHighRound BvnHighSteps BvnHighBudget BvnHighNode BvnHighCF BvnHighJ1 BvnHighSum.
+Require Import BvnHighAssembly BvnHighRound BvnHighSteps BvnHighBudget BvnHighNode BvnHighNodeHi BvnHighCF BvnHighJ1 BvnHighSum.
 Open Scope R_scope.
 
 Local Opaque fadd fsub fmul fdiv fsqrt fneg fabs.
@@ -77,10 +78,10 @@ Lemma node_value_ok sf xuf wf bsf hkf s xu w bs hk :
   exb xuf xu 0 -> 1 / 4 <= xu -> xu <= 1 -> exb wf w 0 ->
   exb bsf bs 14 -> 0 <= bs -> exb hkf hk 11 -> - (4 * hk) <= bs ->
   exb (node_value L (sf /f k4) (sf *f sf) xuf wf bsf hkf)
-      (node_term expT sqrtF (rndF (s * s)) xu w bs hk (s / 4)) 3.
+      (node_term expT sqrtF (rndF (s * s)) xu w bs hk (s / 4)) 5.
 Proof.
   intros Hs Hs0 Hs1 Hxu Hxu0 Hxu1 Hw Hbs Hbs0 Hhk Hc.
-  unfold node_term, node_phiT, node_rsT, node_xsT. rnd2F.
+  unfold node_term, node_term_lo, node_term_hi, node_phiT, node_bigT, node_smallT, node_dT, node_rsT, node_xsT. rnd2F.
   assert (Hs2 : exb (sf *f sf) (rndF (s * s)) 0) by lift_to.
   set (s2 := rndF (s * s)) in *.
   assert (Hs2lo : bpow radix2 (-17) <= s2).
@@ -135,6 +136,59 @@ Proof.
     rewrite Rabs_pos_eq by lra.
     assert (bpow radix2 (-1000) <= bpow radix2 (-9)) by (apply bpow_le; lia).
     assert (bpow radix2 (-9) = 1 / 512) by (bnum; lra). lra. }
+  destruct (Rle_dec 16 hk) as [H16|H16]; cbv iota.
+  - (* the split form *)
+    unfold node_value, integrand_term. cbv zeta.
+    assert (Hge16 : fge hkf k16 = true).
+    { apply (fge_iff hkf k16 (exb_fin _ _ _ Hhk) (proj1 exb_k16)).
+      rewrite (exb_val _ _ _ Hhk), (proj1 (proj2 exb_k16)). exact H16. }
+    rewrite Hge16.
+    assert (Hhh : exb (hkf *f khalf) (rndF (hk * (1 / 2))) 11) by (eapply exb_weak; [apply (exb_mul hkf khalf hk (1 / 2) 11 0 Hhk exb_khalf); unfold cl; lia | unfold cl; lia]).
+    assert (Hhh0 : 0 <= rndF (hk * (1 / 2))) by (apply rnd_nonneg0; lra).
+    assert (Hqq : exb (bsf /f (k2 *f (sf *f sf *f xuf))) (rndF (bs / (2 * xs))) 33).
+    { eapply exb_weak; [eapply exb_div; [exact Hbs | exact H2x | unfold cl; lia | exact Dx | unfold cl; lia] | unfold cl; lia]. }
+    assert (Hqq0 : 0 <= rndF (bs / (2 * xs))).
+    { apply rnd_nonneg0. apply Rmult_le_pos; [exact Hbs0 | left; apply Rinv_0_lt_compat; pose proof (bpow_gt_0 radix2 (-19)); lra]. }
+    assert (HbigK : exb (hkf *f khalf +f bsf /f (k2 *f (sf *f sf *f xuf))) (rndF (rndF (hk * (1 / 2)) + rndF (bs / (2 * xs)))) 34).
+    { eapply exb_weak; [eapply exb_add; [exact Hhh | exact Hqq | unfold cl; lia] | unfold cl; lia]. }
+    set (bigR := rndF (rndF (hk * (1 / 2)) + rndF (bs / (2 * xs)))) in *.
+    assert (Hbig0 : 0 <= bigR) by (apply rnd_nonneg0; lra).
+    assert (HDk2 : 2 <= rndF (2 * D)).
+    { assert (F2 : fmtF 2) by (replace 2 with (bpow radix2 1) by (simpl; lra); apply fmtF_bpow; lia).
+      apply rnd_ge_fmt; [exact F2 | lra]. }
+    assert (HdenK : exb (k2 *f (k1 +f fsqrt (k1 -f (sf *f sf *f xuf))) *f (k1 +f fsqrt (k1 -f (sf *f sf *f xuf))))
+                        (rndF (rndF (2 * D) * D)) 6).
+    { eapply exb_weak; [eapply exb_mul; [eapply exb_mul; [exact exb_k2 | exact HD | unfold cl; lia] | exact HD | unfold cl; lia] | unfold cl; lia].
+      Unshelve. all: try (cbn; lia). }
+    assert (Hden1 : 1 <= rndF (rndF (2 * D) * D)).
+    { apply rnd_ge_fmt; [exact fmtF_one |]. nra. }
+    assert (HnumK : exb (hkf *f (sf *f sf *f xuf)) (rndF (hk * xs)) 11).
+    { eapply exb_weak; [apply (exb_mul hkf (sf *f sf *f xuf) hk xs 11 0 Hhk Hxs); unfold cl; lia | unfold cl; lia]. }
+    assert (HsmallK : exb (hkf *f (sf *f sf *f xuf) /f (k2 *f (k1 +f fsqrt (k1 -f (sf *f sf *f xuf))) *f (k1 +f fsqrt (k1 -f (sf *f sf *f xuf)))))
+                          (rndF (rndF (hk * xs) / rndF (rndF (2 * D) * D))) 11).
+    { eapply exb_weak; [eapply exb_div_one2; [rewrite Rabs_pos_eq by lra; lra | exact HnumK | exact HdenK | unfold cl; lia | unfold cl; lia] | unfold cl; lia]. }
+    set (smallR := rndF (rndF (hk * xs) / rndF (rndF (2 * D) * D))) in *.
+    assert (Hsm0 : 0 <= smallR).
+    { apply rnd_nonneg0. unfold Rdiv. apply Rmult_le_pos; [apply rnd_nonneg0; apply Rmult_le_pos; [lra | pose proof (bpow_gt_0 radix2 (-19)); lra] | left; apply Rinv_0_lt_compat; lra]. }
+    destruct (Rlt_dec bigR 700) as [Hlt | Hge].
+    + assert (Hk : flt (hkf *f khalf +f bsf /f (k2 *f (sf *f sf *f xuf))) kphi_cutoff = true).
+      { apply flt_iff; [exact (exb_fin _ _ _ HbigK) | exact (proj1 exb_kphi_cutoff) |]. rewrite (exb_val _ _ _ HbigK), (proj1 (proj2 exb_kphi_cutoff)). exact Hlt. }
+      rewrite Hk. lift_to.
+    + assert (Hk : flt (hkf *f khalf +f bsf /f (k2 *f (sf *f sf *f xuf))) kphi_cutoff = false).
+      { destruct (flt (hkf *f khalf +f bsf /f (k2 *f (sf *f sf *f xuf))) kphi_cutoff) eqn:E; [| reflexivity].
+        exfalso. apply Hge. apply (flt_iff _ _ (exb_fin _ _ _ HbigK) (proj1 exb_kphi_cutoff)) in E.
+        rewrite (exb_val _ _ _ HbigK), (proj1 (proj2 exb_kphi_cutoff)) in E. exact E. }
+      rewrite Hk. eapply exb_weak.
+      * eapply exb_cong; [eapply exb_mul; [exact Hhw | exact exb_k0 | cl_side] |].
+        rewrite Rmult_0_r. apply round_0. exact _.
+      * cl_side.
+  - (* the single exponential *)
+    unfold node_value, integrand_term. cbv zeta.
+    assert (Hge16 : fge hkf k16 = false).
+    { destruct (fge hkf k16) eqn:E; [|reflexivity]. exfalso.
+      apply (fge_iff hkf k16 (exb_fin _ _ _ Hhk) (proj1 exb_k16)) in E.
+      rewrite (exb_val _ _ _ Hhk), (proj1 (proj2 exb_k16)) in E. exact (H16 E). }
+    rewrite Hge16.
   unfold node_value, integrand_term. cbv zeta.
   destruct (Rlt_dec phi 700) as [Hlt | Hge].
   - assert (Hk : flt (bsf /f (k2 *f (sf *f sf *f xuf)) +f hkf /f (k1 +f fsqrt (k1 -f (sf *f sf *f xuf)))) kphi_cutoff = true).
@@ -162,16 +216,15 @@ Hypotheses (Hexp : lib_exp_rel L expT 1 2) (Hnc : lib_ncdf_rel L nc).
     [exp] of so small an argument is 1 either way); the hypotheses [Hh1] and [Hh2]
     exclude that case, and are the only inputs on which the kernel and the proof's
     function are not proved equal. *)
-Lemma closed_form_ok sf bsf hkf s bs hk :
+Lemma closed_base_ok sf bsf hkf s bs hk :
   exb sf s 0 -> 1 / 10 ^ 8 <= s -> s <= 3 / 1000 ->
   exb bsf bs 0 -> 0 <= bs -> bs <= 4001 / 10 * (s * s) ->
   exb hkf hk 11 -> - (4 * hk) <= bs -> hk < 1400 ->
   (rndF (rndF (bs / rndF (s * s)) + hk) = 0 \/ bpow radix2 (-1000) <= Rabs (rndF (rndF (bs / rndF (s * s)) + hk))) ->
   (hk = 0 \/ bpow radix2 (-1000) <= Rabs hk) ->
-  flt (fsqrt bsf) (k20 *f sf) = true ->
-  exists E, exb (closed_form L sf bsf hkf) (closed_k expT sqrtF nc s bs hk) E.
+  exb (closed_base L sf bsf hkf) (closed_k expT sqrtF nc s bs hk) 100.
 Proof.
-  intros Hs Hs0 Hs1 Hbs Hbs0 Hbs1 Hhk Hc Hk1400 Hh1 Hh2 Hg.
+  intros Hs Hs0 Hs1 Hbs Hbs0 Hbs1 Hhk Hc Hk1400 Hh1 Hh2.
   unfold closed_k. rnd2F.
   assert (Hss : s * s <= 9 / 1000000) by nra.
   assert (Hss0 : 1 / 10 ^ 16 <= s * s) by nra.
@@ -235,8 +288,42 @@ Proof.
   assert (Hv : exb (fneg (fsqrt bsf) /f sf) (rndF (- sqrtF bs / s)) 27) by lift_to.
   assert (Hnn : exb (lib_norm_cdf L (fneg (fsqrt bsf) /f sf)) (nc (rndF (- sqrtF bs / s))) 0).
   { eapply exb_lib_ncdf; [exact Hnc | exact Hv]. }
-  unfold closed_form. rewrite Hg. cbv zeta. unfold SQRT_TAU.
-  eexists. lift.
+  unfold closed_base. cbv zeta. unfold SQRT_TAU.
+  lift_to.
+Qed.
+
+(** The closed form of the kernel, with its remainder correction: from [hk >= 16] the value is
+    [closed_k] plus a correction [r] within [2e-20], rounded once. *)
+Lemma closed_form_ok sf bsf hkf s bs hk :
+  exb sf s 0 -> 1 / 10 ^ 8 <= s -> s <= 3 / 1000 ->
+  exb bsf bs 0 -> 0 <= bs -> bs <= 4001 / 10 * (s * s) ->
+  exb hkf hk 11 -> - (4 * hk) <= bs -> hk < 1400 ->
+  (rndF (rndF (bs / rndF (s * s)) + hk) = 0 \/ bpow radix2 (-1000) <= Rabs (rndF (rndF (bs / rndF (s * s)) + hk))) ->
+  (hk = 0 \/ bpow radix2 (-1000) <= Rabs hk) ->
+  flt (fsqrt bsf) (k20 *f sf) = true ->
+  exists E r, Rabs r <= 2 / 10 ^ 20 /\ exb (closed_form L sf bsf hkf) (closed_k2 expT sqrtF nc s bs hk r) E.
+Proof.
+  intros Hs Hs0 Hs1 Hbs Hbs0 Hbs1 Hhk Hc Hk1400 Hh1 Hh2 Hg.
+  pose proof (closed_base_ok sf bsf hkf s bs hk Hs Hs0 Hs1 Hbs Hbs0 Hbs1 Hhk Hc Hk1400 Hh1 Hh2) as HE0.
+  unfold closed_form. rewrite Hg.
+  destruct (fge hkf k16) eqn:E16; cbv iota.
+  - apply (fge_iff hkf k16 (exb_fin _ _ _ Hhk) (proj1 exb_k16)) in E16.
+    rewrite (exb_val _ _ _ Hhk), (proj1 (proj2 exb_k16)) in E16.
+    unfold closed_form_remainder. cbv zeta.
+    destruct (exb_rem_clamp (fold_left (remainder_step L sf bsf hkf (gen_c hkf) (gen_d hkf)) krem_nodes k0)) as [r Hr].
+    exists (cl (Z.max 100 (-66) + 1)), r. split.
+    + pose proof (proj2 (proj2 Hr)) as Hb. eapply Rle_trans; [exact Hb|].
+      assert (bpow radix2 (-66) <= 2 / 10 ^ 20) by (bnum; interval).
+      exact H.
+    + unfold closed_k2. destruct (Rle_dec 16 hk) as [Hk|Hk]; [|exfalso; apply Hk; exact E16].
+      rnd2F. eapply exb_add; [exact HE0 | exact Hr | unfold cl; lia].
+  - assert (Hk : ~ 16 <= hk).
+    { intro Hk. assert (Ht : fge hkf k16 = true).
+      { apply (fge_iff hkf k16 (exb_fin _ _ _ Hhk) (proj1 exb_k16)). rewrite (exb_val _ _ _ Hhk), (proj1 (proj2 exb_k16)). exact Hk. }
+      congruence. }
+    exists 100%Z, 0. split.
+    + rewrite Rabs_R0. assert (0 < 2 / 10 ^ 20) by interval. lra.
+    + unfold closed_k2. destruct (Rle_dec 16 hk) as [Hk'|Hk']; [exfalso; exact (Hk Hk') | exact HE0].
 Qed.
 End ClosedForm.
 
@@ -384,7 +471,7 @@ Hypotheses (Hbs : exb bsf bs 14) (Hbs0 : 0 <= bs) (Hhk : exb hkf hk 11) (Hc : - 
 (** A panel's nodes: each [node_value] is the proof's [node_term]. *)
 Lemma values_ok sf s nds : exb sf s 0 -> 3 / 1000 < s -> s <= 381 / 1000 ->
   Forall (fun xw => fin_range (1 / 4) 1 (fst xw) /\ fin_range 0 1 (snd xw)) nds ->
-  Forall2 (value_rel L (sf /f k4) (sf *f sf) bsf hkf 3) nds
+  Forall2 (value_rel L (sf /f k4) (sf *f sf) bsf hkf 5) nds
     (map (fun xw => node_term expT sqrtF (rndF (s * s)) (B (fst xw)) (B (snd xw)) bs hk (s / 4)) nds).
 Proof.
   intros Hs Hs0 Hs1 HF. induction HF as [| xw nds [[Fx [Hx0 Hx1]] [Fw [Hw0 Hw1]]] Hr IH]; simpl.
@@ -405,7 +492,7 @@ Qed.
     exist to exclude overflow. *)
 Lemma panel_sum_ok fuel : forall j sf s hi lo rh rl E,
   exb sf s 0 -> 0 < s -> s * bpow radix2 (Z.of_nat j) <= 381 / 1000 ->
-  exb hi rh E -> exb lo rl E -> (3 <= E)%Z -> (E + 16 * Z.max 0 (7 - Z.of_nat j) <= 850)%Z ->
+  exb hi rh E -> exb lo rl E -> (5 <= E)%Z -> (E + 16 * Z.max 0 (7 - Z.of_nat j) <= 850)%Z ->
   let '(l, sl, p) := panel_terms expT fuel s bs hk in
   exb (fst (fst (panel_sum L fuel sf bsf hkf hi lo))) (fst (dwsum ts_ideal rh rl l)) (E + Z.of_nat (length l))
   /\ exb (snd (fst (panel_sum L fuel sf bsf hkf hi lo))) (snd (dwsum ts_ideal rh rl l)) (E + Z.of_nat (length l))
@@ -447,7 +534,7 @@ Proof.
       pose proof (rnodes_len wide) as Hn16. unfold rnodes in Hn16. rewrite map_length in Hn16.
       assert (Hn16z : (Z.of_nat (length (panel_nodes (panel_rule_of wide))) <= 16)%Z) by exact (proj1 (Nat2Z.inj_le _ 16) Hn16).
       pose proof (values_ok sf s (panel_nodes (panel_rule_of wide)) Hs ltac:(lra) Hs1 (panel_nodes_ok wide)) as Hvals.
-      pose proof (panel_fold_ok L (sf /f k4) (sf *f sf) bsf hkf 3 (panel_nodes (panel_rule_of wide))
+      pose proof (panel_fold_ok L (sf /f k4) (sf *f sf) bsf hkf 5 (panel_nodes (panel_rule_of wide))
         (map (fun xw => node_term expT sqrtF (rndF (s * s)) (B (fst xw)) (B (snd xw)) bs hk (s / 4)) (panel_nodes (panel_rule_of wide)))
         Hvals hi lo rh rl E Hh Hl ltac:(lia) ltac:(lia)
         ltac:(assert (0 <= 16 * Z.max 0 (7 - Z.of_nat j))%Z by lia; lia))
@@ -520,7 +607,7 @@ Proof.
     { unfold sqrtF. apply exb_sqrt; [exact Hass | exact Hass0 | lia]. }
     eapply exb_tight; [exact H2 |]. rewrite Rabs_pos_eq by lra. change (bpow radix2 0) with 1. lra. }
   unfold high_integral. rewrite Hflt. cbv zeta.
-  pose proof (panel_sum_ok 64%nat 0%nat (fsqrt ((k1 -f fabs rhof) *f (k1 +f fabs rhof))) (sqrtF (ass_k (Rabs rho))) k0 k0 0 0 3%Z
+  pose proof (panel_sum_ok 64%nat 0%nat (fsqrt ((k1 -f fabs rhof) *f (k1 +f fabs rhof))) (sqrtF (ass_k (Rabs rho))) k0 k0 0 0 5%Z
     Ha Ha0 ltac:(simpl; lra) ltac:(eapply exb_weak; [exact exb_k0 | lia]) ltac:(eapply exb_weak; [exact exb_k0 | lia]) ltac:(lia) ltac:(simpl; lia)) as Hps.
   destruct (panel_terms expT 64 (sqrtF (ass_k (Rabs rho))) bs hk) as [[l sl] p] eqn:Ept.
   destruct Hps as [P1 [P2 [P3 [P4 P5]]]].

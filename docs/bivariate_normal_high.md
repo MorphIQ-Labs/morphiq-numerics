@@ -28,7 +28,7 @@ Both are below the low branch's largest bound (`3.721e-16`). The `9.4e-16` is ma
 | Term | Bound |
 | --- | --- |
 | Rounding of the 15/16-node terms (`11.7 u` relative each, positive terms summing to at most `0.4123`) | `5.4e-16` |
-| Genz's closed form on the last scale: rounding `1.5e-16`, tail `2.3e-18` | `1.61e-16` |
+| Genz's closed form on the last scale: rounding `1.5e-16`, tail `2.3e-18`, the remainder correction of 1.8 (capped at `2e-20`) and its addition `1e-18` | `1.61e-16` |
 | Rounding of the scale `a` (`2.03 u` relative) | `9.4e-17` |
 | Panel truncation (`63e-18` per unit of panel scale, scales summing below `0.762`) | `5e-17` |
 | Rounding of `hi + lo` to `P`, and of `Cl + P` | `4.6e-17` each |
@@ -121,11 +121,13 @@ if hk < 1400:
         for each node (unit square xu, weight w):                       // plus, minus, centre
             term = hw * (phi < 700 ? w * (exp(-phi)/rs) : 0)            // rs = sqrt(1 - s2*xu),
                                                                         // phi = bs/(2 s2 xu) + hk/(1 + rs)
+            // from hk >= 16 (1.8):  big = hk*0.5 + bs/(2 xs);  small = hk*xs/(2*d*d), d = 1 + rs;
+            //   term = hw * (big < 700 ? w * (exp(-big)*exp(-small)/rs) : 0)
             (high, err) = two_sum(high, term);  low += err
         s /= 2
     panels = high + low
     b = sqrt(bs)
-    if b < 20 s:  J = A1 - A2                                           // 1.4, at s = s_f
+    if b < 20 s:  J = A1 - A2;  if hk >= 16: J += remainder(s, bs, hk, c, d)   // 1.4 at s = s_f; 1.8
     J += panels
 g = -J / TAU                                      // TAU = 2 pi as a double
 rho > 0:                    clamp(g + norm_cdf(-max(dh, dk)))
@@ -141,7 +143,8 @@ not on rounded values).
 
 ### 1.7 The approximations made
 
-* **A1** The Taylor remainder `int_0^s E (G - T)` is dropped (bound in 1.4).
+* **A1** The Taylor remainder `int_0^s E (G - T)` is dropped (bound in 1.4); from `hk >= 16` the code adds it
+  back (1.8) and the bound still counts it as dropped.
 * **A2** The Gauss-Legendre remainder of each panel is dropped (section 3).
 * **A3** For `hk >= 1400`, `J` is not computed: every node has `phi >= hk/2 >= 700`, so
   `J <= a e^-700 / 0.925 < 1e-304`, and the result is at most `Phi(-sqrt 1400) = 1.05e-306`, 47 times
@@ -154,12 +157,43 @@ not on rounded values).
 * **A5** A node term with `phi >= 700` is zero (its `F` is below `e^-700 < 1e-304`; the node
   bound's additive `1e-39` covers it). A node with `100 <= phi < 700` is computed and is tiny
   (below `1e-42` of its weight); `node_error` covers it by an upper bound alone (`BvnHighNode.tiny_term`).
+* **A7** The remainder correction of 1.8 is discarded unless it is within `1e-20` (a NaN is not):
+  the closed form's bound does not depend on its value (`BvnHighEnd.closed_total_rem`,
+  `BvnHighBig.closed_total_big_rem`).
 * **A6** For `100 <= hk < 1400` the closed form `closed_x` and the integral `I(0, s)` are
   each below `1e-24`: they are `exp(-hk/2)` (below `e^-50 < 2e-22`) times the moments, and the three
   moments `E_m = int_0^s exp(-bs/(2 x^2)) x^m dx` lie in `[0, s^(m+1)/(m+1)]`. So the kernel's
   closed form is within `161e-18` of `I(0, s)` without Claim K (`BvnHighBig.closed_x_small`,
   `closed_total_big`), and its float evaluation is under `1e-32` off `closed_x`
   (`BvnHighCF.closed_error_big`, over `BvnHighPolB`).
+
+### 1.8 The split exponent and the remainder correction (`hk >= 16`)
+
+Both are changes to how the same integral is evaluated, made to match the accuracy of
+`We04DP` (QuantLib's Genz implementation) near the diagonal, where it was ahead by up to a factor
+of 70 (`docs/bivariate_normal.md` section 7.1); neither changes a bound.
+
+*The split exponent.* The node's exponent is `phi = hk/2 + bs/(2 xs) + small`, with
+`small = hk (1 - rs) / (2 (1 + rs)) = hk xs / (2 (1 + rs)^2)` (`BvnHighNodeHi.split_identity`).
+Evaluated as `exp(-phi)` after `phi = bs/(2 xs) + hk/(1 + rs)`, its rounding is `u phi`, which at
+`phi = 100` is the node's whole relative error; as `exp(-big) exp(-small)` with
+`big = hk * 0.5 + bs/(2 xs)` it is not, because `hk * 0.5` is exact and `small` is under `0.038 phi`.
+The cutoff is on `big`, which is at most `phi`. The proof (`BvnHighNodeHi.node_error_hi`) shows the
+computed `big + small` is within `8.41 u q + 3.5 u r2 + 1e-188` of `phi` (`split_exponent`, over
+`small_rel` and `big_err`), takes `-ln` of the product of the two computed exponentials as the
+exponent proxy (`ln_lump`: within `3.07 u` of `big + small`), and from there reuses the node
+chain of 4.2 unchanged: the bound is the same `(s/4) w (11.7 u + 1e-39)`.
+
+*The remainder correction.* Below `PANEL_FLOOR` the integrand is replaced by `exp(-hk/2)` times the
+Taylor polynomial `T` of 1.4; the dropped remainder grows like `hk^3 s^6`, and at `hk = 196` is
+`1e-13` of the closed form (`6%` of `J` on the diagonal, where `b < 20 s` holds). `We04DP` integrates
+that remainder numerically at every scale. The code adds
+`int_0^s exp(-bs/(2 x^2) - hk/2) (G - T) dx` by a 5-point Gauss-Legendre rule, and keeps it only
+if it is within `REMAINDER_CAP = 1e-20` (its value is at most `1.1e-23` for `hk >= 16`, its
+evaluation's rounding at most `5e-22`). A kept correction is finite and under `2^-66`
+(`BvnLift.exb_rem_clamp`), which is all the absolute bound uses (`closed_total_rem`): it costs
+`1e-18` of the `1.1e-17` the closed form's bound had in hand. Whether the correction improves the
+value is measured, not proved.
 
 ## 2. Why a single rule is not provable, and what it cost
 
@@ -241,7 +275,12 @@ stages (`xs = s2 * xu`, `1 - xs`, `sqrt`, `bs / (2 xs)`, `hk / (1 + rs)`, the su
 quotient, the products) are `BvnHighSteps`, `BvnHighNodeExp`, `BvnHighNodeMul`; the
 exponential's absolute error `E * phi_err` is bounded by `exp(-x) x <= e^-1` times the
 relative error of `phi`, uniformly in `phi < 100`; from `phi = 100` to `700` the term is below
-`1e-42` of its weight and only its upper bound is needed (A5).
+`1e-42` of its weight and only its upper bound is needed (A5). From `hk >= 16` the kernel computes the
+split form of 1.8; `BvnHighNodeHi.node_error_hi` proves it to the same bound, and `BvnHighNodeHi.node_error`
+is the statement for the kernel's choice between the two (`node_term`; `node_error_lo` is the single
+exponential's, in `BvnHighNode`). Its stages are `split_exponent`, `small_rel` and `big_err`; the
+cutoff is on `big`, and a node with `99.9 <= big + small` is tiny and needs only an upper bound
+(`small_F2`, `tiny_term`).
 
 ### 4.3 The accumulation
 
@@ -267,7 +306,10 @@ Lipschitz bound of `Phi`, `BvnHighClosed2.Phi_diff`, plus the contract's `0.5 u`
 `BvnHighCF.closed_error`, `|closed_k - closed_x| <= 1.5e-16`: the kernel's sequence
 (`closed_k`, proved equal to the calculator's tree by `reflexivity`) against the exact
 expression (`closed_x`, proved equal to the tree's semantics by `field`). The guard
-`b < 20 s` gives `bs <= 400.1 s^2` (`BvnHighCF.guard_bsq`).
+`b < 20 s` gives `bs <= 400.1 s^2` (`BvnHighCF.guard_bsq`). From `hk >= 16` the kernel adds the
+remainder correction of 1.8 (`closed_k2`); the correction is under `2^-66` whatever it was computed
+as (`BvnLift.exb_rem_clamp`), so `BvnHighEnd.closed_total_rem` (and, for `hk >= 100`,
+`BvnHighBig.closed_total_big_rem`) bound the sum within `161e-18` of `I(0, s)`, as before.
 
 ### 4.5 The scale
 
@@ -319,7 +361,8 @@ prints the assumptions of each final theorem and the lane checks them against
 
 1. **Library contracts.** `exp` and `sqrt` correctly rounded on the ranges used
    (`docs/exp.md`, `docs/sqrt.md`), and `exp` under `1e-300` for arguments in `[-1000, -700)`
-   (the closed form's exponent reaches `-900`); `norm_cdf` is `RN(Z)` with `|Z - Phi| <= 2^-112 Phi`, in
+   (the closed form's exponent reaches `-900`), and `exp` of the split exponents' arguments, `-big` in
+   `[-700, 0]` and `-small` in `[-700, 0]`; `norm_cdf` is `RN(Z)` with `|Z - Phi| <= 2^-112 Phi`, in
    `[0, 1]` (`docs/normal.md`); `two_sum` exact (`eft.rs`).
 2. **Classical analysis.** (a) Plackett's identity and the decomposition
    `P = Phi(-max) - J/(2 pi)` with the reflection of 1.6. (b) T1 (3.2) with the analyticity of
@@ -335,7 +378,7 @@ prints the assumptions of each final theorem and the lane checks them against
    sequences; the kernel is `BvnKernel.v`, the same operations over the proved IEEE 754 binary64
    operations, extracted and compared bit for bit with `mod.rs` (`docs/bivariate_normal.md`
    section 6.5). `BvnRefineHigh.v` proves the kernel's pieces equal these functions:
-   `node_value_ok` (`node_term`), `closed_form_ok` (`closed_k`), `panel_sum_ok` (the panels' `dwsum`
+   `node_value_ok` (`node_term`, both forms), `closed_form_ok` (`closed_k2`: `closed_base_ok` for `closed_k`, and the remainder's clamp), `panel_sum_ok` (the panels' `dwsum`
    and the loop), `high_integral_ok` (`J_bound`'s `rnd (Cl + P)`), and the three assemblies of
    `BvnHighEnd.v` (`high_pos_composite`, `high_neg_diff_composite`, `high_neg_zero_composite`). What
    the equality assumes, besides the library contracts of item 1: that the exponent arguments
