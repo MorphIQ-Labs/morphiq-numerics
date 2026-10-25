@@ -1,6 +1,8 @@
 //! Native paired tridiagonal timings. Protocol and native qualification are in #152 under epic #149.
 //! Exact synthetic inputs; preallocated buffers; no oracle in timed loops.
-use morphiq_numerics::linalg::tridiagonal::{DominantTridiagonal, SignTridiagonal};
+use morphiq_numerics::linalg::tridiagonal::{
+    DominantTridiagonal, SignTridiagonal, UnpivotedTridiagonal,
+};
 use std::{hint::black_box, time::Instant};
 
 // Adapted from the same original MIT FerroRisk recurrence as the library.
@@ -49,8 +51,8 @@ impl Work {
         } else {
             1.0
         };
-        let lower = vec![-scale; n.saturating_sub(1)];
-        let upper = (0..n.saturating_sub(1))
+        let mut lower = vec![-scale; n.saturating_sub(1)];
+        let mut upper: Vec<_> = (0..n.saturating_sub(1))
             .map(|i| {
                 if kind.starts_with("sign") || (kind == "mixed" && i % 2 == 0) {
                     scale
@@ -69,6 +71,16 @@ impl Work {
             }) * scale;
             n
         ];
+        if kind == "unpivoted" {
+            for i in 0..n.saturating_sub(1) {
+                lower[i] = if i % 3 == 0 { -2.0 } else { 2.0 };
+                upper[i] = if i % 2 == 0 { 1.0 } else { -1.0 };
+            }
+            for i in 0..n {
+                diagonal[i] = (if i % 2 == 0 { 2.0 } else { -2.0 })
+                    + if i > 0 { lower[i - 1] / 2.0 } else { 0.0 };
+            }
+        }
         let rhs = (0..n)
             .map(|i| f64::from(u32::try_from(i % 13).unwrap()) * scale)
             .collect();
@@ -258,6 +270,90 @@ impl Work {
         elapsed
     }
 
+    fn measure_unpivoted(&mut self, method: &str, count: usize) -> u128 {
+        let a = UnpivotedTridiagonal::new(&self.lower, &self.diagonal, &self.upper).unwrap();
+        let f = a
+            .factor_into(&mut self.pivots, &mut self.normalized)
+            .unwrap();
+        f.solve_into(&self.rhs, &mut self.out).unwrap();
+        let mut old = vec![0.; self.out.len()];
+        legacy(
+            &self.lower,
+            &self.diagonal,
+            &self.upper,
+            &self.rhs,
+            &mut old,
+            &mut self.old_scratch,
+        );
+        assert!(
+            old.iter()
+                .zip(&self.out)
+                .all(|(x, y)| x.to_bits() == y.to_bits())
+        );
+        if method == "total" || method == "factor" {
+            let start = Instant::now();
+            for _ in 0..count {
+                let a = UnpivotedTridiagonal::new(
+                    black_box(&self.lower),
+                    black_box(&self.diagonal),
+                    black_box(&self.upper),
+                )
+                .unwrap();
+                let f = a
+                    .factor_into(black_box(&mut self.pivots), black_box(&mut self.normalized))
+                    .unwrap();
+                if method == "total" {
+                    assert!(f.min_abs_pivot().is_none_or(|p| p >= 1e-300));
+                    f.solve_into(black_box(&self.rhs), black_box(&mut self.out))
+                        .unwrap();
+                }
+                black_box(f);
+            }
+            return start.elapsed().as_nanos();
+        }
+        let f = a
+            .factor_into(&mut self.pivots, &mut self.normalized)
+            .unwrap();
+        let start = Instant::now();
+        for _ in 0..count {
+            match method {
+                "admit" => {
+                    black_box(
+                        UnpivotedTridiagonal::new(
+                            black_box(&self.lower),
+                            black_box(&self.diagonal),
+                            black_box(&self.upper),
+                        )
+                        .unwrap(),
+                    );
+                }
+                "minimum" => {
+                    black_box(f.min_abs_pivot());
+                }
+                "solve" => {
+                    f.solve_into(black_box(&self.rhs), black_box(&mut self.out))
+                        .unwrap();
+                }
+                "residual" => {
+                    black_box(
+                        f.certify_residual(black_box(&self.rhs), black_box(&self.out))
+                            .unwrap(),
+                    );
+                }
+                "legacy" => legacy(
+                    black_box(&self.lower),
+                    black_box(&self.diagonal),
+                    black_box(&self.upper),
+                    black_box(&self.rhs),
+                    black_box(&mut self.out),
+                    black_box(&mut self.old_scratch),
+                ),
+                _ => panic!("unknown unpivoted method"),
+            }
+        }
+        start.elapsed().as_nanos()
+    }
+
     // Separate sign-domain entry point; the existing dominant campaign is unchanged.
     // Layout preparation and qualification are outside every timed phase.
     fn measure_sign(&mut self, method: &str, count: usize, rhs_count: usize) -> u128 {
@@ -424,6 +520,14 @@ fn main() {
         let count = args.get(3).expect("count").parse().unwrap();
         let mut work = Work::new(401, "ordinary");
         work.run(method, count, 8);
+        return;
+    }
+    if args.get(1).is_some_and(|s| s == "--unpivoted-one") {
+        let mut work = Work::new(args[2].parse().unwrap(), &args[3]);
+        println!(
+            "{}",
+            work.measure_unpivoted(&args[4], args[5].parse().unwrap())
+        );
         return;
     }
     if args.get(1).is_some_and(|s| s == "--sign-one") {

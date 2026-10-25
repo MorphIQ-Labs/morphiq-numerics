@@ -242,6 +242,16 @@ jobs:
           shared-key: test-${{ matrix.os }}
       - if: runner.arch != 'ARM64'
         run: cargo test --locked --workspace --all-features
+      - name: Unpivoted admission and pivot-policy mutation controls
+        if: runner.os == 'Linux'
+        run: python3 scripts/check_tridiagonal_unpivoted_mutations.py target/unpivoted-mutations
+      - name: Retain mutation receipts
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: unpivoted-mutations-${{ matrix.os }}
+          path: target/unpivoted-mutations/
+
       - if: runner.arch == 'ARM64'
         run: ./scripts/check_fma.sh
 

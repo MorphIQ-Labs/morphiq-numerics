@@ -34,7 +34,7 @@
 //! - [`interval`]: finite conservative outward enclosures with typed domain and
 //!   range failures; these are not tight directed-rounding operations;
 //! - [`linalg::tridiagonal`]: reusable allocation-free Thomas factors for
-//!   strictly row-dominant matrices, with optional absolute error certificates;
+//!   dominant, sign and general unpivoted matrices, with explicit certificates;
 //! - [`ulp`]: units in the last place, and distances measured in them.
 //!
 //! The crate is `no_std`, forbids `unsafe` and never calls a platform math

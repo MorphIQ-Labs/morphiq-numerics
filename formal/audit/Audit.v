@@ -83,6 +83,7 @@ From Binary64 Require Tridiagonal.
 Print Assumptions Tridiagonal.margin_step.
 Print Assumptions Tridiagonal.dominant_row.
 Print Assumptions Tridiagonal.finite_abs_max.
+Print Assumptions Tridiagonal.residual_backward_error.
 Print Assumptions Tridiagonal.tridiagonal_error_bound.
 Print Assumptions Tridiagonal.tridiagonal_zero_kernel.
 Print Assumptions Tridiagonal.rounded_error_bound.
