@@ -153,6 +153,9 @@ pub(crate) fn branches(x: f64, y: f64, rho: f64) -> Vec<std::string::String> {
                 tags.push("hk-skip".to_string());
                 return tags;
             }
+            if hk >= 100.0 {
+                tags.push("hk-large".to_string());
+            }
             let a = super::sqrt((1.0 - rho.abs()) * (1.0 + rho.abs()));
             let (mut s, mut panels) = (a, 0);
             while s > super::PANEL_FLOOR {

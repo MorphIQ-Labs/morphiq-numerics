@@ -239,13 +239,38 @@ fn the_high_branch_bound_depends_on_the_sign_of_the_correlation() {
     assert_eq!(largest, ABSOLUTE_ERROR_BOUND);
 }
 
-/// The integrand is zero from `phi = 100` on, and positive just below it.
+/// The integrand is zero from `phi = 700` on, and positive just below it.
 #[test]
 fn the_integrand_stops_at_the_exponent_cutoff() {
     // `xs = 0.75` gives `rs = 0.5`; with `bs = 0`, `phi = hk / 1.5`.
-    assert_eq!(integrand_term(0.75, 1.0, 0.0, 150.0), 0.0);
-    assert!(integrand_term(0.75, 1.0, 0.0, 149.999).is_sign_positive());
-    assert!(integrand_term(0.75, 1.0, 0.0, 149.999) > 0.0);
+    assert_eq!(integrand_term(0.75, 1.0, 0.0, 1050.0), 0.0);
+    assert!(integrand_term(0.75, 1.0, 0.0, 1049.999).is_sign_positive());
+    assert!(integrand_term(0.75, 1.0, 0.0, 1049.999) > 0.0);
+    // A node past the old cutoff of 100 is computed.
+    assert!(integrand_term(0.75, 1.0, 0.0, 300.0) > 0.0);
+}
+
+/// Where both thresholds are far below zero and the correlation is high, the
+/// correlation integral is most of the result, so it is computed out to
+/// `hk = 1400`: the leading term alone is `1.6` off in relative terms at
+/// `P(-12, -12; 0.99)`.
+#[test]
+fn the_high_branch_keeps_the_integral_in_the_deep_tail() {
+    // Reference values from a 60-digit adaptive Gauss-Legendre integral of Plackett's identity
+    // (`generators/bivariate_normal_reference.py`, kind `deep`), rounded to binary64.
+    let rows = [
+        (-12.0, -12.0, 0.99, 6.959e-34),
+        (-14.0, -14.0, 0.99, 2.483e-45),
+        (-20.0, -20.0, 0.999, 1.800e-89),
+    ];
+    for (x, y, rho, expected) in rows {
+        let got = bivariate_norm_cdf(x, y, rho);
+        let relative = ((got - expected) / expected).abs();
+        assert!(
+            relative < 1e-3,
+            "P({x}, {y}; {rho}) = {got:e}, expected {expected:e}"
+        );
+    }
 }
 
 /// A refused correlation says so when displayed.

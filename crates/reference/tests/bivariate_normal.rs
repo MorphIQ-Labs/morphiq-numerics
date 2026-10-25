@@ -169,3 +169,58 @@ fn lower_tail_results_keep_their_relative_accuracy() {
         worst.1
     );
 }
+
+/// High correlation with both thresholds far below zero, `hk = h k` from 100
+/// to 1400: the correlation integral is most of the result there and the high
+/// branch computes it (docs/bivariate_normal.md section 7.1). Measured, not a
+/// contract: the exponent's rounding (`u phi`, `1e-13` at `phi = 700`) and the
+/// cancellation of `Phi(-max) - J / 2 pi` grow with depth, and faster as `rho`
+/// falls toward the split. The bounds are about 5 times the measured worst:
+/// `DEEP_NEAR` for probabilities of at least `1e-150` (`9.3e-8` at
+/// `P(-25, -25; 0.93)`) and `DEEP_FAR` for the rest at `rho >= 0.97` (`1.5e-8`).
+const DEEP_NEAR: f64 = 5e-7;
+const DEEP_FAR: f64 = 1e-7;
+
+#[test]
+fn deep_tails_at_high_correlation_keep_their_relative_accuracy() {
+    let mut worst = (0.0_f64, String::new());
+    let mut checked = 0;
+    for case in cases().into_iter().filter(|case| case.kind == "deep") {
+        // Below `1e-300` the result is subnormal or nearly so.
+        if case.expected < 1e-300 {
+            continue;
+        }
+        let bound = if case.expected >= 1e-150 {
+            DEEP_NEAR
+        } else if case.rho >= 0.97 {
+            DEEP_FAR
+        } else {
+            continue;
+        };
+        checked += 1;
+        let got = bivariate_norm_cdf(case.x, case.y, case.rho);
+        let relative = ((got - case.expected) / case.expected).abs();
+        assert!(
+            relative <= bound,
+            "P({:e}, {:e}; {:e}) = {got:e}, expected {:e}: relative error {relative:e}",
+            case.x,
+            case.y,
+            case.rho,
+            case.expected
+        );
+        if relative > worst.0 {
+            worst = (
+                relative,
+                format!("P({:e}, {:e}; {:e})", case.x, case.y, case.rho),
+            );
+        }
+    }
+    println!(
+        "worst deep-tail relative error {:e} over {checked}: {}",
+        worst.0, worst.1
+    );
+    assert!(
+        checked >= 50,
+        "the deep cases are in the fixture: {checked}"
+    );
+}

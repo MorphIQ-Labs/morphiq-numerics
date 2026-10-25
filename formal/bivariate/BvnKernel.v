@@ -46,7 +46,8 @@ Definition k8 := aw 0x4020000000000000.
 Definition k12 := aw 0x4028000000000000.
 Definition k16 := aw 0x4030000000000000.
 Definition k20 := aw 0x4034000000000000.
-Definition k100 := aw 0x4059000000000000.
+(** [PHI_CUTOFF = 700]. *)
+Definition kphi_cutoff := aw 0x4085e00000000000.
 Definition kquarter := aw 0x3fd0000000000000.
 (** [f64::NAN]. *)
 Definition knan := aw 0x7ff8000000000000.
@@ -66,8 +67,8 @@ Definition kpanel_floor := aw 0x3f689374bc6a7efa.
 Definition kpanel_wide := aw 0x3fb851eb851eb852.
 (** The unit square of the 15-node rule's centre node, [(3/4)^2]. *)
 Definition kcentre_square := aw 0x3fe2000000000000.
-(** [HK_CUTOFF = 100]. *)
-Definition khk_cutoff := aw 0x4059000000000000.
+(** [HK_CUTOFF = 1400]. *)
+Definition khk_cutoff := aw 0x4095e00000000000.
 
 (** [LOW_RULE_LIMITS]. *)
 Definition low_rule_limits : list Z :=
@@ -224,7 +225,7 @@ Definition panel_rule (s : f64) : list Z * list Z * list Z * option Z :=
 Definition integrand_term (L : lib) (xs w bs hk : f64) : f64 :=
   let rs := fsqrt (k1 -f xs) in
   let phi := bs /f (k2 *f xs) +f hk /f (k1 +f rs) in
-  if flt phi k100 then w *f (lib_exp L (fneg phi) /f rs) else k0.
+  if flt phi kphi_cutoff then w *f (lib_exp L (fneg phi) /f rs) else k0.
 
 (** The panel nodes of a scale in order, each as its unit square and weight:
     the pair of each abscissa, then the centre. *)

@@ -399,9 +399,14 @@ pub fn bivariate_norm_cdf_bounded(x: f64, y: f64, rho: f64) -> BoundedProbabilit
 /// integrated analytically (`docs/bivariate_normal_high.md` sections 1.4, 1.5).
 const PANEL_FLOOR: f64 = 0.003;
 
-/// The integral of the high branch is zero to `1e-22` from this `hk` on, and
-/// is not computed (`docs/bivariate_normal_high.md` section 1.7, A3).
-const HK_CUTOFF: f64 = 100.0;
+/// From this `hk` on every node of the high branch has `phi >= hk / 2`, at
+/// least [`PHI_CUTOFF`], so the integral is zero and is not computed
+/// (`docs/bivariate_normal_high.md` section 1.7, A3).
+const HK_CUTOFF: f64 = 1400.0;
+
+/// A node whose `phi` reaches this is zero: `exp(-phi)` is below `1e-304`, the
+/// bottom of the normal range (`docs/bivariate_normal_high.md` section 1.7, A5).
+const PHI_CUTOFF: f64 = 700.0;
 
 /// A Gauss-Legendre rule of the panels: the positive abscissas' weights, the
 /// unit squares `((3 + t)/4)^2` and `((3 - t)/4)^2` of the abscissas `t`, and
@@ -511,12 +516,12 @@ fn bounded_in_blocks(
 /// The integrand of the high-correlation integral at a node of the panel, times
 /// its weight: `weight * exp(-phi) / rs` with `xs = x^2` (the panel's `s^2`
 /// times the node's unit square), `rs = sqrt(1 - xs)` and
-/// `phi = bs / (2 xs) + hk / (1 + rs)`; zero where `exp(-phi)` is below `e^-100`.
+/// `phi = bs / (2 xs) + hk / (1 + rs)`; zero where `phi` reaches [`PHI_CUTOFF`].
 /// `phi` is not negative on the branch's domain, so every term is positive.
 fn integrand_term(xs: f64, weight: f64, bs: f64, hk: f64) -> f64 {
     let rs = sqrt(1.0 - xs);
     let phi = bs / (2.0 * xs) + hk / (1.0 + rs);
-    if phi < 100.0 {
+    if phi < PHI_CUTOFF {
         weight * (exp(-phi) / rs)
     } else {
         0.0

@@ -161,7 +161,7 @@ fn correlations(rng: &mut SplitMix64) -> Vec<f64> {
 
 /// The thresholds every correlation is run at: the zeros and their signs, the
 /// diagonal and anti-diagonal (where `x + y = 0`, `m = 0`), the high branch's
-/// `hk` cutoff and the closed form's `b` skip on either side, the saturation
+/// `hk` of 100 and its cutoff, the closed form's `b` skip on either side, the saturation
 /// thresholds and their neighbours, the infinities and NaN.
 fn structured_points() -> Vec<(f64, f64)> {
     let mut points = std::vec![
@@ -190,6 +190,16 @@ fn structured_points() -> Vec<(f64, f64)> {
         (-9.0, -13.0),
         (-30.0, -30.0),
         (-30.0, 30.0),
+        // hk = dh dk around 1400, the cutoff, and below it where the nodes' own
+        // cutoff `phi = 700` falls inside the panels.
+        (-37.0, -37.83783783783783),
+        (-37.0, -37.83783783783784),
+        (-37.0, 37.83783783783783),
+        (-37.0, 37.83783783783784),
+        (-36.0, -37.0),
+        (-36.5, 36.5),
+        (-20.0, -30.0),
+        (-15.0, -20.0),
         // b = |dh - k| around 20 s.
         (-0.5, -0.5 - 1e-9),
         (-0.5, -0.5 + 0.01),
@@ -320,6 +330,7 @@ pub(super) fn write(out: &mut String) {
         "negative-difference",
         "negative-zero",
         "hk-skip",
+        "hk-large",
         "closed-form",
         "closed-form-skip",
         "panel-16-nodes",

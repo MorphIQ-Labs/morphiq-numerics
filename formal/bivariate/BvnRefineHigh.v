@@ -136,14 +136,14 @@ Proof.
     assert (bpow radix2 (-1000) <= bpow radix2 (-9)) by (apply bpow_le; lia).
     assert (bpow radix2 (-9) = 1 / 512) by (bnum; lra). lra. }
   unfold node_value, integrand_term. cbv zeta.
-  destruct (Rlt_dec phi 100) as [Hlt | Hge].
-  - assert (Hk : flt (bsf /f (k2 *f (sf *f sf *f xuf)) +f hkf /f (k1 +f fsqrt (k1 -f (sf *f sf *f xuf)))) k100 = true).
-    { apply flt_iff; [exact (exb_fin _ _ _ Hphik) | exact (proj1 exb_k100) |]. rewrite (exb_val _ _ _ Hphik), (proj1 (proj2 exb_k100)). exact Hlt. }
+  destruct (Rlt_dec phi 700) as [Hlt | Hge].
+  - assert (Hk : flt (bsf /f (k2 *f (sf *f sf *f xuf)) +f hkf /f (k1 +f fsqrt (k1 -f (sf *f sf *f xuf)))) kphi_cutoff = true).
+    { apply flt_iff; [exact (exb_fin _ _ _ Hphik) | exact (proj1 exb_kphi_cutoff) |]. rewrite (exb_val _ _ _ Hphik), (proj1 (proj2 exb_kphi_cutoff)). exact Hlt. }
     rewrite Hk. lift_to.
-  - assert (Hk : flt (bsf /f (k2 *f (sf *f sf *f xuf)) +f hkf /f (k1 +f fsqrt (k1 -f (sf *f sf *f xuf)))) k100 = false).
-    { destruct (flt (bsf /f (k2 *f (sf *f sf *f xuf)) +f hkf /f (k1 +f fsqrt (k1 -f (sf *f sf *f xuf)))) k100) eqn:E; [| reflexivity].
-      exfalso. apply Hge. apply (flt_iff _ _ (exb_fin _ _ _ Hphik) (proj1 exb_k100)) in E.
-      rewrite (exb_val _ _ _ Hphik), (proj1 (proj2 exb_k100)) in E. exact E. }
+  - assert (Hk : flt (bsf /f (k2 *f (sf *f sf *f xuf)) +f hkf /f (k1 +f fsqrt (k1 -f (sf *f sf *f xuf)))) kphi_cutoff = false).
+    { destruct (flt (bsf /f (k2 *f (sf *f sf *f xuf)) +f hkf /f (k1 +f fsqrt (k1 -f (sf *f sf *f xuf)))) kphi_cutoff) eqn:E; [| reflexivity].
+      exfalso. apply Hge. apply (flt_iff _ _ (exb_fin _ _ _ Hphik) (proj1 exb_kphi_cutoff)) in E.
+      rewrite (exb_val _ _ _ Hphik), (proj1 (proj2 exb_kphi_cutoff)) in E. exact E. }
     rewrite Hk. eapply exb_weak.
     + eapply exb_cong; [eapply exb_mul; [exact Hhw | exact exb_k0 | cl_side] |].
       rewrite Rmult_0_r. apply round_0. exact _.
@@ -165,13 +165,13 @@ Hypotheses (Hexp : lib_exp_rel L expT 1 2) (Hnc : lib_ncdf_rel L nc).
 Lemma closed_form_ok sf bsf hkf s bs hk :
   exb sf s 0 -> 1 / 10 ^ 8 <= s -> s <= 3 / 1000 ->
   exb bsf bs 0 -> 0 <= bs -> bs <= 4001 / 10 * (s * s) ->
-  exb hkf hk 7 -> - (4 * hk) <= bs -> hk < 100 ->
+  exb hkf hk 11 -> - (4 * hk) <= bs -> hk < 1400 ->
   (rndF (rndF (bs / rndF (s * s)) + hk) = 0 \/ bpow radix2 (-1000) <= Rabs (rndF (rndF (bs / rndF (s * s)) + hk))) ->
   (hk = 0 \/ bpow radix2 (-1000) <= Rabs hk) ->
   flt (fsqrt bsf) (k20 *f sf) = true ->
   exists E, exb (closed_form L sf bsf hkf) (closed_k expT sqrtF nc s bs hk) E.
 Proof.
-  intros Hs Hs0 Hs1 Hbs Hbs0 Hbs1 Hhk Hc Hk100 Hh1 Hh2 Hg.
+  intros Hs Hs0 Hs1 Hbs Hbs0 Hbs1 Hhk Hc Hk1400 Hh1 Hh2 Hg.
   unfold closed_k. rnd2F.
   assert (Hss : s * s <= 9 / 1000000) by nra.
   assert (Hss0 : 1 / 10 ^ 16 <= s * s) by nra.
@@ -187,26 +187,26 @@ Proof.
   { unfold divlow. pose proof (bpow_gt_0 radix2 (-27)). rewrite Rabs_pos_eq by (bnum_in Hs0; lra). bnum. bnum_in Hs0. lra. }
   assert (Fhk : fmtF hk) by (rewrite <- (exb_val _ _ _ Hhk); apply B_fmt).
   (* c, d, w, x, p1, p2 *)
-  assert (Hcc : exb (gen_c hkf) (rndF (rndF (4 - hk) / 8)) 8).
+  assert (Hcc : exb (gen_c hkf) (rndF (rndF (4 - hk) / 8)) 12).
   { unfold gen_c. lift_to. }
   set (c := rndF (rndF (4 - hk) / 8)) in *.
-  assert (Hdd : exb (gen_d hkf) (rndF (rndF (12 - hk) / 16)) 8).
+  assert (Hdd : exb (gen_d hkf) (rndF (rndF (12 - hk) / 16)) 12).
   { unfold gen_d. lift_to. }
   set (d := rndF (rndF (12 - hk) / 16)) in *.
-  assert (Hww : exb (gen_w (gen_d hkf) bsf) (rndF (1 - rndF (rndF (d * bs) / 5))) 9).
+  assert (Hww : exb (gen_w (gen_d hkf) bsf) (rndF (1 - rndF (rndF (d * bs) / 5))) 13).
   { unfold gen_w. lift_to. }
   set (w := rndF (1 - rndF (rndF (d * bs) / 5))) in *.
   assert (Hxx : exb (gen_x (gen_c hkf) bsf (sf *f sf) (gen_w (gen_d hkf) bsf))
-                    (rndF (rndF (rndF (c * rndF (bs - ass)) * w) / 3)) 18).
+                    (rndF (rndF (rndF (c * rndF (bs - ass)) * w) / 3)) 27).
   { unfold gen_x. lift_to. }
   set (x := rndF (rndF (rndF (c * rndF (bs - ass)) * w) / 3)) in *.
   assert (Hp1 : exb (gen_p1 (gen_c hkf) (gen_d hkf) (sf *f sf)
                       (gen_x (gen_c hkf) bsf (sf *f sf) (gen_w (gen_d hkf) bsf)))
-                    (rndF (rndF (1 - x) + rndF (rndF (rndF (rndF (c * d) * ass) * ass) / 5))) 20).
+                    (rndF (rndF (1 - x) + rndF (rndF (rndF (rndF (c * d) * ass) * ass) / 5))) 29).
   { unfold gen_p1. lift_to. }
   set (p1 := rndF (rndF (1 - x) + rndF (rndF (rndF (rndF (c * d) * ass) * ass) / 5))) in *.
   assert (Hp2 : exb (gen_p2 (gen_c hkf) bsf (gen_w (gen_d hkf) bsf))
-                    (rndF (1 - rndF (rndF (rndF (c * bs) * w) / 3))) 18).
+                    (rndF (1 - rndF (rndF (rndF (c * bs) * w) / 3))) 27).
   { unfold gen_p2. lift_to. }
   set (p2 := rndF (1 - rndF (rndF (rndF (c * bs) * w) / 3))) in *.
   (* the exponent arguments *)
@@ -221,9 +221,9 @@ Proof.
   { eapply exb_cong; [ | apply Ropp_div].
     eapply exb_weak; [apply (exb_half _ _ 55 (exb_neg _ _ _ Hsg)); [ | unfold cl; lia] | unfold cl; lia].
     destruct Hh1 as [H | H]; [left; rewrite H; ring | right; rewrite Rabs_Ropp; exact H]. }
-  assert (Hh2' : exb (fneg hkf /f k2) (- (hk / 2)) 7).
+  assert (Hh2' : exb (fneg hkf /f k2) (- (hk / 2)) 11).
   { eapply exb_cong; [ | apply Ropp_div].
-    eapply exb_weak; [apply (exb_half _ _ 7 (exb_neg _ _ _ Hhk)); [ | unfold cl; lia] | unfold cl; lia].
+    eapply exb_weak; [apply (exb_half _ _ 11 (exb_neg _ _ _ Hhk)); [ | unfold cl; lia] | unfold cl; lia].
     destruct Hh2 as [H | H]; [left; rewrite H; ring | right; rewrite Rabs_Ropp; exact H]. }
   assert (Hhklo : - 1 <= hk) by nra.
   assert (Hb : exb (fsqrt bsf) (sqrtF bs) 0).

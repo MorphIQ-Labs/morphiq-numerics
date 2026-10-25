@@ -21,7 +21,7 @@ what remains; nothing below claims more than the checks named here establish.
 | Relative accuracy of small probabilities (FerroRisk's tail construction) | not ported: refused instead (section 8) |
 | ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits, with slice and paired entry points (section 12) | done for the low-correlation quadrature: bit equality, digest and mutation witnesses (section 12); AVX2 and AVX-512F not yet run here (CI) |
 | Coq proof of the error budget | **proved** for both branches (`formal/bivariate/`), from the named hypotheses of section 6 |
-| The kernel the proofs describe | the scalar kernel is transcribed over the proved binary64 operations (`formal/bivariate/BvnKernel.v`), **extracted and compared bit for bit** with this code on 13 966 cases, and its operations are proved equal to the proofs' rounding model (section 6.5); the hypotheses that remain are listed there |
+| The kernel the proofs describe | the scalar kernel is transcribed over the proved binary64 operations (`formal/bivariate/BvnKernel.v`), **extracted and compared bit for bit** with this code on 14 134 cases, and its operations are proved equal to the proofs' rounding model (section 6.5); the hypotheses that remain are listed there |
 | Same-host scalar and batch timings against the FerroRisk baseline | **not measured in this change**: timings belong to the performance epic #149 (native x86 #216, hardware-sqrt #217), and the repository has no bivariate benchmark binary yet; the machine-independent work per call is counted in section 9 |
 
 ## 2. Specification
@@ -192,12 +192,13 @@ carries a looser last step (a second `norm_cdf` rounding counted in full) that
 a finer argument would reduce by about `2.8e-17`. Its hypotheses are the same
 kind as the low branch's: the library contracts (`exp`, `sqrt`, `norm_cdf`,
 `two_sum`), classical analysis (Plackett's identity, the Gauss-Legendre
-remainder, the skip bounds for `hk >= 100` and `b >= 20 s`) cited and not
-machine-checked, and the stored tables' fidelity; the Coq transcription of
+remainder, the skip bounds for `hk >= 1400`, `phi >= 700` and `b >= 20 s`, and the
+size of the closed form and the integral on the last scale for `100 <= hk < 1400`)
+cited and not machine-checked, and the stored tables' fidelity; the Coq transcription of
 the operation sequence is checked against `mod.rs` mechanically (section 6.5). `docs/bivariate_normal_high.md`
 lists each.
 
-**Measured.** Over the fixture's 3,495 cases (section 7) the worst absolute error
+**Measured.** Over the fixture's 3,320 cases (section 7) the worst absolute error
 is `1.11e-16`, within the bound of each case's own correlation; the proved figures
 are worst-case alignments of every rounding.
 
@@ -224,16 +225,17 @@ and runs it (`bvndriver.ml`) on the `bvn_` lines of the internal cross-check cor
 `norm_cdf` return those results, looked up by argument: a call the kernel makes that the Rust did not, a call
 the Rust made that the kernel did not, and a result that differs by one bit are each a mismatch. (A zero argument
 is looked up without its sign, since Rust fixes neither the sign of `max(-0.0, 0.0)` nor, here, any library result
-that differs between `-0` and `+0`; a recorded pair that disagrees fails.) The corpus is 252 correlations and
-13 966 cases, with the table of each correlation compared as well (the regime, `asr`, and every node's `kw`, `p`
-and `q`): 252 tables (6 independent, 1 comonotone, 1 countermonotone, 118 low, 119 high, 7 invalid), 13 966 values,
-0 mismatches. By the writer's own coverage account (a case may count under several): independent 330, comonotone 55,
-countermonotone 55, invalid correlation 511, NaN threshold 542, saturated below 1 540 and above 1 170, swapped
-arguments 3 203, signed-zero threshold 542 and correlation 73; the low rules of 6, 8, 12, 14, 20 and 24
-nodes 495, 660, 660, 990, 935, 660, 385, 660 and 937, each rule limit with the adjacent doubles either side; the high
-branch for `rho > 0` 1 492 and `rho < 0` 1 889 (`Phi(-dh) > Phi(dk)` in 407 of them, `<=` in 1 347), the `hk >= 100` skip 327, the
-closed form evaluated 1 043 and skipped (`sqrt(bs) >= 20 s`) 2 011, 16-node panels 1 400 and 15-node panels 7 616,
-and cases with 0 to 7 panels 979, 222, 238, 263, 269, 377, 374 and 332, including the correlation at which the panel
+that differs between `-0` and `+0`; a recorded pair that disagrees fails.) The corpus is 234 correlations and
+14 134 cases, with the table of each correlation compared as well (the regime, `asr`, and every node's `kw`, `p`
+and `q`): 234 tables (6 independent, 1 comonotone, 1 countermonotone, 100 low, 119 high, 7 invalid), 14 134 values,
+0 mismatches. By the writer's own coverage account (a case may count under several): independent 378, comonotone 63,
+countermonotone 63, invalid correlation 567, NaN threshold 492, saturated below 1 644 and above 900, swapped
+arguments 3 930, signed-zero threshold 492 and correlation 81; the low rules of 6, 8, 12, 14, 20 and 24
+nodes 819, 630, 1 953, 756, 819 and 1 199, each rule limit with the adjacent doubles either side; the high
+branch for `rho > 0` 1 730 and `rho < 0` 2 121 (`Phi(-dh) > Phi(dk)` in 473 of them, `<=` in 1 511), the `hk >= 1400` skip 170,
+`hk` from 100 to 1400 (the integral computed where it used to be skipped) 359,
+the closed form evaluated 1 247 and skipped (`sqrt(bs) >= 20 s`) 2 434, 16-node panels 1 772 and 15-node panels 8 953,
+and cases with 0 to 7 panels 1 298, 194, 276, 240, 416, 312, 580 and 365, including the correlation at which the panel
 scale crosses `0.095 2^j` and `0.003 2^j` and the counterexample `bivariate_norm_cdf(-0.21101192279835226,
 -0.0014549743776884816, 0.925)`. A random corpus cannot tell apart two orderings whose results differ with
 probability below about `2^-37` per case: the association of `c d ass^2 / 5` in the closed form's `p1`, a term about
@@ -293,8 +295,10 @@ added for them (the `Display` text, the panel rule's threshold, the per-sign bou
 block offsets, the integrand's exponent cutoff, the reflection's sign test, and the panel floor, which the
 determinism digest pins at the correlation whose scales halve to exactly `0.003`). The other four survive and are argued equivalent:
 
-  - `hk < HK_CUTOFF` against `<=`: at `hk = 100` the integral is at most about `1.5e-44`, below any
-    visible ulp of a result that is not itself subnormal, and the cutoff's proved skip bound is `8e-23`.
+  - `hk < HK_CUTOFF` against `<=`: the two differ only at `hk = 1400` exactly, where every node has
+    `phi >= 700` (dropped) and only the closed form on the last scale (below `3e-307`) is added, to a
+    result of at most `Phi(-sqrt 1400) = 1.05e-306`: a result in the range where nodes with `phi >= 700` are
+    dropped and no relative accuracy is claimed (the proved bound is absolute).
   - `b < 20 s` against `<=`, and `20 * s` against `20 + s`: the term skipped or kept is below the proved
     `1.2e-46` bound, or underflows.
   - `-dh > dk` against `>=`: on a tie both `norm_cdf` values are equal, so both branches return the same
@@ -365,24 +369,40 @@ pairs):
   16 from 0.75 to 0.81);
 * `Dr78` (Drezner 1978) is orders of magnitude worse everywhere.
 
-Two regions are not at parity or better, and neither implementation promises
+One region is not at parity or better, and neither implementation promises
 anything there:
 
 * **Negative correlation in a tail, and every cancellation case.** The integral
   is subtracted from the product, so the result cancels to the rounding floor;
   every implementation measured is wrong in relative terms, and this one
   reports a bound that says so (section 8).
-* **Correlation above 0.925 with both thresholds near -12.** `We04DP` stays
-  relatively accurate (`1e-14` to `1e-16`) for `hk = h k` from 100 to about
-  200, where this function skips the correlation integral (`hk >= 100`,
-  absolute bound `8e-23`) and returns the leading term: at
-  `P(-12, -12; 0.99)` it is `1.6` off in relative terms against `We04DP`'s
-  `5.7e-16`, with an absolute error of `1e-33`. From `hk = 200` on `We04DP`
-  fails the same way (its exponent test passes `-100`). Closing this gap means
-  re-proving the high branch's closed-form and node ranges (`BvnHighClosed`,
-  `BvnHighClosed2`, `BvnHighCF`, `BvnRefineHigh`: `hk <= 100` is a hypothesis
-  of each) out to `hk` of about 200, for a result no one specifies; it is not
-  done.
+
+**Correlation above 0.925 with both thresholds far below zero** was the other,
+and is not now. The correlation integral is most of the result there (at
+`P(-12, -12; 0.99)` the leading term alone is `1.6` off in relative terms), and
+the high branch skipped it from `hk = h k = 100`, where its absolute size is
+below `1e-22`, while `We04DP` kept it to `hk` of about 200 and then fails the
+same way (its exponent test passes `-100`). The branch now computes the integral
+out to `hk = 1400`, dropping nodes whose `phi` reaches 700 (`exp(-700) = 1e-304`; from
+`hk = 1400` all of them, and the result is at most `1.05e-306`), so a result below about
+`1e-304` is the leading term alone, with the closed form and the node range re-proved over it
+(`docs/bivariate_normal_high.md` sections 1.7 and 4; the proofs bound the
+absolute error, and the relative accuracy below is measured). Against a
+60-digit reference (`generators/bivariate_normal_reference.py`, kind `deep`):
+
+| `rho` | `P(-12,-12)` | `P(-17,-17)` | `P(-25,-25)` | `P(-36,-36)` | `We04DP` |
+|---|---|---|---|---|---|
+| 0.99 | 1.3e-15 | 1.5e-15 | 3.3e-13 | 3.3e-11 | 5.7e-16 at -12; 3.4 (wrong) at -17; fails after |
+| 0.999 | 8.0e-16 | 1.2e-14 | 2.5e-13 | 4.5e-12 | 1.8e-16 at -12; 0.42 at -17 |
+| 0.97 | 5.4e-15 | 3.8e-15 | 4.3e-12 | 1.5e-8 | 2.4e-15 at -12; 27 at -17 |
+| 0.93 | 7.6e-15 | 1.0e-11 | 9.3e-8 | 0.33 | 1.9e-14 at -12; 860 at -17 |
+
+The growth with depth has two causes, neither removable by more nodes: the
+exponent `phi` is rounded to `u phi` (`1e-13` at `phi = 700`) and enters `exp`,
+and the result is `Phi(-max) - J / 2 pi`, which cancels more as `rho` falls
+toward 0.925 (at 0.93 and `-25` the result is `5e5` times smaller than the
+term it is subtracted from). The positive-correlation tail rows of the fixture
+(`deep`, 84 of them) keep it from regressing.
 
 Provenance of the comparison: QuantLib's `We04DP` source (BSD-style license) was read
 for it. What it contributed to this code is three numbers, the node counts 6, 12

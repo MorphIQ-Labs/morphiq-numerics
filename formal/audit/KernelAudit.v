@@ -852,7 +852,7 @@ Print Assumptions BvnBudget.low_12.
 Print Assumptions BvnBudget.low_14.
 Print Assumptions BvnBudget.low_20.
 Print Assumptions BvnBudget.low_24.
-Require BvnHighAlgebra BvnHighAssembly BvnHighPanels BvnHighBudget BvnHighRound BvnHighSteps BvnHighNode BvnHighErr BvnHighErrTree BvnHighSum BvnHighClosed BvnHighClosed2 BvnHighPol BvnHighCF BvnHighJ1 BvnHighJ2 BvnHighFinal BvnHighEnd.
+Require BvnHighAlgebra BvnHighAssembly BvnHighPanels BvnHighBudget BvnHighRound BvnHighSteps BvnHighNode BvnHighErr BvnHighErrTree BvnHighSum BvnHighClosed BvnHighClosed2 BvnHighPol BvnHighPolB BvnHighCF BvnHighBig BvnHighJ1 BvnHighJ2 BvnHighFinal BvnHighEnd.
 Print Assumptions BvnHighAlgebra.plackett_exponent.
 Print Assumptions BvnHighAlgebra.moment_closed_form.
 Print Assumptions BvnHighAlgebra.reflection_phi_terms.
@@ -866,16 +866,23 @@ Print Assumptions BvnHighBudget.g_small.
 Print Assumptions BvnHighRound.rel_div.
 Print Assumptions BvnHighSteps.rel_sqrt.
 Print Assumptions BvnHighNode.node_error.
+Print Assumptions BvnHighNode.tiny_term.
 Print Assumptions BvnHighErrTree.sound.
 Print Assumptions BvnHighSum.dw_ok.
 Print Assumptions BvnHighClosed.E_core.
+Print Assumptions BvnHighClosed.E_core_big.
 Print Assumptions BvnHighClosed.sqrt_rela.
 Print Assumptions BvnHighClosed2.S_leaf.
 Print Assumptions BvnHighClosed2.eh_leaf.
+Print Assumptions BvnHighClosed2.eh_leaf_big.
 Print Assumptions BvnHighClosed2.b_rel.
 Print Assumptions BvnHighClosed2.Phi_diff.
 Print Assumptions BvnHighPol.A_final.
+Print Assumptions BvnHighPolB.A_final_b.
 Print Assumptions BvnHighCF.closed_error.
+Print Assumptions BvnHighCF.closed_error_big.
+Print Assumptions BvnHighBig.closed_x_small.
+Print Assumptions BvnHighBig.closed_total_big.
 Print Assumptions BvnHighJ1.a_setup.
 Print Assumptions BvnHighJ1.a_range.
 Print Assumptions BvnHighJ2.J_bound.

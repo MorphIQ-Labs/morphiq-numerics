@@ -113,13 +113,13 @@ and `exp` rounds once):
 ```
 (k, hk) = rho < 0 ? (-dk, -(dh*dk)) : (dk, dh*dk);   bs = (dh - k)*(dh - k)
 J = 0
-if hk < 100:
+if hk < 1400:
     ass = (1 - |rho|)*(1 + |rho|);  a = sqrt(ass);  c = (4 - hk)/8;  d = (12 - hk)/16
     high = low = 0;  s = a
     while s > 0.003:
         rule = s > 0.095 ? GL16 : GL15;  hw = s/4;  s2 = s*s
         for each node (unit square xu, weight w):                       // plus, minus, centre
-            term = hw * (phi < 100 ? w * (exp(-phi)/rs) : 0)            // rs = sqrt(1 - s2*xu),
+            term = hw * (phi < 700 ? w * (exp(-phi)/rs) : 0)            // rs = sqrt(1 - s2*xu),
                                                                         // phi = bs/(2 s2 xu) + hk/(1 + rs)
             (high, err) = two_sum(high, term);  low += err
         s /= 2
@@ -143,12 +143,23 @@ not on rounded values).
 
 * **A1** The Taylor remainder `int_0^s E (G - T)` is dropped (bound in 1.4).
 * **A2** The Gauss-Legendre remainder of each panel is dropped (section 3).
-* **A3** For `hk >= 100`, `J` is not computed: `phi >= hk/2 >= 50`, so
-  `J <= a e^-50 / 0.925 < 8e-23`.
+* **A3** For `hk >= 1400`, `J` is not computed: every node has `phi >= hk/2 >= 700`, so
+  `J <= a e^-700 / 0.925 < 1e-304`, and the result is at most `Phi(-sqrt 1400) = 1.05e-306`, 47 times
+  the smallest normal binary64. (Between `hk = 100`
+  and `1400`, `J` is computed: it is the larger share of the result at high correlation with
+  both thresholds far below zero, e.g. `1.6` in relative terms at `P(-12, -12; 0.99)`; nodes with
+  `phi >= 700` are dropped (A5), so a result below about `1e-304` is the leading term alone.)
 * **A4** Where `b >= 20 s`, the closed form is not evaluated: `phi >= bs/(4 x^2) >= 100`
   on `[0, s]`, so `int_0^s F < 1.2e-46`.
-* **A5** A node term with `phi >= 100` is zero (its `F` is below `e^-100 < 3.8e-44`; the
-  node bound's additive `1e-39` covers it).
+* **A5** A node term with `phi >= 700` is zero (its `F` is below `e^-700 < 1e-304`; the node
+  bound's additive `1e-39` covers it). A node with `100 <= phi < 700` is computed and is tiny
+  (below `1e-42` of its weight); `node_error` covers it by an upper bound alone (`BvnHighNode.tiny_term`).
+* **A6** For `100 <= hk < 1400` the closed form `closed_x` and the integral `I(0, s)` are
+  each below `1e-24`: they are `exp(-hk/2)` (below `e^-50 < 2e-22`) times the moments, and the three
+  moments `E_m = int_0^s exp(-bs/(2 x^2)) x^m dx` lie in `[0, s^(m+1)/(m+1)]`. So the kernel's
+  closed form is within `161e-18` of `I(0, s)` without Claim K (`BvnHighBig.closed_x_small`,
+  `closed_total_big`), and its float evaluation is under `1e-32` off `closed_x`
+  (`BvnHighCF.closed_error_big`, over `BvnHighPolB`).
 
 ## 2. Why a single rule is not provable, and what it cost
 
@@ -229,7 +240,8 @@ The inputs: `hk` is `rnd(dh dk)` (negated for `rho < 0`; relative `u`), `bs` is
 stages (`xs = s2 * xu`, `1 - xs`, `sqrt`, `bs / (2 xs)`, `hk / (1 + rs)`, the sum, `exp`, the
 quotient, the products) are `BvnHighSteps`, `BvnHighNodeExp`, `BvnHighNodeMul`; the
 exponential's absolute error `E * phi_err` is bounded by `exp(-x) x <= e^-1` times the
-relative error of `phi`, uniformly in `phi < 100`.
+relative error of `phi`, uniformly in `phi < 100`; from `phi = 100` to `700` the term is below
+`1e-42` of its weight and only its upper bound is needed (A5).
 
 ### 4.3 The accumulation
 
@@ -243,7 +255,10 @@ relative error of `phi`, uniformly in `phi < 100`.
 The kernel's `A1 - A2` is evaluated in `BvnHighPol` through the verified calculator:
 `c`, `d`, `1 - d bs / 5`, `X = c (bs - ass) w / 3`, `Pol1`, `Pol2` (each stage's result is
 a leaf of the next, with its proved bound: `|c| <= 13` within `39 u`; `|Pol1|, |Pol2| <= 1.016`
-within `2.3 u` and `1.3 u`), then `A1 - A2`. The leaves, from `BvnHighClosed`,
+within `2.3 u` and `1.3 u`), then `A1 - A2`. For `100 <= hk < 1400` the same chain runs over
+`BvnHighPolB` with the larger bounds `hk` gives (`|c| <= 176` within `527 u`, `|d| <= 89`), and
+the two exponential leaves, now under `2e-22`, are within `1e-32` (`BvnHighClosed.E_core_big`,
+`BvnHighClosed2.eh_leaf_big`): the closed form's error is under `1e-32`. The leaves, from `BvnHighClosed`,
 `BvnHighClosed2` and `BvnHighCF`: the exponent `bs/ass + hk` within `6.4 u (Q + |hk|)`, `exp`
 of it within `3.5 u` (absolute, `E <= 1`, using `q exp(-q^2/2) <= 0.607`-type bounds);
 `exp(-hk/2)` within `1.5 u`; `SQRT_TAU` within `2e-16`; `sqrt(bs)` within `4.3 u b`;
@@ -303,13 +318,14 @@ prints the assumptions of each final theorem and the lane checks them against
 ### 6.2 Named hypotheses (each a hypothesis of the theorem that uses it)
 
 1. **Library contracts.** `exp` and `sqrt` correctly rounded on the ranges used
-   (`docs/exp.md`, `docs/sqrt.md`); `norm_cdf` is `RN(Z)` with `|Z - Phi| <= 2^-112 Phi`, in
+   (`docs/exp.md`, `docs/sqrt.md`), and `exp` under `1e-300` for arguments in `[-1000, -700)`
+   (the closed form's exponent reaches `-900`); `norm_cdf` is `RN(Z)` with `|Z - Phi| <= 2^-112 Phi`, in
    `[0, 1]` (`docs/normal.md`); `two_sum` exact (`eft.rs`).
 2. **Classical analysis.** (a) Plackett's identity and the decomposition
    `P = Phi(-max) - J/(2 pi)` with the reflection of 1.6. (b) T1 (3.2) with the analyticity of
    `F` on the filled ellipse and its bound `M`. (c) Claim K: `|I(0, s) - closed form| <= 7.2 s^7/7`,
    `s <= 0.003`. (d) `I` additive and `0 <= I x y <= 1.0818 (y - x)` on `[0, 0.381]`. (e) The
-   skip bounds A3 and A4. (f) `Phi` monotone, in `[0, 1]`, in `[0, 1/2]` for arguments `<= 0`,
+   skip bounds A3 and A4, and the size facts of A6. (f) `Phi` monotone, in `[0, 1]`, in `[0, 1/2]` for arguments `<= 0`,
    and locally Lipschitz: `|Phi x1 - Phi x2| <= |x1 - x2| exp(-min(|x1|, |x2|)^2 / 2) / 2.5066`
    for `x1, x2 <= 0`.
 3. **Tables.** The tabulated nodes and weights are within relative `u` of the true

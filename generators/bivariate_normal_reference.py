@@ -12,7 +12,7 @@ and no cancellation reaches a small probability: the value is then accurate in
 relative terms as well as absolutely.
 
 Every case is evaluated at two precisions and must agree to 1e-36 relative
-(or 1e-46 absolute); a subset is also evaluated by a second route, Owen's
+(or 1e-46 absolute; the `deep` cases, down to 1e-290, to 1e-30 relative); a subset is also evaluated by a second route, Owen's
 T function, which shares no integrand with the first, and must agree with the
 first to 1e-30 absolute. The value is written with 36 significant digits.
 Replay with --check.
@@ -76,6 +76,16 @@ TAIL = [(h, k, rho)
                     -0.05, -0.3, -0.5, -0.78, -0.85)
         for h, k in ((-4.0, -4.0), (-6.0, -6.0), (-8.0, -8.0), (-8.0, 3.0), (-10.0, 2.0),
                      (-9.0, -4.0), (-12.0, 0.0))]
+# Lower tails at high correlation with hk = h k from 100 to 1400, where the
+# correlation integral is most of the result and is computed out to the
+# cutoff (docs/bivariate_normal_high.md section 1.7): probabilities from 1e-26
+# to 1e-290.
+DEEP = [(h, k, rho)
+        for rho in (0.93, 0.95, 0.97, 0.99, 0.999, 0.99999, 1.0 - 2.0 ** -30)
+        for h, k in ((-10.5, -10.5), (-12.0, -12.0), (-14.0, -14.0), (-17.0, -17.0),
+                     (-20.0, -20.0), (-25.0, -25.0), (-30.0, -30.0), (-36.0, -36.0),
+                     (-10.0, -30.0), (-20.0, -9.0), (-37.0, -37.83783783783783),
+                     (-37.0, -37.83783783783784))]
 FERRO = ROOT / 'generators/bivariate_normal_ferro_inputs.json'
 
 
@@ -203,6 +213,8 @@ def cases():
         out.append((h, k, rho, 'ferro', (row['family'], row['status'], row['value'])))
     for h, k, rho in TAIL:
         out.append((h, k, rho, 'tail', None))
+    for h, k, rho in DEEP:
+        out.append((h, k, rho, 'deep', None))
     return out
 
 
@@ -233,9 +245,12 @@ def evaluate(case):
         return row, False, None
     lo, hi = (at(p, bvn, h, k, rho) for p in PRECISIONS)
     tolerance = max(abs(hi) * mp.mpf(10) ** -36, mp.mpf(10) ** -46)
+    if kind == 'deep':
+        # A value far below 1e-46 is held to its own relative size.
+        tolerance = abs(hi) * mp.mpf(10) ** -30
     assert abs(lo - hi) <= tolerance, (h, k, rho, lo, hi)
     crossed = False
-    if h * k != 0 and abs(rho) <= 0.99 and index % 3 == 0:
+    if kind != 'deep' and h * k != 0 and abs(rho) <= 0.99 and index % 3 == 0:
         # Owen's route needs the digits the value lacks: its subtractions
         # cancel to the size of the result.
         depth = 0 if hi == 0 else max(0, int(-mp.log10(abs(hi))))

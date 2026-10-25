@@ -5,7 +5,7 @@ From Coq Require Import Reals Lra Psatz ZArith Lia.
 From Interval Require Import Tactic.
 From Flocq Require Import Core.
 Require Import BvnHighAssembly BvnHighRound BvnHighSteps BvnHighBudget BvnHighErr BvnHighErrTree
-  BvnHighClosed BvnHighClosed2 BvnHighPol.
+  BvnHighClosed BvnHighClosed2 BvnHighPol BvnHighPolB.
 Open Scope R_scope.
 
 (** The exact closed form: [s e P1 - exp(-hk/2) sqrt(2 pi) Phi(-b/s) b P2] with
@@ -82,6 +82,7 @@ Qed.
 Section CF.
 Variables expT sqrtT nc Phi : R -> R.
 Hypothesis Hex7 : forall x, -700 <= x -> x <= 1 -> rel (exp x) (expT x) u.
+Hypothesis Hexu : forall x, -1000 <= x -> x < -700 -> 0 <= expT x <= 1 / 10 ^ 300.
 Hypothesis Hsq0 : forall x, 0 <= x -> rel (sqrt x) (sqrtT x) u.
 Hypothesis Hnc : forall x, x <= 0 -> Rabs (nc x - Phi x) <= (u + bpow radix2 (-111)) * Phi x + eta.
 Hypothesis PhiA : forall x, x <= 0 -> 0 <= Phi x <= 1 / 2.
@@ -93,7 +94,6 @@ Hypothesis Hs : 1 / 10 ^ 8 <= s <= 3 / 1000.
 Hypothesis Hbs : 0 <= bs.
 Hypothesis Hbsq : bs <= 4001 / 10 * (s * s).
 Hypothesis Hc : - (4 * hk) <= bs.
-Hypothesis Hhk : hk < 100.
 Hypothesis He0 : 0 <= e0 <= / 10 ^ 200.
 Hypothesis Hbs2 : rela bs bsT (31 / 10 * u) e0.
 Hypothesis Hhk2 : rela hk hkT u e0.
@@ -212,8 +212,10 @@ Proof.
 Qed.
 
 Theorem closed_error :
+  hk < 100 ->
   Rabs (closed_k expT sqrtT nc s bsT hkT - closed_x Phi s bs hk) <= 15 / 10 ^ 17.
 Proof.
+  intros Hhk.
   pose proof u_pos as Hu. pose proof u_lt as Hu2. pose proof eta_small as Hη.
   pose proof b_facts as [HT0 [Hb1 Hq1]].
   pose proof (hk_lo s bs hk Hs Hbsq Hc) as Hl.
@@ -262,9 +264,9 @@ Proof.
         { assert (0 < s * s) by lra. rewrite <- Rinv_1. apply Rinv_le_contravar; [exact H | lra]. }
         replace (bs / (s * s)) with (bs * / (s * s)) by (unfold Rdiv; ring). nra. }
       lra. }
-    exact (E_core expT Hex7 (bs / (s * s)) hk sigT Hq0 Hq1' Hl ltac:(lra) Hw Hsig). }
+    exact (E_core expT Hex7 Hexu (bs / (s * s)) hk sigT Hq0 Hq1' Hl ltac:(lra) Hw Hsig). }
   assert (L8 : ab eh (expT (- (hkT / 2))) (10005 / 10000) (15 / 10 * u)).
-  { exact (eh_leaf expT Hex7 hk hkT e0 Hl ltac:(lra) He0' Hhk2). }
+  { exact (eh_leaf expT Hex7 Hexu hk hkT e0 Hl ltac:(lra) He0' Hhk2). }
   assert (L9 : ab S SQRT_TAU (2507 / 1000) (2 / 10 ^ 16)) by exact S_leaf.
   assert (L10 : ab P (nc (rnd (- sqrtT bsT / s))) (1 / 2) (183 / 100 * u)) by exact Phi_leaf.
   assert (L11 : ab b (sqrtT bsT) (601 / 10000) (43 / 10 * u * (601 / 10000) + 3 / 10 ^ 100)).
@@ -279,6 +281,86 @@ Proof.
     destruct i as [|i]; [exact L9|]. destruct i as [|i]; [exact L10|]. destruct i as [|i]; [exact L11|].
     cbn [xe0 ce0 xe_leaf ce_leaf me0 ee0]. unfold ab. rewrite Rminus_diag_eq by reflexivity. rewrite Rabs_R0. split; lra. }
   pose proof (A_final xe0 ce0 Henv) as HA.
+  pose proof (sem_closed Phi s bs hk) as E1.
+  pose proof (csem_closed expT sqrtT nc s bsT hkT) as E2.
+  assert (E1' : sem (XE6 xe0) A_t = closed_x Phi s bs hk) by exact E1.
+  rewrite E1' in HA.
+  assert (E3 : csem (CE6 xe0 ce0) A_t = closed_k expT sqrtT nc s bsT hkT).
+  { rewrite <- E2. unfold ce0. reflexivity. }
+  rewrite E3 in HA. destruct HA as [_ HA]. exact HA.
+Qed.
+
+(** [100 <= hk < 1400]: the same, with every exponential factor under [2e-22]. *)
+Theorem closed_error_big :
+  100 <= hk -> hk < 1400 ->
+  Rabs (closed_k expT sqrtT nc s bsT hkT - closed_x Phi s bs hk) <= 1 / 10 ^ 32.
+Proof.
+  intros Hhk0 Hhk.
+  pose proof u_pos as Hu. pose proof u_lt as Hu2. pose proof eta_small as Hη.
+  pose proof b_facts as [HT0 [Hb1 Hq1]].
+  pose proof (hk_lo s bs hk Hs Hbsq Hc) as Hl.
+  pose proof (ss_bounds s Hs) as [Hss1 Hss2].
+  destruct He0 as [He0a He0b]. assert (He0' : 0 <= e0 <= / 10 ^ 200) by (split; assumption).
+  assert (Hhk100 : Rabs hk <= 1400) by (apply Rabs_le; lra).
+  set (sigT := rnd (rnd (bsT / rnd (s * s)) + hkT)).
+  set (Eex := exp (- ((bs / (s * s) + hk) / 2))).
+  set (eh := exp (- (hk / 2))).
+  set (S := sqrt (2 * PI)).
+  set (P := Phi (- (sqrt bs / s))).
+  set (b := sqrt bs).
+  set (xe0 := xe_leaf hk bs s Eex eh S P b).
+  set (ce0 := ce_leaf hkT bsT (rnd (s * s)) s (expT (- (sigT / 2))) (expT (- (hkT / 2))) SQRT_TAU
+                (nc (rnd (- sqrtT bsT / s))) (sqrtT bsT)).
+  assert (L0 : ab hk hkT 1400 (1400 * u + 1 / 10 ^ 190)).
+  { unfold ab. split; [exact Hhk100|]. unfold rela in Hhk2.
+    assert (u * Rabs hk <= u * 1400) by (apply Rmult_le_compat_l; lra).
+    assert (e0 <= 1 / 10 ^ 190) by (assert (/ 10 ^ 200 <= 1 / 10 ^ 190) by interval; lra). lra. }
+  assert (L1 : ab bs bsT (36009 / 10 ^ 7) (32 / 10 * u * (36009 / 10 ^ 7) + 1 / 10 ^ 190)).
+  { assert (Hm : bs <= 36009 / 10 ^ 7).
+    { assert (4001 / 10 * (s * s) <= 4001 / 10 * (9 / 10 ^ 6)) by (apply Rmult_le_compat_l; [lra | lra]).
+      assert (4001 / 10 * (9 / 10 ^ 6) = 36009 / 10 ^ 7) by field. lra. }
+    unfold ab. split; [rewrite Rabs_right by lra; exact Hm|]. unfold rela in Hbs2. rewrite (Rabs_right bs) in Hbs2 by lra.
+    assert (31 / 10 * u * bs <= 31 / 10 * u * (36009 / 10 ^ 7)) by (apply Rmult_le_compat_l; [lra | lra]).
+    assert (e0 <= 1 / 10 ^ 190) by (assert (/ 10 ^ 200 <= 1 / 10 ^ 190) by interval; lra).
+    assert (E : 32 / 10 * u * (36009 / 10 ^ 7) = 31 / 10 * u * (36009 / 10 ^ 7) + 1 / 10 * u * (36009 / 10 ^ 7)) by field.
+    assert (0 <= 1 / 10 * u * (36009 / 10 ^ 7)) by (assert (0 <= u * (36009 / 10 ^ 7)) by (apply Rmult_le_pos; [lra | interval]); lra).
+    lra. }
+  assert (L2 : ab (s * s) (rnd (s * s)) (9 / 10 ^ 6) (u * (9 / 10 ^ 6) + eta)).
+  { unfold ab. split; [rewrite Rabs_right by lra; exact Hss2|].
+    pose proof (rnd_abs (s * s)) as Hr. rewrite (Rabs_right (s * s)) in Hr by lra.
+    assert (u * (s * s) <= u * (9 / 10 ^ 6)) by (apply Rmult_le_compat_l; lra). lra. }
+  assert (Lc : forall x, ab x x (Rabs x) 0) by (intro x; apply ab_exact).
+  assert (L3 : ab 1 1 1 0) by (pose proof (Lc 1) as H; rewrite Rabs_right in H by lra; exact H).
+  assert (L4 : ab 4 4 4 0) by (pose proof (Lc 4) as H; rewrite Rabs_right in H by lra; exact H).
+  assert (L5 : ab 12 12 12 0) by (pose proof (Lc 12) as H; rewrite Rabs_right in H by lra; exact H).
+  assert (L6 : ab s s (3 / 1000) 0) by (pose proof (Lc s) as H; rewrite Rabs_right in H by (destruct Hs; lra); destruct Hs; eapply ab_mono; [exact H | lra | lra]).
+  assert (Hsig : Rabs (sigT - (bs / (s * s) + hk)) <= 64 / 10 * u * (bs / (s * s) + Rabs hk) + 1 / 10 ^ 170)
+    by (exact (sig_err s bs hk bsT hkT e0 Hs Hbs Hbsq He0' Hbs2 Hhk2)).
+  assert (L7 : ab Eex (expT (- (sigT / 2))) (2 / 10 ^ 22) (1 / 10 ^ 32)).
+  { pose proof (Q_bounds s bs Hs Hbs Hbsq) as [Hq0 Hq1']. 
+    assert (Hw : 0 <= bs / (s * s) + hk).
+    { assert (bs <= bs / (s * s)).
+      { assert (1 <= / (s * s)).
+        { assert (0 < s * s) by lra. rewrite <- Rinv_1. apply Rinv_le_contravar; [exact H | lra]. }
+        replace (bs / (s * s)) with (bs * / (s * s)) by (unfold Rdiv; ring). nra. }
+      lra. }
+    exact (E_core_big expT Hex7 Hexu (bs / (s * s)) hk sigT Hq0 Hq1' Hhk0 ltac:(lra) Hsig). }
+  assert (L8 : ab eh (expT (- (hkT / 2))) (2 / 10 ^ 22) (1 / 10 ^ 32)).
+  { exact (eh_leaf_big expT Hex7 Hexu hk hkT e0 Hhk0 ltac:(lra) He0' Hhk2). }
+  assert (L9 : ab S SQRT_TAU (2507 / 1000) (2 / 10 ^ 16)) by exact S_leaf.
+  assert (L10 : ab P (nc (rnd (- sqrtT bsT / s))) (1 / 2) (183 / 100 * u)) by exact Phi_leaf.
+  assert (L11 : ab b (sqrtT bsT) (601 / 10000) (43 / 10 * u * (601 / 10000) + 3 / 10 ^ 100)).
+  { change b with (sqrt bs). pose proof b_err as He. pose proof (sqrt_pos bs) as Hb0. unfold ab. split.
+    - rewrite Rabs_right by (apply Rle_ge; exact Hb0). lra.
+    - assert (43 / 10 * u * sqrt bs <= 43 / 10 * u * (601 / 10000)) by (apply Rmult_le_compat_l; lra). lra. }
+  assert (Henv : forall i, ab (xe0 i) (ce0 i) (me0b i) (ee0b i)).
+  { intro i.
+    destruct i as [|i]; [exact L0|]. destruct i as [|i]; [exact L1|]. destruct i as [|i]; [exact L2|].
+    destruct i as [|i]; [exact L3|]. destruct i as [|i]; [exact L4|]. destruct i as [|i]; [exact L5|].
+    destruct i as [|i]; [exact L6|]. destruct i as [|i]; [exact L7|]. destruct i as [|i]; [exact L8|].
+    destruct i as [|i]; [exact L9|]. destruct i as [|i]; [exact L10|]. destruct i as [|i]; [exact L11|].
+    cbn [xe0 ce0 xe_leaf ce_leaf me0b ee0b]. unfold ab. rewrite Rminus_diag_eq by reflexivity. rewrite Rabs_R0. split; lra. }
+  pose proof (A_final_b xe0 ce0 Henv) as HA.
   pose proof (sem_closed Phi s bs hk) as E1.
   pose proof (csem_closed expT sqrtT nc s bsT hkT) as E2.
   assert (E1' : sem (XE6 xe0) A_t = closed_x Phi s bs hk) by exact E1.

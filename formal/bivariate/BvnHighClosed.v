@@ -89,14 +89,18 @@ Qed.
 Section ECore.
 Variable expT : R -> R.
 Hypothesis Hex7 : forall x, -700 <= x -> x <= 1 -> rel (exp x) (expT x) u.
+(** Below [-700] the library's result is under [1e-300] (it underflows toward zero). *)
+Hypothesis Hexu : forall x, -1000 <= x -> x < -700 -> 0 <= expT x <= 1 / 10 ^ 300.
 
-(** The exponential of the closed form's first term, for [w = (Q + hk)/2]. *)
-Lemma E_core Q hk sig :
-  0 <= Q -> Q <= 4001 / 10 -> - (91 / 100000) <= hk -> hk <= 100 -> 0 <= Q + hk ->
+(** The exponential of the closed form's first term, for [w = (Q + hk)/2], where the library's
+    exponential is within its relative contract. *)
+Lemma E_core_rel Q hk sig :
+  0 <= Q -> Q <= 4001 / 10 -> - (91 / 100000) <= hk -> hk <= 1400 -> 0 <= Q + hk ->
   Rabs (sig - (Q + hk)) <= 64 / 10 * u * (Q + Rabs hk) + 1 / 10 ^ 170 ->
+  -700 <= - (sig / 2) ->
   ab (exp (- ((Q + hk) / 2))) (expT (- (sig / 2))) 1 (35 / 10 * u).
 Proof.
-  intros Q0 Q1 Hl Hh Hw Hsg.
+  intros Q0 Q1 Hl Hh Hw Hsg Hr1.
   pose proof u_pos as Hu. pose proof u_lt as Hu2.
   assert (Hw0 : 0 <= (Q + hk) / 2) by lra.
   assert (HQa : Q + Rabs hk <= 2 * ((Q + hk) / 2) + 2 / 1000).
@@ -104,12 +108,12 @@ Proof.
     - rewrite (Rabs_right hk) by lra. lra.
     - rewrite (Rabs_left hk) by lra. lra. }
   assert (HQh : 0 <= Q + Rabs hk) by (pose proof (Rabs_pos hk); lra).
-  assert (Hhk100 : Rabs hk <= 100) by (apply Rabs_le; lra).
+  assert (Hhk100 : Rabs hk <= 1400) by (apply Rabs_le; lra).
   assert (HT : 0 < 1 / 10 ^ 170) by interval.
   assert (HDs : 32 / 10 * u * (Q + Rabs hk) + 1 / 10 ^ 170 <= 1 / 10 ^ 12).
-  { assert (u * (Q + Rabs hk) <= u * (4001 / 10 + 100)) by (apply Rmult_le_compat_l; [lra | lra]).
-    assert (u * (4001 / 10 + 100) <= 12 / 10 ^ 17 * (4001 / 10 + 100)) by (apply Rmult_le_compat_r; [lra | lra]).
-    assert (32 / 10 * (12 / 10 ^ 17 * (4001 / 10 + 100)) + 1 / 10 ^ 170 <= 1 / 10 ^ 12) by interval. nra. }
+  { assert (u * (Q + Rabs hk) <= u * (4001 / 10 + 1400)) by (apply Rmult_le_compat_l; [lra | lra]).
+    assert (u * (4001 / 10 + 1400) <= 12 / 10 ^ 17 * (4001 / 10 + 1400)) by (apply Rmult_le_compat_r; [lra | lra]).
+    assert (32 / 10 * (12 / 10 ^ 17 * (4001 / 10 + 1400)) + 1 / 10 ^ 170 <= 1 / 10 ^ 12) by interval. nra. }
   set (D := 32 / 10 * u * (Q + Rabs hk) + 1 / 10 ^ 170) in *.
   assert (HD0 : 0 <= D) by (unfold D; assert (0 <= u * (Q + Rabs hk)) by nra; lra).
   assert (HDh : D <= 1 / 2) by (assert (1 / 10 ^ 12 <= 1 / 2) by interval; lra).
@@ -118,7 +122,6 @@ Proof.
     eapply Rle_trans; [exact Hhf|]. unfold D. apply (half_le (Q + Rabs hk) (1 / 10 ^ 170) (Rlt_le _ _ HT)). }
   pose proof (exp_pert ((Q + hk) / 2) (sig / 2) D Hd HD0 HDh) as Hp1.
   pose proof (Rabs_le_inv _ _ Hd) as [Hd1 Hd2].
-  assert (Hr1 : -700 <= - (sig / 2)) by lra.
   assert (Hr2 : - (sig / 2) <= 1) by lra.
   pose proof (Hex7 (- (sig / 2)) Hr1 Hr2) as Hp1b.
   pose proof (rel_trans (exp (- ((Q + hk) / 2))) (exp (- (sig / 2))) (expT (- (sig / 2))) (D + 2 * (D * D)) u ltac:(nra) (Rlt_le _ _ Hu) Hp1 Hp1b) as Hp2.
@@ -160,6 +163,99 @@ Proof.
     assert (Hfin2 : (1 + 1 / 10 ^ 11) * u <= 101 / 100 * u) by (assert (1 + 1 / 10 ^ 11 <= 101 / 100) by interval; nra).
     nra.
 Qed.
+(** The same, over the whole range of the argument: past [-700] both exponentials are under
+    [1e-300] and the bound holds with room. *)
+Lemma E_core Q hk sig :
+  0 <= Q -> Q <= 4001 / 10 -> - (91 / 100000) <= hk -> hk <= 1400 -> 0 <= Q + hk ->
+  Rabs (sig - (Q + hk)) <= 64 / 10 * u * (Q + Rabs hk) + 1 / 10 ^ 170 ->
+  ab (exp (- ((Q + hk) / 2))) (expT (- (sig / 2))) 1 (35 / 10 * u).
+Proof.
+  intros Q0 Q1 Hl Hh Hw Hsg.
+  destruct (Rle_dec (-700) (- (sig / 2))) as [Hr|Hr].
+  - exact (E_core_rel Q hk sig Q0 Q1 Hl Hh Hw Hsg Hr).
+  - pose proof u_pos as Hu. pose proof u_lt as Hu2.
+    assert (HT : 0 < 1 / 10 ^ 170) by interval.
+    assert (Hs : Rabs (sig - (Q + hk)) <= 1 / 10).
+    { assert (Hq : 64 / 10 * u * (Q + Rabs hk) <= 64 / 10 * (12 / 10 ^ 17) * (4001 / 10 + 1400)).
+      { assert (u * (Q + Rabs hk) <= (12 / 10 ^ 17) * (4001 / 10 + 1400)).
+        { assert (Rabs hk <= 1400) by (apply Rabs_le; lra).
+          apply Rmult_le_compat; [lra | pose proof (Rabs_pos hk); lra | lra | lra]. }
+        nra. }
+      assert (64 / 10 * (12 / 10 ^ 17) * (4001 / 10 + 1400) + 1 / 10 ^ 170 <= 1 / 10) by interval. lra. }
+    apply Rabs_le_inv in Hs. destruct Hs as [Hs1 Hs2].
+    assert (Hr3 : -1000 <= - (sig / 2)) by lra.
+    destruct (Hexu (- (sig / 2)) Hr3 ltac:(lra)) as [Ht0 Ht1].
+    assert (Hw0 : 699 <= (Q + hk) / 2) by lra.
+    assert (Hx : exp (- ((Q + hk) / 2)) <= exp (- 699)).
+    { destruct (Rle_lt_or_eq_dec _ _ Hw0) as [Hl2|Heq]; [left; apply exp_increasing; lra | right; f_equal; lra]. }
+    assert (Hx2 : exp (- 699) <= 1 / 10 ^ 300) by interval.
+    pose proof (exp_pos (- ((Q + hk) / 2))) as Hpos.
+    assert (Hu5 : 1 / 10 ^ 300 <= 35 / 10 * u) by (rewrite u_value; interval).
+    unfold ab. split.
+    + rewrite Rabs_right by lra. lra.
+    + apply Rabs_le. lra.
+Qed.
+(** Where [hk >= 100] every exponential here is under [e^-50 < 2e-22], and the library's relative
+    error makes its absolute error under [1e-32]. *)
+Lemma E_core_big Q hk sig :
+  0 <= Q -> Q <= 4001 / 10 -> 100 <= hk -> hk <= 1400 ->
+  Rabs (sig - (Q + hk)) <= 64 / 10 * u * (Q + Rabs hk) + 1 / 10 ^ 170 ->
+  ab (exp (- ((Q + hk) / 2))) (expT (- (sig / 2))) (2 / 10 ^ 22) (1 / 10 ^ 32).
+Proof.
+  intros Q0 Q1 Hh0 Hh Hsg.
+  pose proof u_pos as Hu. pose proof u_lt as Hu2.
+  assert (Hw0 : 50 <= (Q + hk) / 2) by lra.
+  assert (HE : exp (- ((Q + hk) / 2)) <= 2 / 10 ^ 22).
+  { assert (Hx : exp (- ((Q + hk) / 2)) <= exp (- 50)).
+    { destruct (Rle_lt_or_eq_dec _ _ Hw0) as [Hl2|Heq]; [left; apply exp_increasing; lra | right; f_equal; lra]. }
+    assert (exp (- 50) <= 2 / 10 ^ 22) by interval. lra. }
+  pose proof (exp_pos (- ((Q + hk) / 2))) as Hpos.
+  assert (Hhk : Rabs hk <= 1400) by (apply Rabs_le; lra).
+  assert (HT : 0 < 1 / 10 ^ 170) by interval.
+  assert (HDs : 32 / 10 * u * (Q + Rabs hk) + 1 / 10 ^ 170 <= 1 / 10 ^ 12).
+  { assert (u * (Q + Rabs hk) <= u * (4001 / 10 + 1400)) by (apply Rmult_le_compat_l; [lra | lra]).
+    assert (u * (4001 / 10 + 1400) <= 12 / 10 ^ 17 * (4001 / 10 + 1400)) by (apply Rmult_le_compat_r; [lra | lra]).
+    assert (32 / 10 * (12 / 10 ^ 17 * (4001 / 10 + 1400)) + 1 / 10 ^ 170 <= 1 / 10 ^ 12) by interval. nra. }
+  set (D := 32 / 10 * u * (Q + Rabs hk) + 1 / 10 ^ 170) in *.
+  assert (HD0 : 0 <= D) by (unfold D; assert (0 <= u * (Q + Rabs hk)) by (apply Rmult_le_pos; [lra | pose proof (Rabs_pos hk); lra]); lra).
+  assert (HDh : D <= 1 / 2) by (assert (1 / 10 ^ 12 <= 1 / 2) by interval; lra).
+  assert (Hd : Rabs (sig / 2 - (Q + hk) / 2) <= D).
+  { pose proof (half_abs sig (Q + hk) _ Hsg) as Hhf.
+    eapply Rle_trans; [exact Hhf|]. unfold D. apply (half_le (Q + Rabs hk) (1 / 10 ^ 170) (Rlt_le _ _ HT)). }
+  pose proof (Rabs_le_inv _ _ Hd) as [Hd1 Hd2].
+  unfold ab. split.
+  - rewrite Rabs_right by lra. exact HE.
+  - destruct (Rle_dec (-700) (- (sig / 2))) as [Hr1|Hr1].
+    + pose proof (exp_pert ((Q + hk) / 2) (sig / 2) D Hd HD0 HDh) as Hp1.
+      assert (Hr2 : - (sig / 2) <= 1) by lra.
+      pose proof (Hex7 (- (sig / 2)) Hr1 Hr2) as Hp1b.
+      pose proof (rel_trans (exp (- ((Q + hk) / 2))) (exp (- (sig / 2))) (expT (- (sig / 2))) (D + 2 * (D * D)) u ltac:(nra) (Rlt_le _ _ Hu) Hp1 Hp1b) as Hp2.
+      unfold rel in Hp2. rewrite (Rabs_right (exp (- ((Q + hk) / 2)))) in Hp2 by lra.
+      assert (Hth : (D + 2 * (D * D)) + u * (1 + (D + 2 * (D * D))) <= 1 / 10 ^ 11).
+      { assert (D * D <= D * (1 / 10 ^ 12)) by (apply Rmult_le_compat_l; lra).
+        assert (D * (1 / 10 ^ 12) <= 1 / 10 ^ 12 * (1 / 10 ^ 12)) by (apply Rmult_le_compat_r; [interval | lra]).
+        assert (1 / 10 ^ 12 * (1 / 10 ^ 12) <= 1 / 10 ^ 13) by interval.
+        assert (u * (1 + (D + 2 * (D * D))) <= u * 2) by (apply Rmult_le_compat_l; nra).
+        assert (1 / 10 ^ 12 + 2 * (1 / 10 ^ 13) + 12 / 10 ^ 17 * 2 <= 1 / 10 ^ 11) by interval. nra. }
+      assert (Hm : ((D + 2 * (D * D)) + u * (1 + (D + 2 * (D * D)))) * exp (- ((Q + hk) / 2)) <= 1 / 10 ^ 11 * (2 / 10 ^ 22)).
+      { apply Rmult_le_compat; [nra | lra | exact Hth | exact HE]. }
+      assert (1 / 10 ^ 11 * (2 / 10 ^ 22) <= 1 / 10 ^ 32) by interval. lra.
+    + assert (Hs : Rabs (sig - (Q + hk)) <= 1 / 10).
+      { assert (Hq : 64 / 10 * u * (Q + Rabs hk) <= 64 / 10 * (12 / 10 ^ 17) * (4001 / 10 + 1400)).
+        { assert (u * (Q + Rabs hk) <= (12 / 10 ^ 17) * (4001 / 10 + 1400)).
+          { apply Rmult_le_compat; [lra | pose proof (Rabs_pos hk); lra | lra | lra]. }
+          nra. }
+        assert (64 / 10 * (12 / 10 ^ 17) * (4001 / 10 + 1400) + 1 / 10 ^ 170 <= 1 / 10) by interval. lra. }
+      apply Rabs_le_inv in Hs. destruct Hs as [Hs1 Hs2].
+      assert (Hr3 : -1000 <= - (sig / 2)) by lra.
+      destruct (Hexu (- (sig / 2)) Hr3 ltac:(lra)) as [Ht0 Ht1].
+      assert (Hw7 : 699 <= (Q + hk) / 2) by lra.
+      assert (Hx7 : exp (- ((Q + hk) / 2)) <= exp (- 699)).
+      { destruct (Rle_lt_or_eq_dec _ _ Hw7) as [Hl2|Heq]; [left; apply exp_increasing; lra | right; f_equal; lra]. }
+      assert (exp (- 699) <= 1 / 10 ^ 300) by interval.
+      assert (1 / 10 ^ 300 <= 1 / 10 ^ 32) by interval.
+      apply Rabs_le. lra.
+Qed.
 End ECore.
 
 Section Closed.
@@ -168,7 +264,7 @@ Hypothesis Hs : 1 / 10 ^ 8 <= s <= 3 / 1000.
 Hypothesis Hbs : 0 <= bs.
 Hypothesis Hbsq : bs <= 4001 / 10 * (s * s).
 Hypothesis Hc : - (4 * hk) <= bs.
-Hypothesis Hhk : hk < 100.
+Hypothesis Hhk : hk < 1400.
 Hypothesis He0 : 0 <= e0 <= / 10 ^ 200.
 Hypothesis Hbs2 : rela bs bsT (31 / 10 * u) e0.
 Hypothesis Hhk2 : rela hk hkT u e0.

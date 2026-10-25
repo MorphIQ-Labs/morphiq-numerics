@@ -319,7 +319,7 @@ Lemma exb_k8 : exb k8 8 3. Proof. unfold k8. kconst. Qed.
 Lemma exb_k12 : exb k12 12 4. Proof. unfold k12. kconst. Qed.
 Lemma exb_k16 : exb k16 16 4. Proof. unfold k16. kconst. Qed.
 Lemma exb_k20 : exb k20 20 5. Proof. unfold k20. kconst. Qed.
-Lemma exb_k100 : exb k100 100 7. Proof. unfold k100. kconst. Qed.
+Lemma exb_kphi_cutoff : exb kphi_cutoff 700 10. Proof. unfold kphi_cutoff. kconst. Qed.
 Lemma exb_kquarter : exb kquarter (/ 4) 0. Proof. unfold kquarter. kconst. Qed.
 Lemma exb_ktau : exb ktau (884279719003555 / 140737488355328) 3. Proof. unfold ktau. kconst. Qed.
 Lemma exb_ksqrt_tau : exb ksqrt_tau (2822212540896131 / 1125899906842624) 2. Proof. unfold ksqrt_tau. kconst. Qed.
@@ -331,7 +331,7 @@ Lemma exb_kpanel_wide : exb kpanel_wide (3422735716801577 / 36028797018963968) 0
 Lemma exb_k0' : exb k0 0 0. Proof. eapply exb_weak; [exact exb_k0 | lia]. Qed.
 
 Create HintDb exb.
-#[export] Hint Resolve exb_k0 exb_k1 exb_kneg1 exb_k2 exb_k3 exb_k4 exb_k5 exb_k8 exb_k12 exb_k16 exb_k20 exb_k100
+#[export] Hint Resolve exb_k0 exb_k1 exb_kneg1 exb_k2 exb_k3 exb_k4 exb_k5 exb_k8 exb_k12 exb_k16 exb_k20 exb_kphi_cutoff
   exb_kquarter exb_ktau exb_ksqrt_tau exb_kcentre_square : exb.
 
 (** A product by [+-1] is exact. *)
