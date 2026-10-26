@@ -242,46 +242,6 @@ certificate_audit=$!
     sleep 120
   done ) &
 memwatch=$!
-# The kernel audit is one serial coqc, which took 47 of a 91 minute run, so its
-# Print Assumptions lines are dealt round-robin to as many files as the machine
-# has been chosen (three), each with the file's whole header, and checked by one
-# coqc each at once. The checks below read the chunks' concatenated reports, so
-# they are the checks of one file: the same entries, the same expected axioms,
-# the same report count.
-kernel_audit_file="$build/gappa/KernelAudit.v"
-if [ -n "$changed" ]; then
-  (cd "$build" && coqdep -R double-word Double -R two-prod "" -R binary64 Binary64 -R q Q -R gappa "" \
-    $(find double-word two-prod binary64 q gappa -name '*.v' \
-      ! -name CertificateAudit.v ! -name KernelAudit.v ! -name 'KernelAuditPart*.v' | LC_ALL=C sort)) \
-    > "$work/coqdep.txt"
-  python3 scripts/formal_affected.py --coqdep-output "$work/coqdep.txt" \
-    --changed "$changed" --audit "$build/gappa/KernelAudit.v" --base-audit "$base_audit" \
-    --out "$work/KernelAudit.selected.v"
-  kernel_audit_file="$work/KernelAudit.selected.v"
-fi
-# Each chunk is a coqc that loads the whole closure (a few GB), so the chunks
-# are few: three, with the other two audits, fit the 16 GB runner; six did not.
-kernel_chunks=3
-[ "$kernel_chunks" -gt "$(nproc)" ] && kernel_chunks=$(nproc)
-kernel_entries=$(grep -c '^Print Assumptions ' "$kernel_audit_file" || true)
-if [ "$kernel_entries" -ne "$(grep -c '^Print Assumptions .*\.$' "$kernel_audit_file" || true)" ]; then
-  echo "a Print Assumptions line of KernelAudit.v is not a single statement" >&2
-  exit 1
-fi
-[ "$kernel_chunks" -gt "$kernel_entries" ] && kernel_chunks=$kernel_entries
-kernel_pids=
-i=0
-while [ "$i" -lt "$kernel_chunks" ]; do
-  chunk="$build/gappa/KernelAuditPart$i.v"
-  awk -v n="$kernel_chunks" -v part="$i" '
-    /^Print Assumptions / { if (count++ % n == part) print; next }
-    { print }
-  ' "$kernel_audit_file" > "$chunk"
-  (cd "$build/gappa" && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" "KernelAuditPart$i.v") \
-    > "$work/kernel_audit$i.log" 2> "$work/kernel_audit$i.err" &
-  kernel_pids="$kernel_pids $!"
-  i=$((i + 1))
-done
 # finish NAME PID: waits for the step, shows its errors, and fails if it did.
 finish() {
   status=0
@@ -331,6 +291,46 @@ if [ "$reports" -ne "$certificates" ]; then
   exit 1
 fi
 echo "certificates in Coq: $certificates proved"
+# The kernel audit is one serial coqc, which took 47 of a 91 minute run, so its
+# Print Assumptions lines are dealt round-robin to three files, each with the
+# file's whole header, and checked by one coqc each at once. The checks below read
+# the chunks' concatenated reports, so they are the checks of one file: the same
+# entries, the same expected axioms, the same report count. It starts only once
+# the other two audits are done: every audit process loads the whole closure and
+# grows as it prints assumptions (about 3 GB each after six minutes), and with all
+# five in flight the 16 GB runner was out of memory (exit 137).
+kernel_audit_file="$build/gappa/KernelAudit.v"
+if [ -n "$changed" ]; then
+  (cd "$build" && coqdep -R double-word Double -R two-prod "" -R binary64 Binary64 -R q Q -R gappa "" \
+    $(find double-word two-prod binary64 q gappa -name '*.v' \
+      ! -name CertificateAudit.v ! -name KernelAudit.v ! -name 'KernelAuditPart*.v' | LC_ALL=C sort)) \
+    > "$work/coqdep.txt"
+  python3 scripts/formal_affected.py --coqdep-output "$work/coqdep.txt" \
+    --changed "$changed" --audit "$build/gappa/KernelAudit.v" --base-audit "$base_audit" \
+    --out "$work/KernelAudit.selected.v"
+  kernel_audit_file="$work/KernelAudit.selected.v"
+fi
+kernel_chunks=3
+[ "$kernel_chunks" -gt "$(nproc)" ] && kernel_chunks=$(nproc)
+kernel_entries=$(grep -c '^Print Assumptions ' "$kernel_audit_file" || true)
+if [ "$kernel_entries" -ne "$(grep -c '^Print Assumptions .*\.$' "$kernel_audit_file" || true)" ]; then
+  echo "a Print Assumptions line of KernelAudit.v is not a single statement" >&2
+  exit 1
+fi
+[ "$kernel_chunks" -gt "$kernel_entries" ] && kernel_chunks=$kernel_entries
+kernel_pids=
+i=0
+while [ "$i" -lt "$kernel_chunks" ]; do
+  chunk="$build/gappa/KernelAuditPart$i.v"
+  awk -v n="$kernel_chunks" -v part="$i" '
+    /^Print Assumptions / { if (count++ % n == part) print; next }
+    { print }
+  ' "$kernel_audit_file" > "$chunk"
+  (cd "$build/gappa" && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" "KernelAuditPart$i.v") \
+    > "$work/kernel_audit$i.log" 2> "$work/kernel_audit$i.err" &
+  kernel_pids="$kernel_pids $!"
+  i=$((i + 1))
+done
 
 i=0
 for pid in $kernel_pids; do
