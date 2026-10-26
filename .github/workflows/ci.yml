@@ -363,25 +363,52 @@ jobs:
           # base, so the change is HEAD^1..HEAD.
           fetch-depth: 2
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - name: The audit selection's tests
-        run: python3 -m unittest scripts.test_formal_affected
-      - name: Which proofs the change can affect
-        # A pull request audits the kernel proofs its change can affect
-        # (scripts/formal_affected.py); a push to main audits all of them, so
-        # every proof is audited on the default branch.
-        if: github.event_name == 'pull_request'
+      - name: The selections' tests
+        run: python3 -m unittest scripts.test_formal_affected scripts.test_formal_relevant
+      - name: Whether the change can affect the proofs
+        # A pull request that touches no proof, no file a proof is bound to, no
+        # library source and none of the lane's own files cannot change what this
+        # lane checks (scripts/formal_relevant.py), so it reports that and runs
+        # nothing further; the job still runs and passes, so the required check
+        # means what it says. A push to main always runs the lane in full.
+        id: scope
         run: |
           mkdir -p target
-          git diff --name-only HEAD^1 HEAD > target/changed-files.txt
-          git show HEAD^1:formal/audit/KernelAudit.v > target/KernelAudit.base.v
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            git diff --name-only HEAD^1 HEAD > target/changed-files.txt
+            git show HEAD^1:formal/audit/KernelAudit.v > target/KernelAudit.base.v
+            verdict=$(python3 scripts/formal_relevant.py --changed target/changed-files.txt)
+          else
+            verdict="affected: push to the default branch"
+          fi
+          echo "formal lane: $verdict"
+          case "$verdict" in
+            affected*) echo "affected=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "affected=false" >> "$GITHUB_OUTPUT" ;;
+          esac
       - name: Write the cross-check corpus from the Rust library
+        if: steps.scope.outputs.affected == 'true'
         # target/ doesn't exist on a fresh checkout, and the shell opens the
         # redirect before cargo creates it.
         run: |
           mkdir -p target
           cargo run --locked -p morphiq-numerics-reference --bin crosscheck-corpus > target/crosscheck.txt
           MORPHIQ_INTERNAL_CORPUS="$PWD/target/internal-crosscheck.txt" cargo test --locked -p morphiq-numerics --lib internal_crosscheck -- --ignored
+      - name: Restore the Gappa certificates' Coq proofs
+        # Gappa can take a different route to a proof on every run, so the
+        # proofs are cached with the stamps of the certificates they were
+        # written from and only a changed certificate is rewritten
+        # (scripts/write_gappa_proofs.sh); otherwise every run would hand the
+        # proof build new sources and recompile all of them.
+        id: gappa
+        if: steps.scope.outputs.affected == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/gappa-proofs
+          key: gappa-proofs-${{ hashFiles('formal/**/*.g', 'scripts/write_gappa_proofs.sh') }}
+          restore-keys: gappa-proofs-
       - name: Write the Gappa certificates' Coq proofs
+        if: steps.scope.outputs.affected == 'true'
         # The certificates job's image and Gappa version. Gappa's proof search
         # can differ between hosts, so the proofs are written here and checked
         # below rather than committed.
@@ -389,19 +416,28 @@ jobs:
           docker run --rm -v "$PWD:/w" -w /w \
             debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 \
             bash -c 'apt-get update -qq >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gappa=1.4.1-1 >/dev/null && ./scripts/write_gappa_proofs.sh target/gappa-proofs'
+      - name: Save the Gappa certificates' Coq proofs
+        if: ${{ steps.scope.outputs.affected == 'true' && steps.gappa.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/gappa-proofs
+          key: ${{ steps.gappa.outputs.cache-primary-key }}
       - name: Pull the Coq image
+        if: steps.scope.outputs.affected == 'true'
         run: docker pull --quiet "$(cat .cargo/coq-image)"
       - name: Cache keys
+        if: steps.scope.outputs.affected == 'true'
         id: keys
         run: echo "deps=coq-deps-$(sha256sum .cargo/coq-image .cargo/coq-packages scripts/formal_deps.sh | sha256sum | cut -c1-64)" >> "$GITHUB_OUTPUT"
       - name: Restore the Coq libraries
+        if: steps.scope.outputs.affected == 'true'
         id: deps
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/coq-deps
           key: ${{ steps.keys.outputs.deps }}
       - name: Build the Coq libraries
-        if: steps.deps.outputs.cache-hit != 'true'
+        if: ${{ steps.scope.outputs.affected == 'true' && (steps.deps.outputs.cache-hit != 'true') }}
         # The container's user isn't the runner's, so the mounted directory is
         # open to it.
         run: |
@@ -410,12 +446,13 @@ jobs:
           docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP/coq-deps:/deps" -w /w "$(cat .cargo/coq-image)" \
             ./scripts/formal_deps.sh /deps/coq-deps.tar.gz
       - name: Save the Coq libraries
-        if: steps.deps.outputs.cache-hit != 'true'
+        if: ${{ steps.scope.outputs.affected == 'true' && (steps.deps.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/coq-deps
           key: ${{ steps.keys.outputs.deps }}
       - name: Restore the proof build
+        if: steps.scope.outputs.affected == 'true'
         id: build
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -423,6 +460,7 @@ jobs:
           key: formal-build-${{ steps.keys.outputs.deps }}-${{ hashFiles('formal/**', 'scripts/check_formal.sh', 'target/gappa-proofs/**') }}
           restore-keys: formal-build-${{ steps.keys.outputs.deps }}-
       - name: Build the source-bound proofs for the cache
+        if: steps.scope.outputs.affected == 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/formal-build"
           rm -f "$RUNNER_TEMP/formal-build/.built"
@@ -435,15 +473,16 @@ jobs:
       # invocation still checks source/toolchain identity and reruns the audits.
       - name: Was the proof build completed
         id: built
-        if: ${{ !cancelled() && steps.build.outputs.cache-hit != 'true' }}
+        if: ${{ steps.scope.outputs.affected == 'true' && (!cancelled() && steps.build.outputs.cache-hit != 'true') }}
         run: if [ -e "$RUNNER_TEMP/formal-build/.built" ]; then echo "built=true" >> "$GITHUB_OUTPUT"; fi
       - name: Save the proof build
-        if: ${{ !cancelled() && steps.built.outputs.built == 'true' }}
+        if: ${{ steps.scope.outputs.affected == 'true' && (!cancelled() && steps.built.outputs.built == 'true') }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/formal-build
           key: ${{ steps.build.outputs.cache-primary-key }}
       - name: Proofs are bound to the source, assume only the expected axioms, and match the Rust bit for bit
+        if: steps.scope.outputs.affected == 'true'
         id: proofs
         run: |
           docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
