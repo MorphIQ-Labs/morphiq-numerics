@@ -19,7 +19,8 @@
 #      argument ranges, sin t / t),
 #      which apply the certificates' theorems, build (formal/exp/ExpStageTables.v
 #      checks exp's 512-entry table by one reflective computation); and the global axioms the
-#      theorems in formal/audit/KernelAudit.v rest on are among
+#      theorems in formal/audit/KernelAudit.v (audited in parallel chunks of its
+#      Print Assumptions lines, one coqc each) rest on are among
 #      formal/axioms.expected, formal/axioms.int63.expected and formal/axioms.float.expected. The second
 #      list is Coq's primitive 63-bit integers: CoqInterval, which proves the kernels' constants,
 #      computes with them through Bignums. The third is Coq's primitive floats (FloatAxioms), which
@@ -218,9 +219,33 @@ audit=$!
 (cd "$build/gappa" && coqc -R . "" CertificateAudit.v) \
   > "$work/certificate_audit.log" 2> "$work/certificate_audit.err" &
 certificate_audit=$!
-(cd "$build/gappa" && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" KernelAudit.v) \
-  > "$work/kernel_audit.log" 2> "$work/kernel_audit.err" &
-kernel_audit=$!
+# The kernel audit is one serial coqc, which took 47 of a 91 minute run, so its
+# Print Assumptions lines are dealt round-robin to as many files as the machine
+# has cores (at most 6), each with the file's whole header, and checked by one
+# coqc each at once. The checks below read the chunks' concatenated reports, so
+# they are the checks of one file: the same entries, the same expected axioms,
+# the same report count.
+kernel_chunks=$(nproc)
+[ "$kernel_chunks" -gt 6 ] && kernel_chunks=6
+[ "$kernel_chunks" -lt 1 ] && kernel_chunks=1
+kernel_entries=$(grep -c '^Print Assumptions ' "$build/gappa/KernelAudit.v")
+if [ "$kernel_entries" -ne "$(grep -c '^Print Assumptions .*\.$' "$build/gappa/KernelAudit.v")" ]; then
+  echo "a Print Assumptions line of KernelAudit.v is not a single statement" >&2
+  exit 1
+fi
+kernel_pids=
+i=0
+while [ "$i" -lt "$kernel_chunks" ]; do
+  chunk="$build/gappa/KernelAuditPart$i.v"
+  awk -v n="$kernel_chunks" -v part="$i" '
+    /^Print Assumptions / { if (count++ % n == part) print; next }
+    { print }
+  ' "$build/gappa/KernelAudit.v" > "$chunk"
+  (cd "$build/gappa" && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" "KernelAuditPart$i.v") \
+    > "$work/kernel_audit$i.log" 2> "$work/kernel_audit$i.err" &
+  kernel_pids="$kernel_pids $!"
+  i=$((i + 1))
+done
 (cd "$build/extraction" \
   && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
   && compile_extraction -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
@@ -289,7 +314,12 @@ if [ "$reports" -ne "$certificates" ]; then
 fi
 echo "certificates in Coq: $certificates proved"
 
-finish kernel_audit "$kernel_audit"
+i=0
+for pid in $kernel_pids; do
+  finish "kernel_audit$i" "$pid"
+  i=$((i + 1))
+done
+cat "$work"/kernel_audit[0-9]*.log > "$work/kernel_audit.log"
 grep -E '^[^[:space:]]' "$work/kernel_audit.log" \
   | grep -v -E '^(Axioms:|Closed under the global context)' \
   | sed 's/ :.*//' | sort -u > "$work/kernel-axioms"
