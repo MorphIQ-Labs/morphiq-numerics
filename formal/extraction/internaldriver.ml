@@ -494,6 +494,8 @@ let () =
   (try
      while true do
        let line = input_line file in
+       (* The bivariate normal's lines are bvndriver.ml's. *)
+       if String.length line >= 4 && String.sub line 0 4 = "bvn_" then () else begin
        incr lines;
        match String.split_on_char ':' line with
        | [lhs; rhs] ->
@@ -509,6 +511,7 @@ let () =
                 end
             | [] -> failwith ("malformed line " ^ string_of_int !lines))
        | _ -> failwith ("malformed line " ^ string_of_int !lines)
+       end
      done
    with End_of_file -> ());
   Printf.printf "internal crosscheck: %d cases, %d mismatches\n" !lines !failures;

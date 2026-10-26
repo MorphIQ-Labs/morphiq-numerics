@@ -93,7 +93,7 @@ MORPHIQ_INTERNAL_CORPUS=$PWD/target/internal-crosscheck.txt cargo test --locked 
 #   (--build DIR keeps the proof build in DIR and reuses it next time; see the script's header)
 #   (--changed FILE --base-audit FILE audits only the kernel proofs a change can affect, as CI does on pull requests; the whole audit runs without them, and on every push to main; a pull request that touches no proof, bound file, library source or lane file skips the lane, see scripts/formal_relevant.py, and the Gappa proofs are cached and rewritten only for changed certificates, see scripts/write_gappa_proofs.sh)
 # after a passing cached build, in the same image: ./scripts/check_formal_negative.sh binding /path/to/coq-deps.tar.gz DIR target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
-#   (repeat for admitted, axiom, certificate, crosscheck, internal-crosscheck; each uses an isolated copy)
+#   (repeat for admitted, axiom, certificate, crosscheck, internal-crosscheck, bvn-crosscheck; each uses an isolated copy)
 # and, in the pinned Debian image (see the certificates job): ./scripts/check_certificates.sh
 cargo deny --locked check licenses
 ```

@@ -1,0 +1,191 @@
+//! Gauss-Legendre rules of the bivariate normal, written by
+//! `generators/bivariate_normal_nodes.py`; do not edit. Each rule lists the
+//! positive abscissas in descending order and their weights, each rounded
+//! once to nearest-even binary64 from the 120-digit root of `P_n`;
+//! `docs/bivariate_normal.md` gives the derivation.
+
+/// The 3 positive abscissas of the 6-point rule
+pub(super) const GL6_X: [f64; 3] = [
+    f64::from_bits(0x3fedd6ca4e80a01e),
+    f64::from_bits(0x3fe528a09655c95e),
+    f64::from_bits(0x3fce8b12d03675c5),
+];
+/// Their weights, summing to 1 over the 3 positive nodes
+pub(super) const GL6_W: [f64; 3] = [
+    f64::from_bits(0x3fc5edf601e2dbf8),
+    f64::from_bits(0x3fd716b7b5794c1c),
+    f64::from_bits(0x3fddf24d499545e8),
+];
+/// The 4 positive abscissas of the 8-point rule
+pub(super) const GL8_X: [f64; 4] = [
+    f64::from_bits(0x3feebab1cb0acc67),
+    f64::from_bits(0x3fe97e4ab249f41e),
+    f64::from_bits(0x3fe0d129583284b4),
+    f64::from_bits(0x3fc77ac94f3c7345),
+];
+/// Their weights, summing to 1 over the 4 positive nodes
+pub(super) const GL8_W: [f64; 4] = [
+    f64::from_bits(0x3fb9ea1d04ca0374),
+    f64::from_bits(0x3fcc76fb531d2b96),
+    f64::from_bits(0x3fd413c50a255615),
+    f64::from_bits(0x3fd736360b199343),
+];
+/// The 6 positive abscissas of the 12-point rule
+pub(super) const GL12_X: [f64; 6] = [
+    f64::from_bits(0x3fef68f1d8e42e81),
+    f64::from_bits(0x3fecee874ffb88b4),
+    f64::from_bits(0x3fe8a30aeed88f36),
+    f64::from_bits(0x3fe2cb4f05c077f9),
+    f64::from_bits(0x3fd78a8d20a8b19d),
+    f64::from_bits(0x3fc007a5f8f630e4),
+];
+/// Their weights, summing to 1 over the 6 positive nodes
+pub(super) const GL12_W: [f64; 6] = [
+    f64::from_bits(0x3fa8275d9dea6d8f),
+    f64::from_bits(0x3fbb60602bce6181),
+    f64::from_bits(0x3fc47d7258f22d8f),
+    f64::from_bits(0x3fca0163e6b1ab72),
+    f64::from_bits(0x3fcde3155c256ab5),
+    f64::from_bits(0x3fcfe40ce6d4f025),
+];
+/// The 7 positive abscissas of the 14-point rule
+pub(super) const GL14_X: [f64; 7] = [
+    f64::from_bits(0x3fef8fa30fddab0b),
+    f64::from_bits(0x3fedb5bd12b99e9f),
+    f64::from_bits(0x3fea786ee46dd9c4),
+    f64::from_bits(0x3fe5fe4db09e0c89),
+    f64::from_bits(0x3fe07ceab54ef096),
+    f64::from_bits(0x3fd46c564912d702),
+    f64::from_bits(0x3fbba97d36de76b0),
+];
+/// Their weights, summing to 1 over the 7 positive nodes
+pub(super) const GL14_W: [f64; 7] = [
+    f64::from_bits(0x3fa1fb2d8b27f553),
+    f64::from_bits(0x3fb4853d8adc703d),
+    f64::from_bits(0x3fbf1bd74ef611c1),
+    f64::from_bits(0x3fc41f3bbee2d2f2),
+    f64::from_bits(0x3fc7bfb8e2a8f57e),
+    f64::from_bits(0x3fca43f1796fab09),
+    f64::from_bits(0x3fcb8dc415514e34),
+];
+/// Their weights, summing to 1 over the 8 positive nodes
+pub(super) const GL16_W: [f64; 8] = [
+    f64::from_bits(0x3f9bcddab4b7c211),
+    f64::from_bits(0x3fafdfb1a2c1265d),
+    f64::from_bits(0x3fb85c4ee79cc258),
+    f64::from_bits(0x3fbfe7af2bad386a),
+    f64::from_bits(0x3fc325f61bca3cbf),
+    f64::from_bits(0x3fc5a6ebbb5a75fc),
+    f64::from_bits(0x3fc75f8c77e0c00f),
+    f64::from_bits(0x3fc83feae80e4dfc),
+];
+/// `((3 + t) / 4)^2` for the abscissas of the 16-point rule
+pub(super) const GL16_XP: [f64; 8] = [
+    f64::from_bits(0x3fefd4a4cca98683),
+    f64::from_bits(0x3fef1e8d57d8a84a),
+    f64::from_bits(0x3fede2de9aee34b1),
+    f64::from_bits(0x3fec34c493f0b683),
+    f64::from_bits(0x3fea2d95256a041c),
+    f64::from_bits(0x3fe7ea6f407bd7eb),
+    f64::from_bits(0x3fe589b0206a4d68),
+    f64::from_bits(0x3fe328801d4fc000),
+];
+/// `((3 - t) / 4)^2` for the abscissas of the 16-point rule
+pub(super) const GL16_XM: [f64; 8] = [
+    f64::from_bits(0x3fd02b875fded849),
+    f64::from_bits(0x3fd0e62a968eda0d),
+    f64::from_bits(0x3fd238dce63d129e),
+    f64::from_bits(0x3fd427205b6ac166),
+    f64::from_bits(0x3fd6b2b3b0932b25),
+    f64::from_bits(0x3fd9d8c24d44f240),
+    f64::from_bits(0x3fdd8f081422f432),
+    f64::from_bits(0x3fe0e0be5bb4a011),
+];
+/// The 10 positive abscissas of the 20-point rule
+pub(super) const GL20_X: [f64; 10] = [
+    f64::from_bits(0x3fefc7b5a0c71ce0),
+    f64::from_bits(0x3feed8dba7bd769f),
+    f64::from_bits(0x3fed31064173fd92),
+    f64::from_bits(0x3feada0bd5efd6e7),
+    f64::from_bits(0x3fe7e1f37346a54e),
+    f64::from_bits(0x3fe45a8d3fa710db),
+    f64::from_bits(0x3fe05905c13f7ff7),
+    f64::from_bits(0x3fd7eaccf15652c4),
+    f64::from_bits(0x3fcd281636928bc0),
+    f64::from_bits(0x3fb3973df98b86b0),
+];
+/// Their weights, summing to 1 over the 10 positive nodes
+pub(super) const GL20_W: [f64; 10] = [
+    f64::from_bits(0x3f9209680274e8af),
+    f64::from_bits(0x3fa4c9b5ea53b67f),
+    f64::from_bits(0x3fb00b467df7e475),
+    f64::from_bits(0x3fb5519fe196e24a),
+    f64::from_bits(0x3fba1817a317a821),
+    f64::from_bits(0x3fbe41ff31573b48),
+    f64::from_bits(0x3fc0db2c5db26dff),
+    f64::from_bits(0x3fc230348f34a535),
+    f64::from_bits(0x3fc31819b52c5992),
+    f64::from_bits(0x3fc38d6c490a3370),
+];
+/// The 12 positive abscissas of the 24-point rule
+pub(super) const GL24_X: [f64; 12] = [
+    f64::from_bits(0x3fefd892de691982),
+    f64::from_bits(0x3fef30f9f0cbf876),
+    f64::from_bits(0x3fee06585a70aa4d),
+    f64::from_bits(0x3fec5d841864d0f5),
+    f64::from_bits(0x3fea3d74ce0d3700),
+    f64::from_bits(0x3fe7af18edb9ddd6),
+    f64::from_bits(0x3fe4bd2ee5fa1086),
+    f64::from_bits(0x3fe17417bac4d72b),
+    f64::from_bits(0x3fdbc345d81e24b5),
+    f64::from_bits(0x3fd429a8c588e910),
+    f64::from_bits(0x3fc8769542b94f8d),
+    f64::from_bits(0x3fb0660853eda2e8),
+];
+/// Their weights, summing to 1 over the 12 positive nodes
+pub(super) const GL24_W: [f64; 12] = [
+    f64::from_bits(0x3f89465bd3112202),
+    f64::from_bits(0x3f9d375514486f1d),
+    f64::from_bits(0x3fa6ab884f57c979),
+    f64::from_bits(0x3fae5c6255d25eda),
+    f64::from_bits(0x3fb2c6d5c2eff064),
+    f64::from_bits(0x3fb6108ef504463a),
+    f64::from_bits(0x3fb8fd8936444b16),
+    f64::from_bits(0x3fbb8177ba4a68dc),
+    f64::from_bits(0x3fbd91c78acb1b2d),
+    f64::from_bits(0x3fbf25cbce1d1ff6),
+    f64::from_bits(0x3fc01b7117cf8bd8),
+    f64::from_bits(0x3fc060475e763736),
+];
+/// Their weights; with the centre weight, `2 * sum + centre = 2`
+pub(super) const GL15_W: [f64; 7] = [
+    f64::from_bits(0x3f9f7dc7227a291b),
+    f64::from_bits(0x3fb2038260b5d026),
+    f64::from_bits(0x3fbb6ec9635f1146),
+    f64::from_bits(0x3fc1dd73b4963161),
+    f64::from_bits(0x3fc5484f30a86ed1),
+    f64::from_bits(0x3fc7d41fa76dc267),
+    f64::from_bits(0x3fc96633f1fd02ce),
+];
+/// `((3 + t) / 4)^2` for the abscissas of the 15-point rule
+pub(super) const GL15_XP: [f64; 7] = [
+    f64::from_bits(0x3fefcee423f6fc6f),
+    f64::from_bits(0x3fef01161aab82c9),
+    f64::from_bits(0x3fed9e0d20c3da04),
+    f64::from_bits(0x3febbe1963146ab9),
+    f64::from_bits(0x3fe980f177e7cf2d),
+    f64::from_bits(0x3fe70a5ff5c4037a),
+    f64::from_bits(0x3fe47ecb2541debc),
+];
+/// `((3 - t) / 4)^2` for the abscissas of the 15-point rule
+pub(super) const GL15_XM: [f64; 7] = [
+    f64::from_bits(0x3fd031548da19ea6),
+    f64::from_bits(0x3fd104f50de1f726),
+    f64::from_bits(0x3fd285570e87b7f4),
+    f64::from_bits(0x3fd4b68da200c7cc),
+    f64::from_bits(0x3fd799c7c94230e5),
+    f64::from_bits(0x3fdb296afdc625ec),
+    f64::from_bits(0x3fdf5550656a1bb4),
+];
+/// The weight of the 15-point rule's centre node, abscissa 0
+pub(super) const GL15_W0: f64 = f64::from_bits(0x3fc9ee1575f9c980);
