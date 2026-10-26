@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.13](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.12...v0.0.13) - 2026-10-25
+
+### Added
+
+- *(linalg)* add explicit checked unpivoted Thomas contract ([#226](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/226))
+
 ## [0.0.12](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.11...v0.0.12) - 2026-10-23
 
 ### Added
