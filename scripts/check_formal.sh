@@ -47,7 +47,8 @@
 #                and check their pinned versions, instead of installing them.
 #   --build DIR  build in DIR and keep it, so a later run reuses it (CI caches
 #                it). A .vo file is reused only if its source file's bytes, the
-#                generated _CoqProject and the Coq toolchain's fingerprint (the
+#                generated _CoqProject's library mappings (not its list of files)
+#                and the Coq toolchain's fingerprint (the
 #                compiler, its library and plugin files, and every installed
 #                package's version) are unchanged; make rebuilds everything
 #                downstream of a rebuilt file, and Coq refuses a .vo compiled
@@ -183,7 +184,12 @@ toolchain=$({
 # .built marks a tree whose last make succeeded, so every .vo in it is complete;
 # CI saves the tree only then.
 rm -f "$build/.built"
-if [ "$(cat "$build/.toolchain" 2>/dev/null)" != "$toolchain" ] || ! cmp -s "$build/_CoqProject" "$src/_CoqProject"; then
+# Only the library mappings (the -R lines) decide whether a compiled file can
+# still be trusted. The list of files may grow or shrink: make rebuilds what a
+# new or changed file touches, and a file that's gone is removed below, so a new
+# development doesn't cost the compiled proofs of the others.
+mappings() { grep '^-' "$1" 2>/dev/null || true; }
+if [ "$(cat "$build/.toolchain" 2>/dev/null)" != "$toolchain" ] || [ "$(mappings "$build/_CoqProject")" != "$(mappings "$src/_CoqProject")" ]; then
   find "$build" -mindepth 1 -delete
 fi
 # A source file that's new or changed is copied, with a new modification time,
