@@ -30,4 +30,4 @@ std = ["morphiq-numerics-arch?/std"]
 # (AGENTS.md, "Security, Safety, and Dependencies"). It holds the workspace's
 # only `unsafe` code, so this crate keeps `forbid(unsafe_code)`.
 [dependencies]
-morphiq-numerics-arch = { path = "../morphiq-numerics-arch", version = "0.0.13", optional = true }
+morphiq-numerics-arch = { path = "../morphiq-numerics-arch", version = "0.0.14", optional = true }
