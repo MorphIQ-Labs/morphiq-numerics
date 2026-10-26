@@ -54,6 +54,14 @@
 #                against a different version of a library it requires.
 #                It marks the tree with DIR/.built once make succeeds.
 #                Without it, the build is in a fresh temporary directory.
+#   --changed FILE --base-audit FILE
+#                audit only the kernel proofs a change can affect: FILE lists the
+#                changed paths (git diff --name-only against the base commit) and
+#                --base-audit is the base commit's formal/audit/KernelAudit.v.
+#                scripts/formal_affected.py keeps the entries of a changed module
+#                or of one that depends on it (by coqdep), and any entry the base
+#                audit lacks; a path it does not know selects the whole audit. CI
+#                passes these on pull requests only: a push to main audits it all.
 #
 # Runs inside the pinned Coq image (.cargo/coq-image; see the formal jobs in
 # .github/workflows/ci.yml), which provides coqc, coq_makefile and opam; the
@@ -62,11 +70,15 @@ set -eu
 deps=
 build=
 build_only=0
+changed=
+base_audit=
 while [ $# -gt 0 ]; do
   case $1 in
     --build-only) build_only=1; shift ;;
     --deps) deps=$(realpath "$2"); shift 2 ;;
     --build) mkdir -p "$2"; build=$(realpath "$2"); shift 2 ;;
+    --changed) changed=$(realpath "$2"); shift 2 ;;
+    --base-audit) base_audit=$(realpath "$2"); shift 2 ;;
     --) shift; break ;;
     -*) echo "unknown option $1" >&2; exit 2 ;;
     *) break ;;
@@ -74,6 +86,10 @@ while [ $# -gt 0 ]; do
 done
 if [ $# -ne 3 ]; then
   echo "usage: $0 [--deps <tar>] [--build <dir>] [--build-only] <cross-check corpus> <internal cross-check corpus> <Gappa proofs directory>" >&2
+  exit 2
+fi
+if [ -n "$changed" ] && [ -z "$base_audit" ] || [ -z "$changed" ] && [ -n "$base_audit" ]; then
+  echo "--changed and --base-audit go together" >&2
   exit 2
 fi
 if [ "$build_only" -eq 1 ] && [ -z "$build" ]; then
@@ -222,14 +238,26 @@ certificate_audit=$!
 # coqc each at once. The checks below read the chunks' concatenated reports, so
 # they are the checks of one file: the same entries, the same expected axioms,
 # the same report count.
+kernel_audit_file="$build/gappa/KernelAudit.v"
+if [ -n "$changed" ]; then
+  (cd "$build" && coqdep -R double-word Double -R two-prod "" -R binary64 Binary64 -R q Q -R gappa "" \
+    $(find double-word two-prod binary64 q gappa -name '*.v' \
+      ! -name CertificateAudit.v ! -name KernelAudit.v ! -name 'KernelAuditPart*.v' | LC_ALL=C sort)) \
+    > "$work/coqdep.txt"
+  python3 scripts/formal_affected.py --coqdep-output "$work/coqdep.txt" \
+    --changed "$changed" --audit "$build/gappa/KernelAudit.v" --base-audit "$base_audit" \
+    --out "$work/KernelAudit.selected.v"
+  kernel_audit_file="$work/KernelAudit.selected.v"
+fi
 kernel_chunks=$(nproc)
 [ "$kernel_chunks" -gt 6 ] && kernel_chunks=6
 [ "$kernel_chunks" -lt 1 ] && kernel_chunks=1
-kernel_entries=$(grep -c '^Print Assumptions ' "$build/gappa/KernelAudit.v")
-if [ "$kernel_entries" -ne "$(grep -c '^Print Assumptions .*\.$' "$build/gappa/KernelAudit.v")" ]; then
+kernel_entries=$(grep -c '^Print Assumptions ' "$kernel_audit_file" || true)
+if [ "$kernel_entries" -ne "$(grep -c '^Print Assumptions .*\.$' "$kernel_audit_file" || true)" ]; then
   echo "a Print Assumptions line of KernelAudit.v is not a single statement" >&2
   exit 1
 fi
+[ "$kernel_chunks" -gt "$kernel_entries" ] && kernel_chunks=$kernel_entries
 kernel_pids=
 i=0
 while [ "$i" -lt "$kernel_chunks" ]; do
@@ -237,7 +265,7 @@ while [ "$i" -lt "$kernel_chunks" ]; do
   awk -v n="$kernel_chunks" -v part="$i" '
     /^Print Assumptions / { if (count++ % n == part) print; next }
     { print }
-  ' "$build/gappa/KernelAudit.v" > "$chunk"
+  ' "$kernel_audit_file" > "$chunk"
   (cd "$build/gappa" && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" "KernelAuditPart$i.v") \
     > "$work/kernel_audit$i.log" 2> "$work/kernel_audit$i.err" &
   kernel_pids="$kernel_pids $!"
@@ -310,7 +338,10 @@ for pid in $kernel_pids; do
   finish "kernel_audit$i" "$pid"
   i=$((i + 1))
 done
-cat "$work"/kernel_audit[0-9]*.log > "$work/kernel_audit.log"
+: > "$work/kernel_audit.log"
+for log in "$work"/kernel_audit[0-9]*.log; do
+  [ -e "$log" ] && cat "$log" >> "$work/kernel_audit.log"
+done
 grep -E '^[^[:space:]]' "$work/kernel_audit.log" \
   | grep -v -E '^(Axioms:|Closed under the global context)' \
   | sed 's/ :.*//' | sort -u > "$work/kernel-axioms"
@@ -319,7 +350,7 @@ if ! comm -23 "$work/kernel-axioms" "$work/kernel-expected" | diff /dev/null - >
   echo "a kernel theorem rests on an axiom outside formal/axioms.expected, formal/axioms.int63.expected and formal/axioms.float.expected" >&2
   exit 1
 fi
-kernels=$(grep -c '^Print Assumptions' formal/audit/KernelAudit.v)
+kernels=$kernel_entries
 reports=$(( $(grep -c '^Axioms:' "$work/kernel_audit.log" || true) + $(grep -c 'Closed under the global context' "$work/kernel_audit.log" || true) ))
 if [ "$reports" -ne "$kernels" ]; then
   echo "the kernel audit reported on $reports theorems, not $kernels" >&2
