@@ -358,7 +358,22 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # A pull request's checkout is a merge commit; its first parent is the
+          # base, so the change is HEAD^1..HEAD.
+          fetch-depth: 2
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: The audit selection's tests
+        run: python3 -m unittest scripts.test_formal_affected
+      - name: Which proofs the change can affect
+        # A pull request audits the kernel proofs its change can affect
+        # (scripts/formal_affected.py); a push to main audits all of them, so
+        # every proof is audited on the default branch.
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p target
+          git diff --name-only HEAD^1 HEAD > target/changed-files.txt
+          git show HEAD^1:formal/audit/KernelAudit.v > target/KernelAudit.base.v
       - name: Write the cross-check corpus from the Rust library
         # target/ doesn't exist on a fresh checkout, and the shell opens the
         # redirect before cargo creates it.
@@ -433,4 +448,5 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
             ./scripts/check_formal.sh --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
+            $(if [ "${{ github.event_name }}" = pull_request ]; then echo "--changed target/changed-files.txt --base-audit target/KernelAudit.base.v"; fi) \
             target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
