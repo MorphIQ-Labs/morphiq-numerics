@@ -125,7 +125,8 @@ else
 fi
 
 work=$(mktemp -d)
-trap 'rm -rf "$work"' EXIT
+memwatch=
+trap 'rm -rf "$work"; [ -n "$memwatch" ] && kill "$memwatch" 2>/dev/null; true' EXIT
 
 # The source tree: the developments, each Gappa certificate's proof with its
 # hints proved, and the kernels beside the certificates they apply.
@@ -232,9 +233,15 @@ audit=$!
 (cd "$build/gappa" && coqc -R . "" CertificateAudit.v) \
   > "$work/certificate_audit.log" 2> "$work/certificate_audit.err" &
 certificate_audit=$!
+# Memory is what bounded the parallel steps, so it is logged while they run.
+( while :; do
+    echo "memory: $(awk '/MemAvailable/ { print int($2 / 1024) }' /proc/meminfo) MB available" >&2
+    sleep 120
+  done ) &
+memwatch=$!
 # The kernel audit is one serial coqc, which took 47 of a 91 minute run, so its
 # Print Assumptions lines are dealt round-robin to as many files as the machine
-# has cores (at most 6), each with the file's whole header, and checked by one
+# has been chosen (three), each with the file's whole header, and checked by one
 # coqc each at once. The checks below read the chunks' concatenated reports, so
 # they are the checks of one file: the same entries, the same expected axioms,
 # the same report count.
@@ -249,9 +256,10 @@ if [ -n "$changed" ]; then
     --out "$work/KernelAudit.selected.v"
   kernel_audit_file="$work/KernelAudit.selected.v"
 fi
-kernel_chunks=$(nproc)
-[ "$kernel_chunks" -gt 6 ] && kernel_chunks=6
-[ "$kernel_chunks" -lt 1 ] && kernel_chunks=1
+# Each chunk is a coqc that loads the whole closure (a few GB), so the chunks
+# are few: three, with the other two audits, fit the 16 GB runner; six did not.
+kernel_chunks=3
+[ "$kernel_chunks" -gt "$(nproc)" ] && kernel_chunks=$(nproc)
 kernel_entries=$(grep -c '^Print Assumptions ' "$kernel_audit_file" || true)
 if [ "$kernel_entries" -ne "$(grep -c '^Print Assumptions .*\.$' "$kernel_audit_file" || true)" ]; then
   echo "a Print Assumptions line of KernelAudit.v is not a single statement" >&2
@@ -271,18 +279,6 @@ while [ "$i" -lt "$kernel_chunks" ]; do
   kernel_pids="$kernel_pids $!"
   i=$((i + 1))
 done
-(cd "$build/extraction" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
-  && compile_extraction -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
-  && echo "extraction: running crosscheck" \
-  && ./crosscheck "$corpus") > "$work/crosscheck.log" 2> "$work/crosscheck.err" &
-crosscheck=$!
-(cd "$build/extraction" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R ../gappa "" InternalCrosscheck.v \
-  && compile_extraction -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
-  && echo "extraction: running internalcrosscheck" \
-  && ./internalcrosscheck "$icorpus") > "$work/internal_crosscheck.log" 2> "$work/internal_crosscheck.err" &
-internal_crosscheck=$!
 # finish NAME PID: waits for the step, shows its errors, and fails if it did.
 finish() {
   status=0
@@ -358,6 +354,21 @@ if [ "$reports" -ne "$kernels" ]; then
 fi
 echo "kernel proofs: $kernels proved"
 
+# The extractions start only now: the audits above each load the whole closure,
+# and together with the extractions' compilers they exceeded the runner's memory
+# (the kernel audit was killed, exit 137, with six chunks beside them).
+(cd "$build/extraction" \
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
+  && compile_extraction -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
+  && echo "extraction: running crosscheck" \
+  && ./crosscheck "$corpus") > "$work/crosscheck.log" 2> "$work/crosscheck.err" &
+crosscheck=$!
+(cd "$build/extraction" \
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R ../gappa "" InternalCrosscheck.v \
+  && compile_extraction -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
+  && echo "extraction: running internalcrosscheck" \
+  && ./internalcrosscheck "$icorpus") > "$work/internal_crosscheck.log" 2> "$work/internal_crosscheck.err" &
+internal_crosscheck=$!
 finish crosscheck "$crosscheck"
 cat "$work/crosscheck.log"
 finish internal_crosscheck "$internal_crosscheck"
