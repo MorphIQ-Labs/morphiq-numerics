@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.14](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.13...v0.0.14) - 2026-10-26
+
+### Added
+
+- *(normal)* bivariate normal distribution function with proved bounds ([#228](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/228))
+
 ## [0.0.13](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.12...v0.0.13) - 2026-10-25
 
 ### Added
