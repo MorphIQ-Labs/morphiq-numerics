@@ -938,3 +938,5 @@ Print Assumptions FastErfcx.fast_erfcx_fallback_contract.
 Print Assumptions FastNormal.fast_normal_lower_ok.
 Print Assumptions FastNormal.fast_normal_entry_ok.
 Print Assumptions FastNormal.fast_normal_fallback_contract.
+Print Assumptions FastExp.fast_exp_public_accelerated.
+Print Assumptions FastExp.fast_exp_public_fallback.

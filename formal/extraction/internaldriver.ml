@@ -98,6 +98,14 @@ let compute op args =
        | [hi; lo; eps; k] ->
            show_opt (x_decide_scaled (z_of_u64 (hex hi)) (z_of_u64 (hex lo)) (z_of_u64 (hex eps)) (z_of_int (int_of_string k)))
        | _ -> failwith "decide_scaled takes three words and an exponent")
+  | "fast_exp" ->
+      (match args with
+       | [x; fallback] -> show_bits (x_fast_exp (z_of_u64 (hex x)) (z_of_u64 (hex fallback)))
+       | _ -> failwith "fast_exp takes input and strong fallback result")
+  | "fast_erfcx" | "fast_normal" ->
+      (match args with
+       | [x] -> show_bits ((if op = "fast_erfcx" then x_fast_erfcx else x_fast_normal) (z_of_u64 (hex x)))
+       | _ -> failwith (op ^ " takes a word"))
   | "erfcx_entry" ->
       (match args with
        | [x] -> show_bits (x_erfcx_entry (z_of_u64 (hex x)))
