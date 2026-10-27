@@ -316,7 +316,7 @@ jobs:
         with:
           shared-key: test-${{ matrix.os }}
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
-        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (runner.arch != 'ARM64') }}
+      - if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (runner.arch != 'ARM64') }}
         run: cargo test --locked --workspace --all-features
       - name: Unpivoted admission and pivot-policy mutation controls
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (runner.os == 'Linux') }}
@@ -327,15 +327,15 @@ jobs:
         with:
           name: unpivoted-mutations-${{ matrix.os }}
           path: target/unpivoted-mutations/
-        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (runner.arch == 'ARM64') }}
+      - if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (runner.arch == 'ARM64') }}
 
         run: ./scripts/check_fma.sh
-
-  # The scalar kernels' FMA build (eft::two_prod_d): tests, digest and
-  # cross-check corpora byte-identical to the default build's.
       - name: Prose-only change
         if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
         run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
+
+  # The scalar kernels' FMA build (eft::two_prod_d): tests, digest and
+  # cross-check corpora byte-identical to the default build's.
   fma:
     name: fma (x86-64)
     needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, generators-bivariate, msrv, no-std]
