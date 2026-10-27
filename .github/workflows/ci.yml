@@ -51,10 +51,22 @@ jobs:
           fi
 
   repository-hygiene:
+    outputs:
+      prose_only: ${{ steps.prose.outputs.prose_only }}
     name: check / repository-hygiene
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Check prose scope decisions
+        run: python3 -m unittest discover -s ci -p test_prose_ci.py
+      - name: Classify the complete change and check whitespace
+        id: prose
+        env:
+          CI_PROSE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CI_PROSE_HEAD: ${{ github.sha }}
+        run: python3 ci/prose_ci.py
       - name: No generated or ignored files are tracked
         run: |
           tracked_ignored="$(git ls-files -ci --exclude-standard)"
@@ -74,6 +86,7 @@ jobs:
       - name: The adapted Thomas recurrence ships its MIT notice
         run: |
           cargo package --locked --allow-dirty --list -p morphiq-numerics | grep -qx THIRD_PARTY_NOTICES.md
+        if: ${{ steps.prose.outputs.prose_only != 'true' }}
       - name: The library depends only on the first-party arch crate, optionally
         # Target independence and clean provenance rest on the library being
         # self-contained; its one dependency is the optional first-party lane
@@ -122,65 +135,103 @@ jobs:
             --log-opts="$BASE..HEAD"
 
   fmt:
+    needs: repository-hygiene
     name: check / fmt
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo fmt --all -- --check
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
   clippy:
+    needs: repository-hygiene
     name: check / clippy
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: workspace
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: rustc --version
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo doc --locked --workspace --all-features --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
   # Runs on pull requests and on main, so a newly published advisory blocks
   # the next change and withdraws a just-merged revision from release.
   audit:
+    needs: repository-hygiene
     name: check / audit
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: tools
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo install --locked --no-default-features cargo-audit --version "$(cat .cargo/audit-version)"
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: ./scripts/check_advisories.sh
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
   # The graph may ship under MIT OR Apache-2.0 only while every dependency is
   # permissively licensed; deny.toml is that allowlist.
   licenses:
+    needs: repository-hygiene
     name: check / licenses
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: tools
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo install --locked cargo-deny --version "$(cat .cargo/deny-version)"
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo deny --locked check licenses
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
   # rust-toolchain.toml pins the development toolchain. Select the declared
   # minimum explicitly so this job cannot silently build with the newer pin.
   generators:
+    needs: repository-hygiene
     name: check / generators
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: Every committed fixture matches a fresh run of its generator
         run: ./scripts/check_generators.sh
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
   # The bivariate fixture needs hours of multiprecision CPU to replay: eight
   # shards together replay every row against the committed file.
   generators-bivariate:
+    needs: repository-hygiene
     name: check / generators-bivariate (${{ matrix.shard }}/8)
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -190,32 +241,55 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: Replay this shard of the bivariate-normal reference fixture
         run: ./scripts/check_bivariate_shard.sh ${{ matrix.shard }} 8
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
   msrv:
+    needs: repository-hygiene
     name: check / msrv
     runs-on: ubuntu-24.04
     env:
       RUSTUP_TOOLCHAIN: "1.89.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: rustup toolchain install 1.89.0 --profile minimal
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: rustc --version && cargo --version
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo check --locked --workspace --all-features --all-targets
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
   # The library builds without std or an allocator, and for wasm: the targets
   # on which a platform libm is least available and most likely to differ.
   no-std:
+    needs: repository-hygiene
     name: check / no-std
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo build --locked -p morphiq-numerics --target thumbv7em-none-eabihf
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo build --locked -p morphiq-numerics --target wasm32-unknown-unknown
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+
       # With simd, these targets have only the scalar backend: it must build.
       - run: cargo build --locked -p morphiq-numerics --features simd --target thumbv7em-none-eabihf
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo build --locked -p morphiq-numerics --features simd --target wasm32-unknown-unknown
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
   test:
     name: test (${{ matrix.os }})
@@ -237,26 +311,31 @@ jobs:
       MORPHIQ_REQUIRE_BACKENDS: ${{ matrix.backends }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: test-${{ matrix.os }}
-      - if: runner.arch != 'ARM64'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (runner.arch != 'ARM64') }}
         run: cargo test --locked --workspace --all-features
       - name: Unpivoted admission and pivot-policy mutation controls
-        if: runner.os == 'Linux'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (runner.os == 'Linux') }}
         run: python3 scripts/check_tridiagonal_unpivoted_mutations.py target/unpivoted-mutations
       - name: Retain mutation receipts
-        if: always() && runner.os == 'Linux'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (always() && runner.os == 'Linux') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: unpivoted-mutations-${{ matrix.os }}
           path: target/unpivoted-mutations/
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (runner.arch == 'ARM64') }}
 
-      - if: runner.arch == 'ARM64'
         run: ./scripts/check_fma.sh
 
   # The scalar kernels' FMA build (eft::two_prod_d): tests, digest and
   # cross-check corpora byte-identical to the default build's.
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
   fma:
     name: fma (x86-64)
     needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, generators-bivariate, msrv, no-std]
@@ -264,10 +343,16 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: fma
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: ./scripts/check_fma.sh
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
   # The determinism digest on targets beyond the test hosts: musl's libc,
   # WebAssembly and bare metal, where a platform libm differs most or is absent. Each runs the reference
@@ -283,18 +368,24 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: digest-${{ matrix.target }}
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: Pinned wasmtime
-        if: matrix.target == 'wasm32-wasip1'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.target == 'wasm32-wasip1') }}
         run: |
           ./scripts/install_wasmtime.sh "$RUNNER_TEMP/wasmtime"
           echo "$RUNNER_TEMP/wasmtime/bin" >> "$GITHUB_PATH"
       - name: QEMU for bare-metal Cortex-M4F
-        if: matrix.target == 'thumbv7em-none-eabihf'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.target == 'thumbv7em-none-eabihf') }}
         run: sudo apt-get install --yes --no-install-recommends qemu-system-arm
       - run: ./scripts/check_digest_target.sh ${{ matrix.target }}
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
   # The AVX-512F lane backend, which the hosted runners may lack, under
   # Intel's Software Development Emulator, pinned by version and SHA-256
@@ -306,16 +397,24 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: simd-avx512
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: Pinned Intel SDE
         run: |
           ./scripts/install_sde.sh "$RUNNER_TEMP/sde"
           echo "$RUNNER_TEMP/sde" >> "$GITHUB_PATH"
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: ./scripts/check_lanes_sde.sh
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: No lane kernel calls an AVX2 or AVX-512F operation out of line
         run: ./scripts/check_lane_codegen.sh
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
   # Machine-checked proofs, bound to the source they describe: the double-word
   # error bounds and two_prod's exactness (docs/double-word.md), the Gappa
@@ -327,6 +426,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: Sollya and Gappa certificates reproduce, prove their goals, and are bound to their sources
         # Debian bookworm, pinned by digest, with Sollya 8.0 and Gappa 1.4.1
         # pinned by package version.
@@ -334,6 +434,10 @@ jobs:
           docker run --rm -v "$PWD:/w:ro" -w /w \
             debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 \
             bash -c 'apt-get update -qq >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq sollya=8.0+ds-2+b1 gappa=1.4.1-1 >/dev/null && ./scripts/check_certificates.sh'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
   # The Coq proofs (scripts/check_formal.sh). The Coq image is pinned by digest
   # (.cargo/coq-image) and its libraries by version (.cargo/coq-packages).
@@ -362,9 +466,12 @@ jobs:
           # A pull request's checkout is a merge commit; its first parent is the
           # base, so the change is HEAD^1..HEAD.
           fetch-depth: 2
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: The selections' tests
         run: python3 -m unittest scripts.test_formal_affected scripts.test_formal_relevant
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: Whether the change can affect the proofs
         # A pull request that touches no proof, no file a proof is bound to, no
         # library source and none of the lane's own files cannot change what this
@@ -386,8 +493,9 @@ jobs:
             affected*) echo "affected=true" >> "$GITHUB_OUTPUT" ;;
             *) echo "affected=false" >> "$GITHUB_OUTPUT" ;;
           esac
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: Write the cross-check corpus from the Rust library
-        if: steps.scope.outputs.affected == 'true'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
         # target/ doesn't exist on a fresh checkout, and the shell opens the
         # redirect before cargo creates it.
         run: |
@@ -401,14 +509,14 @@ jobs:
         # (scripts/write_gappa_proofs.sh); otherwise every run would hand the
         # proof build new sources and recompile all of them.
         id: gappa
-        if: steps.scope.outputs.affected == 'true'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: target/gappa-proofs
           key: gappa-proofs-${{ hashFiles('formal/**/*.g', 'scripts/write_gappa_proofs.sh') }}
           restore-keys: gappa-proofs-
       - name: Write the Gappa certificates' Coq proofs
-        if: steps.scope.outputs.affected == 'true'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
         # The certificates job's image and Gappa version. Gappa's proof search
         # can differ between hosts, so the proofs are written here and checked
         # below rather than committed.
@@ -417,27 +525,27 @@ jobs:
             debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 \
             bash -c 'apt-get update -qq >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gappa=1.4.1-1 >/dev/null && ./scripts/write_gappa_proofs.sh target/gappa-proofs'
       - name: Save the Gappa certificates' Coq proofs
-        if: ${{ steps.scope.outputs.affected == 'true' && steps.gappa.outputs.cache-hit != 'true' }}
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true' && steps.gappa.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: target/gappa-proofs
           key: ${{ steps.gappa.outputs.cache-primary-key }}
       - name: Pull the Coq image
-        if: steps.scope.outputs.affected == 'true'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
         run: docker pull --quiet "$(cat .cargo/coq-image)"
       - name: Cache keys
-        if: steps.scope.outputs.affected == 'true'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
         id: keys
         run: echo "deps=coq-deps-$(sha256sum .cargo/coq-image .cargo/coq-packages scripts/formal_deps.sh | sha256sum | cut -c1-64)" >> "$GITHUB_OUTPUT"
       - name: Restore the Coq libraries
-        if: steps.scope.outputs.affected == 'true'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
         id: deps
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/coq-deps
           key: ${{ steps.keys.outputs.deps }}
       - name: Build the Coq libraries
-        if: ${{ steps.scope.outputs.affected == 'true' && (steps.deps.outputs.cache-hit != 'true') }}
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true' && (steps.deps.outputs.cache-hit != 'true')) }}
         # The container's user isn't the runner's, so the mounted directory is
         # open to it.
         run: |
@@ -446,13 +554,13 @@ jobs:
           docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP/coq-deps:/deps" -w /w "$(cat .cargo/coq-image)" \
             ./scripts/formal_deps.sh /deps/coq-deps.tar.gz
       - name: Save the Coq libraries
-        if: ${{ steps.scope.outputs.affected == 'true' && (steps.deps.outputs.cache-hit != 'true') }}
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true' && (steps.deps.outputs.cache-hit != 'true')) }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/coq-deps
           key: ${{ steps.keys.outputs.deps }}
       - name: Restore the proof build
-        if: steps.scope.outputs.affected == 'true'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
         id: build
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -460,7 +568,7 @@ jobs:
           key: formal-build-${{ steps.keys.outputs.deps }}-${{ hashFiles('formal/**', 'scripts/check_formal.sh', 'target/gappa-proofs/**') }}
           restore-keys: formal-build-${{ steps.keys.outputs.deps }}-
       - name: Build the source-bound proofs for the cache
-        if: steps.scope.outputs.affected == 'true'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
         run: |
           mkdir -p "$RUNNER_TEMP/formal-build"
           rm -f "$RUNNER_TEMP/formal-build/.built"
@@ -473,19 +581,22 @@ jobs:
       # invocation still checks source/toolchain identity and reruns the audits.
       - name: Was the proof build completed
         id: built
-        if: ${{ steps.scope.outputs.affected == 'true' && (!cancelled() && steps.build.outputs.cache-hit != 'true') }}
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true' && (!cancelled() && steps.build.outputs.cache-hit != 'true')) }}
         run: if [ -e "$RUNNER_TEMP/formal-build/.built" ]; then echo "built=true" >> "$GITHUB_OUTPUT"; fi
       - name: Save the proof build
-        if: ${{ steps.scope.outputs.affected == 'true' && (!cancelled() && steps.built.outputs.built == 'true') }}
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true' && (!cancelled() && steps.built.outputs.built == 'true')) }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/formal-build
           key: ${{ steps.build.outputs.cache-primary-key }}
       - name: Proofs are bound to the source, assume only the expected axioms, and match the Rust bit for bit
-        if: steps.scope.outputs.affected == 'true'
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
         id: proofs
         run: |
           docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
             ./scripts/check_formal.sh --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
             $(if [ "${{ github.event_name }}" = pull_request ]; then echo "--changed target/changed-files.txt --base-audit target/KernelAudit.base.v"; fi) \
             target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
+      - name: Prose-only change
+        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
+        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
