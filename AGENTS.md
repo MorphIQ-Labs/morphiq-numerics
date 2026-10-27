@@ -4,6 +4,18 @@
 
 This file is the repository's engineering contract for human and agent contributors. `CLAUDE.md` contains only `@AGENTS.md`.
 
+## Strategic Pragmatism
+
+Be strategically pragmatic in all MorphIQ Labs work. Choose the simplest solution that delivers the intended outcome and meets its correctness, performance, and operational contracts.
+
+- **Keep the outcome and scope explicit.** Resist speculative features, general-purpose frameworks, and adjacent problems that are not needed for the agreed result. Added scope must earn its implementation, maintenance, and opportunity cost.
+- **Challenge direction constructively.** Treat proposed approaches, including the owner's, as proposals to evaluate. Raise concerns early, explain the tradeoffs, and recommend a simpler or better-supported alternative when one exists. Agreement is not a substitute for judgment.
+- **Respect ownership boundaries.** Prefer established libraries and supported provider capabilities. Do not turn a third-party limitation or a problem outside our domain into a subsystem we must build and maintain. Establish our boundary, surface the limitation, and recommend an upstream fix, a supported alternative, or an explicit scope reduction; custom machinery needs a clear domain benefit.
+- **Bound investigations.** Name the question, the evidence needed to decide, and a stopping condition. When further investigation or engineering costs substantially more than its expected value, stop expanding the work and recommend a decision or rescope. Do not chase exhaustive explanations that cannot change that decision.
+- **Prefer explicit failure to speculative recovery.** Reject unsupported inputs or conditions with an actionable error or exception at the owning boundary rather than adding fallbacks for every conceivable edge case. Preserve valid state and required cleanup; never silently approximate, discard data, or report success. Required supported cases and recovery guarantees still have to work.
+
+Pragmatism governs which guarantees we undertake, not whether we honor them. If an existing commitment is disproportionate, make the tradeoff and proposed contract change explicit to the owner before narrowing it; do not disguise unfinished work as completion.
+
 ## Purpose and Architecture
 
 `morphiq-numerics` provides binary64 numerical primitives: elementary functions, seeded random streams and the normal family. Existing APIs retain their strong numerical contracts: correctly rounded where established, with their stated proved bounds elsewhere, and identical results on every target. They must be as performant as the evidence and credible algorithm choices allow without weakening those contracts; parity with weaker-contract competitors is not required. Explicit bounded-approximation APIs have a separate performance target, defined below. Correctness claims are limited to the domains established by the proofs, and performance claims to the hosts, workloads and comparisons established by measurements. An unmet requirement remains incomplete work. It is the shared numerics substrate for MorphIQ Labs' engines and is published openly under MIT OR Apache-2.0. Read [the provenance policy](docs/PROVENANCE.md) before any change. Scope, intent and progress are recorded in GitHub issues, epics and milestones, never in repository documents.
@@ -67,7 +79,7 @@ Every invariant names its enforcement, chosen from this ladder: (1) unrepresenta
 
 ## Engineering and Review Principles
 
-- Finish the job in the change that surfaces it: fix the defect pattern, not the instance, search the crate for siblings, and say what the search found, including when it found none. If completing the pattern would make one change unreviewable, split it into stacked pull requests that land together.
+- Treat technical debt as a code-review concern: fix the defect pattern, not just its first instance. Search the affected crate or module for same-pattern siblings and report what was checked and found. Check other implementations of the same contract when there is evidence they share the defect; do not turn a local repair into an unrelated cross-repository audit. Fix siblings required by the agreed contract in the same change, coordinating with in-flight work where necessary. If that scope reveals disproportionate cost, a new design decision, or a third-party responsibility, apply Strategic Pragmatism before expanding implementation. Any accepted deferral or scope reduction remains explicit and is not reported as a completed fix. Split genuinely necessary large changes into reviewable dependent PRs; do not manufacture extra PRs for incidental refinements.
 - Root-cause every regression: how it entered, why the safeguards missed it, and what prevents recurrence.
 - Documentation ships in the change that invalidates it. Standards and contract documents describe the current tree only; intent and progress live in GitHub issues and milestones.
 - Prefer simple, auditable code. Every function's derivation is a document, and the code follows it.
@@ -136,6 +148,8 @@ Check them with `gh api repos/MorphIQ-Labs/morphiq-numerics/rulesets` rather tha
 
 ## Definition of Done
 
-A change is complete when its contract is stated, its implementation follows a documented derivation with generated constants, independent oracles confirm bit equality wherever correct rounding is claimed and the actual bound elsewhere, its proofs are rerun and bound, its contract-specific performance evaluation and regression review are complete (including the declared parity criterion for fast APIs), every gate passes on every target, the determinism digest is unchanged or deliberately updated with the reason, documentation describes the new current state, and every same-pattern sibling is fixed.
+A change is complete when its contract is stated, its implementation follows a documented derivation with generated constants, independent oracles confirm bit equality wherever correct rounding is claimed and the actual bound elsewhere, its proofs are rerun and bound, its contract-specific performance evaluation and regression review are complete (including the declared parity criterion for fast APIs), every gate passes on every target, the determinism digest is unchanged or deliberately updated with the reason, documentation describes the new current state, and same-pattern siblings required by the agreed contract are fixed.
 
-A known shortfall in correctness, performance or architecture keeps the affected work incomplete until it is fixed and the required evidence establishes that. Passing CI, merging code, documenting the shortfall or moving it to a follow-up issue does not make that work complete. Missing evidence also leaves the corresponding requirement unestablished; it is never reported as satisfied.
+Explicitly accepted scope changes are recorded with their remaining limitations; deferred work is not counted as delivered. Untracked debt or a green test suite alone does not make a change complete.
+
+A known shortfall in correctness, performance or architecture within the agreed contract keeps the affected work incomplete until it is fixed and the required evidence establishes that. Passing CI, merging code, documenting the shortfall or moving it to a follow-up issue does not make that work complete. Missing evidence also leaves the corresponding requirement unestablished; it is never reported as satisfied.
