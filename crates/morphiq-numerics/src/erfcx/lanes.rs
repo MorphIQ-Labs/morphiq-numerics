@@ -32,29 +32,31 @@ pub(crate) fn table<K: Simd>(k: K, x: K::F) -> Dw<K> {
     let shift = k.load(shift);
     let hh = k.sub(k.add(h, shift), shift);
     let l = k.sub(h, hh);
-    let a = coefficients.map(|a| k.load(a));
-    let a1 = k.to_float(k.and_u(k.to_bits(a[2]), k.splat_bits(!((1 << 18) - 1))));
-    let b1 = k.add(k.sub(a[2], a1), a[3]);
-    let a2 = k.to_float(k.and_u(k.to_bits(a[4]), k.splat_bits(!((1 << 36) - 1))));
-    let b2 = k.add(k.sub(a[4], a2), a[5]);
+    // Load only the coefficient being consumed; avoid materializing a second
+    // array of vectors through the generic array-map machinery.
+    let a = |j: usize| k.load(coefficients[j]);
+    let a1 = k.to_float(k.and_u(k.to_bits(a(2)), k.splat_bits(!((1 << 18) - 1))));
+    let b1 = k.add(k.sub(a(2), a1), a(3));
+    let a2 = k.to_float(k.and_u(k.to_bits(a(4)), k.splat_bits(!((1 << 36) - 1))));
+    let b2 = k.add(k.sub(a(4), a2), a(5));
     let p1 = k.mul(a1, hh);
     let sq = k.mul(hh, hh);
     let p2 = k.mul(a2, sq);
-    let mut q = a[6 + DEG - 3];
+    let mut q = a(6 + DEG - 3);
     for j in (6..6 + DEG - 3).rev() {
-        q = k.add(a[j], k.mul(h, q));
+        q = k.add(a(j), k.mul(h, q));
     }
     let lh = k.mul(l, k.add(h, hh));
     let h2 = k.add(sq, lh);
     let t3 = k.mul(k.mul(h2, h), q);
     let rest = k.add(
         k.add(
-            k.add(a[1], k.add(k.mul(a1, l), k.mul(b1, h))),
-            k.add(k.mul(a[4], lh), k.mul(b2, sq)),
+            k.add(a(1), k.add(k.mul(a1, l), k.mul(b1, h))),
+            k.add(k.mul(a(4), lh), k.mul(b2, sq)),
         ),
         t3,
     );
-    let (s, e1) = fast_two_sum(k, a[0], p1);
+    let (s, e1) = fast_two_sum(k, a(0), p1);
     let (s2, e2) = fast_two_sum(k, s, p2);
     fast_two_sum(k, s2, k.add(k.add(e1, e2), rest))
 }

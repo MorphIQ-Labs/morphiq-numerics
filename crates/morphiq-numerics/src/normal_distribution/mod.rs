@@ -8,6 +8,9 @@ pub(crate) mod lanes;
 mod log_first_table;
 pub(crate) mod log_tail;
 mod tables;
+
+/// Generated nearest-binary64 high word, shared with the bounded CDF.
+pub(crate) const INV_SQRT2_HIGH: f64 = tables::INV_SQRT2.0;
 #[cfg(test)]
 mod tests;
 
