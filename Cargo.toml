@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/morphiq-numerics", "crates/morphiq-numerics-arch", "crates/digest", "crates/digest-embedded", "crates/reference"]
 
 [workspace.package]
-version = "0.0.14"
+version = "0.0.15"
 edition = "2024"
 # The library's MSRV, checked by the `msrv` CI job.
 rust-version = "1.89"
