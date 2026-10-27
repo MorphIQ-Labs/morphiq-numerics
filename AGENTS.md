@@ -16,6 +16,24 @@ Be strategically pragmatic in all MorphIQ Labs work. Choose the simplest solutio
 
 Pragmatism governs which guarantees we undertake, not whether we honor them. If an existing commitment is disproportionate, make the tradeoff and proposed contract change explicit to the owner before narrowing it; do not disguise unfinished work as completion.
 
+## Prose-only CI
+
+Changes confined to the root `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`,
+`README.md`, or Markdown files directly under `docs/adr/` use lightweight prose
+checks. This is an explicit exception to the general every-change build, test,
+assurance and dependency-audit rules. Keep applicable title, repository-hygiene,
+secret and whitespace checks, and a required successful pipeline/check result.
+Do not use a blanket CI-skip marker or leave required checks pending.
+
+The allowlist is deliberately narrow. Any mixed change or other path retains
+its existing CI gates, including unfamiliar files, code, dependencies, build/CI
+configuration, release metadata, examples, notebooks, fixtures, generated inputs
+and proof-related documentation. Review consumers before extending the allowlist;
+Markdown is not automatically inert. Preserve focused checks that read an
+allowlisted file as a policy input. Scheduled/operational pipelines and release
+automation retain their existing responsibilities. CI-rule changes themselves
+run full CI and exercise prose, mixed, renamed and unknown-path cases.
+
 ## Purpose and Architecture
 
 `morphiq-numerics` provides binary64 numerical primitives: elementary functions, seeded random streams and the normal family. Existing APIs retain their strong numerical contracts: correctly rounded where established, with their stated proved bounds elsewhere, and identical results on every target. They must be as performant as the evidence and credible algorithm choices allow without weakening those contracts; parity with weaker-contract competitors is not required. Explicit bounded-approximation APIs have a separate performance target, defined below. Correctness claims are limited to the domains established by the proofs, and performance claims to the hosts, workloads and comparisons established by measurements. An unmet requirement remains incomplete work. It is the shared numerics substrate for MorphIQ Labs' engines and is published openly under MIT OR Apache-2.0. Read [the provenance policy](docs/PROVENANCE.md) before any change. Scope, intent and progress are recorded in GitHub issues, epics and milestones, never in repository documents.
