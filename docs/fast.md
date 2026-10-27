@@ -118,7 +118,13 @@ does not assert those separate acceptance obligations have run or passed.
 
 ## Consumer use
 
-Choose an explicit primitive contract from the consumer's error budget. A CDF
+Choose an explicit primitive contract from the consumer's error budget.
+Competitors need not match our numerical accuracy: each must satisfy the actual
+use-case budget, and cost decides among acceptable choices. Extra accuracy
+beyond that requirement earns no independent credit. Matching algorithm
+parameters or comparing result bits is diagnostic evidence, not the acceptance
+objective. Report error-versus-cost curves and ordinary/difficult populations
+separately when the selected computation changes with the required budget. A CDF
 absolute error does not by itself qualify cancellation-sensitive prices,
 Greeks, inverse problems or tail-relative accuracy. Retain exact-input
 independent references and measure the full consumer calculation as well as
