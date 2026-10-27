@@ -52,6 +52,10 @@ cargo deny --locked check licenses
   that release automation reads.
 - **Description:** what changed and why, and the numerical impact (which
   results can change, and why the new ones are correct).
+- **Numerical decisions:** link the derivation/evidence record using
+  [the decision form](docs/numerical-decision-template.md). The PR template
+  prompts for the evidence required by [AGENTS.md](AGENTS.md); prose-only
+  changes can state that no numerical result or cost changes.
 - **Issues:** close the ones it resolves with `Closes #N`.
 
 Every CI job is a required check, and `main` accepts changes only through

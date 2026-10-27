@@ -27,6 +27,12 @@ reference, returns the same bits.
 
 ## Principles
 
+- **Accuracy and performance together:** each numerical API is evaluated
+  against its declared error and cost requirements. Existing guarantees stay
+  intact; the policy for explicit bounded-error `fast` APIs and the distinction
+  from internal fast paths are in [AGENTS.md](AGENTS.md#explicit-approximation-apis).
+  Numerical changes use an [accuracy/performance decision record](docs/numerical-decision-template.md).
+  This policy does not imply that additional fast APIs are already exported.
 - **Correctly rounded:** the result is the nearest binary64, ties to even,
   over the whole domain. Where that isn't yet proved, the proved bound is
   stated instead.
