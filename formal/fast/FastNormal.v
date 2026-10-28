@@ -10,9 +10,9 @@ Require Import StageGappa ErfcxDecision ErfcxGaussianTarget NormalConstants
   NormalAccurateCentralCdf FastExp FastErfcx FastNormalArgument FastNormalAnalytic.
 Open Scope R_scope.
 
-(** Temporary CI diagnostics for the previously silent FastNormal compile.
+(** CI diagnostics for the previously silent FastNormal compile.
     Named checkpoints locate a stalled stage; tactic budgets fail closed and
-    retain every proof obligation. Remove after the hotspot is measured. *)
+    retain every proof obligation. *)
 
 Definition fast_normal_lower64 a :=
   let t:=fast_normal_exponent64 a in
@@ -27,6 +27,36 @@ Definition fast_normal_screen64 x :=
   normal_le(erfcx_pow2(-33))(b64_abs x) && normal_le(b64_abs x)(erfcx_pow2 3).
 Definition fast_normal_entry64 x :=
   if fast_normal_screen64 x then fast_normal_cdf64 x else normal_entry64 NormalCdf x.
+
+(** Keep real algebra abstract: ring/field must never normalize a local
+    alias for a computed binary64 Gaussian value. *)
+Lemma fast_normal_half_product x y : (/2*x)*y=x*y/2.
+Proof. timeout 30 (unfold Rdiv;ring). Time Qed.
+
+Lemma fast_normal_three_errors w p q r :
+  Rabs(w-r)<=Rabs(w-p)+Rabs(p-q)+Rabs(q-r).
+Proof.
+  replace(w-r)with((w-p)+(p-q)+(q-r))by timeout 30 ring.
+  eapply Rle_trans;[apply Rabs_triang|].
+  apply Rplus_le_compat_r;apply Rabs_triang.
+Time Qed.
+
+Lemma fast_normal_complement_errors w v r :
+  Rabs(w-(1-r))<=Rabs(w-(1-v))+Rabs(v-r).
+Proof.
+  replace(w-(1-r))with((w-(1-v))-(v-r))by timeout 30 ring.
+  eapply Rle_trans;[apply Rabs_triang|].
+  rewrite Rabs_Ropp;apply Rle_refl.
+Time Qed.
+
+Lemma fast_normal_half_complement x : /2+x=1-(/2-x).
+Proof. timeout 30 field. Time Qed.
+
+Lemma fast_normal_three_quarters_format : fmtF(3/4).
+Proof.
+  replace(3/4)with(IZR 3*bpow radix2(-2))by(timeout 30 (bpow_num;simpl;field)).
+  apply bnd_fmt;lia.
+Time Qed.
 
 Lemma fast_normal_product_error e f eh fh : 0<e -> 0<f -> e*f/2<=51/100 ->
   Rabs(eh-e)<=bpow radix2(-51)*e ->
@@ -104,7 +134,7 @@ Proof.
     assert(ProductValue : B(fmul(erfcx_pow2(-1))e)*B f=B e*B f/2).
     { transitivity ((/2*B e)*B f).
       - exact(f_equal(fun h:R=>h*B f)He).
-      - timeout 30 (unfold Rdiv;ring). }
+      - exact(fast_normal_half_product(B e)(B f)). }
     idtac "FastNormal.lower.value_equality".
     assert(LowerValue : B(fast_normal_lower64 a)=rndF(B e*B f/2)).
     { exact(eq_trans L (f_equal rndF ProductValue)). }
@@ -115,7 +145,7 @@ Proof.
       - apply round_ge_generic;[exact _|exact _| |bpow_num_all;timeout 30 lra].
         apply generic_format_bpow;unfold FLT_exp,emin,prec;lia.
       - apply round_le_generic;[exact _|exact _| |exact(proj2 ProductRange)].
-        replace(3/4)with(IZR 3*bpow radix2(-2))by(bpow_num;simpl;field);apply bnd_fmt;lia. }
+        exact fast_normal_three_quarters_format. }
     idtac "FastNormal.lower.rounding".
     assert(Round : Rabs(B(fast_normal_lower64 a)-B e*B f/2)<=bpow radix2(-54)).
     { rewrite L;apply(rnd_err_below _ 0);[lia|].
@@ -125,12 +155,10 @@ Proof.
     pose proof(fast_normal_perturbation (B a)(B z)(B t)ltac:(split;timeout 30 lra)Zpos Zerror Terror)as Perturbation.
     idtac "FastNormal.lower.error_sum".
     assert(Error : Rabs(B(fast_normal_lower64 a)-normal_tail(B a))<=9*bpow radix2(-53)).
-    { replace(B(fast_normal_lower64 a)-normal_tail(B a))with
-        ((B(fast_normal_lower64 a)-B e*B f/2)+(B e*B f/2-exp(B t)*gaussian_erfcx(B z)/2)+
-         (exp(B t)*gaussian_erfcx(B z)/2-normal_tail(B a)))by (unfold Rdiv;ring).
-      eapply Rle_trans;[apply Rabs_triang|].
-      eapply Rle_trans;[apply Rplus_le_compat_r;apply Rabs_triang|].
-      bpow_num_all;timeout 30 lra. }
+    { eapply Rle_trans.
+      - exact(fast_normal_three_errors (B(fast_normal_lower64 a))
+          (B e*B f/2)(exp(B t)*gaussian_erfcx(B z)/2)(normal_tail(B a))).
+      - bpow_num_all;timeout 30 lra. }
     idtac "FastNormal.lower.finish".
     split;[exact Fl|];split;[exact Range|exact Error].
 Time Qed.
@@ -152,10 +180,11 @@ Proof.
   - apply normal_lt_true in Sign;try assumption;rewrite Zero in Sign.
     assert(Target : normal_cdf(B x)=normal_tail(Rabs(B x))).
     { rewrite Rabs_left by timeout 30 lra;rewrite normal_tail_negative_cdf.
-      replace(- -B x)with(B x)by (unfold Rdiv;ring);timeout 30 reflexivity. }
+      rewrite Ropp_involutive;timeout 30 reflexivity. }
     idtac "FastNormal.cdf.negative_finish".
-    timeout 30 (rewrite Target;repeat split;try assumption;try lra).
-    eapply Rle_trans;[exact Error|bpow_num;timeout 30 lra].
+    rewrite Target;split;[exact Fl|];split.
+    + split;[exact(proj1 L)|timeout 30 lra].
+    + eapply Rle_trans;[exact Error|bpow_num;timeout 30 lra].
   - apply normal_lt_false in Sign;try assumption;rewrite Zero in Sign.
     set(lower:=fast_normal_lower64(b64_abs x))in *.
     idtac "FastNormal.cdf.complement_bound".
@@ -179,12 +208,14 @@ Proof.
       change(bpow radix2 0)with 1;pose proof(bpow_gt_0 radix2(-58));timeout 30 lra. }
     idtac "FastNormal.cdf.positive_target".
     assert(Target : normal_cdf(B x)=1-normal_tail(Rabs(B x))).
-    { rewrite Rabs_pos_eq by timeout 30 lra;rewrite normal_tail_complement;unfold normal_cdf;ring. }
+    { rewrite Rabs_pos_eq by timeout 30 lra;rewrite normal_tail_complement.
+      unfold normal_cdf;apply fast_normal_half_complement. }
     idtac "FastNormal.cdf.positive_finish".
     rewrite Target;split;[exact Fo|];split;[exact Range|].
-    replace(B(fsub(erfcx_pow2 0)lower)-(1-normal_tail(Rabs(B x))))with
-      ((B(fsub(erfcx_pow2 0)lower)-(1-B lower))-(B lower-normal_tail(Rabs(B x))))by (unfold Rdiv;ring).
-    eapply Rle_trans;[apply Rabs_triang|];rewrite Rabs_Ropp;bpow_num_all;timeout 30 lra.
+    eapply Rle_trans.
+    + exact(fast_normal_complement_errors (B(fsub(erfcx_pow2 0)lower))
+        (B lower)(normal_tail(Rabs(B x)))).
+    + bpow_num_all;timeout 30 lra.
 Time Qed.
 
 Theorem fast_normal_screen_finite x : finite x ->
