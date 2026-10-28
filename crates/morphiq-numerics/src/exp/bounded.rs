@@ -163,6 +163,25 @@ impl<const N: usize> morphiq_numerics_arch::WithSimd for Packet<'_, N> {
     }
 }
 #[cfg(feature = "simd")]
+#[cfg_attr(
+    any(target_feature = "avx2", target_feature = "avx512f"),
+    inline(never)
+)]
+#[cfg_attr(
+    not(any(target_feature = "avx2", target_feature = "avx512f")),
+    inline(always)
+)]
+fn fixed<K: morphiq_numerics_arch::Simd, const N: usize>(
+    k: K,
+    input: &[f64; N],
+    output: &mut [f64; N],
+) {
+    // Keep static-feature builds from inlining every packet kernel into the
+    // dispatcher and imposing their register saves on short/remainder calls.
+    k.vectorize(Packet { input, output });
+}
+
+#[cfg(feature = "simd")]
 #[inline(never)]
 fn packet<K: morphiq_numerics_arch::Simd, const N: usize>(k: K, op: Slice<'_>) {
     let (input, tail) = op.input.split_at(N);
@@ -174,7 +193,7 @@ fn packet<K: morphiq_numerics_arch::Simd, const N: usize>(k: K, op: Slice<'_>) {
     for (&x, y) in tail.iter().zip(rest) {
         *y = exp(x);
     }
-    k.vectorize(packet);
+    fixed(k, packet.input, packet.output);
 }
 #[cfg(feature = "simd")]
 #[inline(always)]
@@ -185,10 +204,11 @@ fn run<K: morphiq_numerics_arch::Simd>(k: K, op: Slice<'_>) {
     {
         macro_rules! fixed {
             ($n:literal) => {
-                k.vectorize(Packet::<$n> {
-                    input: op.input.try_into().expect("fixed packet"),
-                    output: op.output.try_into().expect("fixed packet"),
-                })
+                fixed::<K, $n>(
+                    k,
+                    op.input.try_into().expect("fixed packet"),
+                    op.output.try_into().expect("fixed packet"),
+                )
             };
         }
         return match op.input.len() {
