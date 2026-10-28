@@ -2,8 +2,8 @@
     decision, and retain the strong owner on every screened input. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz Bool.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
-From Binary64 Require Import Binary64Add IEEE64 RoundingCore.
-Require Import StageGappa ErfcxDecision ErfcxGaussianTarget ErfcxTableEntry
+From Binary64 Require Import Binary64Add IEEE64 RoundingCore RoundingTest.
+Require Import StageGappa ErfcxReciprocal ErfcxDecision ErfcxGaussianTarget ErfcxTableEntry
   ErfcxTableBound ErfcxTableFast ErfcxTableAnalyticEntry ErfcxPublicModel
   ErfcxPublicEntry.
 Open Scope R_scope.
@@ -78,7 +78,7 @@ Proof.
   assert(Fabs : finite(b64_abs x))by(unfold b64_abs;rewrite is_finite_Babs;exact Fx).
   unfold fast_erfcx_screen64;rewrite !andb_true_iff.
   rewrite(erfcx_le_true _ _ Fn Fx),(erfcx_lt_true _ _ Fx F16),
-    (erfcx_le_true _ _ Fmin Fabs),N,V16,Vmin,B2R_Babs.
+    (erfcx_le_true _ _ Fmin Fabs),N,V16,Vmin,B_abs.
   change((-/2<=B x /\ B x<16) /\ bpow radix2(-33)<=Rabs(B x) <->
     -/2<=B x<16 /\ bpow radix2(-33)<=Rabs(B x)).
   tauto.
@@ -107,7 +107,7 @@ Proof. intros Screen;rewrite fast_erfcx_fallback by exact Screen;apply erfcx_pub
 Theorem fast_erfcx_nonfinite x : is_finite 53 1024 x=false ->
   fast_erfcx_entry64 x=erfcx_entry64 x.
 Proof.
-  destruct x as[s|s|s p Hp|s m e Hm];try discriminate.
+  intros Nonfinite;destruct x as[s|s|s p Hp|s m e Hm];try discriminate.
   - destruct s;reflexivity.
   - reflexivity.
 Qed.

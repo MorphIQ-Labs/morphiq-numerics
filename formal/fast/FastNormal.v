@@ -5,7 +5,8 @@ From Flocq Require Import Core Mult_error IEEE754.Binary IEEE754.Bits.
 From Interval Require Import Tactic.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add RoundingConstant RoundingTest.
 Require Import StageGappa ErfcxDecision ErfcxGaussianTarget NormalConstants
-  NormalComparisons NormalTailAnalytic NormalPublicEntry NormalPublicModel
+  NormalComparisons NormalFastDispatch NormalErfcxSensitivity
+  NormalTailAnalytic NormalPublicEntry NormalPublicModel
   NormalAccurateCentralCdf FastExp FastErfcx FastNormalArgument FastNormalAnalytic.
 Open Scope R_scope.
 
@@ -33,11 +34,11 @@ Proof.
   assert(Eid : eh=e*(1+de))by(unfold de;field;lra).
   assert(Fid : fh=f*(1+df))by(unfold df;field;lra).
   assert(De : Rabs de<=bpow radix2(-51)).
-  { unfold de;rewrite Rabs_div,(Rabs_pos_eq e)by lra.
-    apply(Rmult_le_reg_r e);[lra|];unfold Rdiv;rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;exact Ee. }
+  { unfold de,Rdiv;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq e)by lra.
+    apply(Rmult_le_reg_r e);[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;exact Ee. }
   assert(Df : Rabs df<=bpow radix2(-51)).
-  { unfold df;rewrite Rabs_div,(Rabs_pos_eq f)by lra.
-    apply(Rmult_le_reg_r f);[lra|];unfold Rdiv;rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;exact Fe. }
+  { unfold df,Rdiv;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq f)by lra.
+    apply(Rmult_le_reg_r f);[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;exact Fe. }
   assert(Factor : Rabs((1+de)*(1+df)-1)<=9*bpow radix2(-53)).
   { apply Rabs_le_inv in De,Df;apply Rabs_le;bpow_num_all;split;interval with(i_prec 160). }
   rewrite Eid,Fid.
@@ -186,7 +187,7 @@ Proof. intros Screen;rewrite fast_normal_fallback by exact Screen;apply normal_p
 Theorem fast_normal_nonfinite x : is_finite 53 1024 x=false ->
   fast_normal_entry64 x=normal_entry64 NormalCdf x.
 Proof.
-  destruct x as[s|s|s p Hp|s m e Hm];try discriminate.
+  intros Nonfinite;destruct x as[s|s|s p Hp|s m e Hm];try discriminate.
   - destruct s;reflexivity.
   - reflexivity.
 Qed.
