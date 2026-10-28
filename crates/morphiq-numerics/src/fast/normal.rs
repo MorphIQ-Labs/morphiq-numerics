@@ -1,14 +1,14 @@
-//! Draft approximations assembled from Numerics' generated table kernels.
+//! Bounded approximations assembled from Numerics' generated table kernels.
 //!
-//! The intended bounds below remain subject to the draft's proof, source-binding
-//! and native qualification work. They are not whole-domain rounding claims.
+//! IEEE/Coq entry proofs and source-bound certificates establish the per-domain
+//! error bounds below. They are not whole-domain rounding claims.
 
 /// Exact `2^-33`, the lower magnitude screen of these approximation domains.
 pub(super) const MIN_MAGNITUDE: f64 = f64::from_bits((1023_u64 - 33) << 52);
 
 /// Scaled complementary error function, `exp(x²) erfc(x)`.
 ///
-/// The draft targets relative error at most `2^-51` on
+/// Relative error is at most `2^-51` on
 /// `-0.5 <= x < 16`, excluding `|x| < 2^-33`. On that domain it evaluates
 /// the high words of the generated table polynomial in adjacent pairs. All other inputs
 /// use [`crate::normal::erfcx`], retaining its special-value semantics.
@@ -24,7 +24,7 @@ pub fn erfcx(x: f64) -> f64 {
 
 /// Standard-normal cumulative distribution, `P(Z <= x)`.
 ///
-/// The draft targets absolute error at most `2^-49` on
+/// Absolute error is at most `2^-49` on
 /// `2^-33 <= |x| <= 8`. For `|x| <= 1` it evaluates the generated
 /// integrated Gaussian polynomial. For larger arguments it uses the identity
 /// `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` for `a = |x|`,

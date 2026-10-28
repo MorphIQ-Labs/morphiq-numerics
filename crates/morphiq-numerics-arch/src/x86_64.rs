@@ -163,12 +163,6 @@ impl Simd for Avx2 {
         Some(unsafe { avx2::mul_add(a, b, c) })
     }
 
-    #[inline(always)]
-    fn gather_wrapped<const N: usize>(self, table: &[u64; N], index: __m256i) -> __m256d {
-        // SAFETY: this token establishes the helper's CPU features. The helper
-        // checks the table shape and masks indices before every memory access.
-        unsafe { avx2::gather_wrapped(table, index) }
-    }
     forward! { avx2;
         fn splat(x: f64) -> __m256d;
         fn splat_bits(x: u64) -> __m256i;
@@ -258,12 +252,6 @@ impl Simd for Avx512 {
         Some(unsafe { avx512::mul_add(a, b, c) })
     }
 
-    #[inline(always)]
-    fn gather_wrapped<const N: usize>(self, table: &[u64; N], index: __m512i) -> __m512d {
-        // SAFETY: this token establishes the helper's CPU features. The helper
-        // checks the table shape and masks indices before every memory access.
-        unsafe { avx512::gather_wrapped(table, index) }
-    }
     #[inline(always)]
     fn load_partial(self, values: &[f64]) -> __m512d {
         // SAFETY: this token establishes AVX-512F; the helper checks the length
@@ -501,27 +489,10 @@ mod helpers {
             _mm256_set1_pd, _mm256_srl_epi64, _mm256_storeu_pd, _mm256_sub_epi64, _mm256_sub_pd,
             _mm256_xor_pd,
         };
-        use core::arch::x86_64::{_mm256_add_epi64, _mm256_i64gather_epi64, _mm256_sll_epi64};
+        use core::arch::x86_64::{_mm256_add_epi64, _mm256_sll_epi64};
 
         use super::super::Avx2Mask;
 
-        #[target_feature(enable = "avx2,fma")]
-        #[inline]
-        pub(in super::super) fn gather_wrapped<const N: usize>(
-            table: &[u64; N],
-            index: __m256i,
-        ) -> __m256d {
-            assert!(
-                N.is_power_of_two(),
-                "gather table length must be a positive power of two"
-            );
-            #[allow(clippy::cast_possible_wrap)] // a Rust array cannot exceed isize::MAX bytes
-            let index = _mm256_and_si256(index, _mm256_set1_epi64x((N - 1) as i64));
-            // SAFETY: masked indices are in 0..N; scale eight addresses exactly
-            // the u64 elements of the live array. This helper has the CPU feature.
-            let words = unsafe { _mm256_i64gather_epi64::<8>(table.as_ptr().cast(), index) };
-            _mm256_castsi256_pd(words)
-        }
         #[target_feature(enable = "avx2,fma")]
         #[inline]
         pub(in super::super) fn splat(x: f64) -> __m256d {
@@ -687,29 +658,11 @@ mod helpers {
             _mm512_sub_epi64, _mm512_sub_pd, _mm512_xor_si512,
         };
         use core::arch::x86_64::{
-            _mm512_add_epi64, _mm512_i64gather_epi64, _mm512_mask_storeu_pd, _mm512_maskz_loadu_pd,
-            _mm512_sll_epi64,
+            _mm512_add_epi64, _mm512_mask_storeu_pd, _mm512_maskz_loadu_pd, _mm512_sll_epi64,
         };
 
         use super::super::Avx512Mask;
 
-        #[target_feature(enable = "avx512f")]
-        #[inline]
-        pub(in super::super) fn gather_wrapped<const N: usize>(
-            table: &[u64; N],
-            index: __m512i,
-        ) -> __m512d {
-            assert!(
-                N.is_power_of_two(),
-                "gather table length must be a positive power of two"
-            );
-            #[allow(clippy::cast_possible_wrap)] // a Rust array cannot exceed isize::MAX bytes
-            let index = _mm512_and_si512(index, _mm512_set1_epi64((N - 1) as i64));
-            // SAFETY: masked indices are in 0..N; scale eight addresses exactly
-            // the u64 elements of the live array. This helper has the CPU feature.
-            let words = unsafe { _mm512_i64gather_epi64::<8>(index, table.as_ptr().cast()) };
-            _mm512_castsi512_pd(words)
-        }
         #[target_feature(enable = "avx512f")]
         #[inline]
         pub(in super::super) fn load_partial(values: &[f64]) -> __m512d {

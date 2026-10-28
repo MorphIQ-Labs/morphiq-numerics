@@ -45,8 +45,10 @@ and `None` on one without; it is never emulated.
 **Table and prefix memory operations.** `gather_wrapped(table, index)` requires
 a nonempty power-of-two array and masks each lane's index inside the owner,
 returning the selected `u64` word reinterpreted as binary64. Arbitrary input
-indices, including all-ones words, are valid. AVX2 and AVX-512 use hardware
-gathers; other backends perform bounded scalar loads.
+indices, including all-ones words, are valid. Every backend performs bounded
+scalar loads and assembles the result into lanes. This avoids hardware-gather
+latency on affected x86 hosts with the Gather Data Sampling mitigation; the
+bounded exp code-generation gate retains that choice.
 
 `load_partial` accepts at most `LANES` values and fills unused lanes with positive
 zero. `store_partial` writes only the supplied output prefix. Both reject longer
@@ -92,10 +94,9 @@ other, and `unsafe_op_in_unsafe_fn` is denied. No public function is
    unaligned forms need only the element's alignment. For AVX-512 prefix
    operations the checked slice length determines the mask, so only elements
    belonging to the slice are accessed, including no accesses for an empty slice.
-3. **Gather loads**: the helper checks the table shape and masks every index by
-   `N - 1` before the intrinsic. Every enabled lane therefore addresses one
-   initialized element of the borrowed array. The intrinsic reads that word's
-   binary64 encoding; no caller precondition is needed.
+Table gathers require no additional unsafe block: the default trait method
+checks the table shape, masks each index by `N - 1`, and reads the word through
+safe array indexing. The existing lane load then assembles those encodings.
 
 There are no raw-pointer slices, transmutes or `static mut`.
 

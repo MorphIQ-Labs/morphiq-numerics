@@ -16,6 +16,8 @@
 # The batched tridiagonal solve must also contain packed division in both
 # vector widths, with no fused operations: scalar-only dispatch would satisfy
 # numerical tests while failing to provide the promised SIMD implementation.
+# Bounded exp must use scalar table loads assembled into lanes: hardware
+# gather caused a native regression on hosts with the GDS microcode mitigation.
 # Exit 1 on a violation, 2 when the check cannot run or the
 # binary has no AVX2 or AVX-512F kernels to check. x86-64 only; needs objdump.
 set -eu
@@ -33,11 +35,13 @@ for line in sys.stdin:
         print(m["executable"])')
 fi
 [ -f "$binary" ] || { echo "no test binary: '$binary'" >&2; exit 2; }
-objdump -d --no-show-raw-insn -C "$binary" | awk '
+objdump -d --no-show-raw-insn --demangle=rust "$binary" | awk '
     /^[0-9a-f]+ <.*>:$/ {
         fn = $0; sub(/^[0-9a-f]+ </, "", fn); sub(/>:$/, "", fn)
         if (fn ~ /^morphiq_numerics_arch::x86_64::avx2_run(::)?</) avx2++
         if (fn ~ /^morphiq_numerics_arch::x86_64::avx512_run(::)?</) avx512++
+        if (fn ~ /exp::bounded::/ && fn ~ /avx2_run/) exp_avx2++
+        if (fn ~ /exp::bounded::/ && fn ~ /avx512_run/) exp_avx512++
         next
     }
     /vdivpd/ && fn ~ /tridiagonal::lanes::Batch/ {
@@ -48,6 +52,10 @@ objdump -d --no-show-raw-insn -C "$binary" | awk '
         printf "fused operation in %s\n", fn > "/dev/stderr"
         fused++
     }
+    /v(p)?gather/ && fn ~ /(exp::bounded::|fast::lanes::Cdf)/ {
+        printf "hardware gather in bounded kernel %s\n", fn > "/dev/stderr"
+        gather++
+    }
     /call.*helpers::(avx2|avx512)::/ {
         if (fn ~ /::tests::/) next
         if (fn ~ /^morphiq_numerics::(lanes::cold|ln::lanes::finish_ln_1p)(::)?</ && /helpers::(avx2|avx512)::(load|store)>/) next
@@ -55,6 +63,10 @@ objdump -d --no-show-raw-insn -C "$binary" | awk '
     }
     END {
         if (!avx2 || !avx512) { print "no AVX2 or AVX-512F kernels in the binary" > "/dev/stderr"; exit 2 }
+        if (!exp_avx2 || !exp_avx512 || gather) {
+            print "bounded exp requires AVX2/AVX-512 kernels without hardware gather" > "/dev/stderr"
+            exit 1
+        }
         if (!tri_avx2 || !tri_avx512 || fused) {
             print "tridiagonal lanes require AVX2/AVX-512 packed division without FMA" > "/dev/stderr"
             exit 1
