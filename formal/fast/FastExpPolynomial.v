@@ -1,57 +1,55 @@
-(** Bounded exponential's quartic, using the existing reduction and coefficients. *)
+(** Constrained cubic: independently certified on the 1024-way reduction. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz Classical.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Mul RoundingConstant.
 From Gappa Require Import Gappa_library.
 From Interval Require Import Tactic.
 Require Import StageGappa ExpStageTables ExpStageReduction ExpStageA ErfcxTableEvaluation ErfcxReciprocal.
-Require exp_fast_quartic.
+Require Import FastExpTables FastExpReduction.
+Require exp_fast_cubic.
 Open Scope R_scope.
-Definition fast_quartic64 r :=
+Definition fast_c2_g : R := float2R (Float2 2251799831492399 (-52)).
+Lemma fast_c2_g_eq : B fx_c2=fast_c2_g.
+Proof. rewrite fx_c2_val. unfold fast_c2_g,float2R,F2R. simpl. bpow_num_all;lra. Qed.
+Definition fast_cubic64 r :=
  let r2:=fmul r r in
- let left:=fadd r (fmul c_half r2) in
- let p:=fadd st_d3 (fmul r st_d4) in
- fadd left (fmul (fmul r2 r) p).
-Definition fast_quartic_value r :=
+ let p:=fadd fx_c2 (fmul r st_d3) in
+ fadd r (fmul r2 p).
+Definition fast_cubic_value r :=
  let r2:=rn(r*r) in
- let left:=rn(r+rn(half_g*r2)) in
- let p:=rn(d3_g+rn(r*d4_g)) in
- rn(left+rn(rn(r2*r)*p)).
-Lemma fast_quartic_ieee r : finite r -> Rabs(B r)<=/1024 ->
- finite(fast_quartic64 r) /\ B(fast_quartic64 r)=fast_quartic_value(B r).
+ let p:=rn(fast_c2_g+rn(r*d3_g)) in
+ rn(r+rn(r2*p)).
+Lemma fast_cubic_ieee r : finite r -> Rabs(B r)<=/1024 ->
+ finite(fast_cubic64 r) /\ B(fast_cubic64 r)=fast_cubic_value(B r).
 Proof.
  intros Fr Rr.
- pose proof st_d3_finite as F3;pose proof st_d4_finite as F4;pose proof c_half_finite as Fhalf.
+ pose proof st_d3_finite as F3;pose proof fx_c2_finite as Fc.
  assert (C3:Rabs(B st_d3)<=/4) by (rewrite st_d3_val;interval).
- assert (C4:Rabs(B st_d4)<=/16) by (rewrite st_d4_val;interval).
- assert (Ch:Rabs(B c_half)<=/2) by (rewrite c_half_g,half_g_eq;rewrite Rabs_pos_eq;lra).
+ assert (Cc:Rabs(B fx_c2)<=3/4) by (rewrite fx_c2_val;interval).
  pose proof Rr as Rr_copy.
  table_op fmul_bnd 1%Z (-20)%Z r r F2 V2 C2.
- table_op fmul_bnd 1%Z (-21)%Z c_half (fmul r r) Fh Vh Chh.
- table_op fadd_bnd 1%Z (-9)%Z r (fmul c_half (fmul r r)) Fl Vl Cl.
- table_op fmul_bnd 1%Z (-14)%Z r st_d4 Fm Vm Cm.
- table_op fadd_bnd 1%Z (-1)%Z st_d3 (fmul r st_d4) Fp Vp Cp.
- table_op fmul_bnd 1%Z (-30)%Z (fmul r r) r Fcube Vcube Ccube.
- table_op fmul_bnd 1%Z (-31)%Z (fmul (fmul r r) r) (fadd st_d3 (fmul r st_d4)) Fv Vv Cv.
- table_op fadd_bnd 1%Z (-8)%Z (fadd r (fmul c_half (fmul r r)))
-   (fmul (fmul (fmul r r) r) (fadd st_d3 (fmul r st_d4))) Fu Vu Cu.
- unfold fast_quartic64. split;[exact Fu|].
- rewrite Vu,Vl,Vv,Vcube,Vp,Vm,Vh,V2,c_half_g,d3_g_eq,d4_g_eq. reflexivity.
+ table_op fmul_bnd 1%Z (-12)%Z r st_d3 Fm Vm Cm.
+ table_op fadd_bnd 1%Z 0%Z fx_c2 (fmul r st_d3) Fp Vp Cp.
+ table_op fmul_bnd 1%Z (-20)%Z (fmul r r) (fadd fx_c2 (fmul r st_d3)) Fv Vv Cv.
+ table_op fadd_bnd 1%Z (-9)%Z r
+   (fmul (fmul r r) (fadd fx_c2 (fmul r st_d3))) Fu Vu Cu.
+ unfold fast_cubic64. split;[exact Fu|].
+ rewrite Vu,Vv,Vp,Vm,V2,fast_c2_g_eq,d3_g_eq. reflexivity.
 Qed.
-Lemma fast_quartic_certificate R dr m a : Rabs R<=0.000677 ->
+Lemma fast_cubic_certificate R dr m a : Rabs R<=0.000338451 ->
  Rabs dr<=bpow radix2(-77) -> Rabs m<=bpow radix2(-74) ->
  Rabs a<=IZR 5174524961095286666344419*bpow radix2(-158) ->
- Rabs(fast_quartic_value(rn(R+dr))-(R+Qs(rn(R+dr))+m+a))<=bpow radix2(-59) /\
- Rabs(fast_quartic_value(rn(R+dr)))<=/1024.
+ Rabs(fast_cubic_value(rn(R+dr))-(R+Qs(rn(R+dr))+m+a))<=7*bpow radix2(-56) /\
+ Rabs(fast_cubic_value(rn(R+dr)))<=/1024.
 Proof.
- intros HR Hd Hm Ha. unfold fast_quartic_value,Qs,half_g,d3_g,d4_g,d5_g.
+ intros HR Hd Hm Ha. unfold fast_cubic_value,fast_c2_g,Qs,half_g,d3_g,d4_g,d5_g.
  apply Rabs_le_inv in HR,Hd,Hm,Ha.
- split;apply Rabs_le;erfcx_goal (exp_fast_quartic.l1 R dr m a).
+ split;apply Rabs_le;erfcx_goal (exp_fast_cubic.l1 R dr m a).
 Qed.
-Theorem fast_quartic_approx r R dr : finite r -> Rabs R<=0.000677 ->
+Theorem fast_cubic_approx r R dr : finite r -> Rabs R<=0.000338451 ->
  Rabs dr<=bpow radix2(-77) -> B r=rn(R+dr) ->
- finite(fast_quartic64 r) /\ Rabs(B(fast_quartic64 r)-(exp R-1))<=bpow radix2(-59) /\
- Rabs(B(fast_quartic64 r))<=/1024.
+ finite(fast_cubic64 r) /\ Rabs(B(fast_cubic64 r)-(exp R-1))<=7*bpow radix2(-56) /\
+ Rabs(B(fast_cubic64 r))<=/1024.
 Proof.
  intros Fr HR Hdr Br.
  assert (Er : Rabs (B r-(R+dr))<=bpow radix2(-64)).
@@ -68,11 +66,11 @@ Proof.
    apply Rabs_le;bpow_num_all;lra. }
  set (a:=exp R-1-R-Qs R).
  assert (Ha:Rabs a<=IZR 5174524961095286666344419*bpow radix2(-158)).
- { pose proof (st_poly_approx R HR) as A. unfold st_poly_bound,Rdiv in A.
+ { pose proof (st_poly_approx R ltac:(lra)) as A. unfold st_poly_bound,Rdiv in A.
    rewrite <-(bpow_m 158) in A. rewrite d3_g_eq,d4_g_eq,d5_g_eq in A.
    unfold a,Qs. rewrite half_g_eq. replace (/2) with (1/2) by field. exact A. }
- destruct (fast_quartic_ieee r Fr ltac:(lra)) as [Fu Vu].
- destruct (fast_quartic_certificate R dr m a HR Hdr Hm Ha) as [Error Range].
+ destruct (fast_cubic_ieee r Fr ltac:(lra)) as [Fu Vu].
+ destruct (fast_cubic_certificate R dr m a HR Hdr Hm Ha) as [Error Range].
  rewrite <-Br,<-Vu in Error,Range.
  assert (Id:R+Qs(B r)+m+a=exp R-1) by (unfold m,a;ring).
  rewrite Id in Error. repeat split;assumption.

@@ -945,7 +945,7 @@ Require FastExpScale FastExpPolynomial FastExpReconstruction FastErfcxEvaluation
 Print Assumptions FastExpScale.fast_scaled_high_ok.
 Print Assumptions FastExpScale.fast_raw_scale.
 Print Assumptions FastExpScale.fast_raw_index.
-Print Assumptions FastExpPolynomial.fast_quartic_approx.
+Print Assumptions FastExpPolynomial.fast_cubic_approx.
 Print Assumptions FastExpReconstruction.fast_reconstruction_ok.
 Print Assumptions FastErfcxEvaluation.fast_table_ieee.
 Print Assumptions FastErfcxCertificates.fast_table_certificate.

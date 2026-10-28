@@ -9,7 +9,7 @@ Open Scope R_scope.
 Definition fast_reconstruct64 h u := fmul h (fadd one u).
 Lemma fast_reconstruction_budget u dt du ep ey :
  Rabs u<=/1024 -> Rabs dt<=4503599627370498*bpow radix2(-105) ->
- Rabs du<=bpow radix2(-59) -> Rabs ep<=1025*bpow radix2(-63) ->
+ Rabs du<=7*bpow radix2(-56) -> Rabs ep<=1025*bpow radix2(-63) ->
  Rabs ey<=1026*bpow radix2(-63) ->
  Rabs(((1+u+ep+ey)-(1+dt)*(1+u+du))/((1+dt)*(1+u+du)))<=bpow radix2(-51).
 Proof.
@@ -18,7 +18,7 @@ Proof.
 Qed.
 Theorem fast_reconstruction_ok h u dt du : finite h -> finite u ->
  bpow radix2(-1016)<=B h<=bpow radix2 1017 -> Rabs(B u)<=/1024 ->
- Rabs dt<=4503599627370498*bpow radix2(-105) -> Rabs du<=bpow radix2(-59) ->
+ Rabs dt<=4503599627370498*bpow radix2(-105) -> Rabs du<=7*bpow radix2(-56) ->
  finite(fast_reconstruct64 h u) /\
  Rabs((B(fast_reconstruct64 h u)-B h*((1+dt)*(1+B u+du)))/
    (B h*((1+dt)*(1+B u+du))))<=bpow radix2(-51).

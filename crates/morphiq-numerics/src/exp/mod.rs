@@ -5,6 +5,7 @@
 //! section numbers below refer to it.
 
 pub(crate) mod bounded;
+mod bounded_tables;
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;
 pub(crate) mod tables;
