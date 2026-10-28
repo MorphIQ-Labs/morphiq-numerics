@@ -1,4 +1,5 @@
 //! Same-host contract comparison and scalar/slice observations; not CI timing.
+//! `MORPHIQ_FAST_BENCH_ITERATIONS` sets timed calls per sample (default 10,000).
 use morphiq_numerics::{elementary, fast, normal};
 use std::{hint::black_box, time::Instant};
 
@@ -23,6 +24,18 @@ fn main() {
         }
         return;
     }
+    let iterations = std::env::var_os("MORPHIQ_FAST_BENCH_ITERATIONS").map_or(10_000, |value| {
+        value
+            .into_string()
+            .expect("MORPHIQ_FAST_BENCH_ITERATIONS must be a positive u32")
+            .parse::<u32>()
+            .expect("MORPHIQ_FAST_BENCH_ITERATIONS must be a positive u32")
+    });
+    assert!(
+        iterations > 0,
+        "MORPHIQ_FAST_BENCH_ITERATIONS must be positive"
+    );
+    eprintln!("timed_iterations={iterations}; values_per_call=52; warmup_calls=100");
     let functions: [(&str, Scalar, Slice, Scalar, Slice, f64, f64); 3] = [
         (
             "exp",
@@ -85,14 +98,16 @@ fn main() {
                 evaluate(&mut out);
             }
             let start = Instant::now();
-            for _ in 0..10000 {
+            for _ in 0..iterations {
                 evaluate(black_box(&mut out));
                 black_box(&out);
             }
+            let elapsed = start.elapsed();
             println!(
                 "{name},{mode},{}",
-                start.elapsed().as_secs_f64() * 100_000.0
+                elapsed.as_secs_f64() * 1e9 / f64::from(iterations)
             );
+            eprintln!("{name},{mode},elapsed_ns={}", elapsed.as_nanos());
         }
     }
 }
