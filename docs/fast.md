@@ -80,9 +80,13 @@ input finishes through the scalar fast/strong owners; this preserves the
 scalar bits and keeps invalid intermediates out of inactive lanes. Cold slice
 packets pass their slices by reference, avoiding a returned lane-array spill
 on the hot path. Two independent vectors are scheduled per bulk iteration.
-Single-vector calls carry fixed-size references across the dispatch boundary;
-one- and two-value remainders use scalar evaluation, as do AVX2/SSE2 tails.
-Larger AVX-512 remainders use checked partial loads/stores. The architecture
+Power-of-two batches of up to eight vectors carry fixed-size references
+across the dispatch boundary. Their combined domain mask is checked before
+arithmetic; groups of four vectors expose independent table work. One- and
+two-value remainders use scalar evaluation before the fixed batch, as do
+AVX2/SSE2 tails. Larger AVX-512 remainders use checked partial loads/stores.
+The SSE2 fallback loop and scalar-remainder helper are kept outside the runtime
+dispatcher so their register needs do not burden every selected backend. The architecture
 API owns index masking and prefix-length validation. The lane code-generation
 gate rejects hardware gather in these bounded kernels.
 
@@ -206,3 +210,11 @@ individual kernels. Extra digits are not an independent optimization objective.
 slice observations from exact input encodings for independent fixture analysis.
 Neither a local speedup nor fixture agreement establishes universal competitor
 parity, a whole-consumer contract, or native results on an unmeasured host.
+
+The CDF composition enters exp's screened scalar/lane kernels directly.
+`FastNormalArgument.fast_normal_exponent_ok` proves that its rounded exponent
+is in `[-32, 0]` after the CDF's public magnitude check; inactive SIMD lanes
+use magnitude one. This avoids a duplicate exp screen and an unreachable
+strong-exp fallback. Debug assertions check the internal precondition, and
+public exp retains its own screen. The sibling erfcx composition likewise
+uses its table kernel under the already-proved argument range.

@@ -40,7 +40,9 @@ pub fn norm_cdf(x: f64) -> f64 {
     if a <= 1.0 {
         return central(x);
     }
-    let exponential = super::elementary::exp((-0.5 * a) * a);
+    // The screen above establishes a <= 8; fast_normal_exponent_ok proves
+    // that this rounded argument is in [-32, 0], inside exp's kernel domain.
+    let exponential = crate::exp::bounded::in_domain((-0.5 * a) * a);
     let scaled = a * crate::normal_distribution::INV_SQRT2_HIGH;
     // The composition needs the table below erfcx's public magnitude screen.
     let lower = (0.5 * exponential) * crate::erfcx::bounded::table(scaled);
