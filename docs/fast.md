@@ -1,8 +1,9 @@
 # Explicit fast primitives
 
-This draft implementation has derived candidate bounds; formal entry proofs,
-source bindings and complete native qualification remain required before release.
-Sampled agreement is not a substitute for those obligations.
+These explicit approximation APIs have separate IEEE/Coq entry proofs and
+Gappa arithmetic certificates for the bounds below. Source bindings connect
+the proofs to the implementation. Sampled agreement and native performance
+measurements are separate evidence; neither substitutes for a whole-domain bound.
 
 The `fast` namespace selects a bounded approximation explicitly. Existing
 `elementary` and `normal` functions keep their contracts and dispatch. No
@@ -165,9 +166,9 @@ changes the selected contract or the scalar result bits.
 The derivation above is distinct from a sampled error result. Independent
 rounded reference fixtures include their half-ULP uncertainty when checking
 the fast bound. Mixed inputs, dispatch endpoints, SIMD remainders and retained
-special values are checked separately. Completion of the formal entry/source
-transcriptions and native qualification is tracked in #191–#194; this derivation
-does not assert those separate acceptance obligations have run or passed.
+special values are checked separately. The extracted entry models exercise the
+same central/outer and accelerated/fallback decisions. Native measurements
+apply only to their recorded hosts, calling interfaces and input populations.
 
 ## Consumer use
 
