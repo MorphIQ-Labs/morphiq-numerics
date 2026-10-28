@@ -15,7 +15,8 @@ const HIGH: [u64; 512] = {
 
 #[inline]
 pub(crate) fn exp(x: f64) -> f64 {
-    if !(x.abs() < 704.0) {
+    let active = x.abs() < 704.0; // NaNs belong to the strong owner too.
+    if !active {
         return super::exp(x);
     }
     let t = x * INV_N + SHIFTER;
@@ -127,7 +128,8 @@ impl morphiq_numerics_arch::WithSimd for Slice<'_> {
 #[inline(never)]
 fn repair(input: &[f64], output: &mut [f64]) {
     for (&x, y) in input.iter().zip(output) {
-        if !(x.abs() < 704.0) {
+        let active = x.abs() < 704.0;
+        if !active {
             *y = super::exp(x);
         }
     }
