@@ -7,7 +7,7 @@ From Binary64 Require Import Binary64Add IEEE64 IEEE64Add RoundingConstant Round
 Require Import StageGappa ErfcxDecision ErfcxGaussianTarget NormalConstants
   NormalComparisons NormalFastDispatch NormalErfcxSensitivity
   NormalTailAnalytic NormalPublicEntry NormalPublicModel
-  NormalAccurateCentralCdf FastExp FastErfcx FastNormalArgument FastNormalAnalytic.
+  NormalAccurateCentralCdf FastExp FastErfcx FastNormalArgument FastNormalAnalytic FastNormalCentral.
 Open Scope R_scope.
 
 (** CI diagnostics for the previously silent FastNormal compile.
@@ -20,9 +20,12 @@ Definition fast_normal_lower64 a :=
   let z:=fast_normal_argument64 a in
   let f:=fast_erfcx_table64 z in
   fmul(fmul(erfcx_pow2(-1))e)f.
-Definition fast_normal_cdf64 x :=
+Definition fast_normal_outer64 x :=
   let lower:=fast_normal_lower64(b64_abs x)in
   if normal_lt x normal_zero then lower else fsub(erfcx_pow2 0)lower.
+Definition fast_normal_cdf64 x :=
+ if normal_le (b64_abs x) (erfcx_pow2 0) then fast_normal_center64 x
+ else fast_normal_outer64 x.
 Definition fast_normal_screen64 x :=
   normal_le(erfcx_pow2(-33))(b64_abs x) && normal_le(b64_abs x)(erfcx_pow2 3).
 Definition fast_normal_entry64 x :=
@@ -163,10 +166,10 @@ Proof.
     split;[exact Fl|];split;[exact Range|exact Error].
 Time Qed.
 
-Theorem fast_normal_cdf_ok x : finite x -> bpow radix2(-33)<=Rabs(B x)<=8 ->
-  finite(fast_normal_cdf64 x) /\
-  bpow radix2(-58)<=B(fast_normal_cdf64 x)<=1 /\
-  Rabs(B(fast_normal_cdf64 x)-normal_cdf(B x))<=bpow radix2(-49).
+Theorem fast_normal_outer_ok x : finite x -> bpow radix2(-33)<=Rabs(B x)<=8 ->
+  finite(fast_normal_outer64 x) /\
+  bpow radix2(-58)<=B(fast_normal_outer64 x)<=1 /\
+  Rabs(B(fast_normal_outer64 x)-normal_cdf(B x))<=bpow radix2(-49).
 Proof.
   idtac "FastNormal.cdf.begin".
   intros Fx X.
@@ -176,7 +179,7 @@ Proof.
   destruct(erfcx_pow2_ok 0 ltac:(lia))as[Fone One];change(bpow radix2 0)with 1 in One.
   assert(Fzero : finite normal_zero)by timeout 30 reflexivity.
   assert(Zero : B normal_zero=0)by timeout 30 reflexivity.
-  unfold fast_normal_cdf64;destruct(normal_lt x normal_zero)eqn:Sign.
+  unfold fast_normal_outer64;destruct(normal_lt x normal_zero)eqn:Sign.
   - apply normal_lt_true in Sign;try assumption;rewrite Zero in Sign.
     assert(Target : normal_cdf(B x)=normal_tail(Rabs(B x))).
     { rewrite Rabs_left by timeout 30 lra;rewrite normal_tail_negative_cdf.
@@ -217,6 +220,23 @@ Proof.
         (B lower)(normal_tail(Rabs(B x)))).
     + bpow_num_all;timeout 30 lra.
 Time Qed.
+
+Theorem fast_normal_cdf_ok x : finite x -> bpow radix2(-33)<=Rabs(B x)<=8 ->
+ finite(fast_normal_cdf64 x) /\
+ bpow radix2(-58)<=B(fast_normal_cdf64 x)<=1 /\
+ Rabs(B(fast_normal_cdf64 x)-normal_cdf(B x))<=bpow radix2(-49).
+Proof.
+ intros Fx X. unfold fast_normal_cdf64.
+ destruct(normal_le (b64_abs x) (erfcx_pow2 0)) eqn:Central.
+ - assert(Fa:finite(b64_abs x)) by (unfold b64_abs;destruct x;exact Fx).
+   destruct(erfcx_pow2_ok 0 ltac:(lia)) as [Fo One].
+   apply (normal_le_true _ _ Fa Fo) in Central;rewrite B_abs,One in Central.
+   change (bpow radix2 0) with 1 in Central.
+   destruct(fast_normal_center_ok x Fx Central) as [Fy [Range Error]].
+   split;[exact Fy|];split;[bpow_num_all;lra|].
+   unfold normal_cdf;eapply Rle_trans;[exact Error|bpow_num;lra].
+ - apply fast_normal_outer_ok;assumption.
+Qed.
 
 Theorem fast_normal_screen_finite x : finite x ->
   (fast_normal_screen64 x=true <-> bpow radix2(-33)<=Rabs(B x)<=8).

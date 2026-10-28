@@ -940,3 +940,14 @@ Print Assumptions FastNormal.fast_normal_entry_ok.
 Print Assumptions FastNormal.fast_normal_fallback_contract.
 Print Assumptions FastExp.fast_exp_public_accelerated.
 Print Assumptions FastExp.fast_exp_public_fallback.
+
+Require FastExpScale FastExpPolynomial FastExpReconstruction FastErfcxEvaluation FastErfcxCertificates FastNormalCentralAnalytic FastNormalCentral.
+Print Assumptions FastExpScale.fast_scaled_high_ok.
+Print Assumptions FastExpScale.fast_raw_scale.
+Print Assumptions FastExpScale.fast_raw_index.
+Print Assumptions FastExpPolynomial.fast_quartic_approx.
+Print Assumptions FastExpReconstruction.fast_reconstruction_ok.
+Print Assumptions FastErfcxEvaluation.fast_table_ieee.
+Print Assumptions FastErfcxCertificates.fast_table_certificate.
+Print Assumptions FastNormalCentralAnalytic.gaussian_integral_weighted_remainder.
+Print Assumptions FastNormalCentral.fast_normal_center_ok.

@@ -177,6 +177,65 @@ pub trait Simd: Copy + Send + Sync + core::fmt::Debug + sealed::Sealed + 'static
     fn sub_u(self, a: Self::U, b: Self::U) -> Self::U;
     /// `a >> n`, logical; zero for `n ≥ 64`.
     fn shr_u(self, a: Self::U, n: u32) -> Self::U;
+    /// `a + b`, wrapping independently in each lane.
+    #[inline(always)]
+    fn add_u(self, a: Self::U, b: Self::U) -> Self::U {
+        self.sub_u(a, self.sub_u(self.splat_bits(0), b))
+    }
+    /// `a << n`, with zero for `n >= 64`.
+    #[inline(always)]
+    fn shl_u(self, a: Self::U, n: u32) -> Self::U {
+        let a = self.store(self.to_float(a));
+        let mut out = Self::Words::default();
+        for (out, a) in out.as_mut().iter_mut().zip(a.as_ref()) {
+            *out = a.to_bits().checked_shl(n).unwrap_or(0);
+        }
+        self.load_bits(out)
+    }
+    /// Load `table[index % N]` as binary64 bits in each lane.
+    ///
+    /// # Panics
+    /// If `N` is not a positive power of two. Masking inside this owner
+    /// bounds every memory access, including arbitrary caller indices.
+    #[inline(always)]
+    fn gather_wrapped<const N: usize>(self, table: &[u64; N], index: Self::U) -> Self::F {
+        assert!(
+            N.is_power_of_two(),
+            "gather table length must be a positive power of two"
+        );
+        let index = self.store(self.to_float(index));
+        let mut out = Self::Array::default();
+        for (out, index) in out.as_mut().iter_mut().zip(index.as_ref()) {
+            #[allow(clippy::cast_possible_truncation)]
+            // The mask bounds the index by a valid array length.
+            let index = (index.to_bits() & (N - 1) as u64) as usize;
+            *out = f64::from_bits(table[index]);
+        }
+        self.load(out)
+    }
+    /// Load a prefix of at most `LANES` values; remaining lanes are positive zero.
+    ///
+    /// # Panics
+    /// If the slice is longer than `LANES`.
+    #[inline(always)]
+    fn load_partial(self, values: &[f64]) -> Self::F {
+        assert!(
+            values.len() <= Self::LANES,
+            "partial load exceeds lane width"
+        );
+        let mut a = Self::Array::default();
+        a.as_mut()[..values.len()].copy_from_slice(values);
+        self.load(a)
+    }
+    /// Store only the prefix selected by the output slice's length.
+    ///
+    /// # Panics
+    /// If the slice is longer than `LANES`.
+    #[inline(always)]
+    fn store_partial(self, value: Self::F, out: &mut [f64]) {
+        assert!(out.len() <= Self::LANES, "partial store exceeds lane width");
+        out.copy_from_slice(&self.store(value).as_ref()[..out.len()]);
+    }
     /// `a = b`.
     fn eq_u(self, a: Self::U, b: Self::U) -> Self::M;
 }

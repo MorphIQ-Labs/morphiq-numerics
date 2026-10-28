@@ -11,6 +11,18 @@ mod tables;
 
 /// Generated nearest-binary64 high word, shared with the bounded CDF.
 pub(crate) const INV_SQRT2_HIGH: f64 = tables::INV_SQRT2.0;
+/// Existing generated central coefficients, projected to their high words.
+pub(crate) const CENTER_HIGH: [f64; 13] = {
+    let mut a = [0.0; 13];
+    let mut i = 0;
+    while i < 13 {
+        a[i] = tables::CENTER[i].0;
+        i += 1;
+    }
+    a
+};
+pub(crate) const DENSITY_HIGH: f64 = tables::DENSITY.0;
+
 #[cfg(test)]
 mod tests;
 

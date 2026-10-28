@@ -2,82 +2,40 @@
 use crate::lanes::{Kernel, lanes_mask};
 use morphiq_numerics_arch::Simd;
 
-pub(super) struct Exp;
-pub(super) struct Erfcx;
 pub(super) struct Cdf;
-
-impl Kernel for Exp {
-    fn scalar(x: f64) -> f64 {
-        super::elementary::exp(x)
-    }
-
-    #[inline(always)]
-    fn lanes<K: Simd>(k: K, input: K::Array) -> K::Array {
-        let reduced = crate::exp::lanes::reduce(k, &input);
-        let (h, l) = crate::exp::lanes::stage_a(k, &reduced);
-        let mut out = k.store(k.mul(k.add(h, l), reduced.table.scale));
-        for (i, value) in out.as_mut().iter_mut().enumerate() {
-            if reduced.screened >> i & 1 != 0 {
-                *value = Self::scalar(input.as_ref()[i]);
-            }
-        }
-        out
-    }
-}
-
-impl Kernel for Erfcx {
-    fn scalar(x: f64) -> f64 {
-        super::normal::erfcx(x)
-    }
-
-    #[inline(always)]
-    fn lanes<K: Simd>(k: K, input: K::Array) -> K::Array {
-        let x = k.load(input);
-        let active = k.and_m(
-            k.and_m(k.le(k.splat(-0.5), x), k.lt(x, k.splat(16.0))),
-            k.le(k.splat(super::normal::MIN_MAGNITUDE), k.abs(x)),
-        );
-        let active_bits = k.mask_bits(active);
-        // Every inactive argument becomes a valid table input before reduction.
-        let safe = k.select(active, x, k.splat(1.0));
-        let (hi, lo) = crate::erfcx::lanes::table(k, safe);
-        let mut out = k.store(k.add(hi, lo));
-        if active_bits != lanes_mask::<K>() {
-            for (i, value) in out.as_mut().iter_mut().enumerate() {
-                if active_bits >> i & 1 == 0 {
-                    *value = crate::normal::erfcx(input.as_ref()[i]);
-                }
-            }
-        }
-        out
-    }
-}
 
 impl Kernel for Cdf {
     fn scalar(x: f64) -> f64 {
         super::normal::norm_cdf(x)
     }
-
     #[inline(always)]
     fn lanes<K: Simd>(k: K, input: K::Array) -> K::Array {
         let x = k.load(input);
-        let magnitude = k.abs(x);
+        let a = k.abs(x);
         let active = k.and_m(
-            k.le(k.splat(super::normal::MIN_MAGNITUDE), magnitude),
-            k.le(magnitude, k.splat(8.0)),
+            k.le(k.splat(super::normal::MIN_MAGNITUDE), a),
+            k.le(a, k.splat(8.0)),
         );
+        let central = k.and_m(active, k.le(a, k.splat(1.0)));
+        let tail = k.and_m(active, k.not_m(central));
+        let mut y = k.splat(0.0);
+        if k.mask_bits(central) != 0 {
+            y = center(k, k.select(central, x, k.splat(0.0)));
+        }
+        if k.mask_bits(tail) != 0 {
+            let safe = k.select(tail, a, k.splat(1.0));
+            let exponential =
+                crate::exp::bounded::lanes(k, k.mul(k.mul(k.splat(-0.5), safe), safe));
+            let scaled = k.mul(safe, k.splat(crate::normal_distribution::INV_SQRT2_HIGH));
+            let lower = k.mul(
+                k.mul(k.splat(0.5), exponential),
+                crate::erfcx::bounded::lanes(k, scaled),
+            );
+            let value = k.select(k.lt(x, k.splat(0.0)), lower, k.sub(k.splat(1.0), lower));
+            y = k.select(tail, value, y);
+        }
+        let mut out = k.store(y);
         let active_bits = k.mask_bits(active);
-        let a = k.select(active, magnitude, k.splat(1.0));
-        // Preserve the scalar multiply order, including rounding of -a²/2.
-        let exponent = k.mul(k.mul(k.splat(-0.5), a), a);
-        let reduced = crate::exp::lanes::reduce(k, &k.store(exponent));
-        let (exp_hi, exp_lo) = crate::exp::lanes::stage_a(k, &reduced);
-        let exponential = k.mul(k.add(exp_hi, exp_lo), reduced.table.scale);
-        let scaled = k.mul(a, k.splat(crate::normal_distribution::INV_SQRT2_HIGH));
-        let (hi, lo) = crate::erfcx::lanes::table(k, scaled);
-        let lower = k.mul(k.mul(k.splat(0.5), exponential), k.add(hi, lo));
-        let cdf = k.select(k.lt(x, k.splat(0.0)), lower, k.sub(k.splat(1.0), lower));
-        let mut out = k.store(cdf);
         if active_bits != lanes_mask::<K>() {
             for (i, value) in out.as_mut().iter_mut().enumerate() {
                 if active_bits >> i & 1 == 0 {
@@ -87,4 +45,23 @@ impl Kernel for Cdf {
         }
         out
     }
+}
+
+#[inline(always)]
+fn center<K: Simd>(k: K, x: K::F) -> K::F {
+    use crate::normal_distribution::{CENTER_HIGH as A, DENSITY_HIGH};
+    let z = k.mul(x, x);
+    let zz = k.mul(z, z);
+    let pair = |j: usize| k.add(k.splat(A[j]), k.mul(z, k.splat(A[j + 1])));
+    let p0 = pair(0);
+    let p1 = pair(2);
+    let p2 = pair(4);
+    let p3 = pair(6);
+    let p4 = pair(8);
+    let p5 = pair(10);
+    let mut p = k.add(p5, k.mul(zz, k.splat(A[12])));
+    for q in [p4, p3, p2, p1, p0] {
+        p = k.add(q, k.mul(zz, p));
+    }
+    k.add(k.splat(0.5), k.mul(k.mul(x, k.splat(DENSITY_HIGH)), p))
 }

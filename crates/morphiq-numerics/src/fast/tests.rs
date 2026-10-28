@@ -32,9 +32,11 @@ fn mixed_slices_preserve_fast_scalar_bits_and_remainders() {
     for boundary in [
         -704.0,
         -8.0,
+        -1.0,
         -0.5,
         -normal::MIN_MAGNITUDE,
         normal::MIN_MAGNITUDE,
+        1.0,
         8.0,
         16.0,
         704.0,

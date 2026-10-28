@@ -53,6 +53,48 @@ impl WithSimd for Check<'_> {
     fn with<S: Simd>(self, s: S) {
         let n = S::LANES;
         let all = (1_u64 << n) - 1;
+        let prefix: Vec<_> = (0..n).map(|i| self.0[i]).collect();
+        for len in 0..=n {
+            let loaded = s.store(s.load_partial(&prefix[..len]));
+            for (i, &x) in loaded.as_ref().iter().enumerate() {
+                let expected = if i < len { prefix[i].to_bits() } else { 0 };
+                assert_eq!(x.to_bits(), expected, "{}: padded load", S::NAME);
+            }
+            let sentinel = f64::from_bits(0x7ff8_0000_0000_1234);
+            let mut output = std::vec![sentinel; n + 2];
+            s.store_partial(s.load_partial(&prefix), &mut output[1..=len]);
+            for (i, &x) in output.iter().enumerate() {
+                let expected = if (1..=len).contains(&i) {
+                    prefix[i - 1].to_bits()
+                } else {
+                    sentinel.to_bits()
+                };
+                assert_eq!(x.to_bits(), expected, "{}: partial store boundary", S::NAME);
+            }
+        }
+        let oversized = std::vec![0.0; n + 1];
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| s.load_partial(&oversized)))
+                .is_err()
+        );
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+                || s.store_partial(s.splat(0.0), &mut oversized.clone())
+            ))
+            .is_err()
+        );
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+                || s.gather_wrapped(&[0_u64; 0], s.splat_bits(0))
+            ))
+            .is_err()
+        );
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+                || s.gather_wrapped(&[0_u64; 3], s.splat_bits(u64::MAX))
+            ))
+            .is_err()
+        );
         for bits in 0..=all {
             for input in [bits, bits | !all] {
                 let mask = s.mask_from_bits(input);
@@ -87,6 +129,12 @@ impl WithSimd for Check<'_> {
                 (words(s.shr_u(ua, 45)), 12),
                 (words(s.shr_u(ua, 0)), 13),
                 (words(s.shr_u(ua, 64)), 14),
+                (words(s.add_u(ua, ub)), 15),
+                (words(s.shl_u(ua, 43)), 16),
+                (words(s.shl_u(ua, 0)), 17),
+                (words(s.shl_u(ua, 63)), 18),
+                (words(s.shl_u(ua, 64)), 19),
+                (words(s.shl_u(ua, 128)), 20),
                 (lanes(s.splat(xs[0])), 10),
                 (words(s.splat_bits(xs[0].to_bits())), 11),
             ];
@@ -104,6 +152,26 @@ impl WithSimd for Check<'_> {
                 "{}: load_bits",
                 S::NAME
             );
+            let table = [
+                0,
+                1,
+                u64::MAX,
+                0x8000_0000_0000_0000,
+                0x7ff0_0000_0000_0000,
+                0x7ff8_0000_0000_1234,
+                0x0010_0000_0000_0000,
+                0x3ff0_0000_0000_0000,
+            ];
+            let gathered = s.store(s.gather_wrapped(&table, ua));
+            for (&input, &output) in xs.iter().zip(gathered.as_ref()) {
+                let index = usize::try_from(input.to_bits() & 7).unwrap();
+                assert_eq!(
+                    output.to_bits(),
+                    table[index],
+                    "{}: wrapped gather",
+                    S::NAME
+                );
+            }
             let lt = mask(s.lt(va, vb));
             let le = mask(s.le(va, vb));
             let eq = mask(s.eq_u(ua, ub));
@@ -132,11 +200,17 @@ impl WithSimd for Check<'_> {
                     f64::from_bits(x.to_bits() >> 45),
                     x,
                     0.0,
+                    f64::from_bits(x.to_bits().wrapping_add(y.to_bits())),
+                    f64::from_bits(x.to_bits() << 43),
+                    x,
+                    f64::from_bits(x.to_bits() << 63),
+                    0.0,
+                    0.0,
                 ];
                 for (got, op) in &results {
                     let want = expected[*op];
                     // Bit operations are compared as words, NaN payloads included.
-                    let exact = matches!(op, 4 | 5 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14);
+                    let exact = matches!(op, 4 | 5 | 7..=20);
                     let ok = if exact {
                         got.as_ref()[i].to_bits() == want.to_bits()
                     } else {
