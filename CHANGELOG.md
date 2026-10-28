@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.15](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.14...v0.0.15) - 2026-10-27
+
+### Other
+
+- require accuracy and cost decisions for numerical paths ([#239](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/239))
+
 ## [0.0.14](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.13...v0.0.14) - 2026-10-26
 
 ### Added
