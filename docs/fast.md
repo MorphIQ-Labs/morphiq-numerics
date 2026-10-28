@@ -96,6 +96,9 @@ across the dispatch boundary. Their combined domain mask is checked before
 arithmetic; groups of four vectors expose independent table work. One- and
 two-value remainders use scalar evaluation before the fixed batch, as do
 AVX2/SSE2 tails. Larger AVX-512 remainders use checked partial loads/stores.
+Static AVX builds keep fixed packet kernels outside the dispatcher too; their
+register saves must not burden a short call selecting a different packet.
+Runtime detection already introduces this ISA boundary, so its helper inlines.
 The SSE2 fallback loop and scalar-remainder helper are kept outside the runtime
 dispatcher so their register needs do not burden every selected backend. The architecture
 API owns index masking and prefix-length validation. The lane code-generation
