@@ -67,3 +67,28 @@ Proof.
    (raw+(-9460198045384704)*512)%Z by ring.
  rewrite Z.mod_add by lia;reflexivity.
 Qed.
+
+
+(** Pre-subtract the low index contribution from each table word. Adding
+    the complete shifted raw encoding then cancels it exactly modulo 2^64. *)
+Lemma fast_biased_raw_scale (high raw : Z) :
+ (((high-(raw mod 512)*2^43) mod 2^64 + Z.shiftl raw 43) mod 2^64 =
+ (high+Z.shiftl (Z.shiftr raw 9) 52) mod 2^64)%Z.
+Proof.
+ rewrite Z.add_mod_idemp_l by lia.
+ rewrite !Z.shiftl_mul_pow2 by lia.
+ rewrite Z.shiftr_div_pow2 by lia.
+ change (2^9)%Z with 512%Z.
+ f_equal.
+ pose proof (Z.div_mod raw 512 ltac:(lia)) as E.
+ replace (2^52)%Z with (512*2^43)%Z by reflexivity.
+ nia.
+Qed.
+
+
+Lemma fast_biased_lookup_ok (raw : Z) :
+ fast_scaled_high64 (Z.to_nat (raw mod 512))
+   (Z.shiftr (raw-4843621399236968448) 9) =
+ b64_of_bits (((fast_high_bits (Z.to_nat (raw mod 512)) - (raw mod 512)*2^43)
+   mod 2^64 + Z.shiftl raw 43) mod 2^64)%Z.
+Proof. rewrite fast_biased_raw_scale. apply fast_raw_scale. Qed.

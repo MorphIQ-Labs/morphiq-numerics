@@ -42,8 +42,12 @@ The following composition estimates are tighter.
 **Exponential.** The existing 512-way reduction gives
 `R = x - n*ln(2)/512`, `abs(R) <= 0.000677`, and
 `r = RN(R + dr)` with `abs(dr) <= 2^-77`. The high words of the generated
-`S_T` table form a 4 KiB projection; the low words remain with the strong
-implementation. The bounded evaluator uses the existing cubic and quartic
+`S_T` table form a 4 KiB projection; word `j` is pre-biased by
+subtracting `j << 43`, modulo `2^64`. Adding the complete reduction encoding
+shifted left by 43 cancels this index contribution and supplies the exponent
+scale. `FastExpScale.fast_biased_lookup_ok` proves that it is the original
+scaled high word, including negative reductions. The low words remain with
+the strong implementation. The bounded evaluator uses the existing cubic and quartic
 coefficients, with this binary64 operation order:
 
 ```
@@ -51,7 +55,7 @@ r2 = RN(r*r)
 left = RN(r + RN(0.5*r2))
 p = RN(d3 + RN(r*d4))
 u = RN(left + RN(RN(r2*r)*p))
-y = RN(H + RN(H*u))
+y = RN(H * RN(1 + u))
 ```
 
 Here `H` is the table high word scaled by `2^k` through its exponent field.
@@ -59,15 +63,32 @@ Here `H` is the table high word scaled by `2^k` through its exponent field.
 `-1016 <= k <= 1016`. `fast_quartic.g` combines the existing degree-five
 analytic certificate, the omitted fifth-order term, reduction and arithmetic
 errors to bound `abs(u - (exp(R)-1))` by `2^-59`. `FastExpReconstruction`
-includes subnormal rounding of `H*u`; the final result is normal throughout
-the accelerated domain. `FastExp.fast_exp_entry_ok` composes these bounds
+first rounds `1 + u` and then multiplies by `H`. Both operations have normal
+results throughout the accelerated domain. Their normalized rounding-error
+bounds are `1025 * 2^-63` and `1026 * 2^-63`, respectively. This order avoids
+the subnormal correction product created by forming `H*u` separately near
+the negative end of the domain; no extra precision is required by the public
+`4u` contract. `FastExp.fast_exp_entry_ok` composes these bounds
 with the original table error to establish relative `4u`.
 
-The slice path evaluates the same operations using a masked table gather.
-It accumulates lane-screen results and repairs screened inputs with the strong
-owner once after the vector pass. A partial load/store handles the remainder
-on the selected backend. Masking and prefix-length validation belong to the
-safe architecture API, before its intrinsic memory accesses.
+The slice path evaluates the same operations using bounded scalar table loads
+assembled into SIMD lanes. Hardware gather is deliberately avoided: its
+latency can dominate on processors with the Gather Data Sampling microcode
+mitigation ([Intel performance analysis](https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/resources/gds-mitigation-performance-analysis.html)).
+A full-vector domain check precedes arithmetic. A packet containing a screened
+input finishes through the scalar fast/strong owners; this preserves the
+scalar bits and keeps invalid intermediates out of inactive lanes. Cold slice
+packets pass their slices by reference, avoiding a returned lane-array spill
+on the hot path. Two independent vectors are scheduled per bulk iteration.
+Power-of-two batches of up to eight vectors carry fixed-size references
+across the dispatch boundary. Their combined domain mask is checked before
+arithmetic; groups of four vectors expose independent table work. One- and
+two-value remainders use scalar evaluation before the fixed batch, as do
+AVX2/SSE2 tails. Larger AVX-512 remainders use checked partial loads/stores.
+The SSE2 fallback loop and scalar-remainder helper are kept outside the runtime
+dispatcher so their register needs do not burden every selected backend. The architecture
+API owns index masking and prefix-length validation. The lane code-generation
+gate rejects hardware gather in these bounded kernels.
 
 **Scaled erfc.** The bounded path retains the original table reduction,
 177 cells, degree-nine polynomials and generated coefficient bits. It evaluates
@@ -189,3 +210,11 @@ individual kernels. Extra digits are not an independent optimization objective.
 slice observations from exact input encodings for independent fixture analysis.
 Neither a local speedup nor fixture agreement establishes universal competitor
 parity, a whole-consumer contract, or native results on an unmeasured host.
+
+The CDF composition enters exp's screened scalar/lane kernels directly.
+`FastNormalArgument.fast_normal_exponent_ok` proves that its rounded exponent
+is in `[-32, 0]` after the CDF's public magnitude check; inactive SIMD lanes
+use magnitude one. This avoids a duplicate exp screen and an unreachable
+strong-exp fallback. Debug assertions check the internal precondition, and
+public exp retains its own screen. The sibling erfcx composition likewise
+uses its table kernel under the already-proved argument range.

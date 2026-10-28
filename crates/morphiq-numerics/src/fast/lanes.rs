@@ -24,8 +24,10 @@ impl Kernel for Cdf {
         }
         if k.mask_bits(tail) != 0 {
             let safe = k.select(tail, a, k.splat(1.0));
+            // Active magnitudes are at most 8; other lanes use 1. Thus every
+            // rounded exponent is in [-32, 0] (fast_normal_exponent_ok).
             let exponential =
-                crate::exp::bounded::lanes(k, k.mul(k.mul(k.splat(-0.5), safe), safe));
+                crate::exp::bounded::in_domain_lanes(k, k.mul(k.mul(k.splat(-0.5), safe), safe));
             let scaled = k.mul(safe, k.splat(crate::normal_distribution::INV_SQRT2_HIGH));
             let lower = k.mul(
                 k.mul(k.splat(0.5), exponential),

@@ -1,7 +1,6 @@
 //! Bounded elementary functions with explicit identities.
 
-/// Exponential with a draft target of relative error at most `2^-51`
-/// for `|x| < 704`, pending formal entry and source-binding qualification.
+/// Exponential with relative error at most `2^-51` for `|x| < 704`.
 ///
 /// It uses the generated table high words and a bounded quartic polynomial,
 /// with exact exponent-field scaling. Other inputs use [`crate::elementary::exp`],
