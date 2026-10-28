@@ -519,9 +519,8 @@ mod helpers {
             let index = _mm256_and_si256(index, _mm256_set1_epi64x((N - 1) as i64));
             // SAFETY: masked indices are in 0..N; scale eight addresses exactly
             // the u64 elements of the live array. This helper has the CPU feature.
-            unsafe {
-                _mm256_castsi256_pd(_mm256_i64gather_epi64::<8>(table.as_ptr().cast(), index))
-            }
+            let words = unsafe { _mm256_i64gather_epi64::<8>(table.as_ptr().cast(), index) };
+            _mm256_castsi256_pd(words)
         }
         #[target_feature(enable = "avx2,fma")]
         #[inline]
@@ -708,9 +707,8 @@ mod helpers {
             let index = _mm512_and_si512(index, _mm512_set1_epi64((N - 1) as i64));
             // SAFETY: masked indices are in 0..N; scale eight addresses exactly
             // the u64 elements of the live array. This helper has the CPU feature.
-            unsafe {
-                _mm512_castsi512_pd(_mm512_i64gather_epi64::<8>(index, table.as_ptr().cast()))
-            }
+            let words = unsafe { _mm512_i64gather_epi64::<8>(index, table.as_ptr().cast()) };
+            _mm512_castsi512_pd(words)
         }
         #[target_feature(enable = "avx512f")]
         #[inline]
