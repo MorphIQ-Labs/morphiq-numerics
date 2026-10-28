@@ -41,7 +41,7 @@ Proof.
   assert(Factor : Rabs((1+de)*(1+df)-1)<=9*bpow radix2(-53)).
   { apply Rabs_le_inv in De,Df;apply Rabs_le;bpow_num_all;split;interval with(i_prec 160). }
   rewrite Eid,Fid.
-  replace(e*(1+de)*(f*(1+df))/2-e*f/2)with((e*f/2)*((1+de)*(1+df)-1))by ring.
+  replace(e*(1+de)*(f*(1+df))/2-e*f/2)with((e*f/2)*((1+de)*(1+df)-1))by (unfold Rdiv;ring).
   rewrite Rabs_mult,(Rabs_pos_eq(e*f/2))by nra.
   assert(Scaled : (e*f/2)*Rabs((1+de)*(1+df)-1)<=(e*f/2)*(9*bpow radix2(-53))).
   { apply Rmult_le_compat_l;[nra|exact Factor]. }
@@ -89,7 +89,7 @@ Proof.
       ltac:(lia)ltac:(lia)ltac:(lia)ltac:(lia)Mbound)as[Fl [L _]].
     assert(Def : fast_normal_lower64 a=fmul(fmul(erfcx_pow2(-1))e)f)by reflexivity.
     rewrite <-Def in Fl,L;rewrite He in L.
-    replace(/2*B e*B f)with(B e*B f/2)in L by ring.
+    replace(/2*B e*B f)with(B e*B f/2)in L by (unfold Rdiv;ring).
     assert(Range : bpow radix2(-58)<=B(fast_normal_lower64 a)<=3/4).
     { rewrite L;split.
       - apply round_ge_generic;[exact _|exact _| |bpow_num_all;lra].
@@ -104,7 +104,7 @@ Proof.
     assert(Error : Rabs(B(fast_normal_lower64 a)-normal_tail(B a))<=9*bpow radix2(-53)).
     { replace(B(fast_normal_lower64 a)-normal_tail(B a))with
         ((B(fast_normal_lower64 a)-B e*B f/2)+(B e*B f/2-exp(B t)*gaussian_erfcx(B z)/2)+
-         (exp(B t)*gaussian_erfcx(B z)/2-normal_tail(B a)))by ring.
+         (exp(B t)*gaussian_erfcx(B z)/2-normal_tail(B a)))by (unfold Rdiv;ring).
       eapply Rle_trans;[apply Rabs_triang|].
       eapply Rle_trans;[apply Rplus_le_compat_r;apply Rabs_triang|].
       bpow_num_all;lra. }
@@ -127,7 +127,7 @@ Proof.
   - apply normal_lt_true in Sign;try assumption;rewrite Zero in Sign.
     assert(Target : normal_cdf(B x)=normal_tail(Rabs(B x))).
     { rewrite Rabs_left by lra;rewrite normal_tail_negative_cdf.
-      replace(- -B x)with(B x)by ring;reflexivity. }
+      replace(- -B x)with(B x)by (unfold Rdiv;ring);reflexivity. }
     rewrite Target;repeat split;try assumption;try lra.
     eapply Rle_trans;[exact Error|bpow_num;lra].
   - apply normal_lt_false in Sign;try assumption;rewrite Zero in Sign.
@@ -151,7 +151,7 @@ Proof.
     { rewrite Rabs_pos_eq by lra;rewrite normal_tail_complement;unfold normal_cdf;ring. }
     rewrite Target;split;[exact Fo|];split;[exact Range|].
     replace(B(fsub(erfcx_pow2 0)lower)-(1-normal_tail(Rabs(B x))))with
-      ((B(fsub(erfcx_pow2 0)lower)-(1-B lower))-(B lower-normal_tail(Rabs(B x))))by ring.
+      ((B(fsub(erfcx_pow2 0)lower)-(1-B lower))-(B lower-normal_tail(Rabs(B x))))by (unfold Rdiv;ring).
     eapply Rle_trans;[apply Rabs_triang|];rewrite Rabs_Ropp;bpow_num_all;lra.
 Qed.
 

@@ -16,7 +16,10 @@ Proof.
   intros A Z Zerror Terror.
   set(y:=a/sqrt 2).
   set(q:=a*a/2).
-  assert(Y : 0<y<=6)by(unfold y;split;interval with(i_prec 80)).
+  assert(Y : 0<y<=6).
+  { unfold y;split.
+    - apply Rdiv_lt_0_compat;[exact(proj1 A)|interval with(i_prec 80)].
+    - interval with(i_prec 80). }
   assert(Q : 0<=q<=32)by(unfold q;nra).
   assert(QY : q=y*y)by(unfold q,y;symmetry;apply normal_sqrt_two_square).
   fold y in Zerror;fold q in Terror.
@@ -30,11 +33,11 @@ Proof.
   assert(Identity : exp t=exp(-q)*exp(t+q)).
   { rewrite <-exp_plus;f_equal;ring. }
   assert(ExpDifference : Rabs(exp t-exp(-q))<=2*bpow radix2(-53)*q*exp(-q)).
-  { rewrite Identity;replace(exp(-q)*exp(t+q)-exp(-q))with(exp(-q)*(exp(t+q)-1))by ring.
+  { rewrite Identity;replace(exp(-q)*exp(t+q)-exp(-q))with(exp(-q)*(exp(t+q)-1))by (unfold Rdiv;ring).
     rewrite Rabs_mult,(Rabs_pos_eq(exp(-q)))by(left;apply exp_pos).
     eapply Rle_trans with(exp(-q)*(2*Rabs(t+q))).
     - apply Rmult_le_compat_l;[left;apply exp_pos|exact ExpError].
-    - replace(2*bpow radix2(-53)*q*exp(-q))with(exp(-q)*(2*(bpow radix2(-53)*q)))by ring.
+    - replace(2*bpow radix2(-53)*q*exp(-q))with(exp(-q)*(2*(bpow radix2(-53)*q)))by (unfold Rdiv;ring).
       apply Rmult_le_compat_l;[left;apply exp_pos|lra]. }
   assert(Qdamped : q*exp(-q)<=1).
   { interval with(i_prec 80,i_bisect q). }
@@ -42,15 +45,15 @@ Proof.
   { rewrite QY;interval with(i_prec 80,i_bisect y). }
   assert(ExponentPart : Rabs((exp t-exp(-q))*gaussian_erfcx z/2)<=bpow radix2(-53)).
   { replace((exp t-exp(-q))*gaussian_erfcx z/2)with
-      ((exp t-exp(-q))*(gaussian_erfcx z/2))by ring.
+      ((exp t-exp(-q))*(gaussian_erfcx z/2))by (unfold Rdiv;ring).
     rewrite Rabs_mult,(Rabs_pos_eq(gaussian_erfcx z/2))by lra.
     assert(Scale : Rabs(exp t-exp(-q))*(gaussian_erfcx z/2)<=Rabs(exp t-exp(-q))/2).
-    { replace(Rabs(exp t-exp(-q))/2)with(Rabs(exp t-exp(-q))*(/2))by ring.
+    { replace(Rabs(exp t-exp(-q))/2)with(Rabs(exp t-exp(-q))*(/2))by (unfold Rdiv;ring).
       apply Rmult_le_compat_l;[apply Rabs_pos|lra]. }
     bpow_num_all;nra. }
   assert(ArgumentPart : Rabs(exp(-q)*(gaussian_erfcx z-gaussian_erfcx y)/2)<=2*bpow radix2(-53)).
   { replace(exp(-q)*(gaussian_erfcx z-gaussian_erfcx y)/2)with
-      ((exp(-q)/2)*(gaussian_erfcx z-gaussian_erfcx y))by ring.
+      ((exp(-q)/2)*(gaussian_erfcx z-gaussian_erfcx y))by (unfold Rdiv;ring).
     rewrite Rabs_mult,(Rabs_pos_eq(exp(-q)/2))by(pose proof(exp_pos(-q));lra).
     assert(Scale : (exp(-q)/2)*Rabs(gaussian_erfcx z-gaussian_erfcx y)<=
       (exp(-q)/2)*(2*Rabs(z-y))).
@@ -59,10 +62,10 @@ Proof.
       (exp(-q)/2)*(2*(3*bpow radix2(-53)*y))).
     { apply Rmult_le_compat_l;[pose proof(exp_pos(-q));lra|lra]. }
     bpow_num_all;nra. }
-  unfold normal_tail;fold y q.
-  replace(-a*a/2)with(-q)by(unfold q;ring).
+  unfold normal_tail;fold y.
+  replace(-a*a/2)with(-q)by(unfold q,Rdiv;ring).
   replace(exp t*gaussian_erfcx z/2-exp(-q)*gaussian_erfcx y/2)with
-    ((exp t-exp(-q))*gaussian_erfcx z/2+exp(-q)*(gaussian_erfcx z-gaussian_erfcx y)/2)by ring.
+    ((exp t-exp(-q))*gaussian_erfcx z/2+exp(-q)*(gaussian_erfcx z-gaussian_erfcx y)/2)by (unfold Rdiv;ring).
   eapply Rle_trans;[apply Rabs_triang|];lra.
 Qed.
 
@@ -73,7 +76,7 @@ Proof.
   intros A Z Error.
   assert(Q : 0<=a*a/2<=32)by nra.
   pose proof(Rabs_le_inv _ _ Error)as T.
-  assert(Tupper : t<=32*bpow radix2(-53))by nra.
+  assert(Tupper : t<=32*bpow radix2(-53))by(bpow_num_all;nra).
   assert(Eupper : exp t<=102/100).
   { eapply Rle_trans with(exp(32*bpow radix2(-53))).
     - apply exp_le;exact Tupper.

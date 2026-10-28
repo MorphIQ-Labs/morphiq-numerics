@@ -54,12 +54,12 @@ Proof.
   { rewrite Rabs_pos_eq by lra;eapply Rle_trans with(bpow radix2(-10));[apply bpow_le;lia|lra]. }
   pose proof(rnd_rel (B h+B l)Normal)as Round.
   change(Rabs(rndF(B h+B l)-(B h+B l))<=bpow radix2(-53)*Rabs(B h+B l))in Round.
-  rewrite Rabs_pos_eq in Round by lra.
+  rewrite(Rabs_pos_eq(B h+B l))in Round by lra.
   assert(Combined : Rabs(B(fadd h l)-gaussian_erfcx(B x))<=
     bpow radix2(-51)*gaussian_erfcx(B x)).
   { rewrite Out.
     replace(rndF(B h+B l)-gaussian_erfcx(B x))with
-      ((rndF(B h+B l)-(B h+B l))+((B h+B l)-gaussian_erfcx(B x)))by ring.
+      ((rndF(B h+B l)-(B h+B l))+((B h+B l)-gaussian_erfcx(B x)))by (unfold Rdiv;ring).
     eapply Rle_trans;[apply Rabs_triang|].
     rewrite Rabs_minus_sym in Error.
     pose proof(Rabs_le_inv _ _ Error)as Interval.
@@ -79,7 +79,8 @@ Proof.
   unfold fast_erfcx_screen64;rewrite !andb_true_iff.
   rewrite(erfcx_le_true _ _ Fn Fx),(erfcx_lt_true _ _ Fx F16),
     (erfcx_le_true _ _ Fmin Fabs),N,V16,Vmin,B2R_Babs.
-  change((-/2<=B x /\ B x<16) /\ bpow radix2(-33)<=Rabs(B x) <-> _).
+  change((-/2<=B x /\ B x<16) /\ bpow radix2(-33)<=Rabs(B x) <->
+    -/2<=B x<16 /\ bpow radix2(-33)<=Rabs(B x)).
   tauto.
 Qed.
 

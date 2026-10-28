@@ -3,7 +3,7 @@
     perform a correct-rounding decision. Scaling is exact on its domain. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
-From Binary64 Require Import Binary64Add IEEE64 Encodings RoundingConstant RoundingTest Grid.
+From Binary64 Require Import Binary64Add IEEE64 Encodings RoundingConstant RoundingTest RoundingGaps Grid.
 From Interval Require Import Tactic.
 Require Import StageGappa ExpStageTables ExpStageReduction ExpStageA.
 Open Scope R_scope.

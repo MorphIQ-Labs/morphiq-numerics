@@ -76,25 +76,25 @@ Proof.
     assert(Qrange : bpow radix2(-67)<=B a*B a/2<=32)by(bpow_num_all;split;nra).
     assert(Bound : bnd 1 5 (B(fmul erfcx_negative_half a)*B a)).
     { rewrite Ha;unfold bnd;rewrite Rmult_1_l.
-      replace(-/2*B a*B a)with(-(B a*B a/2))by ring.
+      replace(-/2*B a*B a)with(-(B a*B a/2))by (unfold Rdiv;ring).
       rewrite Rabs_Ropp,Rabs_pos_eq by nra;change(bpow radix2 5)with 32;lra. }
     destruct(fmul_bnd 1 5 (fmul erfcx_negative_half a)a Fha Fa ltac:(lia)ltac:(lia)ltac:(lia)ltac:(lia)Bound)
       as[Ft [T _]].
     fold(fast_normal_exponent64 a)in Ft,T;rewrite Ha in T.
-    replace(-/2*B a*B a)with(-B a*B a/2)in T by ring.
+    replace(-/2*B a*B a)with(-B a*B a/2)in T by (unfold Rdiv;ring).
     assert(Range : -32<=B(fast_normal_exponent64 a)<=0).
     { rewrite T;split.
-      - change(-32)with(-bpow radix2 5);apply round_ge_generic;[exact _|exact _| |nra].
+      - change(-32)with(-bpow radix2 5);apply round_ge_generic;[exact _|exact _| |change(-32<= -B a*B a/2);nra].
         apply generic_format_opp,generic_format_bpow;unfold FLT_exp,emin,prec;lia.
       - apply round_le_generic;[exact _|exact _|apply generic_format_0|nra]. }
     assert(Normal : bpow radix2(-1022)<=Rabs(-B a*B a/2)).
-    { replace(-B a*B a/2)with(-(B a*B a/2))by ring;rewrite Rabs_Ropp,Rabs_pos_eq by nra.
+    { replace(-B a*B a/2)with(-(B a*B a/2))by (unfold Rdiv;ring);rewrite Rabs_Ropp,Rabs_pos_eq by nra.
       eapply Rle_trans with(bpow radix2(-67));[apply bpow_le;lia|exact(proj1 Qrange)]. }
     pose proof(rnd_rel _ Normal)as Error.
     change(Rabs(rndF(-B a*B a/2)-(-B a*B a/2))<=bpow radix2(-53)*Rabs(-B a*B a/2))in Error.
     rewrite <-T in Error.
-    replace(-B a*B a/2)with(-(B a*B a/2))in Error by ring.
+    replace(-B a*B a/2)with(-(B a*B a/2))in Error by (unfold Rdiv;ring).
     rewrite Rabs_Ropp,(Rabs_pos_eq(B a*B a/2))in Error by nra.
-    replace(B(fast_normal_exponent64 a)- -(B a*B a/2))with(B(fast_normal_exponent64 a)+B a*B a/2)in Error by ring.
+    replace(B(fast_normal_exponent64 a)- -(B a*B a/2))with(B(fast_normal_exponent64 a)+B a*B a/2)in Error by (unfold Rdiv;ring).
     repeat split;tauto.
 Qed.
