@@ -43,7 +43,9 @@ absolute for CDF. The following composition estimates are tighter.
 `FastExpReduction` proves the index, exact leading subtraction and this
 residual bound over `abs(x) < 704`. A reflective integer certificate in
 `FastExpTables` checks all 1024 generated double-word entries against exp;
-only their high words enter the bounded runtime table (8 KiB). Word `j` is
+only their high words enter a shared static bounded runtime table (8 KiB).
+Static storage prevents separate scalar/SIMD constant promotions from duplicating
+the table in the linked image. Word `j` is
 pre-biased by subtracting `j << 42`, modulo `2^64`. Adding the complete
 reduction encoding shifted left by 42 cancels the index contribution and
 supplies the exponent scale. `FastExpScale.fast_biased_lookup_ok` proves

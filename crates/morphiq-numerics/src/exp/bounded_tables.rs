@@ -4,7 +4,7 @@ pub(super) const L1: f64 = f64::from_bits(0x3f462e42ff000000);
 pub(super) const L2D: f64 = f64::from_bits(0xbd2718432a1b0e26);
 pub(super) const C2: f64 = f64::from_bits(0x3fe00000021f6e5e);
 // Bias cancels the raw reduction index before exponent-field scaling.
-pub(super) const HIGH: [u64; 1024] = [
+pub(super) static HIGH: [u64; 1024] = [
     0x3ff0000000000000,
     0x3feffec605e2e8cf,
     0x3feffd8c86da1c0a,
