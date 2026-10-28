@@ -218,4 +218,3 @@ Proof.
   rewrite <- !exp_plus. f_equal.
   rewrite plus_IZR, mult_IZR, INR_IZR_INZ. simpl (IZR radix2). field.
 Qed.
-
