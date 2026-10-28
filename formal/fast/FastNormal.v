@@ -84,7 +84,7 @@ Proof.
     eapply Rle_lt_trans with 1;[bpow_num_all;nra|change 1 with(bpow radix2 0);apply bpow_lt;lia].
   - rewrite Half in He;change(bpow radix2(-1))with(/2)in He.
     assert(Mbound : bnd 1 0 (B(fmul(erfcx_pow2(-1))e)*B f)).
-    { rewrite He;unfold bnd;change(1* bpow radix2 0)with 1.
+    { rewrite He;unfold bnd;rewrite Rmult_1_l;change(bpow radix2 0)with 1.
       rewrite Rabs_pos_eq by(pose proof(bpow_gt_0 radix2(-57));nra);nra. }
     destruct(fmul_bnd 1 0 (fmul(erfcx_pow2(-1))e)f Fhe Ff
       ltac:(lia)ltac:(lia)ltac:(lia)ltac:(lia)Mbound)as[Fl [L _]].
@@ -96,7 +96,7 @@ Proof.
       - apply round_ge_generic;[exact _|exact _| |bpow_num_all;lra].
         apply generic_format_bpow;unfold FLT_exp,emin,prec;lia.
       - apply round_le_generic;[exact _|exact _| |exact(proj2 ProductRange)].
-        change(3/4)with(3*bpow radix2(-2));apply bnd_fmt;lia. }
+        replace(3/4)with(IZR 3*bpow radix2(-2))by(bpow_num;simpl;field);apply bnd_fmt;lia. }
     assert(Round : Rabs(B(fast_normal_lower64 a)-B e*B f/2)<=bpow radix2(-54)).
     { rewrite L;apply(rnd_err_below _ 0);[lia|].
       rewrite Rabs_pos_eq by(pose proof(bpow_gt_0 radix2(-57));lra).
@@ -134,7 +134,7 @@ Proof.
   - apply normal_lt_false in Sign;try assumption;rewrite Zero in Sign.
     set(lower:=fast_normal_lower64(b64_abs x))in *.
     assert(Bound : bnd 1 0 (B(erfcx_pow2 0)-B lower)).
-    { rewrite One;unfold bnd;change(1*bpow radix2 0)with 1;
+    { rewrite One;unfold bnd;rewrite Rmult_1_l;change(bpow radix2 0)with 1;
       rewrite Rabs_pos_eq by lra;pose proof(bpow_gt_0 radix2(-58));lra. }
     destruct(fsub_bnd 1 0 (erfcx_pow2 0)lower Fone Fl
       ltac:(lia)ltac:(lia)ltac:(lia)ltac:(lia)Bound)as[Fo [Out _]].
