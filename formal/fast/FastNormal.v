@@ -98,11 +98,17 @@ Proof.
     idtac "FastNormal.lower.multiply_ieee".
     destruct(fmul_bnd 1 0 (fmul(erfcx_pow2(-1))e)f Fhe Ff
       ltac:(lia)ltac:(lia)ltac:(lia)ltac:(lia)Mbound)as[Fl [L _]].
-    idtac "FastNormal.lower.definition".
-    assert(Def : fast_normal_lower64 a=fmul(fmul(erfcx_pow2(-1))e)f)by timeout 30 reflexivity.
-    idtac "FastNormal.lower.fold_definition".
-    timeout 30 (rewrite <-Def in Fl,L;rewrite He in L).
-    replace(/2*B e*B f)with(B e*B f/2)in L by (unfold Rdiv;ring).
+    (* Construct the value equality directly, avoiding the measured stall
+       in the previous inverse-entry rewrite / real-product replacement block. *)
+    idtac "FastNormal.lower.product_equality".
+    assert(ProductValue : B(fmul(erfcx_pow2(-1))e)*B f=B e*B f/2).
+    { transitivity ((/2*B e)*B f).
+      - exact(f_equal(fun h:R=>h*B f)He).
+      - timeout 30 (unfold Rdiv;ring). }
+    idtac "FastNormal.lower.value_equality".
+    assert(LowerValue : B(fast_normal_lower64 a)=rndF(B e*B f/2)).
+    { exact(eq_trans L (f_equal rndF ProductValue)). }
+    clear L;rename LowerValue into L.
     idtac "FastNormal.lower.output_range".
     assert(Range : bpow radix2(-58)<=B(fast_normal_lower64 a)<=3/4).
     { rewrite L;split.
@@ -126,7 +132,7 @@ Proof.
       eapply Rle_trans;[apply Rplus_le_compat_r;apply Rabs_triang|].
       bpow_num_all;timeout 30 lra. }
     idtac "FastNormal.lower.finish".
-    timeout 30 (repeat split;tauto).
+    split;[exact Fl|];split;[exact Range|exact Error].
 Time Qed.
 
 Theorem fast_normal_cdf_ok x : finite x -> bpow radix2(-33)<=Rabs(B x)<=8 ->
