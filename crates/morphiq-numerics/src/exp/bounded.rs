@@ -1,18 +1,7 @@
-//! Explicit bounded exponential: high-word table and quartic local polynomial.
-//! The strong exponential retains its own compensated evaluator.
-use super::tables::{INV_N, POLY_S, S_L1, S_L2D, S_T, SHIFTER};
+//! Explicit bounded exponential: high-word table and constrained cubic.
 
-// Project the generated high words and pre-subtract the low index bits.
-// The full shifted reduction encoding restores them in the scale addition.
-const HIGH: [u64; 512] = {
-    let mut high = [0; 512];
-    let mut i = 0;
-    while i < 512 {
-        high[i] = S_T[i].0.wrapping_sub((i as u64) << 43);
-        i += 1;
-    }
-    high
-};
+use super::bounded_tables::{C2, HIGH, INV, L1, L2D};
+use super::tables::{POLY_S, SHIFTER};
 
 #[inline]
 pub(crate) fn exp(x: f64) -> f64 {
@@ -29,20 +18,18 @@ pub(crate) fn exp(x: f64) -> f64 {
 #[inline]
 pub(crate) fn in_domain(x: f64) -> f64 {
     debug_assert!(x.abs() < 704.0);
-    let t = x * INV_N + SHIFTER;
+    let t = x * INV + SHIFTER;
     let n = t - SHIFTER;
     let bits = t.to_bits();
-    #[allow(clippy::cast_possible_truncation)] // masked index is at most 511
-    let index = (bits & 511) as usize;
-    // The index contribution in bits 0..8 cancels the table bias exactly.
-    // Bits 9..20 then supply the normal exponent scale, modulo 2^64.
-    let high = f64::from_bits(HIGH[index].wrapping_add(bits << 43));
-    let r = (x - n * S_L1) - n * S_L2D;
-    let [d3, d4, _] = POLY_S;
+    #[allow(clippy::cast_possible_truncation)] // masked index is at most 1023
+    let index = (bits & 1023) as usize;
+    // The index contribution in bits 0..9 cancels the table bias exactly.
+    // Bits 10..21 then supply the normal exponent scale, modulo 2^64.
+    let high = f64::from_bits(HIGH[index].wrapping_add(bits << 42));
+    let r = (x - n * L1) - n * L2D;
+    let [d3, _, _] = POLY_S;
     let r2 = r * r;
-    let left = r + 0.5 * r2;
-    let p = d3 + r * d4;
-    let u = left + (r2 * r) * p;
+    let u = r + r2 * (C2 + r * d3);
     high * (1.0 + u)
 }
 
@@ -52,18 +39,16 @@ pub(crate) fn in_domain(x: f64) -> f64 {
 #[inline(always)]
 pub(crate) fn in_domain_lanes<K: morphiq_numerics_arch::Simd>(k: K, x: K::F) -> K::F {
     debug_assert!(all_active(k, x));
-    let t = k.add(k.mul(x, k.splat(INV_N)), k.splat(SHIFTER));
+    let t = k.add(k.mul(x, k.splat(INV)), k.splat(SHIFTER));
     let n = k.sub(t, k.splat(SHIFTER));
     let bits = k.to_bits(t);
     let high = k.gather_wrapped(&HIGH, bits);
-    let scale = k.shl_u(bits, 43);
+    let scale = k.shl_u(bits, 42);
     let high = k.to_float(k.add_u(k.to_bits(high), scale));
-    let r = k.sub(k.sub(x, k.mul(n, k.splat(S_L1))), k.mul(n, k.splat(S_L2D)));
-    let [d3, d4, _] = POLY_S;
+    let r = k.sub(k.sub(x, k.mul(n, k.splat(L1))), k.mul(n, k.splat(L2D)));
+    let [d3, _, _] = POLY_S;
     let r2 = k.mul(r, r);
-    let left = k.add(r, k.mul(k.splat(0.5), r2));
-    let p = k.add(k.splat(d3), k.mul(r, k.splat(d4)));
-    let u = k.add(left, k.mul(k.mul(r2, r), p));
+    let u = k.add(r, k.mul(r2, k.add(k.splat(C2), k.mul(r, k.splat(d3)))));
     k.mul(high, k.add(k.splat(1.0), u))
 }
 
