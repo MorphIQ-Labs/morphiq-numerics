@@ -67,12 +67,28 @@ pub(super) fn central(x: f64) -> f64 {
 ///
 /// # Panics
 /// If the input and output lengths differ.
+#[inline]
 pub fn erfcx_slice(x: &[f64], out: &mut [f64]) {
     assert_eq!(
         x.len(),
         out.len(),
         "erfcx_slice: slices of different lengths"
     );
+    if x.len() <= 4 {
+        if !x.is_empty() {
+            out[0] = erfcx(x[0]);
+        }
+        if x.len() >= 2 {
+            out[1] = erfcx(x[1]);
+        }
+        if x.len() >= 3 {
+            out[2] = erfcx(x[2]);
+        }
+        if x.len() == 4 {
+            out[3] = erfcx(x[3]);
+        }
+        return;
+    }
     for (o, &x) in out.iter_mut().zip(x) {
         *o = erfcx(x);
     }
