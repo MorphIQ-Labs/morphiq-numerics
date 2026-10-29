@@ -11,13 +11,16 @@ import unittest
 from unittest.mock import patch
 
 from scripts.bench_campaign import campaign as c
-from scripts.bench_campaign.cost import estimate
+from scripts.bench_campaign import selection
 
 TEST_ROOT = c.REPO / 'target/bench-campaign-tests'
 
 
 def cells():
-    return [{'id': str(i), 'reference': ref, 'required_parity': i < 4}
+    return [{'id': str(i), 'reference': ref, 'required_parity': i < 4,
+             'primitive': ['exp', 'exp', 'erfcx', 'cdf', 'exp'][i],
+             'backend': 'auto', 'population': 'ordinary', 'length': 52,
+             'kind': 'vector' if i in [1, 2] else 'scalar'}
             for i, ref in enumerate(['core_math_exp', 'sleef_exp_scalar_fma', 'libcerf_erfcx', 'scipy_ndtr', 'strong-control'])]
 
 
@@ -107,7 +110,7 @@ class CampaignTests(unittest.TestCase):
                 c.validate_lock(lock, 'x86-linux', self.root)
 
     def test_arm_partial_group_preserves_missing_and_failed_cells(self):
-        arm_cells = [{'id': cell['id'], 'pair': ['ours', cell['reference']], 'parity_required': True}
+        arm_cells = [{'id': cell['id'], 'primitive': cell['primitive'], 'pair': ['ours', cell['reference']], 'parity_required': True}
                      for cell in cells()[:4]]
         c.write(self.root / 'cells.json', arm_cells)
         c.write(self.root / 'qualification-summary.json', {'cells': [
@@ -152,14 +155,17 @@ class CampaignTests(unittest.TestCase):
         measure = f"""import json,pathlib
 p=pathlib.Path(__file__).parent
 (p/'qualification').mkdir()
-(p/'qualification/summary.json').write_text({json.dumps(rows())!r})
+selected={{c['id'] for c in json.loads((p/'qualification-manifest.json').read_text())['cells']}}
+(p/'qualification/summary.json').write_text(json.dumps([r for r in json.loads({json.dumps(rows())!r}) if r['id'] in selected]))
 """
         if tamper:
             measure += "(p/'input.bin').write_bytes(b'changed during timing')\n"
         prepare = f"""import pathlib,sys,json
 p=pathlib.Path(sys.argv[sys.argv.index('--out')+1]); p.mkdir(parents=True)
 (p/'input.bin').write_bytes(b'exact inputs')
-(p/'qualification-manifest.json').write_text({json.dumps({'cells': cells()})!r})
+cells=json.loads({json.dumps(cells())!r})
+for cell in cells: cell.update(product=str(p/'input.bin'),input={{'file':str(p/'input.bin')}})
+(p/'qualification-manifest.json').write_text(json.dumps({{'cells':cells}}))
 (p/'observe.py').write_text({observe!r})
 (p/'run-qualification.py').write_text({measure!r})
 """
@@ -169,7 +175,7 @@ p=pathlib.Path(sys.argv[sys.argv.index('--out')+1]); p.mkdir(parents=True)
         notes.write_text('Synthetic host; test only')
         lock = self.root / 'lock.json'
         c.write(lock, {'build_log': {'path': str(notes)}})
-        args = argparse.Namespace(platform='x86-linux', commit='a' * 40, control_commit='a' * 40,
+        args = argparse.Namespace(command='run', prepared=None, sleef_include=None, suite='full', primitive=[], backend=[], cell=[], platform='x86-linux', commit='a' * 40, control_commit='a' * 40,
                                   control_source=self.root, reference_bin=self.root, reference_lock=lock,
                                   host_notes=notes, cpu=min(os.sched_getaffinity(0)), timeout_hours=.01,
                                   out=native.parent)
@@ -202,31 +208,120 @@ p=pathlib.Path(sys.argv[sys.argv.index('--out')+1]); p.mkdir(parents=True)
                     self.assertIn('Frozen file changed', receipt['verification_error'])
                 self.root = original
 
+    @unittest.skipUnless(sys.platform == 'linux', 'Synthetic controller uses Linux affinity')
+    def test_bootstrap_reused_for_multiple_subsets_without_full_qualification(self):
+        args, harness = self.fixture_campaign()
+        args.command = 'bootstrap'
+        prepared = args.out
+        with patch.object(c, 'REPO', self.root), patch.object(c, 'NATIVE', harness), \
+             patch.object(c, 'git_revision', return_value='a' * 40), \
+             patch.object(c, 'validate_lock'), patch.object(c, 'host_snapshot', return_value={'synthetic': True}), \
+             patch.object(c.platform, 'system', return_value='Linux'), \
+             patch.object(c.platform, 'machine', return_value='x86_64'), \
+             patch.object(c, 'check_x86_host'):
+            self.assertEqual(c.execute(args), 0)
+            bootstrap = c.read(prepared / 'campaign.json')
+            self.assertEqual(bootstrap['state'], 'prepared')
+            self.assertFalse(bootstrap['qualification_passed'])
+            self.assertEqual([s['stage'] for s in bootstrap['stages']], ['prepare', 'freeze'])
+            for suite in ['smoke', 'subset', 'full']:
+                run = argparse.Namespace(**vars(args))
+                run.command, run.prepared, run.suite = 'run', prepared, suite
+                run.out = self.root / 'target' / suite
+                run.primitive = ['exp'] if suite == 'subset' else []
+                for key in bootstrap['configuration']:
+                    setattr(run, key, None)
+                self.assertEqual(c.execute(run), 0)
+                receipt = c.read(run.out / 'campaign.json')
+                self.assertTrue(receipt['selected_passed'])
+                self.assertEqual(receipt['qualification_passed'], suite == 'full')
+                self.assertEqual(receipt['stages'][0]['stage'], 'reuse-prepared')
+                report = c.read(run.out / 'comparisons.json')
+                self.assertEqual(report['suite'], suite)
+                if suite == 'subset':
+                    self.assertEqual(report['excluded'], ['2', '3'])
+                    self.assertEqual(report['missing'], [])
+                c.verify_files(c.read(prepared / 'native/source.json')['files'])
+            (prepared / 'native/qualification').mkdir()
+            with self.assertRaisesRegex(ValueError, 'prior observations or measurements'):
+                c.verify_prepared(prepared / 'native')
+            # A prior attempt is not a fresh bootstrap, even if its cells passed.
+            run.prepared = run.out
+            run.out = self.root / 'target/rejected'
+            with self.assertRaisesRegex(ValueError, 'successful bootstrap'):
+                c.execute(run)
 
-class CostTests(unittest.TestCase):
-    def test_full_campaign_includes_machine_disk_ip_and_storage(self):
-        result = estimate('c3-standard-8', 8, download_gib=1)
-        self.assertAlmostEqual(result['components_usd_per_campaign']['compute'], 8 * .403216)
-        self.assertAlmostEqual(result['components_usd_per_campaign']['boot_disk'], 8 * 100 * .000136986)
-        self.assertAlmostEqual(result['components_usd_per_campaign']['evidence_download'], .12)
-        self.assertGreater(result['per_campaign_usd'], 8 * .403216)
+    def test_subset_report_preserves_full_matrix_and_detects_changed_scope(self):
+        args = argparse.Namespace(suite='subset', primitive=['exp'], backend=[], cell=[])
+        c.apply_selection(self.root, 'x86-linux', args)
+        c.write(self.root / 'qualification/summary.json', [r for r in rows() if r['id'] in ['0', '1', '4']])
+        report = c.comparison_rows(self.root, 'x86-linux')
+        self.assertEqual(report['excluded'], ['2', '3'])
+        self.assertEqual(report['full_cell_count'], 5)
+        self.assertTrue(report['complete'])
+        self.assertEqual(c.read(self.root / 'matrix-full.json')['cells'], cells())
+        plan = c.read(self.root / 'selection.json')
+        plan['suite'] = 'full'
+        c.write(self.root / 'selection.json', plan)
+        with self.assertRaisesRegex(ValueError, 'Filters require'):
+            c.comparison_rows(self.root, 'x86-linux')
 
-    def test_monthly_and_failed_attempt_costs_are_additive(self):
-        one = estimate('c4a-standard-4', 4, failed_hours=1)
-        many = estimate('c4a-standard-4', 4, failed_hours=1, campaigns=20)
-        self.assertAlmostEqual(many['total_usd'], one['total_usd'] * 20)
-        self.assertAlmostEqual(one['components_usd_per_campaign']['compute'], 5 * .1796)
+    def test_sparse_arm_selection_keeps_ids_and_filters_groups(self):
+        arm = [{'id': f'{14+i*5:03d}', 'primitive': cell['primitive'], 'length': 52,
+                'bank': cell['primitive']+'-ordinary', 'mode': 'throughput',
+                'pair': ['prod_'+cell['primitive']+('_slice' if i in [1, 2] else ''), cell['reference']],
+                'parity_required': True} for i, cell in enumerate(cells()[:4])]
+        c.write(self.root / 'cells.json', arm)
+        c.write(self.root / 'groups.json', {'critical': [r['id'] for r in arm[:2]], 'remaining': [r['id'] for r in arm[2:]]})
+        args = argparse.Namespace(suite='subset', primitive=['cdf'], backend=[], cell=[])
+        plan = c.apply_selection(self.root, 'arm-macos', args)
+        self.assertEqual(plan['selected_ids'], ['029'])
+        self.assertEqual(c.read(self.root / 'groups.json'), {'remaining': ['029']})
+        self.assertEqual(c.read(self.root / 'cells.json'), arm[-1:])
 
-    def test_rejects_nonfinite_negative_and_zero_runtime(self):
-        for hours in [float('nan'), float('inf'), -1, 0]:
-            with self.assertRaises(ValueError):
-                estimate('c3-standard-8', hours)
-        with self.assertRaises(ValueError):
-            estimate('c3-standard-8', 1, artifact_gib=-1)
+    def test_arm_cell_runner_uses_declared_id_not_list_index(self):
+        # Execute the real runner against a tiny fake timer, with a non-positional ID.
+        import shutil
+        shutil.copy2(c.NATIVE / 'arm/qualify-cell.py', self.root / 'qualify-cell.py')
+        (self.root / 'matrix.py').write_text("from pathlib import Path\nP=Path(__file__).parent\nCELLS=[{'id':'029','pair':['ours','ref']}]\nclass E: QOS_RESULT=0\ndef measure(cell,name,count): return 300000000\n")
+        base = self.root / 'qualified/029'
+        base.mkdir(parents=True)
+        c.write(base / 'counts.json', {'ours': 1, 'ref': 1})
+        subprocess.run([sys.executable, str(self.root / 'qualify-cell.py'), '029', '0'], check=True, capture_output=True)
+        self.assertTrue((base / '0/samples.csv').exists())
+        self.assertEqual(c.read(base / '0/metadata.json')['cell']['id'], '029')
 
-    def test_compute_minimum_applies_to_each_attempt(self):
-        result = estimate('c3-standard-8', .001, failed_hours=.001)
-        self.assertAlmostEqual(result['components_usd_per_campaign']['compute'], .403216 / 30)
+
+class SelectionTests(unittest.TestCase):
+    def test_smoke_covers_each_canonical_family_and_control(self):
+        full = cells() + [{**cells()[1], 'id': 'long', 'length': 65536}]
+        plan = selection.select(full, 'x86-linux', 'smoke')
+        self.assertEqual(plan['selected_ids'], ['0', '1', '2', '3', '4'])
+        self.assertEqual(plan['excluded_ids'], ['long'])
+        self.assertEqual(plan['timed_work_target_seconds'], 120)
+
+    def test_filter_union_within_field_intersection_between_fields(self):
+        full = cells() + [{**cells()[1], 'id': 'avx2-exp', 'backend': 'avx2'}]
+        plan = selection.select(full, 'x86-linux', 'subset', primitives=['exp', 'cdf'], backends=['avx2'])
+        self.assertEqual(plan['selected_ids'], ['avx2-exp'])
+        plan = selection.select(full, 'x86-linux', 'subset', cell_ids=['3', '0'])
+        self.assertEqual(plan['selected_ids'], ['0', '3'])
+
+    def test_rejects_empty_unknown_or_misleading_selections(self):
+        for kwargs in [{'suite':'full','primitives':['exp']}, {'suite':'subset'},
+                       {'suite':'subset','cell_ids':['missing']},
+                       {'suite':'subset','primitives':['cdf'],'cell_ids':['0']},
+                       {'suite':'subset','backends':['avx2']}]:
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                selection.select(cells(), 'x86-linux', **kwargs)
+
+    def test_full_is_exactly_original_order_and_cells(self):
+        full = cells()
+        plan = selection.select(full, 'x86-linux')
+        self.assertEqual(selection.selected_cells(full, plan), full)
+        self.assertEqual(plan['excluded_ids'], [])
+        self.assertEqual(plan['full_matrix_sha256'], selection.fingerprint(full))
+
 
 
 if __name__ == '__main__':

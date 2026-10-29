@@ -1,6 +1,6 @@
 import csv,datetime,json,math,os,sys
 import matrix as M
-P=M.P;cell=M.CELLS[int(sys.argv[1])];phase=sys.argv[2];base=P/'qualified'/cell['id'];out=base/phase;out.mkdir(parents=True)
+P=M.P;cell=next(c for c in M.CELLS if c['id']==sys.argv[1]);phase=sys.argv[2];base=P/'qualified'/cell['id'];out=base/phase;out.mkdir(parents=True)
 meta=dict(cell=cell,utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),pid=os.getpid(),load_before=os.getloadavg(),qos='QOS_CLASS_USER_INITIATED',qos_result=M.E.QOS_RESULT,affinity='macOS unbound')
 if phase=='calibration':
  from protocol import calibrate

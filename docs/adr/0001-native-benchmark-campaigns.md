@@ -1,78 +1,74 @@
-# Native benchmark campaigns and cloud lifecycle ownership
+# Numerics adapter for the shared benchmarking program
 
-## Decision
+## Ownership decision
 
-The numerical runners in `scripts/bench_fast` own input generation, timing,
+`ai-program` owns the [canonical benchmarking program](https://gitlab.com/prophetizo/morphiq-labs/org/ai-program/-/blob/925c77178941ec86bdfe5eb13c4c666890b46ce6/BENCHMARKING.md),
+shared cost tooling and cloud-provider integration. Numerics supplies a workload
+adapter. The public native runners and correctness evidence remain independently
+usable; private program material and consumer workloads are not dependencies of
+the library, its builds or local benchmark reproduction.
+
+`scripts/bench_fast` owns exact input generation, native call interfaces,
 calibration, pairing and qualification statistics. `scripts/bench_campaign`
-adds source/reference identities, stage execution, evidence receipts and an
-independent cost estimate. It does not introduce a second timing or statistics
-engine. Every canonical participant runs on the same native machine as Numerics.
+orchestrates this domain-specific preparation and observation flow, records
+source/reference identities, selects declared cells and preserves evidence. It
+does not introduce another timing engine, statistical rule, cloud scheduler or
+VM manager. Full cloud delivery is tracked in
+[ai-program #17](https://gitlab.com/prophetizo/morphiq-labs/org/ai-program/-/issues/17);
+Numerics adapter adoption and remaining native coverage are tracked in
+[#245](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/245).
+#150 retains numerical methodology ownership and #243 release qualification.
 
-For cloud lifecycle, adopt external
-[PerfKit Benchmarker](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/50bbc173d75696c867dc0be5a742e9906445f5e9)
-at commit `50bbc173d75696c867dc0be5a742e9906445f5e9`. PKB supplies VM provisioning,
-remote preparation, execution and teardown through provider tools. Keep its
-Apache-2.0 implementation outside this dual-licensed repository and outside
-published crates. A domain adapter may invoke the local campaign command and
-transfer its evidence; it must not become another VM manager or scheduler.
+For shared cloud lifecycle the selected substrate is external
+[PerfKit Benchmarker at commit
+`50bbc173d75696c867dc0be5a742e9906445f5e9`](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/50bbc173d75696c867dc0be5a742e9906445f5e9).
+Its provider lifecycle already covers temporary benchmark hosts. A handwritten
+gcloud provision/poll/delete loop would duplicate that ownership; declarative
+infrastructure alone would still need a campaign execution lifecycle. PKB stays
+external, with its own licence, outside this repository and published crates.
+There is no implemented provider launcher or upload/teardown guarantee here.
 
-The implemented boundary is local execution and offline costing. There is no
-cloud launcher, upload verifier or paid pilot in this tree. Delivery and the
-remaining acceptance evidence are tracked in
-[#245](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/245), with numerical
-methodology owned by #150 and release qualification by #243.
+## Adapter contract
 
-## Alternatives and rationale
+A bootstrap compiles wrappers and freezes the complete input/cell inventory.
+It can supply several fresh attempts on the same configured host. The copy is
+path-bound: native loader paths can still refer to original build outputs.
+Keep the bootstrap and source/reference checkouts until dependent runs finish.
 
-PKB already models temporary benchmark machines and lifecycle stages. Terraform
-or OpenTofu would provide declarative infrastructure but require a separate
-execution and evidence lifecycle for each campaign. A hand-written gcloud
-provision/poll/delete loop would duplicate ownership that PKB already provides.
-Google Benchmark, Criterion and pyperf can measure workloads but do not replace
-the existing exact-input, native paired comparison protocol or cloud lifecycle.
-Adopt PKB for infrastructure; retain the established numerical runners.
+Choose `full`, `smoke`, or explicit `subset` coverage before observations and
+freezing. Preserve the full matrix and its hash, original cell IDs, requested
+filters, selected IDs and intentionally excluded IDs. Subset success never
+claims full qualification. Each attempt recalibrates and keeps its own samples;
+a bootstrap containing timing output cannot be reused as a fresh experiment.
 
-## Experiment identity
+Canonical references and baseline controls are separate comparisons. Each names
+its source/version, actual binary identity, numerical guarantee, special values
+and calling interface. Input domains, populations and backends travel with the
+cell. Independent correctness observations precede timings; reference agreement
+and sampled error do not establish a whole-domain proof.
 
-A campaign declares the candidate and baseline commit, canonical source pins and
-binary hashes, Python reference/oracle versions and installed-file hashes,
-build commands, exact input bits, native platform, allowed CPU, toolchain and
-host conditions. Preparation and independent observations precede the frozen
-measurement interval. Instrumented diagnostics never supply timing observations.
-A reference's numerical guarantee and calling interface are distinct from the
-product's. Missing proof of contract equivalence remains explicit.
+The current matrix covers fast exp, erfcx and CDF versus canonical references
+and x86 unchanged strong-path baseline controls. It does not establish a complete
+strong-versus-canonical or general fast-before/after matrix. Strong and fast
+contracts retain their own acceptance rules; no global 3% spread tolerance,
+weaker numerical contract or favorable average replaces required per-cell
+decisions.
 
-The local adapter preserves each declared cell, including failed and missing
-comparisons. Baseline strong-path controls and canonical fast-path comparisons
-have separate labels. Missing mandatory reference families are rejected. No
-average across functions can hide an absent or failing required cell, and no
-new global 3% spread tolerance is introduced.
+The controller rejects changed frozen inputs/binaries, missing selected results,
+duplicate cells, unsupported hosts and failed stages. Failed/partial attempts
+remain inspectable. Stage process groups terminate on timeout/interruption.
+SIGKILL, host loss or disk failure can prevent final receipts; an unfinished
+receipt never becomes a successful result. Prepared state, selected success and
+full qualification remain distinct in both records and documentation.
 
-## Cloud adapter contract
+## Current platform boundary
 
-The deployment boundary requires explicit project, zone, exact image (not a
-moving image family), machine type, disk configuration, service account,
-artifact bucket/prefix, campaign identity and maximum VM lifetime. An initial
-x86 profile is C3; C4A is the ARM costing profile, not a supported ARM Linux
-benchmark adapter. Verify actual CPU/ISA on arrival and compare only within the
-same instance. A machine SKU does not promise bare-metal isolation or control
-of physical frequency, thermal state or host contention.
+The full x86 adapter requires native Linux with SSE2, AVX2/FMA and AVX-512F;
+subset timing still uses the same prepared backend set. The ARM adapter requires
+Apple Silicon/macOS, retains its scheduling limitations and uses original cell
+IDs through selected groups. This does not establish ARM Linux support.
 
-Bootstrap builds pinned black-box references and the declared source before
-measurement. PKB retries and repeated run stages must not repeat a failed
-qualification into a passing result. Each deliberate new attempt gets a fresh
-identity and retains the previous failure. Source bundles and manifests are
-trusted executable inputs; private consumer code and artifacts stay private.
-
-Evidence must be copied and checksum-verified before normal teardown. Failure,
-interruption, upload failure and controller loss need explicit receipts and
-cleanup tests; missing artifacts never become a successful campaign. Provider
-[maximum runtime with deletion](https://docs.cloud.google.com/compute/docs/instances/limit-vm-runtime)
-and boot-disk auto-delete bound an orphan VM's lifetime independently of the
-controller. They do not delete bucket data or make a billing budget a hard cap.
-PKB's timeout metadata alone is not evidence of that provider-side limit. A
-provider integration must demonstrate the limit on the actual created VM.
-
-Only after bootstrap, successful and failed runs, upload verification, teardown
-and resource inventory have been exercised can the cloud process be called
-operational. Correctness CI remains separate from native performance evidence.
+The shared cost estimator is maintained in ai-program; this repository retains
+only a [pointer and adapter-specific usage](../../scripts/bench_campaign/COSTS.md).
+Runtime budgets must come from selected work and measured overhead. The earlier
+eight-hour example was an allocation scenario, not a harness requirement.

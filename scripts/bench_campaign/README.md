@@ -1,16 +1,22 @@
 # Reusable native comparison campaigns
 
-This controller runs the existing `bench_fast` matrix on native x86 Linux or
+This controller bootstraps and runs the existing `bench_fast` matrix, or declared
+subsets of it, on native x86 Linux or
 Apple Silicon macOS. It records pinned canonical references, candidate/control
 commits, commands, host conditions, raw attempts, comparisons and checksums.
 Python 3.11 or newer is required. It adds no Rust dependencies and changes no
 numerical implementation, timing loop, statistical rule or numerical contract.
 
-The cloud component currently provides an offline cost estimate. Provisioning,
-bootstrap on a fresh VM, verified upload and teardown are not implemented.
-[Architecture](../../docs/adr/0001-native-benchmark-campaigns.md) records the PKB
-lifecycle boundary; [#245](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/245)
-tracks delivery. GCP ARM Linux cannot run the macOS harness.
+This is the Numerics workload adapter for the shared benchmarking program.
+The canonical program and shared GCP cost tooling are owned by
+[ai-program](https://gitlab.com/prophetizo/morphiq-labs/org/ai-program/-/blob/925c77178941ec86bdfe5eb13c4c666890b46ce6/BENCHMARKING.md), with provider implementation tracked in
+[ai-program #17](https://gitlab.com/prophetizo/morphiq-labs/org/ai-program/-/issues/17).
+That private repository is optional organizational tooling: these public native
+runners and their correctness evidence remain independently usable.
+[Architecture](../../docs/adr/0001-native-benchmark-campaigns.md) records the
+adapter boundary; [#245](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/245)
+tracks Numerics adoption. Provisioning, fresh-VM bootstrap, verified upload and
+teardown are not implemented here. GCP ARM Linux cannot run the macOS harness.
 
 ## Canonical comparisons
 
@@ -68,54 +74,118 @@ with an idle sibling; no controller kills unrelated work or reserves a host.
 The controller captures system/tool versions and process snapshots outside the
 timing interval. These records support review, not an automatic idle-host proof.
 
-## Run one complete campaign
+## Bootstrap once, choose the scope per run
 
-Substitute the exact committed candidate/control SHAs and baseline checkout.
-The output must be a new directory under this repository's `target/`:
+Substitute exact committed candidate/control SHAs and the baseline checkout.
+Bootstrap compiles the complete set of wrappers, generates the full input/cell
+matrix and freezes identities. It does not run observations or timing. The host
+still needs the toolchain and reference builds above; this is not OS provisioning.
+Choose the bootstrap timeout explicitly; there is no eight-hour requirement.
 
 ```sh
-python scripts/bench_campaign/campaign.py run \
+python scripts/bench_campaign/campaign.py bootstrap \
   --platform x86-linux --cpu 2 \
   --commit "$CANDIDATE_SHA" \
   --control-source "$BASELINE_CHECKOUT" --control-commit "$BASELINE_SHA" \
   --reference-bin target/bench-fast-refs/bin \
   --reference-lock target/bench-fast-refs/lock.json \
   --host-notes target/host-notes.txt \
-  --timeout-hours 12 \
-  --out target/campaigns/x86-release-001
+  --timeout-hours "$BOOTSTRAP_BUDGET_HOURS" \
+  --out target/bootstraps/release-001
 ```
 
-The command prepares native wrappers and exact input banks, runs independent
-observations, freezes files, executes the complete native matrix, verifies
-identities and writes `comparisons.json`. It invokes all declared canonical
-comparisons; there is no switch that silently drops a slow comparator. The
-native runners retain their 500 x86 cells / 430 required and 163 macOS ARM cells /
-125 required, calibration, alternating pairing and one-sided confidence rule.
-The controller fails closed for missing mandatory families, missing measurements,
-invalid durations, changed files or a failed stage. A zero exit code means the
-native matrix completed and all its required cells passed, not that all library
-contracts or consumer workloads have been qualified.
+The same bootstrap can supply fresh smoke, subset and full attempts. The run
+inherits its source/platform/reference configuration and verifies hashes. It
+copies prepared files, including build outputs, into a new attempt, then runs
+observations and freezes the selected scope before timing. It never reuses old
+samples or calibration counts. Keep the bootstrap and its source/reference
+checkouts available: native loader paths, especially on macOS, may still refer
+to the original build. Copies use disk space; clean completed attempts after
+review. This is local reuse on the same configured host, not a portable cache.
 
-On macOS use `--platform arm-macos` for both commands and supply
-`--sleef-include target/bench-fast-refs/sleef-build/include` to `run`; omit the
-x86 control options. macOS does not provide the x86 CPU-affinity behavior.
-The ARM runner can stop at a failed group; unmeasured later cells remain missing.
+Preview the exact cell IDs, exclusions and timed-work target without executing
+any workload:
 
-`--timeout-hours` bounds subprocess stages including preparation and observations.
-Hashing, final receipts and process cleanup happen outside that deadline; this
-is not a provider billing cap. Timeout, SIGTERM or Ctrl-C kills the stage process
-group, retains evidence and returns failure. SIGKILL, host loss or disk failure
-can prevent final receipts; the last `running` state is not success. There is no
-automatic retry, continuation or outlier deletion.
+```sh
+python scripts/bench_campaign/campaign.py plan \
+  --prepared target/bootstraps/release-001 --suite smoke
+python scripts/bench_campaign/campaign.py plan \
+  --prepared target/bootstraps/release-001 --suite subset \
+  --primitive exp --backend avx2
+```
+
+| Suite | Selection | Meaning of a successful result |
+| --- | --- | --- |
+| `full` (default) | Every original cell; filters forbidden | All required cells in the full native matrix passed. |
+| `smoke` | One ordinary 52-element cell for each canonical family; x86 also includes an unchanged strong exp control | The smoke selection passed; full qualification remains unestablished. |
+| `subset` | Explicit primitives, x86 backends and/or exact cell IDs | Only the declared selection passed; excluded cells remain listed. |
+
+The smoke preset exercises scalar CORE-MATH exp, vector SLEEF exp, batched
+libcerf erfcx and scalar SciPy CDF. It has five cells on x86 and four on macOS.
+At the current protocol's target duration, those contain 120 and 96 seconds of
+timed work respectively, **excluding** warmups, calibration, copies, hashing and
+observations. Smoke keeps the existing per-cell sampling protocol; it is smaller
+coverage, not a shortcut to a full qualification decision.
+
+```sh
+python scripts/bench_campaign/campaign.py run \
+  --prepared target/bootstraps/release-001 --suite smoke \
+  --host-notes target/host-notes.txt --timeout-hours 0.5 \
+  --out target/campaigns/smoke-001
+python scripts/bench_campaign/campaign.py run \
+  --prepared target/bootstraps/release-001 --suite subset \
+  --primitive exp --backend avx2 \
+  --host-notes target/host-notes.txt --timeout-hours "$SUBSET_BUDGET_HOURS" \
+  --out target/campaigns/exp-avx2-001
+python scripts/bench_campaign/campaign.py run \
+  --prepared target/bootstraps/release-001 --suite full \
+  --host-notes target/host-notes.txt --timeout-hours "$FULL_BUDGET_HOURS" \
+  --out target/campaigns/full-001
+```
+
+Repeat `--primitive`, `--backend` or `--cell` to select several values. Values
+within one filter are ORed; different filters are ANDed. Unknown values, empty
+selections, filters on `full`/`smoke`, and an unspecified subset are errors.
+A primitive/backend selection includes every existing reference/control cell
+matching those filters. Exact IDs permit deliberately narrower experiments.
+The original full matrix and all excluded IDs remain in the evidence. Subset
+results cannot silently become full qualification, even if their filters happen
+to select every cell. Use `--suite full` for that decision.
+
+`run` also accepts all bootstrap configuration arguments directly, instead of
+`--prepared`, to build and run in one command. Every output path must be new and
+under this repository's `target/`. A previous timing attempt cannot be supplied
+as a bootstrap. The full native matrices retain 500 x86 cells / 430 required and
+163 macOS ARM cells / 125 required with their established confidence rule.
+
+On macOS use `--platform arm-macos` when locking references and bootstrapping,
+add `--sleef-include target/bench-fast-refs/sleef-build/include`, and omit x86
+control options. macOS has no x86-style affinity or separate backend selector;
+use primitive/cell filters. ARM groups preserve original cell IDs. Its runner
+can stop at a failed group, leaving selected later cells missing. ARM product
+bank observations remain comprehensive even for a selected timing subset.
+
+`--timeout-hours` bounds subprocess stages. Copies, hashing, final receipts and
+cleanup happen outside that deadline; it is not a provider billing cap. Timeout,
+SIGTERM or Ctrl-C kills the stage process group and retains failure evidence.
+SIGKILL, host loss or disk failure can prevent final receipts; `running` is not
+success. No automatic retry, continuation or outlier deletion is supported.
 
 ## Evidence and checks
 
 Each attempt retains:
 
 - `campaign.json`: source/control identity, reference lock, host notes/snapshots,
-  stage commands/status, verification and qualification outcome.
+  stage commands/status, configuration, selection, verification and outcome.
+  `selected_passed` covers the chosen cells; `qualification_passed` can be true
+  only for a successful `full` run. A successful bootstrap is `prepared`, with
+  both performance flags false. Exit zero means that the requested operation
+  succeeded, not necessarily full qualification.
 - `comparisons.json`: every declared cell, canonical/control label, contract,
-  native measurements, failed required cells and missing cells.
+  native measurements, failed required cells, missing selected cells and
+  deliberately excluded cells.
+- `native/matrix-full.json` and `native/selection.json`: original full cells,
+  their hash, requested filters, selected/excluded IDs and timed-work target.
 - `native/`: build command records, exact input banks, observation output, frozen
   source hashes and all native raw/calibration/failed attempts.
 - Stage logs, the reference build log, and `artifacts.json` with SHA-256 identities

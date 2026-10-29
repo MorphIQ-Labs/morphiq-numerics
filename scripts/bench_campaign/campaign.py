@@ -10,9 +10,15 @@ import os
 from pathlib import Path
 import platform
 import signal
+import shutil
 import subprocess
 import sys
 import time
+
+if __package__:
+    from . import selection
+else:
+    import selection
 
 REPO = Path(__file__).resolve().parents[2]
 NATIVE = REPO / 'scripts/bench_fast'
@@ -180,18 +186,15 @@ def comparison_rows(native, kind):
         rows = [{'cell': c, 'measurement': measured.get(c['id']),
                  'passed': bool(measured.get(c['id'], {}).get('meets_cost') and
                                 measured.get(c['id'], {}).get('duration_pass'))} for c in cells]
+    full = read(native / 'matrix-full.json')['cells'] if (native / 'matrix-full.json').exists() else cells
+    plan = read(native / 'selection.json') if (native / 'selection.json').exists() else None
+    if plan and cells != selection.selected_cells(full, plan):
+        raise ValueError('Active cells differ from the declared selection')
+    selection.validate_full(full, kind)
     ids = [c['id'] for c in cells]
     if len(set(ids)) != len(ids) or len(measured) != len(summary) or not set(measured).issubset(ids):
         raise ValueError('Duplicate or unexpected comparison cells')
     required_key = 'required_parity' if kind == 'x86-linux' else 'parity_required'
-    references = {c['reference'] if kind == 'x86-linux' else c['pair'][1] for c in cells}
-    if not {'core_math_exp', 'libcerf_erfcx', 'scipy_ndtr'}.issubset(references) or not any(r.startswith('sleef_') for r in references):
-        raise ValueError('Matrix must include CORE-MATH, SLEEF, libcerf and SciPy comparisons')
-    for reference in references:
-        if reference not in {'core_math_exp', 'libcerf_erfcx', 'scipy_ndtr', 'strong-control'} and not reference.startswith('sleef_'):
-            raise ValueError(f'Undocumented comparator: {reference}')
-    if not cells or not any(c[required_key] for c in cells):
-        raise ValueError('Empty qualification matrix')
     for row in rows:
         reference = row['cell']['reference'] if kind == 'x86-linux' else row['cell']['pair'][1]
         row['reference'] = reference
@@ -199,8 +202,75 @@ def comparison_rows(native, kind):
         row['candidate_contract'] = 'strong' if row['comparison_kind'] == 'baseline-control' else 'fast'
         row['required'] = row['cell'][required_key]
     return {'complete': len(measured) == len(cells), 'cells': rows,
+            'suite': plan['suite'] if plan else 'full',
+            'full_cell_count': len(full), 'selected_cell_count': len(cells),
+            'excluded': plan['excluded_ids'] if plan else [],
             'missing': [r['cell']['id'] for r in rows if r['measurement'] is None],
             'required_failed': [r['cell']['id'] for r in rows if r['required'] and not r['passed']]}
+
+
+def matrix(native, kind):
+    return read(native / 'qualification-manifest.json') if kind == 'x86-linux' else {'cells': read(native / 'cells.json'), 'groups': read(native / 'groups.json')}
+
+
+def apply_selection(native, kind, args):
+    full = matrix(native, kind)
+    plan = selection.select(full['cells'], kind, args.suite, args.primitive, args.backend, args.cell)
+    selected = selection.selected_cells(full['cells'], plan)
+    write(native / 'matrix-full.json', full)
+    write(native / 'selection.json', plan)
+    if kind == 'x86-linux':
+        write(native / 'qualification-manifest.json', {**full, 'cells': selected})
+    else:
+        write(native / 'cells.json', selected)
+        groups = {name: [i for i in ids if i in plan['selected_ids']] for name, ids in full['groups'].items()}
+        groups = {name: ids for name, ids in groups.items() if ids}
+        grouped = [i for ids in groups.values() for i in ids]
+        if sorted(grouped) != sorted(plan['selected_ids']):
+            raise ValueError('ARM groups must cover every selected cell exactly once')
+        write(native / 'groups.json', groups)
+    return plan
+
+
+def prepared_configuration(args):
+    return {key: str(getattr(args, key).resolve()) if isinstance(getattr(args, key), Path) else getattr(args, key)
+            for key in ['platform', 'commit', 'control_source', 'control_commit', 'reference_bin',
+                        'reference_lock', 'sleef_include', 'cpu']}
+
+
+def verify_prepared(native):
+    outputs = ['qualification', 'qualified', 'qualification-observations', 'logs', 'host',
+               'qualification-summary.json', 'COMPLETE', 'selection.json', 'matrix-full.json']
+    if any((native / name).exists() for name in outputs):
+        raise ValueError('Bootstrap contains prior observations or measurements; create a fresh bootstrap')
+    verify_files(read(native / 'source.json')['files'])
+
+
+def load_prepared(args):
+    receipt = read(args.prepared / 'campaign.json')
+    if receipt['state'] != 'prepared' or not receipt['frozen_files_verified']:
+        raise ValueError('--prepared must name a successful bootstrap, not a previous timing attempt')
+    for key, value in receipt['configuration'].items():
+        current = getattr(args, key)
+        normalized = str(current.resolve()) if isinstance(current, Path) else current
+        if current is not None and normalized != value:
+            raise ValueError(f'Prepared {key} differs from the requested configuration')
+        setattr(args, key, Path(value) if key in ['control_source', 'reference_bin', 'reference_lock', 'sleef_include'] and value else value)
+    verify_prepared(args.prepared / 'native')
+    return receipt
+
+
+def copy_prepared(source, destination, kind):
+    # Copy, never hard-link writable manifests. Retain the bootstrap because
+    # native loader paths may still name its build outputs (notably on macOS).
+    shutil.copytree(source, destination, symlinks=True, ignore=shutil.ignore_patterns('__pycache__'))
+    (destination / 'source.json').unlink()
+    if kind == 'x86-linux':
+        full = read(destination / 'qualification-manifest.json')
+        for cell in full['cells']:
+            cell['product'] = str(destination / Path(cell['product']).relative_to(source))
+            cell['input']['file'] = str(destination / Path(cell['input']['file']).relative_to(source))
+        write(destination / 'qualification-manifest.json', full)
 
 
 def check_x86_host(cpu):
@@ -216,6 +286,13 @@ def check_x86_host(cpu):
 
 
 def execute(args):
+    if args.prepared:
+        args.prepared = args.prepared.resolve()
+        load_prepared(args)
+    if not all([args.platform, args.commit, args.reference_bin, args.reference_lock]):
+        raise ValueError('Supply --prepared or --platform, --commit, --reference-bin and --reference-lock')
+    if args.cpu is None:
+        args.cpu = 2
     kind = args.platform
     native_platform = ('Linux', 'x86_64') if kind == 'x86-linux' else ('Darwin', 'arm64')
     if (platform.system(), platform.machine()) != native_platform:
@@ -249,7 +326,8 @@ def execute(args):
     receipt = {'schema': 1, 'started': stamp(), 'state': 'running', 'candidate': revision,
                'control': args.control_commit, 'platform': kind, 'cpu': args.cpu,
                'timeout_hours': args.timeout_hours, 'host_notes': notes, 'reference_lock': lock,
-               'qualification_passed': False, 'stages': [], 'host_before': host_snapshot()}
+               'qualification_passed': False, 'selected_passed': False, 'configuration': prepared_configuration(args),
+               'prepared_from': str(args.prepared) if args.prepared else None, 'stages': [], 'host_before': host_snapshot()}
     write(out / 'campaign.json', receipt)
     (out / 'reference-build.log').write_bytes(Path(lock['build_log']['path']).read_bytes())
     prepare = [sys.executable, str(NATIVE / 'prepare.py'), '--platform', kind, '--out', str(native),
@@ -258,12 +336,14 @@ def execute(args):
         prepare += ['--control-source', str(args.control_source.resolve())]
     else:
         prepare += ['--sleef-include', str(args.sleef_include.resolve())]
-    stages = [('prepare', prepare), ('observe', [sys.executable, str(native / 'observe.py')])]
+    stages = [('reuse-prepared' if args.prepared else 'prepare', None if args.prepared else prepare), ('observe', [sys.executable, str(native / 'observe.py')])]
     if kind == 'arm-macos':
         stages += [('observe-references', [sys.executable, str(native / 'observe-references.py')]),
                    ('diagnostics', [sys.executable, str(native / 'diagnostics.py')])]
     stages += [('freeze', [sys.executable, str(NATIVE / 'freeze.py'), str(native)]),
                ('measure', [sys.executable, str(native / ('run-qualification.py' if kind == 'x86-linux' else 'run-qualified.py'))])]
+    if args.command == 'bootstrap':
+        stages = [('prepare', prepare), ('freeze', [sys.executable, str(NATIVE / 'freeze.py'), str(native)])]
     try:
         for name, argv in stages:
             entry = {'stage': name, 'argv': argv, 'started': stamp()}
@@ -276,13 +356,21 @@ def execute(args):
                     raise ValueError('Baseline changed during preparation')
                 validate_lock(lock, kind, reference_bin)
                 verify_files(read(native / 'source.json')['files'])
-            code = run_stage(argv, REPO, out / (name + '.log'), deadline)
+                if args.prepared:
+                    verify_prepared(args.prepared / 'native')
+            if name == 'reuse-prepared':
+                copy_prepared(args.prepared / 'native', native, kind)
+                code = 0
+            else:
+                code = run_stage(argv, REPO, out / (name + '.log'), deadline)
             entry.update(finished=stamp(), exit_code=code)
-            if name == 'prepare' and not code:
-                comparison_rows(native, kind)  # Check canonical coverage before spending timing time.
+            if name in ['prepare', 'reuse-prepared'] and not code:
+                selection.validate_full(matrix(native, kind)['cells'], kind)
+                if args.command != 'bootstrap':
+                    receipt['selection'] = apply_selection(native, kind, args)
             if code:
                 raise RuntimeError(f'{name} failed ({code}); see {out / (name + ".log")}')
-        receipt['state'] = 'executed'
+        receipt['state'] = 'prepared' if args.command == 'bootstrap' else 'executed'
     except (Exception, KeyboardInterrupt) as exc:
         receipt.update(state='failed', error=f'{type(exc).__name__}: {exc}')
     finally:
@@ -290,22 +378,25 @@ def execute(args):
             if (native / 'source.json').exists():
                 verify_files(read(native / 'source.json')['files'])
                 validate_lock(lock, kind, reference_bin)
+                if args.prepared:
+                    verify_prepared(args.prepared / 'native')
                 receipt['frozen_files_verified'] = True
             else:
                 receipt['frozen_files_verified'] = False
             if (native / ('qualification-manifest.json' if kind == 'x86-linux' else 'cells.json')).exists():
                 comparison = comparison_rows(native, kind)
                 write(out / 'comparisons.json', comparison)
-                receipt['qualification_passed'] = bool(receipt['state'] == 'executed' and
+                receipt['selected_passed'] = bool(receipt['state'] == 'executed' and
                     receipt['frozen_files_verified'] and comparison['complete'] and not comparison['required_failed'])
+                receipt['qualification_passed'] = receipt['selected_passed'] and comparison['suite'] == 'full'
         except Exception as exc:
-            receipt.update(state='failed', verification_error=f'{type(exc).__name__}: {exc}', qualification_passed=False)
+            receipt.update(state='failed', verification_error=f'{type(exc).__name__}: {exc}', qualification_passed=False, selected_passed=False)
         receipt.update(finished=stamp(), host_after=host_snapshot())
         write(out / 'campaign.json', receipt)
         # Index artifacts on both success and failure, without deleting failed attempts.
         write(out / 'artifacts.json', {str(p.relative_to(out)): sha(p) for p in sorted(out.rglob('*'))
                                      if p.is_file() and p.name != 'artifacts.json' and '__pycache__' not in p.parts})
-    return 0 if receipt.get('qualification_passed') else 1
+    return 0 if receipt['state'] == 'prepared' or (receipt['state'] == 'executed' and receipt['selected_passed']) else 1
 
 
 def main():
@@ -318,22 +409,46 @@ def main():
         lock.add_argument('--' + name + '-source', type=Path, required=True)
     lock.add_argument('--build-log', type=Path, required=True)
     lock.add_argument('--out', type=Path, required=True)
-    run = sub.add_parser('run')
-    run.add_argument('--platform', choices=LIBRARIES, required=True)
-    run.add_argument('--commit', required=True)
-    run.add_argument('--control-source', type=Path)
-    run.add_argument('--control-commit')
-    run.add_argument('--reference-bin', type=Path, required=True)
-    run.add_argument('--reference-lock', type=Path, required=True)
-    run.add_argument('--sleef-include', type=Path)
-    run.add_argument('--cpu', type=int, default=2)
-    run.add_argument('--host-notes', type=Path, required=True)
-    run.add_argument('--timeout-hours', type=float, required=True)
-    run.add_argument('--out', type=Path, required=True)
+    for name in ['bootstrap', 'run']:
+        run = sub.add_parser(name)
+        run.add_argument('--platform', choices=LIBRARIES)
+        run.add_argument('--commit')
+        run.add_argument('--control-source', type=Path)
+        run.add_argument('--control-commit')
+        run.add_argument('--reference-bin', type=Path)
+        run.add_argument('--reference-lock', type=Path)
+        run.add_argument('--sleef-include', type=Path)
+        run.add_argument('--cpu', type=int)
+        run.add_argument('--host-notes', type=Path, required=True)
+        run.add_argument('--timeout-hours', type=float, required=True)
+        run.add_argument('--out', type=Path, required=True)
+        if name == 'run':
+            run.add_argument('--prepared', type=Path)
+            run.add_argument('--suite', choices=['full', 'smoke', 'subset'], default='full')
+            run.add_argument('--primitive', action='append', default=[], choices=['exp', 'erfcx', 'cdf'])
+            run.add_argument('--backend', action='append', default=[], choices=['auto', 'sse2', 'avx2', 'avx512'])
+            run.add_argument('--cell', action='append', default=[])
+        else:
+            run.set_defaults(prepared=None, suite='full', primitive=[], backend=[], cell=[])
+    plan = sub.add_parser('plan', help='List the selected cells and timed-work target without running anything')
+    plan.add_argument('--prepared', type=Path, required=True)
+    plan.add_argument('--suite', choices=['full', 'smoke', 'subset'], default='full')
+    plan.add_argument('--primitive', action='append', default=[])
+    plan.add_argument('--backend', action='append', default=[])
+    plan.add_argument('--cell', action='append', default=[])
     args = parser.parse_args()
     try:
         if args.command == 'lock-references':
             reference_lock(args)
+            return 0
+        if args.command == 'plan':
+            prepared = read(args.prepared / 'campaign.json')
+            if prepared['state'] != 'prepared':
+                raise ValueError('Plan requires a successful bootstrap')
+            native = args.prepared / 'native'
+            verify_prepared(native)
+            print(json.dumps(selection.select(matrix(native, prepared['platform'])['cells'], prepared['platform'],
+                                             args.suite, args.primitive, args.backend, args.cell), indent=2))
             return 0
         # SIGTERM follows the same evidence and child cleanup path as Ctrl-C.
         def interrupted(signum, frame):
