@@ -183,3 +183,36 @@ Proof.
     split; lia.
   - rewrite Z.mod_small by lia. split; lia.
 Qed.
+
+(** The scalar reduction record retains the cell index before normalization.
+    An exponent changes only multiples of 2^52, never these nine bits. *)
+Lemma rd_i_low52 bits : rd_i bits =
+ Z.to_nat (Z.shiftr ((bits-st_off) mod 2^52) 43).
+Proof.
+ unfold rd_i.
+ replace 511 with (Z.shiftr (Z.ones 52) 43) by (vm_compute; reflexivity).
+ rewrite <- Z.shiftr_land, Z.land_ones by lia. unfold rd_u.
+ rewrite <- Znumtheory.Zmod_div_mod by (try lia; exists 4096; reflexivity).
+ reflexivity.
+Qed.
+
+Lemma rd_i_periodic bits k : rd_i (bits+k*2^52) = rd_i bits.
+Proof.
+ rewrite !rd_i_low52. replace (bits+k*2^52-st_off) with ((bits-st_off)+k*2^52) by ring.
+ rewrite Z.mod_add by lia. reflexivity.
+Qed.
+
+Lemma rd_i_wrap bits : rd_i (bits mod 2^64) = rd_i bits.
+Proof.
+ rewrite Z.mod_eq by lia.
+ replace (bits-2^64*(bits/2^64)) with (bits+(-(bits/2^64)*4096)*2^52) by ring.
+ apply rd_i_periodic.
+Qed.
+
+Theorem normalized_cell_index bits :
+ rd_i ((bits-Z.land (rd_u bits) (Z.lnot (2^52-1))) mod 2^64) = rd_i bits.
+Proof.
+ rewrite rd_i_wrap, clear_low_52.
+ replace (bits-rd_u bits/2^52*2^52) with (bits+(-(rd_u bits/2^52))*2^52) by ring.
+ apply rd_i_periodic.
+Qed.

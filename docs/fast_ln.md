@@ -69,6 +69,11 @@ interval, the second reduction exponent is zero. These exact specializations
 and the lossless packed table layout are shared with strong `ln` lanes and
 proved in `LnNormalized.v`; [lanes.md](lanes.md#5-ln-and-ln_1p) gives the bit
 identities. They change neither polynomial evaluation nor any returned bit.
+The scalar reciprocal-one cells additionally use `z=x-1` directly, with the
+same polynomial and canonical low word. Their generated interval is
+`[1-2^-9,1+2^-9)`; `LnUnit.v` proves exact identity to the original stage,
+including its strong rounding decision, and checks positive zero at one.
+
 The SIMD layout adds 8 KiB of read-only data; memory-pressure and strong-path
 control measurements are part of its cost qualification.
 

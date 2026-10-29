@@ -966,3 +966,12 @@ Print Assumptions FastErfcxEvaluation.fast_table_ieee.
 Print Assumptions FastErfcxCertificates.fast_table_certificate.
 Print Assumptions FastNormalCentralAnalytic.gaussian_integral_weighted_remainder.
 Print Assumptions FastNormalCentral.fast_normal_center_ok.
+
+Print Assumptions LnNormalized.normalized_cell_index.
+Require LnUnit.
+Print Assumptions LnUnit.unit_parts_identical.
+Print Assumptions LnUnit.unit_fast_identical.
+Print Assumptions LnUnit.unit_strong_decision_identical.
+Print Assumptions LnUnit.unit_one.
+Print Assumptions LnUnit.unit_table_domain.
+Print Assumptions LnUnit.unit_encoding_screen.

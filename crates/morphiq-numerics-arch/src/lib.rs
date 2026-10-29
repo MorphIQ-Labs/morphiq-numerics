@@ -213,6 +213,33 @@ pub trait Simd: Copy + Send + Sync + core::fmt::Debug + sealed::Sealed + 'static
         }
         self.load(out)
     }
+    /// Load adjacent table words into two vectors without changing their bits.
+    /// Each lane loads `table[index & (N-2)]` and the following word. Clearing
+    /// the low bit chooses an aligned pair; masking wraps arbitrary indices.
+    ///
+    /// # Panics
+    /// If `N` is not a power of two of at least two words.
+    #[inline(always)]
+    fn gather_pair_wrapped<const N: usize>(
+        self,
+        table: &[u64; N],
+        index: Self::U,
+    ) -> (Self::F, Self::F) {
+        assert!(
+            N >= 2 && N.is_power_of_two(),
+            "pair table length must be a power of two >= 2"
+        );
+        let words = self.store(self.to_float(index));
+        let (mut first, mut second) = (Self::Array::default(), Self::Array::default());
+        for (lane, word) in words.as_ref().iter().enumerate() {
+            #[allow(clippy::cast_possible_truncation)] // the mask bounds both accesses
+            let i = (word.to_bits() & (N - 2) as u64) as usize;
+            first.as_mut()[lane] = f64::from_bits(table[i]);
+            second.as_mut()[lane] = f64::from_bits(table[i + 1]);
+        }
+        (self.load(first), self.load(second))
+    }
+
     /// Load a prefix of at most `LANES` values; remaining lanes are positive zero.
     ///
     /// # Panics

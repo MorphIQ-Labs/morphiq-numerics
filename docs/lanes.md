@@ -238,7 +238,10 @@ the cross-target digest, not a separate Coq model of SIMD instructions.
    extracting scalar indices, allowing eight-byte indexed loads without a
    separate shift for each lane. `packed_pair_index` proves both word indices
    remain in the 1024-word layout. Constant assertions and `LnNormalized.packed_tables_lossless`
-   check every generated entry. The general reciprocal stage retains its
+   check every generated entry. `gather_pair_wrapped` bounds both words inside
+   the arch crate. AVX-512 narrows masked indices before extraction and loads
+   each adjacent pair in one 128-bit operation, then transposes the pair words.
+   The general reciprocal stage retains its
    original layout and exponent handling. Masking the low ten significand bits
    produces `hh`; the lanes form
    `hl = h − hh` and `z = (hh·rs − 1) + hl·rs`, exactly as `stages::reduce`.

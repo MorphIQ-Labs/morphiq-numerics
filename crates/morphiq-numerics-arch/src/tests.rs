@@ -95,6 +95,20 @@ impl WithSimd for Check<'_> {
             ))
             .is_err()
         );
+        for invalid in [0, 1, 3] {
+            let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match invalid {
+                0 => {
+                    s.gather_pair_wrapped(&[0_u64; 0], s.splat_bits(u64::MAX));
+                }
+                1 => {
+                    s.gather_pair_wrapped(&[0_u64; 1], s.splat_bits(u64::MAX));
+                }
+                _ => {
+                    s.gather_pair_wrapped(&[0_u64; 3], s.splat_bits(u64::MAX));
+                }
+            }));
+            assert!(caught.is_err(), "{}: invalid pair table", S::NAME);
+        }
         for bits in 0..=all {
             for input in [bits, bits | !all] {
                 let mask = s.mask_from_bits(input);
@@ -169,6 +183,23 @@ impl WithSimd for Check<'_> {
                     output.to_bits(),
                     table[index],
                     "{}: wrapped gather",
+                    S::NAME
+                );
+            }
+            let (first, second) = s.gather_pair_wrapped(&table, ua);
+            let (first, second) = (s.store(first), s.store(second));
+            for (lane, &input) in xs.iter().enumerate() {
+                let i = usize::try_from(input.to_bits() & 6).unwrap();
+                assert_eq!(
+                    first.as_ref()[lane].to_bits(),
+                    table[i],
+                    "{}: pair first",
+                    S::NAME
+                );
+                assert_eq!(
+                    second.as_ref()[lane].to_bits(),
+                    table[i + 1],
+                    "{}: pair second",
                     S::NAME
                 );
             }

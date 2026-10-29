@@ -216,6 +216,24 @@ entry: its second exponent is proved zero, so it loads the unscaled reciprocal
 and uses `e` directly. The general entry used by the normal log tail retains
 its additional reduction; the polynomial and interval test are shared.
 
+The normalizer keeps the reduced significand as integer bits and retains the
+nine-bit reciprocal-stage cell before normalization; `normalized_cell_index`
+proves that exponent removal cannot change this cell. Subnormal scaling runs
+in a separate cold function so normal inputs do not pay a speculative multiply.
+
+For `1-2^-9 <= x < 1+2^-9`, generated cells 298–300 have reciprocal one and
+both log words zero. The scalar stage uses the exact Sterbenz difference
+`z=x-1`, then the unchanged polynomial and error estimate. Its low word is
+`0+q`, retaining the ordinary stage's positive-zero canonicalization at one.
+The cutoff is derived by scanning the generated reciprocal table, with constant
+assertions for zero log words and contiguity; it is not fitted to samples.
+`LnUnit.unit_parts_identical`, `unit_fast_identical` and
+`unit_strong_decision_identical` prove equivalence to the full stage and both
+entries. The strong path retains the same decision and accurate fallback.
+The boundary test covers every reciprocal cell and rejects both widening and
+narrowing this selected block. Independent mpmath fixtures include the cell
+boundaries and neighboring encodings; they enforce the published log bound.
+
 ## 4. Double-word fallback (after [DLM] §3.3)
 
 **Decision 2: [DLM]'s portable evaluation, on the crate's proved double-word

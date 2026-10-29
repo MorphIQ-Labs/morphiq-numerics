@@ -76,47 +76,11 @@ fn reduce<K: Simd>(k: K, x: K::F) -> (K::F, K::F) {
 fn fast_value<K: Simd, const NORMALIZED: bool>(k: K, (y, e): (K::F, K::F)) -> StageH<K> {
     let hb = k.to_bits(y);
     let u = k.sub_u(hb, k.splat_bits(OFF));
-    // Scale the normalized index in lanes. A flat pair uses the native
-    // eight-byte address scale, avoiding one scalar shift per gathered lane.
-    let indices = if NORMALIZED {
-        k.shl_u(k.and_u(k.shr_u(u, 43), k.splat_bits(511)), 1)
-    } else {
-        u
-    };
-    let words = k.store(k.to_float(indices));
-    let (mut r, mut th, mut tl, mut re) = (
-        K::Array::default(),
-        K::Array::default(),
-        K::Array::default(),
-        K::Array::default(),
-    );
-    for (lane, word) in words.as_ref().iter().enumerate() {
-        let u = word.to_bits();
-        #[allow(clippy::cast_possible_truncation)] // ten bits after pair scaling
-        let i = if NORMALIZED {
-            u as usize
-        } else {
-            ((u >> 43) & 511) as usize
-        };
-        #[allow(clippy::cast_possible_wrap, clippy::cast_precision_loss)] // signed 12-bit exponent
-        {
-            if !NORMALIZED {
-                re.as_mut()[lane] = ((u as i64) >> 52) as f64;
-            }
-        }
-        if NORMALIZED {
-            let (hi, lo) = (PACKED_LOG[i], PACKED_LOG[i + 1]);
-            th.as_mut()[lane] = f64::from_bits(hi);
-            tl.as_mut()[lane] = f64::from_bits(lo);
-        } else {
-            r.as_mut()[lane] = f64::from_bits(R[i]);
-            (th.as_mut()[lane], tl.as_mut()[lane]) = T[i];
-        }
-    }
-    // Reduced::of already places y in [OFF, 2*OFF), so the stage's
-    // additional exponent is exactly zero on the normalized entry.
-    let (rs, th) = if NORMALIZED {
-        let packed = k.to_bits(k.load(th));
+    let (rs, th, tl, e) = if NORMALIZED {
+        // Two adjacent words per cell, with pair scaling performed in lanes.
+        let indices = k.shl_u(k.and_u(k.shr_u(u, 43), k.splat_bits(511)), 1);
+        let (packed, tl) = k.gather_pair_wrapped(&PACKED_LOG, indices);
+        let packed = k.to_bits(packed);
         let r = k.or_u(
             k.shl_u(k.and_u(packed, k.splat_bits(1023)), 43),
             k.splat_bits(1022 << 52),
@@ -124,19 +88,41 @@ fn fast_value<K: Simd, const NORMALIZED: bool>(k: K, (y, e): (K::F, K::F)) -> St
         (
             k.to_float(r),
             k.to_float(k.and_u(packed, k.splat_bits(!1023))),
+            tl,
+            e,
         )
     } else {
+        let words = k.store(k.to_float(u));
+        let (mut r, mut th, mut tl, mut re) = (
+            K::Array::default(),
+            K::Array::default(),
+            K::Array::default(),
+            K::Array::default(),
+        );
+        for (lane, word) in words.as_ref().iter().enumerate() {
+            let u = word.to_bits();
+            #[allow(clippy::cast_possible_truncation)] // nine bits
+            let i = ((u >> 43) & 511) as usize;
+            #[allow(clippy::cast_possible_wrap, clippy::cast_precision_loss)]
+            // signed 12-bit exponent
+            {
+                re.as_mut()[lane] = ((u as i64) >> 52) as f64;
+            }
+            r.as_mut()[lane] = f64::from_bits(R[i]);
+            (th.as_mut()[lane], tl.as_mut()[lane]) = T[i];
+        }
         (
             k.to_float(k.sub_u(k.to_bits(k.load(r)), k.and_u(u, k.splat_bits(!FRACTION)))),
             k.load(th),
+            k.load(tl),
+            k.add(e, k.load(re)),
         )
     };
     let hh = k.to_float(k.and_u(hb, k.splat_bits(!0x3ff)));
     let hl = k.sub(y, hh);
     let z = k.add(k.sub(k.mul(hh, rs), k.splat(1.0)), k.mul(hl, rs));
-    let e = if NORMALIZED { e } else { k.add(e, k.load(re)) };
     let ln1 = k.add(k.mul(e, k.splat(L1)), th);
-    let ln0 = k.add(k.mul(e, k.splat(L0)), k.load(tl));
+    let ln0 = k.add(k.mul(e, k.splat(L0)), tl);
     let z2 = k.mul(z, z);
     let t0 = k.sub(k.mul(z, k.splat(H[0])), k.splat(0.5));
     let t1 = k.add(k.mul(z, k.splat(H[2])), k.splat(H[1]));

@@ -264,6 +264,16 @@ impl Simd for Avx512 {
         // and stores only to the supplied slice elements.
         unsafe { avx512::store_partial(value, out) }
     }
+    #[inline(always)]
+    fn gather_pair_wrapped<const N: usize>(
+        self,
+        table: &[u64; N],
+        index: __m512i,
+    ) -> (__m512d, __m512d) {
+        // SAFETY: this token establishes AVX-512F. The helper bounds both
+        // table words itself before issuing each unaligned 128-bit load.
+        unsafe { avx512::gather_pair_wrapped(table, index) }
+    }
     forward! { avx512;
         fn splat(x: f64) -> __m512d;
         fn splat_bits(x: u64) -> __m512i;
@@ -661,7 +671,66 @@ mod helpers {
             _mm512_add_epi64, _mm512_mask_storeu_pd, _mm512_maskz_loadu_pd, _mm512_sll_epi64,
         };
 
+        use core::arch::x86_64::{
+            _mm_loadu_si128, _mm_unpackhi_epi64, _mm_unpacklo_epi64, _mm512_castsi128_si512,
+            _mm512_inserti32x4,
+        };
+
+        use core::arch::x86_64::{_mm256_storeu_si256, _mm512_cvtepi64_epi32};
+
         use super::super::Avx512Mask;
+
+        #[target_feature(enable = "avx512f")]
+        #[inline]
+        pub(in super::super) fn gather_pair_wrapped<const N: usize>(
+            table: &[u64; N],
+            index: __m512i,
+        ) -> (__m512d, __m512d) {
+            assert!(
+                N >= 2 && N.is_power_of_two(),
+                "pair table length must be a power of two >= 2"
+            );
+            let words = if N <= u32::MAX as usize {
+                #[allow(clippy::cast_possible_wrap)] // bit mask, not signed arithmetic
+                let mask = (N - 2) as i64;
+                let narrowed =
+                    _mm512_cvtepi64_epi32(_mm512_and_si512(index, _mm512_set1_epi64(mask)));
+                let mut indices = [0_u32; 8];
+                // SAFETY: indices has the 32 bytes written by the unaligned
+                // AVX store; this AVX-512F helper also has AVX enabled.
+                unsafe { _mm256_storeu_si256(indices.as_mut_ptr().cast(), narrowed) };
+                indices.map(u64::from)
+            } else {
+                store(_mm512_castsi512_pd(index)).map(f64::to_bits)
+            };
+            let pair = |lane: usize| {
+                #[allow(clippy::cast_possible_truncation)] // bounded by N-2
+                let i = (words[lane] & (N - 2) as u64) as usize;
+                let row = &table[i..i + 2];
+                // SAFETY: row contains exactly two u64 words, the 16 bytes
+                // read by this unaligned load. Its checked slice is in table.
+                unsafe { _mm_loadu_si128(row.as_ptr().cast()) }
+            };
+            let (a, b, c, d, e, f, g, h) = (
+                pair(0),
+                pair(1),
+                pair(2),
+                pair(3),
+                pair(4),
+                pair(5),
+                pair(6),
+                pair(7),
+            );
+            macro_rules! assemble {
+                ($unpack:ident) => {{
+                    let v = _mm512_castsi128_si512($unpack(a, b));
+                    let v = _mm512_inserti32x4::<1>(v, $unpack(c, d));
+                    let v = _mm512_inserti32x4::<2>(v, $unpack(e, f));
+                    _mm512_castsi512_pd(_mm512_inserti32x4::<3>(v, $unpack(g, h)))
+                }};
+            }
+            (assemble!(_mm_unpacklo_epi64), assemble!(_mm_unpackhi_epi64))
+        }
 
         #[target_feature(enable = "avx512f")]
         #[inline]

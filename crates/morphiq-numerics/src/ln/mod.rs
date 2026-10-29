@@ -55,6 +55,11 @@ pub fn ln(x: f64) -> f64 {
     if x == 1.0 {
         return 0.0;
     }
+    if stage::unit_cell(x.to_bits()) {
+        return stage::unit_parts(x)
+            .3
+            .unwrap_or_else(|| Reduced::of(x).finish());
+    }
     let reduced = Reduced::of(x);
     if let Some(y) = stage::normalized_parts(&reduced).3 {
         return y;
@@ -147,11 +152,16 @@ pub(crate) fn split(x: f64) -> (f64, f64) {
 pub(crate) struct Reduced {
     pub(crate) e: i32,
     i: usize,
-    y: f64,
+    y_bits: u64,
+    stage_index: usize,
     r: f64,
 }
 
 impl Reduced {
+    #[inline(always)]
+    fn y(&self) -> f64 {
+        f64::from_bits(self.y_bits)
+    }
     /// Past the reciprocal stage: the double-word decision, then Q128.
     fn finish(&self) -> f64 {
         if let Some(y) = decide(self.fast_value()) {
@@ -163,16 +173,28 @@ impl Reduced {
     /// `(i, y, R[i])`, for the internal cross-check.
     #[cfg(test)]
     pub(crate) fn parts(&self) -> (usize, f64, f64) {
-        (self.i, self.y, self.r)
+        (self.i, self.y(), self.r)
     }
 
     /// §3, steps 1–3, for finite `x > 0`.
     pub(crate) fn of(x: f64) -> Self {
-        let (bits, scaled) = if x < f64::MIN_POSITIVE {
-            ((x * TWO_54).to_bits(), 54)
-        } else {
-            (x.to_bits(), 0)
-        };
+        let input_bits = x.to_bits();
+        if input_bits < f64::MIN_POSITIVE.to_bits() {
+            return Self::subnormal(x);
+        }
+        Self::normal_bits(input_bits, 0)
+    }
+
+    // Keep scaling off the normal input's dependency chain. An expression
+    // selecting scaled/unscaled bits lets LLVM speculate the multiplication.
+    #[cold]
+    #[inline(never)]
+    fn subnormal(x: f64) -> Self {
+        Self::normal_bits((x * TWO_54).to_bits(), 54)
+    }
+
+    #[inline(always)]
+    fn normal_bits(bits: u64, scaled: i32) -> Self {
         let u = bits.wrapping_sub(stage_tables::OFF);
         // The signed high part of bits-OFF is the normalization exponent;
         // removing it leaves the same interval representative. See
@@ -180,13 +202,16 @@ impl Reduced {
         #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
         // The signed exponent is in [-1022,1024] before subnormal correction.
         let e = ((u as i64) >> 52) as i32 - scaled;
-        let y = f64::from_bits(bits.wrapping_sub(u & !FRACTION));
+        let y_bits = bits.wrapping_sub(u & !FRACTION);
+        #[allow(clippy::cast_possible_truncation)] // nine-bit reciprocal-stage cell
+        let stage_index = ((u >> 43) & 511) as usize;
         #[allow(clippy::cast_possible_truncation)] // seven fraction bits
         let i = ((bits & FRACTION) >> 45) as usize;
         Self {
             e,
             i,
-            y,
+            y_bits,
+            stage_index,
             r: f64::from_bits(R_BITS[i]),
         }
     }
@@ -222,14 +247,14 @@ impl Reduced {
     /// `z = y·R[i] − 1` exactly, as a double-word (§3): the product by
     /// `two_prod`, `p − 1` by Sterbenz's lemma.
     pub(crate) fn z(&self) -> DoubleWord {
-        let (p, q) = two_prod(self.y, self.r);
+        let (p, q) = two_prod(self.y(), self.r);
         DoubleWord::sum(p - 1.0, q)
     }
 
     /// `z = y·R[i] − 1` exactly, from the significands in integer arithmetic
     /// (§6, step 1).
     pub(crate) fn z_exact(&self) -> Q128 {
-        let (m_y, e_y) = significand(self.y);
+        let (m_y, e_y) = significand(self.y());
         let (m_r, e_r) = significand(self.r);
         let product = u128::from(m_y) * u128::from(m_r);
         let scale = e_y + e_r;

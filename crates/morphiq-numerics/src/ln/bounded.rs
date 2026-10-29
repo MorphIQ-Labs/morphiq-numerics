@@ -6,9 +6,13 @@
 #[inline]
 pub(crate) fn ln(x: f64) -> f64 {
     let bits = x.to_bits();
+    if super::stage::unit_cell(bits) {
+        let (s, lo, _, _) = super::stage::unit_parts(x);
+        return s + lo;
+    }
     // Positive finite encodings are precisely 1..INFINITY.to_bits().
     // Wrapping subtraction excludes zero and every sign-bit encoding too.
-    if bits.wrapping_sub(1) >= f64::INFINITY.to_bits() - 1 || x == 1.0 {
+    if bits.wrapping_sub(1) >= f64::INFINITY.to_bits() - 1 {
         return super::ln(x);
     }
     let reduced = super::Reduced::of(x);
