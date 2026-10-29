@@ -1,0 +1,19 @@
+{
+  "source": "c9cb6814a2c693f3ea4835e6ab27e7da8dba7b6a",
+  "start_utc": "2026-10-28T22:37:09.970454+00:00",
+  "end_utc": "2026-10-28T23:46:49.153412+00:00",
+  "elapsed_seconds": 4179.182958,
+  "cells": 163,
+  "required": 125,
+  "diagnostic": 38,
+  "measured_processes": 1630,
+  "samples": {
+    "warmup": 6520,
+    "timed": 6520
+  },
+  "minimum_timed_ms": 309.223,
+  "max_required_upper95": 0.9875245151387129,
+  "frozen_hashes_verified": true,
+  "reference_pins": "../manifest.json",
+  "later_source_changes": "043047f and constrained-cubic d32c2d7 arrived during timing and are not qualified by this packet"
+}

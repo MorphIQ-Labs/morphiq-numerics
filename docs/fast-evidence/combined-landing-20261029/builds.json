@@ -1,0 +1,78 @@
+[
+  {
+    "name": "auto",
+    "features": "simd,std",
+    "rustflags": "",
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,3-13,15-23",
+      "cargo",
+      "build",
+      "--locked",
+      "--release",
+      "--no-default-features",
+      "--features",
+      "simd,std"
+    ],
+    "sha256": "d1704f28fa8ef80952d8b6bf785669a300df69474468053eeac7465a88cf0108",
+    "wrapper_source_sha256": "b83bf95fb16a579f95c3ee5ecb0ed02709d1c83969cecd95797fb43c7e8dbf2e"
+  },
+  {
+    "name": "sse2",
+    "features": "simd",
+    "rustflags": "-C target-feature=-avx,-avx2,-avx512f,-fma",
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,3-13,15-23",
+      "cargo",
+      "build",
+      "--locked",
+      "--release",
+      "--no-default-features",
+      "--features",
+      "simd"
+    ],
+    "sha256": "0576eaa61ad1ffdbf546d22b4435a6f620c112573ea1616e3204c7a06385603c",
+    "wrapper_source_sha256": "b83bf95fb16a579f95c3ee5ecb0ed02709d1c83969cecd95797fb43c7e8dbf2e"
+  },
+  {
+    "name": "avx2",
+    "features": "simd",
+    "rustflags": "-C target-feature=+avx2,+fma,-avx512f",
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,3-13,15-23",
+      "cargo",
+      "build",
+      "--locked",
+      "--release",
+      "--no-default-features",
+      "--features",
+      "simd"
+    ],
+    "sha256": "58f7eaf2cf923cd487c199a4db687f33f0c8369b566bef5fba1d18616dbd13e3",
+    "wrapper_source_sha256": "b83bf95fb16a579f95c3ee5ecb0ed02709d1c83969cecd95797fb43c7e8dbf2e"
+  },
+  {
+    "name": "avx512",
+    "features": "simd",
+    "rustflags": "-C target-feature=+avx512f,+avx2,+fma",
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,3-13,15-23",
+      "cargo",
+      "build",
+      "--locked",
+      "--release",
+      "--no-default-features",
+      "--features",
+      "simd"
+    ],
+    "sha256": "fbd24e7149d49b194a297c3e7bd545315aac8079c6464d65dd2655db909d821b",
+    "wrapper_source_sha256": "b83bf95fb16a579f95c3ee5ecb0ed02709d1c83969cecd95797fb43c7e8dbf2e"
+  }
+]

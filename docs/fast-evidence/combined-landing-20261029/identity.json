@@ -1,0 +1,23 @@
+[
+  {
+    "primitive": "exp",
+    "unique_inputs": 71309,
+    "banks": 68,
+    "identity_checks": 1830968,
+    "mismatches": []
+  },
+  {
+    "primitive": "erfcx",
+    "unique_inputs": 71057,
+    "banks": 68,
+    "identity_checks": 1828952,
+    "mismatches": []
+  },
+  {
+    "primitive": "cdf",
+    "unique_inputs": 70554,
+    "banks": 70,
+    "identity_checks": 1858112,
+    "mismatches": []
+  }
+]

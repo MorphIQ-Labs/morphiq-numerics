@@ -1,0 +1,7 @@
+{
+  "scope": "Post-campaign dependency audit for 3cbfb5c; actual absolute native composition dependency and frozen public wrapper are byte identical",
+  "sha256": "6c8165b84f43dda1cbdf6b81b04124c200acbfb6637a2ea118773e9584632131",
+  "copied_wrapper": "/Users/stephen/Development/MorphIQ-Labs/worktrees/morphiq-numerics-arm-194/target/arm-194/expanded-v2/bin/libproduction_bench_wrapper.dylib",
+  "native_composition_dependency": "/Users/stephen/Development/MorphIQ-Labs/worktrees/morphiq-numerics-arm-194/target/arm-194/wrapper-build/release/deps/libproduction_bench_wrapper.dylib",
+  "otool": "/Users/stephen/Development/MorphIQ-Labs/worktrees/morphiq-numerics-arm-194/target/arm-194/expanded-v2/bin/libnativebench.dylib:\n\ttarget/arm-194/expanded-v2/bin/libnativebench.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t@rpath/libsleef.3.dylib (compatibility version 3.0.0, current version 3.9.0)\n\t/Users/stephen/Development/MorphIQ-Labs/worktrees/morphiq-numerics-arm-194/target/arm-194/wrapper-build/release/deps/libproduction_bench_wrapper.dylib (compatibility version 0.0.0, current version 0.0.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1359.0.0)\n"
+}
