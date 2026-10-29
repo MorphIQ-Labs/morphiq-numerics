@@ -25,6 +25,7 @@ for c in cells:
 def command(c,out,proc):
  args=[sys.executable,str(P/'qualify-cell.py'),'--product',c['product'],'--primitive',c['primitive'],'--length',str(c['length']),'--population',c['input']['file'],'--kind',c['kind'],'--reference',c['reference'],'--counts',str(out/'counts.json'),'--target-ms','600','--cache-slots',str(c.get('cache_slots',1)),'--process',proc,'--out',str(out/proc)]
  if c['control']:args+=['--symbol-prefix','control_','--reference-product',str(c.get('control_product') or P/'final-bin/control.so')]
+ elif c.get('reference_product'):args+=['--reference-product',c['reference_product']]
  return args
 
 def summaries():
