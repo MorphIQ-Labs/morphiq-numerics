@@ -101,6 +101,12 @@ AVX2/SSE2 tails. Larger AVX-512 remainders use checked partial loads/stores.
 Static AVX builds keep fixed packet kernels outside the dispatcher too; their
 register saves must not burden a short call selecting a different packet.
 Runtime detection already introduces this ISA boundary, so its helper inlines.
+In a static AVX-512 build, one full SSE2, AVX2 or AVX-512 vector and its short
+scalar remainders enter directly, before the general dispatcher. Fixed-size
+references preserve both the prefix and remainder lengths across this boundary.
+The general and remainder entries are outlined; their register and stack needs
+do not burden a full-vector call. These entries reuse the same screened packet
+and scalar arithmetic, including strong fallback ownership.
 The SSE2 fallback loop and scalar-remainder helper are kept outside the runtime
 dispatcher so their register needs do not burden every selected backend. The architecture
 API owns index masking and prefix-length validation. The lane code-generation

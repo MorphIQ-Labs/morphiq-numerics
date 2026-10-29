@@ -2,7 +2,7 @@
 
 /// Exponential with relative error at most `2^-51` for `|x| < 704`.
 ///
-/// It uses the generated table high words and a bounded quartic polynomial,
+/// It uses the generated table high words and a bounded cubic polynomial,
 /// with exact exponent-field scaling. Other inputs use [`crate::elementary::exp`],
 /// including gradual underflow, overflow, infinities and NaN payloads.
 #[must_use]
@@ -18,7 +18,12 @@ pub fn exp(x: f64) -> f64 {
 #[inline]
 pub fn exp_slice(x: &[f64], out: &mut [f64]) {
     assert_eq!(x.len(), out.len(), "exp_slice: slices of different lengths");
-    #[cfg(feature = "simd")]
+    #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+    crate::exp::bounded::slice_static_avx512(x, out);
+    #[cfg(all(
+        feature = "simd",
+        not(all(target_arch = "x86_64", target_feature = "avx512f"))
+    ))]
     crate::exp::bounded::slice(x, out);
     #[cfg(not(feature = "simd"))]
     for (o, &x) in out.iter_mut().zip(x) {
