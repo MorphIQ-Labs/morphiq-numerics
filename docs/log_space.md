@@ -24,6 +24,12 @@ derivation. The reference fixtures check the code (§9). No Gappa certificate
 covers the composed operation sequences. Here `u = 2^−53`, `RN` is
 round-to-nearest-even, and `γ_k = k·u/(1 − k·u)`.
 
+For consumer budgets, [the absolute log-error contracts](log_error.md)
+state the bounds for `ln`, `ln_1p`, the log-magnitude of `expm1`, and
+log-CDF in natural-log units. These include each primitive's final
+rounding; the composed bounds below additionally account for argument
+formation, conditioning and subsequent arithmetic.
+
 ## Sources
 
 - **[BHH]** P. Blanchard, D. J. Higham, N. J. Higham, "Accurately computing the
