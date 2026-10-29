@@ -139,13 +139,20 @@ def main():
         method.restype = C.c_uint64
     values = inputs(args.primitive, args.population, args.length)
     words = values*args.cache_slots
-    span = (max(1, len(words))*8 + PAGE - 1) // PAGE * PAGE
-    arena = (C.c_byte * (2*span + 3*PAGE))()
-    input_address = (C.addressof(arena) + PAGE - 1) // PAGE * PAGE
-    output_address = input_address + span + OUTPUT_PAGE_OFFSET
-    x, y = C.cast(input_address, D), C.cast(output_address, D)
-    for index, value in enumerate(words):
-        x[index] = value
+    if platform.system() == 'Darwin':
+        # The shared ln adapter also runs on native ARM. Preserve its existing
+        # allocator placement; the x86 amendment does not qualify an ARM layout.
+        x = (C.c_double * max(1, len(words)))(*words)
+        y = (C.c_double * max(1, len(words)))()
+        input_address, output_address = C.addressof(x), C.addressof(y)
+    else:
+        span = (max(1, len(words))*8 + PAGE - 1) // PAGE * PAGE
+        arena = (C.c_byte * (2*span + 3*PAGE))()
+        input_address = (C.addressof(arena) + PAGE - 1) // PAGE * PAGE
+        output_address = input_address + span + OUTPUT_PAGE_OFFSET
+        x, y = C.cast(input_address, D), C.cast(output_address, D)
+        for index, value in enumerate(words):
+            x[index] = value
     # The paired entries use exactly the same allocated input and output buffers.
     def measure(name, count):
         ptr, method = entries[name]
@@ -191,7 +198,8 @@ def main():
                     input_sha256=hashlib.sha256(input_bytes).hexdigest(),
                     product_sha256=hashlib.sha256(Path(args.product).read_bytes()).hexdigest(),
                     input_address=input_address, output_address=output_address,
-                    placement=dict(input_page_offset=input_address % PAGE,
+                    placement=dict(policy='allocator' if platform.system() == 'Darwin' else 'fixed-4KiB',
+                                   input_page_offset=input_address % PAGE,
                                    output_minus_input_mod_page=(output_address-input_address) % PAGE))
     (out/'metadata.json').write_text(json.dumps(metadata, indent=2)+'\n')
     timed = [r for r in records if r['kind']=='timed']
