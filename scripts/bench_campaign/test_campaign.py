@@ -293,6 +293,27 @@ for cell in cells: cell.update(product=str(p/'input.bin'),input={{'file':str(p/'
 
 
 class SelectionTests(unittest.TestCase):
+    def test_full_arm_inventory_retains_composition_diagnostics(self):
+        # The cell generator is pure; isolate it from native library loading so
+        # every CI host can check the declared ARM inventory without emulation.
+        import ast
+        tree = ast.parse((c.NATIVE / 'arm/matrix.py').read_text())
+        generator = next(node for node in tree.body
+                         if isinstance(node, ast.FunctionDef) and node.name == 'make_cells')
+        namespace = {}
+        exec(compile(ast.Module(body=[generator], type_ignores=[]), 'matrix.py', 'exec'), namespace)
+        full = namespace['make_cells']()
+        self.assertEqual([cell['id'] for cell in full], [f'{i:03d}' for i in range(163)])
+        self.assertEqual(sum(cell['parity_required'] for cell in full), 125)
+        composition = [cell for cell in full if cell['pair'][1] == 'composed_cdf_passes']
+        self.assertEqual([(cell['id'], cell['bank'], cell['length'], cell['mode'],
+                           cell['parity_required']) for cell in composition],
+                         [('161', 'cdf-tails', 52, 'throughput', False),
+                          ('162', 'cdf-tails', 4096, 'throughput', False)])
+        plan = selection.select(full, 'arm-macos', 'full')
+        self.assertEqual(plan['full_cell_count'], 163)
+        self.assertEqual(plan['excluded_ids'], [])
+
     def test_smoke_covers_each_canonical_family_and_control(self):
         full = cells() + [{**cells()[1], 'id': 'long', 'length': 65536}]
         plan = selection.select(full, 'x86-linux', 'smoke')

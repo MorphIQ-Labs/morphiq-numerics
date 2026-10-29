@@ -43,6 +43,9 @@ def make_cells():
    for n in [52,4096]:add(f,label,n,pair,gate=label not in ['mixed','fallback','special'])
  for f,pair in scalar:add(f,'ordinary',52,pair,mode='latency')
  for f,pair in slices:add(f,'ordinary',52,pair,mode='cache',gate=False)
+ for n in [52,4096]:
+  add('cdf','tails',n,('prod_norm_cdf_slice','composed_cdf_passes'),gate=False)
+  cells[-1]['reason']='Same propagated 2^-49 CDF budget; synthetic multi-pass composition cost diagnostic, not a separate consumer qualification'
  return cells
 BANKS=json.loads((P/'banks.json').read_text()) if (P/'banks.json').exists() else {}
 CELLS=json.loads((P/'cells.json').read_text()) if (P/'cells.json').exists() else []
