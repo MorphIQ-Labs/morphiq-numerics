@@ -26,14 +26,15 @@ const TWO_52: f64 = f64::from_bits(0x4330_0000_0000_0000);
 /// Lossless layout of the generated reciprocal/log pairs. R has ten
 /// significant bits and exponent 1022 or 1023; TH has ten zero low bits.
 /// The assertions bind that layout to every generated entry, including zero.
-static PACKED_LOG: [[u64; 2]; 512] = {
-    let mut packed = [[0; 2]; 512];
+static PACKED_LOG: [u64; 1024] = {
+    let mut packed = [0; 1024];
     let mut i = 0;
     while i < 512 {
         let hi = T[i].0.to_bits() | ((R[i] >> 43) & 1023);
         assert!(hi & !1023 == T[i].0.to_bits());
         assert!((1022 << 52) | ((hi & 1023) << 43) == R[i]);
-        packed[i] = [hi, T[i].1.to_bits()];
+        packed[2 * i] = hi;
+        packed[2 * i + 1] = T[i].1.to_bits();
         i += 1;
     }
     packed
@@ -75,7 +76,14 @@ fn reduce<K: Simd>(k: K, x: K::F) -> (K::F, K::F) {
 fn fast_value<K: Simd, const NORMALIZED: bool>(k: K, (y, e): (K::F, K::F)) -> StageH<K> {
     let hb = k.to_bits(y);
     let u = k.sub_u(hb, k.splat_bits(OFF));
-    let words = k.store(k.to_float(u));
+    // Scale the normalized index in lanes. A flat pair uses the native
+    // eight-byte address scale, avoiding one scalar shift per gathered lane.
+    let indices = if NORMALIZED {
+        k.shl_u(k.and_u(k.shr_u(u, 43), k.splat_bits(511)), 1)
+    } else {
+        u
+    };
+    let words = k.store(k.to_float(indices));
     let (mut r, mut th, mut tl, mut re) = (
         K::Array::default(),
         K::Array::default(),
@@ -84,8 +92,12 @@ fn fast_value<K: Simd, const NORMALIZED: bool>(k: K, (y, e): (K::F, K::F)) -> St
     );
     for (lane, word) in words.as_ref().iter().enumerate() {
         let u = word.to_bits();
-        #[allow(clippy::cast_possible_truncation)] // nine bits
-        let i = ((u >> 43) & 511) as usize;
+        #[allow(clippy::cast_possible_truncation)] // ten bits after pair scaling
+        let i = if NORMALIZED {
+            u as usize
+        } else {
+            ((u >> 43) & 511) as usize
+        };
         #[allow(clippy::cast_possible_wrap, clippy::cast_precision_loss)] // signed 12-bit exponent
         {
             if !NORMALIZED {
@@ -93,7 +105,7 @@ fn fast_value<K: Simd, const NORMALIZED: bool>(k: K, (y, e): (K::F, K::F)) -> St
             }
         }
         if NORMALIZED {
-            let [hi, lo] = PACKED_LOG[i];
+            let (hi, lo) = (PACKED_LOG[i], PACKED_LOG[i + 1]);
             th.as_mut()[lane] = f64::from_bits(hi);
             tl.as_mut()[lane] = f64::from_bits(lo);
         } else {

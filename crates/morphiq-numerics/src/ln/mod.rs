@@ -56,7 +56,7 @@ pub fn ln(x: f64) -> f64 {
         return 0.0;
     }
     let reduced = Reduced::of(x);
-    if let Some(y) = stage::parts(reduced.e, reduced.y).3 {
+    if let Some(y) = stage::normalized_parts(&reduced).3 {
         return y;
     }
     reduced.finish()
@@ -173,22 +173,16 @@ impl Reduced {
         } else {
             (x.to_bits(), 0)
         };
-        #[allow(clippy::cast_possible_truncation)] // the 11-bit exponent field
-        let biased = (bits >> 52) as i32;
-        let fraction = bits & FRACTION;
-        #[allow(clippy::cast_possible_truncation)] // 7 bits
-        let i = (fraction >> 45) as usize;
-        let (y, e) = if i < 53 {
-            (
-                f64::from_bits((1023 << 52) | fraction),
-                biased - 1023 - scaled,
-            )
-        } else {
-            (
-                f64::from_bits((1022 << 52) | fraction),
-                biased - 1022 - scaled,
-            )
-        };
+        let u = bits.wrapping_sub(stage_tables::OFF);
+        // The signed high part of bits-OFF is the normalization exponent;
+        // removing it leaves the same interval representative. See
+        // LnNormalized.fused_normalization and fused_signed_exponent.
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        // The signed exponent is in [-1022,1024] before subnormal correction.
+        let e = ((u as i64) >> 52) as i32 - scaled;
+        let y = f64::from_bits(bits.wrapping_sub(u & !FRACTION));
+        #[allow(clippy::cast_possible_truncation)] // seven fraction bits
+        let i = ((bits & FRACTION) >> 45) as usize;
         Self {
             e,
             i,

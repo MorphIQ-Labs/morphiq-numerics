@@ -139,3 +139,47 @@ Proof.
     rewrite Round by (unfold st_off in *; lia);
     apply interval_exponent_zero; lia.
 Qed.
+
+(** Scalar signed-shift spelling of the same fused exponent. *)
+Theorem fused_signed_exponent biased fraction :
+  1 <= biased <= 2046 -> 0 <= fraction < 2^52 ->
+  rd_e (biased * 2^52 + fraction) = normalized_exponent biased fraction.
+Proof.
+  intros Hb Hf.
+  pose proof (normalized_interval fraction Hf) as Hn.
+  pose proof (normalized_decomposition biased fraction Hb Hf) as Hd.
+  cbv zeta in Hd. destruct Hd as [He Hd].
+  set (bits := biased * 2^52 + fraction) in *.
+  set (r := normalized_bits fraction - st_off) in *.
+  assert (Hr : 0 <= r < 2^52) by (unfold r; lia).
+  assert (Hs : -2^63 < bits - st_off < 2^63)
+    by (unfold bits, st_off; lia).
+  unfold rd_e, rd_u.
+  destruct (Z_le_gt_dec 0 (bits - st_off)) as [Hp | Hm].
+  - rewrite Z.mod_small by lia.
+    replace (bits - st_off <? 2^63) with true
+      by (symmetry; apply Z.ltb_lt; lia).
+    symmetry. apply Z.div_unique with r; [left; exact Hr | lia].
+  - replace ((bits - st_off) mod 2^64) with (bits - st_off + 2^64).
+    2: { apply Z.mod_unique with (-1); [left; lia | ring]. }
+    replace (bits - st_off + 2^64 <? 2^63) with false
+      by (symmetry; apply Z.ltb_ge; lia).
+    replace (bits - st_off + 2^64 - 2^64) with (bits - st_off) by ring.
+    symmetry. apply Z.div_unique with r; [left; exact Hr | lia].
+Qed.
+
+(** The flattened pair layout scales the same bounded cell index before
+    extraction to scalar registers. Neither word can leave the table. *)
+Theorem packed_pair_index i : 0 <= i < 512 ->
+  0 <= 2*i < 1024 /\ 0 <= 2*i+1 < 1024 /\ (2*i)/2 = i.
+Proof. intros Hi. repeat split; try lia. rewrite Z.mul_comm, Z.div_mul; lia. Qed.
+
+Theorem positive_encoding_screen bits : 0 <= bits < 2^64 ->
+  ((bits-1) mod 2^64 < 2047*2^52-1 <-> 0 < bits < 2047*2^52).
+Proof.
+  intros Hb. destruct (Z.eq_dec bits 0) as [-> | Hn].
+  - replace ((0-1) mod 2^64) with (2^64-1).
+    2: { apply Z.mod_unique with (-1); [left; lia | ring]. }
+    split; lia.
+  - rewrite Z.mod_small by lia. split; lia.
+Qed.

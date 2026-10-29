@@ -21,7 +21,8 @@ def banks():
     special = ['0000000000000000', '8000000000000000', 'bff0000000000000', '7ff0000000000000', 'fff0000000000000', '7ff8000000000001', '7ff0000000000001']
     mixed_special = [special[(i//16)%len(special)] if i%16==0 else ordinary[i%52] for i in range(4096)]
     composition = [f'{((123+(i*719)%1801)<<52) | ((i*0x9e3779b97f4a7c15)&mask):016x}' for i in range(4096)]
-    return dict(ordinary=ordinary, wide=wide, near_one=near, subnormal=sub,
+    ln1p_fallback = [word(-1.+2.**-k) for k in range(1,53)] + [word(2.**e) for e in range(0,1024,31)] + [word(s*2.**-e) for s in [-1,1] for e in [54,128,1022]]
+    return dict(ln1p_fallback=ln1p_fallback, ordinary=ordinary, wide=wide, near_one=near, subnormal=sub,
                 boundary=boundary, mixed_positive=mixed, special=special,
                 mixed_special=mixed_special, composition=composition)
 
@@ -83,5 +84,14 @@ def matrix(out, builds, arm, full):
     for kind in ['scalar','latency']:
         add('auto','composition',52,kind,'sleef_ln_exp_scalar_fma',primitive='ln_exp')
         add('auto','composition',52,kind,'baseline',primitive='ln_exp',control=True,required=False)
+    # Exact normalization is shared by log2/log10 and the ln_1p fallback.
+    for backend in [b['name'] for b in builds]:
+        for primitive in ['log2','log10']:
+            for region in ['ordinary','wide','subnormal']:
+                for kind in ['scalar','latency']:
+                    add(backend,region,52,kind,'baseline',primitive=primitive,control=True,required=False)
+        for region in ['ordinary','ln1p_fallback']:
+            for kind,n in [('scalar',52),('vector',4096)]:
+                add(backend,region,n,kind,'baseline',primitive='ln_1p',control=True,required=False)
     assert len({c['id'] for c in cells})==len(cells)
     return cells

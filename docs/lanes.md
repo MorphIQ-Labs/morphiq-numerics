@@ -234,7 +234,10 @@ the cross-target digest, not a separate Coq model of SIMD instructions.
    stage's second exponent extraction and reciprocal scaling. A lossless
    8 KiB layout packs the reciprocal into the log high word's ten unused low
    bits, retaining the log low word. SIMD masking and shifting recover the
-   original words; constant assertions and `LnNormalized.packed_tables_lossless`
+   original words. The flat pair layout scales the cell index in lanes before
+   extracting scalar indices, allowing eight-byte indexed loads without a
+   separate shift for each lane. `packed_pair_index` proves both word indices
+   remain in the 1024-word layout. Constant assertions and `LnNormalized.packed_tables_lossless`
    check every generated entry. The general reciprocal stage retains its
    original layout and exponent handling. Masking the low ten significand bits
    produces `hh`; the lanes form

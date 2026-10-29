@@ -206,6 +206,16 @@ finite `x > 0`, `x ≠ 1`, a decided value is `RN(ln x)`; every real within
 §4 and §6. The accurate path and special-value results are unchanged.
 `ln_slice` performs the same stage in lanes ([lanes.md](lanes.md) §5).
 
+The scalar normalizer computes the same pair with integer encodings:
+`u = bits - OFF` (wrapping), `y_bits = bits - (u & !FRACTION)`, and
+`e = (u as i64 >> 52) - scaled`. `LnNormalized.fused_normalization` and
+`fused_signed_exponent` prove equality to the case split above. This exact
+normalizer is also shared by log2, log10 and ln_1p's fallback. It changes no
+returned bit. The reciprocal stage accepts a `Reduced` value for its normalized
+entry: its second exponent is proved zero, so it loads the unscaled reciprocal
+and uses `e` directly. The general entry used by the normal log tail retains
+its additional reduction; the polynomial and interval test are shared.
+
 ## 4. Double-word fallback (after [DLM] §3.3)
 
 **Decision 2: [DLM]'s portable evaluation, on the crate's proved double-word

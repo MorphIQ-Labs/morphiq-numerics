@@ -77,7 +77,13 @@ for build in manifest['builds']:
     for c in [c for c in manifest['cells'] if c['backend']==build['name']]:
         words=json.loads(Path(c['input']['file']).read_text())
         xs=[struct.unpack('>d',bytes.fromhex(words[i%len(words)]))[0] for i in range(c['length'])]
-        if c['control']:continue
+        if c['control']:
+            symbol='control_'+c['primitive']
+            expected=[scalar(baseline,symbol)(x) for x in xs]
+            got=packet(lib,symbol+'_slice',xs) if c['kind']=='vector' else [scalar(lib,symbol)(x) for x in xs]
+            assert list(map(bits,got))==list(map(bits,expected)),c['id']
+            rows.append(dict(cell=c['id'],control_identity=True,count=len(xs)))
+            continue
         if c['primitive']=='ln_exp':
             errors=[]
             for x in xs:

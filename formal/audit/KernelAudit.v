@@ -940,6 +940,9 @@ Print Assumptions FastLn.fast_ln_nan.
 Require LnNormalized.
 Print Assumptions LnNormalized.reduced_stage_exponent_zero.
 Print Assumptions LnNormalized.fused_normalization.
+Print Assumptions LnNormalized.fused_signed_exponent.
+Print Assumptions LnNormalized.packed_pair_index.
+Print Assumptions LnNormalized.positive_encoding_screen.
 Print Assumptions LnNormalized.clear_low_52.
 Print Assumptions LnNormalized.packed_tables_lossless.
 Print Assumptions FastExp.fast_exp_entry_ok.

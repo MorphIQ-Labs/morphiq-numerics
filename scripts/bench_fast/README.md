@@ -254,8 +254,8 @@ power configuration and uses USER_INITIATED QoS; it cannot pin this process to
 a CPU. Record the actual core scheduling, thermal/power conditions and competing
 load with the returned run. An x86 result does not fill an ARM cell.
 
-The versioned `x86/ln-matrix.py` declares 330 x86 cells (244 parity-required)
-and 126 ARM cells (94 required). It covers automatic dispatch plus x86 builds
+The versioned `x86/ln-matrix.py` declares 394 x86 cells (244 parity-required)
+and 142 ARM cells (94 required). It covers automatic dispatch plus x86 builds
 with a static SSE2, AVX2/FMA or AVX-512 ceiling; public wrappers can select a
 narrower width on short inputs. Ordinary and exponent-spanning inputs cover
 lengths 0–17 and large batches, with additional automatic-dispatch boundaries.
@@ -265,7 +265,7 @@ latency compare against SLEEF u10 and correctly rounded CORE-MATH. SLEEF u10 is 
 selected diagnostic accuracy reference with a looser worst-case guarantee than
 the mixed ln bound; observations report its error against that bound without
 claiming equal guarantees. NaN-payload differences make special/mixed-special
-comparisons diagnostic, with no parity claim. Strong-path before/after controls
+comparisons diagnostic, with no parity claim. Strong ln, log2, log10 and ln_1p before/after controls
 are separately reviewed, never silently treated as accepted regressions.
 
 The exact input banks, their hashes and all cell settings are emitted before

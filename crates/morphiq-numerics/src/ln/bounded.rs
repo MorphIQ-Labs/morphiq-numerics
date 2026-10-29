@@ -5,11 +5,14 @@
 /// one reciprocal stage, without a rounding test or precision escalation.
 #[inline]
 pub(crate) fn ln(x: f64) -> f64 {
-    if !(x > 0.0 && x < f64::INFINITY) || x == 1.0 {
+    let bits = x.to_bits();
+    // Positive finite encodings are precisely 1..INFINITY.to_bits().
+    // Wrapping subtraction excludes zero and every sign-bit encoding too.
+    if bits.wrapping_sub(1) >= f64::INFINITY.to_bits() - 1 || x == 1.0 {
         return super::ln(x);
     }
     let reduced = super::Reduced::of(x);
-    let (s, lo, _, _) = super::stage::parts(reduced.e, reduced.y);
+    let (s, lo, _, _) = super::stage::normalized_parts(&reduced);
     s + lo
 }
 
@@ -61,6 +64,100 @@ impl morphiq_numerics_arch::WithSimd for Slice<'_> {
     }
 }
 
+// Fixed packets avoid the bulk loop's stack frame and partial-array copies
+// on short calls. This is the same dispatch structure used by bounded exp.
+#[cfg(feature = "simd")]
+struct Packet<'a, const N: usize> {
+    input: &'a [f64; N],
+    output: &'a mut [f64; N],
+}
+
+#[cfg(feature = "simd")]
+impl<const N: usize> morphiq_numerics_arch::WithSimd for Packet<'_, N> {
+    type Output = ();
+    #[inline(always)]
+    fn with<K: morphiq_numerics_arch::Simd>(self, k: K) {
+        assert!(N >= K::LANES && N.is_multiple_of(K::LANES));
+        for (input, output) in self
+            .input
+            .chunks_exact(K::LANES)
+            .zip(self.output.chunks_exact_mut(K::LANES))
+        {
+            evaluate(k, input, output);
+        }
+    }
+}
+
+#[cfg(feature = "simd")]
+#[cfg_attr(
+    any(target_feature = "avx2", target_feature = "avx512f"),
+    inline(never)
+)]
+#[cfg_attr(
+    not(any(target_feature = "avx2", target_feature = "avx512f")),
+    inline(always)
+)]
+fn fixed<K: morphiq_numerics_arch::Simd, const N: usize>(
+    k: K,
+    input: &[f64; N],
+    output: &mut [f64; N],
+) {
+    k.vectorize(Packet { input, output });
+}
+
+#[cfg(feature = "simd")]
+#[inline(never)]
+fn packet<K: morphiq_numerics_arch::Simd, const N: usize>(k: K, work: Slice<'_>) {
+    let (input, tail) = work.input.split_at(N);
+    let (output, rest) = work.output.split_at_mut(N);
+    for (&x, y) in tail.iter().zip(rest) {
+        *y = ln(x);
+    }
+    fixed::<K, N>(
+        k,
+        input.try_into().expect("fixed packet"),
+        output.try_into().expect("fixed packet"),
+    );
+}
+
+#[cfg(feature = "simd")]
+#[inline(always)]
+fn run<K: morphiq_numerics_arch::Simd>(k: K, work: Slice<'_>) {
+    let n = work.input.len();
+    if n >= K::LANES && n <= 8 * K::LANES && n.is_power_of_two() {
+        macro_rules! fixed {
+            ($n:literal) => {
+                fixed::<K, $n>(
+                    k,
+                    work.input.try_into().expect("fixed packet"),
+                    work.output.try_into().expect("fixed packet"),
+                )
+            };
+        }
+        return match n {
+            2 => fixed!(2),
+            4 => fixed!(4),
+            8 => fixed!(8),
+            16 => fixed!(16),
+            32 => fixed!(32),
+            64 => fixed!(64),
+            _ => k.vectorize(work),
+        };
+    }
+    if n > K::LANES && n <= 8 * K::LANES + 2 {
+        match n {
+            3 => return packet::<K, 2>(k, work),
+            5 | 6 => return packet::<K, 4>(k, work),
+            9 | 10 => return packet::<K, 8>(k, work),
+            17 | 18 => return packet::<K, 16>(k, work),
+            33 | 34 => return packet::<K, 32>(k, work),
+            65 | 66 => return packet::<K, 64>(k, work),
+            _ => (),
+        }
+    }
+    k.vectorize(work);
+}
+
 #[cfg(feature = "simd")]
 pub(crate) fn slice(input: &[f64], output: &mut [f64]) {
     use morphiq_numerics_arch::Simd;
@@ -77,18 +174,18 @@ pub(crate) fn slice(input: &[f64], output: &mut [f64]) {
         if input.len() >= Avx512::LANES
             && let Some(k) = Avx512::try_new()
         {
-            return k.vectorize(work);
+            return run(k, work);
         }
         if input.len() >= Avx2::LANES
             && let Some(k) = Avx2::try_new()
         {
-            return k.vectorize(work);
+            return run(k, work);
         }
-        Sse2::new().vectorize(work)
+        run(Sse2::new(), work)
     }
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
-        morphiq_numerics_arch::Neon::new().vectorize(work)
+        run(morphiq_numerics_arch::Neon::new(), work)
     }
     #[cfg(not(any(
         target_arch = "x86_64",
@@ -102,16 +199,24 @@ mod tests {
     use super::*;
     use crate::lanes::tests::{backends, ln_corpus};
 
+    struct Dispatched<'a>(Slice<'a>);
+    impl morphiq_numerics_arch::WithSimd for Dispatched<'_> {
+        type Output = ();
+        fn with<K: morphiq_numerics_arch::Simd>(self, k: K) {
+            run(k, self.0);
+        }
+    }
+
     #[test]
     fn fast_ln_slices_match_scalar_on_every_backend_and_remainder() {
         let xs = ln_corpus();
         for backend in backends() {
-            for len in (0..=17).chain([31, 32, 33, 51, 52, 53, xs.len()]) {
+            for len in (0..=66).chain([256, 4096, xs.len()]) {
                 let mut output = std::vec![0.0; len];
-                backend.vectorize(Slice {
+                backend.vectorize(Dispatched(Slice {
                     input: &xs[..len],
                     output: &mut output,
-                });
+                }));
                 for (&x, &y) in xs[..len].iter().zip(&output) {
                     assert_eq!(y.to_bits(), ln(x).to_bits(), "{} at {x:?}", backend.name());
                 }

@@ -27,7 +27,9 @@ def host():
     return dict(utc=time.time(), affinity=sorted(os.sched_getaffinity(0)),
                 cpu_stat=Path('/proc/stat').read_text(),
                 load=Path('/proc/loadavg').read_text(),
-                cpuinfo=Path('/proc/cpuinfo').read_text())
+                cpuinfo=Path('/proc/cpuinfo').read_text(),
+                frequency={str(p):p.read_text().strip() for p in Path('/sys/devices/system/cpu').glob('cpu[0-9]*/cpufreq/scaling_cur_freq')},
+                thermal={str(p):p.read_text().strip() for p in Path('/sys/class/thermal').glob('thermal_zone*/temp')})
 
 
 def pointer(path, symbol):
@@ -60,7 +62,7 @@ def main():
     ap.add_argument('--cache-slots', type=int, default=1)
     ap.add_argument('--product', required=True)
     ap.add_argument('--reference', required=True)
-    ap.add_argument('--primitive', choices=['exp', 'erfcx', 'cdf', 'ln', 'ln_exp'], required=True)
+    ap.add_argument('--primitive', choices=['exp', 'erfcx', 'cdf', 'ln', 'ln_exp', 'log2', 'log10', 'ln_1p'], required=True)
     ap.add_argument('--length', type=int, required=True)
     ap.add_argument('--population', default='ordinary')
     ap.add_argument('--kind', choices=['vector', 'scalar', 'latency'], default='vector')
@@ -83,7 +85,7 @@ def main():
         method = getattr(native, name)
         method.argtypes = [C.c_void_p, D, D, C.c_size_t, C.c_uint64]
         method.restype = C.c_uint64
-    symbol = dict(exp='exp', erfcx='erfcx', cdf='norm_cdf', ln='ln', ln_exp='ln_exp')[args.primitive]
+    symbol = dict(exp='exp', erfcx='erfcx', cdf='norm_cdf', ln='ln', ln_exp='ln_exp', log2='log2', log10='log10', ln_1p='ln_1p')[args.primitive]
     symbol = args.symbol_prefix + symbol + ('_slice' if args.kind == 'vector' else '')
     product = pointer(Path(args.product), symbol)
     entries = {'ours': (product, 'measure_packet' if args.kind == 'vector' else 'measure1')}
