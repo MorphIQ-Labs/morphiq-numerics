@@ -54,6 +54,7 @@ fn mixed_slices_preserve_fast_scalar_bits_and_remainders() {
             elementary::exp as fn(f64) -> f64,
             elementary::exp_slice as Slice,
         ),
+        (elementary::ln, elementary::ln_slice),
         (normal::erfcx, normal::erfcx_slice),
         (normal::norm_cdf, normal::norm_cdf_slice),
     ] {
@@ -65,6 +66,31 @@ fn mixed_slices_preserve_fast_scalar_bits_and_remainders() {
             }
         }
     }
+}
+
+#[test]
+fn ln_specials_preserve_the_strong_owner_bits() {
+    for x in [
+        0.0,
+        -0.0,
+        -1.0,
+        f64::NEG_INFINITY,
+        f64::INFINITY,
+        1.0,
+        f64::from_bits(0x7ff8_1234_5678_9abc),
+        f64::from_bits(0xfff0_1234_5678_9abc),
+    ] {
+        assert_eq!(
+            elementary::ln(x).to_bits(),
+            crate::elementary::ln(x).to_bits()
+        );
+    }
+}
+
+#[test]
+#[should_panic(expected = "ln_slice: slices of different lengths")]
+fn ln_slice_rejects_length_mismatch() {
+    elementary::ln_slice(&[1.0], &mut []);
 }
 
 #[test]

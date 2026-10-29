@@ -196,3 +196,37 @@ Permanent raw data retention is optional; do not add generated archives to Git.
 Historical records remain in Git history. This policy does not remove correctness
 fixtures, worst-case witnesses, mathematical proof inputs or certified constants.
 Reproduction means regenerating a comparable experiment, not identical timings.
+
+## Focused logarithm comparison
+
+The `x86/prepare-ln.py` adapter uses the same timers, calibration and
+ten-process paired runner for three explicit cells: scalar throughput,
+dependent latency, and the automatic 52-value slice. Inputs are exact
+binary64 values formed by `.5 + 1.5*i/51`, `i=0..51`. The references are
+the pinned SLEEF scalar FMA u10 log and AVX-512 u10 log with scalar remainders.
+Each cell requires an upper 95% paired ratio at most one; all samples and
+failed cells remain recorded. This scoped comparison does not establish
+the broader ln workload/backend/ARM or consumer qualification.
+
+From a clean committed candidate on native x86 with AVX-512F and FMA:
+
+```sh
+python scripts/bench_fast/x86/prepare-ln.py --cpu 2 \
+  --reference-bin target/bench-fast-refs/bin --out target/ln-ordinary-001
+```
+
+Before timing, run the independent `fast_ln` reference tests, inspect
+`objdump -d -C --disassemble=prod_ln` on the generated wrapper library,
+record host conditions, and finish all builds/proofs/oracle work. The
+manifest records the input, product and reference binary hashes and source
+revision; preserve the pinned reference build receipt too. Freeze and run:
+
+```sh
+python scripts/bench_fast/freeze.py target/ln-ordinary-001
+python target/ln-ordinary-001/run-qualification.py
+python scripts/bench_fast/freeze.py target/ln-ordinary-001 --verify
+```
+
+Use a new output directory for every changed candidate. The adapter keeps
+its ln wrapper separate from the historical matrix's control wrapper, so
+building pre-ln strong controls does not require a nonexistent fast API.

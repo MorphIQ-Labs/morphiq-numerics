@@ -1932,6 +1932,13 @@ fn fast_section(r: &mut Recorder) {
             -40.0,
             40.0,
         ),
+        (
+            "fast::ln",
+            elementary_fast::ln,
+            elementary_fast::ln_slice,
+            0.5,
+            2.0,
+        ),
     ] {
         r.label(name);
         for &bits in &edges {

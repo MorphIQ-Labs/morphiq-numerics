@@ -12,11 +12,14 @@ feature changes an existing API's numerical identity.
 | API | Accelerated domain | Error bound there |
 | --- | --- | --- |
 | `fast::elementary::exp` | `abs(x) < 704` | Relative `2^-51` |
+| `fast::elementary::ln` | All finite `x > 0` | Absolute `2^-53 * abs(ln(x)) + 2^-65`; exact at one |
 | `fast::normal::erfcx` | `-0.5 <= x < 16`, `abs(x) >= 2^-33` | Relative `2^-51` |
 | `fast::normal::norm_cdf` | `2^-33 <= abs(x) <= 8` | Absolute `2^-49` |
 
 Each function has a matching `_slice(x, out)` API. Results in the accelerated
-domains are finite and normal. The CDF has no relative-tail guarantee inside
+domains are finite and normal, except the logarithm's exact zero at one.
+The logarithm's derivation and log-unit budget are in [fast_ln.md](fast_ln.md).
+The CDF has no relative-tail guarantee inside
 its accelerated domain. Correct rounding and
 faithful rounding are not the fast contract. Scalar and slice results must be
 bit-identical within this namespace; fast and strong results may differ.

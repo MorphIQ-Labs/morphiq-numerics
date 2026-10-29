@@ -24,7 +24,7 @@
 //!   density, correctly rounded wherever its rounding test decides; and
 //!   `erfcx`, the scaled complementary error function, with `erfcx_slice`
 //!   for scalar-equivalent SIMD evaluation (see its assurance limits);
-//! - [`fast`]: draft explicit bounded-approximation `exp`, `erfcx` and
+//! - [`fast`]: draft explicit bounded-approximation `exp`, `ln`, `erfcx` and
 //!   `norm_cdf` entries with matching slices; see their qualification limits;
 //! - [`bivariate_normal`]: the bivariate normal distribution function with an
 //!   absolute error bound, and a per-correlation evaluator that reuses its
