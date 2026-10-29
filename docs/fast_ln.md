@@ -51,9 +51,14 @@ retains its Ziv decision and accurate fallback; this entry has neither.
 The slice screens positive finite packets before arithmetic. A packet containing
 a special value finishes through the bounded scalar entry, which delegates
 only special values to the strong owner. Regular packets use a flat loop over
-full vectors. The eight-lane backend processes two independent packets per
-iteration to expose independent polynomial work; each packet retains its own
-special-value screen and arithmetic sequence. Fixed power-of-two packets and one/two-element scalar remainders
+full vectors. The eight-lane backend screens two packets for finite normal
+inputs before evaluating their independent reciprocal stages. This omits
+subnormal scaling on the proved normal domain; `normal_reduction_identical`
+and `fused_normalization` establish the same reduction. Other packets use a
+separate vectorized general loop, retaining each packet's scalar/SIMD selection.
+The fixed 16/32/64-value calls explicitly unroll the same packet work to avoid
+materializing every stage constant for a tiny loop. Per-lane arithmetic is
+unchanged. Fixed power-of-two packets and one/two-element scalar remainders
 use the established bounded-exp dispatch structure to avoid bulk-loop setup on
 short calls. Otherwise the last partial packet is padded with 2 and only its valid prefix
 is stored. It stays in the selected SIMD width instead of entering a second

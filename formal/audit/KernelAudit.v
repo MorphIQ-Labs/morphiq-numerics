@@ -944,6 +944,7 @@ Print Assumptions LnNormalized.fused_signed_exponent.
 Print Assumptions LnNormalized.packed_pair_index.
 Print Assumptions LnNormalized.positive_encoding_screen.
 Print Assumptions LnNormalized.positive_normal_encoding_screen.
+Print Assumptions LnNormalized.normal_reduction_identical.
 Print Assumptions LnNormalized.clear_low_52.
 Print Assumptions LnNormalized.packed_tables_lossless.
 Print Assumptions FastExp.fast_exp_entry_ok.

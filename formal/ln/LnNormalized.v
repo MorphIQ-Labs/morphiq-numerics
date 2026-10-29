@@ -1,7 +1,7 @@
 (** Reduced::of already chooses the reciprocal stage's fundamental interval.
     The normalized lane specialization therefore has no second exponent. *)
-From Coq Require Import ZArith Lia List Bool.
-From Flocq Require Import IEEE754.Binary IEEE754.Bits.
+From Coq Require Import Reals ZArith Lia Lra List Bool.
+From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
 From Binary64 Require Import IEEE64 Encodings.
 From Q Require Import Q128Mul.
 Require Import LnReduction Ln1pReduction Ln1pCheck Ln1pTables.
@@ -225,4 +225,28 @@ Proof.
    2: { apply Z.mod_unique with (-1)%Z; [left; lia|ring]. }
    split; lia.
  - rewrite Z.mod_small by lia. split; lia.
+Qed.
+
+(** A finite normal input selects the unscaled arm of the actual scalar
+    normalizer. The lane specialization then uses fused_normalization. *)
+Theorem normal_reduction_identical x : finite x ->
+ (bpow radix2 (-1022) <= IEEE64.B x)%R ->
+ LnReduction.reduce x =
+ let bits := bits_of_b64 x in
+ let biased := Z.shiftr bits 52 in
+ let fraction := Z.land bits (2^52-1) in
+ let i := Z.to_nat (Z.shiftr fraction 45) in
+ let '(y,e) :=
+   if (i <? 53)%nat then
+     (b64_of_bits (Z.lor (Z.shiftl 1023 52) fraction), biased-1023)
+   else (b64_of_bits (Z.lor (Z.shiftl 1022 52) fraction), biased-1022) in
+ (e,i,y,LnTables.ln_r i).
+Proof.
+ intros Fx Normal. unfold LnReduction.reduce.
+ destruct LnReduction.c_min_pos_ok as [Fm Vm].
+ rewrite (Bcompare_correct 53 1024 x LnReduction.c_min_pos Fx Fm), Vm.
+ destruct (Rcompare_spec (IEEE64.B x) (bpow radix2 (-1022))) as [L|E|G].
+ - exfalso; lra.
+ - cbv beta iota zeta. rewrite !Z.sub_0_r. reflexivity.
+ - cbv beta iota zeta. rewrite !Z.sub_0_r. reflexivity.
 Qed.

@@ -46,7 +46,7 @@ fn scalar_packet(input: &[f64], output: &mut [f64]) {
 
 #[cfg(feature = "simd")]
 #[inline(always)]
-fn evaluate<K: morphiq_numerics_arch::Simd>(k: K, input: &[f64], output: &mut [f64]) {
+fn evaluate_general<K: morphiq_numerics_arch::Simd>(k: K, input: &[f64], output: &mut [f64]) {
     let mut packet = K::Array::default();
     // Padding is a supported positive finite input and is never stored.
     packet.as_mut().fill(2.0);
@@ -60,13 +60,71 @@ fn evaluate<K: morphiq_numerics_arch::Simd>(k: K, input: &[f64], output: &mut [f
 }
 
 #[cfg(feature = "simd")]
-struct Slice<'a> {
+#[inline(always)]
+fn evaluate<K: morphiq_numerics_arch::Simd>(k: K, input: &[f64], output: &mut [f64]) {
+    if K::LANES != 8 {
+        return evaluate_general(k, input, output);
+    }
+    let mut packet = K::Array::default();
+    packet.as_mut().fill(2.0);
+    packet.as_mut()[..input.len()].copy_from_slice(input);
+    let x = k.load(packet);
+    let normal = k.and_m(
+        k.le(k.splat(f64::MIN_POSITIVE), x),
+        k.lt(x, k.splat(f64::INFINITY)),
+    );
+    if k.mask_bits(normal) != (1 << K::LANES) - 1 {
+        return general_packets(k, input, output);
+    }
+    k.store_partial(super::lanes::bounded_normal(k, x), output);
+}
+
+#[cfg(feature = "simd")]
+#[inline(always)]
+fn evaluate_pair<K: morphiq_numerics_arch::Simd>(k: K, input: &[f64], output: &mut [f64]) {
+    let mut a = K::Array::default();
+    let mut b = K::Array::default();
+    a.as_mut().copy_from_slice(&input[..K::LANES]);
+    b.as_mut().copy_from_slice(&input[K::LANES..]);
+    let a = k.load(a);
+    let b = k.load(b);
+    let normal_a = k.and_m(
+        k.le(k.splat(f64::MIN_POSITIVE), a),
+        k.lt(a, k.splat(f64::INFINITY)),
+    );
+    let normal_b = k.and_m(
+        k.le(k.splat(f64::MIN_POSITIVE), b),
+        k.lt(b, k.splat(f64::INFINITY)),
+    );
+    if k.mask_bits(k.and_m(normal_a, normal_b)) != (1 << K::LANES) - 1 {
+        return general_packets(k, input, output);
+    }
+    let (out_a, out_b) = output.split_at_mut(K::LANES);
+    let (a, b) = super::lanes::bounded_normal_pair(k, a, b);
+    k.store_partial(a, out_a);
+    k.store_partial(b, out_b);
+}
+
+// Keep subnormal scaling and mixed-special handling off the normal path.
+// The general loop preserves each packet's scalar/SIMD selection, and
+// vectorize keeps every lane operation inside its backend's feature boundary.
+#[cfg(feature = "simd")]
+#[cold]
+#[inline(never)]
+fn general_packets<K: morphiq_numerics_arch::Simd>(k: K, input: &[f64], output: &mut [f64]) {
+    k.vectorize(Slice::<false> { input, output });
+}
+
+#[cfg(feature = "simd")]
+struct Slice<'a, const SPECIALIZE_NORMAL: bool = true> {
     input: &'a [f64],
     output: &'a mut [f64],
 }
 
 #[cfg(feature = "simd")]
-impl morphiq_numerics_arch::WithSimd for Slice<'_> {
+impl<const SPECIALIZE_NORMAL: bool> morphiq_numerics_arch::WithSimd
+    for Slice<'_, SPECIALIZE_NORMAL>
+{
     type Output = ();
     #[inline(always)]
     fn with<K: morphiq_numerics_arch::Simd>(self, k: K) {
@@ -74,23 +132,26 @@ impl morphiq_numerics_arch::WithSimd for Slice<'_> {
         let bulk = self.input.len() / size * size;
         let (input, rest) = self.input.split_at(bulk);
         let (output, rest_out) = self.output.split_at_mut(bulk);
-        if K::LANES == 8 {
+        if SPECIALIZE_NORMAL && K::LANES == 8 {
             let mut inputs = input.chunks_exact(2 * size);
             let mut outputs = output.chunks_exact_mut(2 * size);
             for (input, output) in inputs.by_ref().zip(outputs.by_ref()) {
-                evaluate(k, &input[..size], &mut output[..size]);
-                evaluate(k, &input[size..], &mut output[size..]);
+                evaluate_pair(k, input, output);
             }
             if !inputs.remainder().is_empty() {
                 evaluate(k, inputs.remainder(), outputs.into_remainder());
             }
         } else {
             for (input, output) in input.chunks_exact(size).zip(output.chunks_exact_mut(size)) {
-                evaluate(k, input, output);
+                evaluate_general(k, input, output);
             }
         }
         if !rest.is_empty() {
-            evaluate(k, rest, rest_out);
+            if SPECIALIZE_NORMAL {
+                evaluate(k, rest, rest_out);
+            } else {
+                evaluate_general(k, rest, rest_out);
+            }
         }
     }
 }
@@ -109,14 +170,17 @@ impl<const N: usize> morphiq_numerics_arch::WithSimd for Packet<'_, N> {
     #[inline(always)]
     fn with<K: morphiq_numerics_arch::Simd>(self, k: K) {
         assert!(N >= K::LANES && N.is_multiple_of(K::LANES));
+        assert!(N.is_power_of_two() && N <= 64);
         if K::LANES == 8 && N.is_multiple_of(2 * K::LANES) {
-            for (input, output) in self
-                .input
-                .chunks_exact(2 * K::LANES)
-                .zip(self.output.chunks_exact_mut(2 * K::LANES))
-            {
-                evaluate(k, &input[..K::LANES], &mut output[..K::LANES]);
-                evaluate(k, &input[K::LANES..], &mut output[K::LANES..]);
+            // These are the existing fixed 16/32/64-value calls. Explicit
+            // pairs avoid a tiny loop hoisting every stage constant at entry.
+            evaluate_pair(k, &self.input[..16], &mut self.output[..16]);
+            if N >= 32 {
+                evaluate_pair(k, &self.input[16..32], &mut self.output[16..32]);
+            }
+            if N >= 64 {
+                evaluate_pair(k, &self.input[32..48], &mut self.output[32..48]);
+                evaluate_pair(k, &self.input[48..64], &mut self.output[48..64]);
             }
         } else {
             for (input, output) in self

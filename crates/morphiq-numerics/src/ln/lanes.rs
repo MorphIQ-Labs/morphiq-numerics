@@ -56,6 +56,16 @@ fn reduce<K: Simd>(k: K, x: K::F) -> (K::F, K::F) {
             k.select(tiny, k.splat(TWO_52 + 1078.0), k.splat(TWO_52 + 1024.0)),
         )
     };
+    normalized_bits(k, bits, offset)
+}
+
+#[inline(always)]
+fn reduce_normal<K: Simd>(k: K, x: K::F) -> (K::F, K::F) {
+    normalized_bits(k, k.to_bits(x), k.splat(TWO_52 + 1024.0))
+}
+
+#[inline(always)]
+fn normalized_bits<K: Simd>(k: K, bits: K::U, offset: K::F) -> (K::F, K::F) {
     // OFF is the encoding of the lower endpoint of Reduced::of's interval.
     // Removing the high bits of bits-OFF leaves exactly its chosen y.
     let u = k.sub_u(bits, k.splat_bits(OFF));
@@ -278,6 +288,24 @@ pub(super) fn fast_ln<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
 pub(super) fn bounded_positive<K: Simd>(k: K, x: K::F) -> K::F {
     let (s, lo, _) = fast_value::<K, true>(k, reduce(k, x));
     k.add(s, lo)
+}
+
+/// A packet whose caller established finite positive normal inputs.
+#[inline(always)]
+pub(super) fn bounded_normal<K: Simd>(k: K, x: K::F) -> K::F {
+    let (s, lo, _) = fast_value::<K, true>(k, reduce_normal(k, x));
+    k.add(s, lo)
+}
+
+/// Two independent positive normal packets. Each lane retains the scalar
+/// operation order; the caller's screen makes subnormal work unnecessary.
+#[inline(always)]
+pub(super) fn bounded_normal_pair<K: Simd>(k: K, a: K::F, b: K::F) -> (K::F, K::F) {
+    let a = reduce_normal(k, a);
+    let b = reduce_normal(k, b);
+    let (sa, la, _) = fast_value::<K, true>(k, a);
+    let (sb, lb, _) = fast_value::<K, true>(k, b);
+    (k.add(sa, la), k.add(sb, lb))
 }
 
 impl Kernel for Ln1p {
