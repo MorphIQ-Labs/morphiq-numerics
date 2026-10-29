@@ -85,6 +85,28 @@ Before declaring parity or accepting a regression, the owning issue must specify
 
 The decision record presents error and cost together for the same source, settings, exact inputs and output set. Report proved bounds separately from observed maxima and reference uncertainty. Show fast-path coverage, fallback frequency and fallback latency/cost by input region and for representative mixtures, including mixed SIMD lanes. Compare strong and fast APIs as distinct contracts; benchmark both when the choice changes a consumer's decision. Tightening a tolerance or adding a runtime check requires its consumer benefit and measured cost in the same review. Loosening a bound requires an independently justified contract change, never fitting the bound to failing samples. Stop investigating once the predeclared decision is supported; a missing required measurement is still unestablished. The record and PR template are review controls, not an automated timing gate; CI proof/oracle and native performance enforcement remain as specified above.
 
+### Hotspot optimization review
+
+Start with a profile identifying the costly operation and its contribution to
+the consumer workload. For a proposed hotspot change, inspect the generated
+code for the actual calling context, target, compiler and flags. Check dependency
+chains, constant materialization, widening, spills, dispatch and vectorization;
+source brevity or instruction counts alone do not establish a speedup. Preserve
+the commands needed to reproduce the inspection and record the relevant findings.
+
+Consider compile-time specialization using established constants and input
+bounds. State and prove the assumptions, including rounding, overflow and boundary
+behavior; preserve the defined outcome outside any specialized domain. An
+optimization preserving an existing API's complete contract belongs in that API
+when qualified; it need not introduce a separate approximate API. Qualify affected
+strong and fast consumers separately where they share the optimized machinery.
+
+Declare independent throughput and dependent latency criteria separately wherever
+both matter to the consumer. Select implementations using measured consumer cost
+on each supported target; a throughput win cannot stand in for a latency result.
+Keep specialization and backend variants proportional to demonstrated benefit.
+Do not create a general-purpose optimization subsystem without a measured need.
+
 ### Benchmark record retention
 
 Commit the methodology: runnable harnesses, deterministic input generators,

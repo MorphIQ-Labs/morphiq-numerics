@@ -150,6 +150,42 @@ Linux `perf record` around a separate cell invocation, with its profile outputs
 under `target/`. Record wrapper/library sizes and exported symbols with the
 platform's `size`/`nm` tools. Profiling runs never replace uninstrumented samples.
 
+## Review a measured hotspot
+
+Use this checklist when investigating an optimization; record findings in the
+owning numerical decision/PR. The engineering requirements live in
+[`AGENTS.md`](../../AGENTS.md#hotspot-optimization-review).
+
+1. Identify the hot call and its share of consumer runtime from a profile.
+   Set a stopping condition before investigating alternatives.
+2. Inspect the exact compiled wrapper and caller used by the workload, including
+   inlined code. Record source revision, compiler, target features, optimization
+   and LTO flags, symbol/caller and disassembly command. Use the platform's
+   disassembler on the built binary; check dependency chains, widened arithmetic,
+   constant loads, spills and scalar/SIMD dispatch. Keep generated assembly under
+   `target/`, and preserve its reproduction commands in the review.
+3. Look for established constants and bounded indices that permit work to move
+   out of the runtime path. Derive the specialized expression and establish its
+   rounding, overflow and boundary behavior before substitution. Test the
+   transitions and domain extremes against an independent reference. Preserve
+   the existing behavior for inputs outside the specialized domain.
+4. Measure independent throughput and dependent latency separately where both
+   affect the consumer, on native ARM and x86 as applicable. Inspect the emitted
+   dependency chain to ensure the compiler has not removed the intended
+   dependency. Qualify the real consumer before choosing between conflicting
+   microbenchmark winners. Assembly inspection explains measurements; it does
+   not replace them.
+5. Apply an exact-result improvement to existing APIs whose full contracts it
+   preserves. Qualify affected strong and fast call sites. Add target-specific
+   variants only when their measured value warrants the maintenance cost.
+
+Ben Joffe's [constant signed floor-division study](https://www.benjoffe.com/fast-floordiv)
+illustrates compiler-sensitive formulations and differing throughput/latency
+winners. It is a methodological reference, not evidence of a speedup in this
+library. In particular, inspect existing power-of-two reductions before assuming
+that a general constant-division technique improves them. Consumer timestamp or
+fixed-point operations warrant investigation only when profiling identifies cost.
+
 ## Retention and scope
 
 Commit recipes, comparator pins, harness source, acceptance rules and changes to

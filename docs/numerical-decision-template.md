@@ -31,7 +31,11 @@ additional precision or fallback using the contract obligation it establishes.
 
 ## Paired evidence
 
+- Profiled hotspot, share of consumer cost and investigation stopping condition:
+- Specialization assumptions (constants, input bounds), boundary/overflow behavior and proof:
 - Exact source/toolchain/features/backend/comparator versions and input bits:
+- Generated-code inspection commands, actual call context and findings by target:
+- Separate throughput/latency criteria where applicable; consumer measurement used to select the candidate:
 - Independent reference, provenance and reference uncertainty:
 - Bound certificates, generated constants, worst-case and boundary witnesses:
 - Versioned reproduction commands/input generators; source/comparator pins and host state:
@@ -42,7 +46,8 @@ additional precision or fallback using the contract obligation it establishes.
 | <strong/fast candidate> | <domain and certificate> | <with reference uncertainty> | <scalar, batch, interface> | <ordinary, difficult and mixed lanes> | <meets both / rejected / unestablished> |
 
 Retain refusals and failed attempts through review; record the decision and
-limitations in the owning issue/PR. Raw runs need not be permanently committed. Separate dependent latency from throughput,
+limitations in the owning issue/PR. Raw runs need not be permanently committed.
+Separate dependent latency from throughput,
 instrumented diagnostics from native timings, and unlike contracts/interfaces.
 Include consumer results separately when a consumer adoption is claimed.
 
@@ -51,6 +56,7 @@ Include consumer results separately when a consumer adoption is claimed.
 - Selected implementation/settings and why further accuracy is unnecessary or required:
 - Rejected alternatives, limitations and re-evaluation trigger:
 - Compatibility/default implications; no implicit change to an existing API:
+- Existing APIs benefiting from exact-result optimization; justification for any new backend variant:
 - Exact CI witnesses and native measurement/review evidence; missing evidence:
 - Reviewer/owner disposition, date and source revision:
 
