@@ -294,3 +294,23 @@ Freeze and run `run-qualification.py` with the same ten-process, two-block,
 there is no aggregation across cells. This matrix stops on its first completed
 required failure and records incomplete qualification explicitly. Preserve the
 entire failed attempt before changing source or predeclaring another campaign.
+
+On native Linux, observe the same final ln binaries for heap allocations before
+freezing/timing, using gperftools heap hooks (record the installed version and
+library hash). This reuses the public-call probe from the native fast campaign:
+
+```sh
+cc -O2 -fPIC -shared scripts/bench_fast/x86/allocation-probe.c \
+  -o target/ln-full-001/bin/allocation-probe.so
+LD_PRELOAD=/path/to/libtcmalloc.so.4 \
+  python scripts/bench_fast/x86/observe-ln-allocations.py \
+  target/ln-full-001 target/ln-full-001/bin/allocation-probe.so
+```
+
+The probe checks scalar/slice calls for every built backend over ordinary,
+wide, near-one, subnormal and mixed populations at lengths 1, 9, 52 and 4096.
+It verifies output bits against the uninstrumented scalar entry and requires a
+71-byte positive allocation control. Retain the raw heap profiles and summary;
+this instrumentation is separate from timing and does not establish macOS
+allocation behavior. The published crates' no-alloc dependency boundary remains
+the structural guarantee on every platform.
