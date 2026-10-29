@@ -16,6 +16,12 @@ P = Path(__file__).resolve().parent
 E = P / 'references'
 D = C.POINTER(C.c_double)
 KEEP = []
+PAGE = 4096
+# Every process, calibration included, places its buffers identically: the input
+# on a page boundary, the output 2 KiB past one. Allocator state otherwise differs
+# between processes, and kernel speed depends on the output's 4 KiB offset from
+# its input (store-to-load aliasing; up to 1.8x on Sapphire Rapids, #243).
+OUTPUT_PAGE_OFFSET = 2048
 
 
 def host():
@@ -132,8 +138,14 @@ def main():
         method.argtypes = [C.c_void_p, D, D, C.c_size_t, C.c_uint64, C.c_size_t]
         method.restype = C.c_uint64
     values = inputs(args.primitive, args.population, args.length)
-    x = (C.c_double * max(1, args.length*args.cache_slots))(*(values*args.cache_slots))
-    y = (C.c_double * max(1, args.length*args.cache_slots))()
+    words = values*args.cache_slots
+    span = (max(1, len(words))*8 + PAGE - 1) // PAGE * PAGE
+    arena = (C.c_byte * (2*span + 3*PAGE))()
+    input_address = (C.addressof(arena) + PAGE - 1) // PAGE * PAGE
+    output_address = input_address + span + OUTPUT_PAGE_OFFSET
+    x, y = C.cast(input_address, D), C.cast(output_address, D)
+    for index, value in enumerate(words):
+        x[index] = value
     # The paired entries use exactly the same allocated input and output buffers.
     def measure(name, count):
         ptr, method = entries[name]
@@ -178,7 +190,9 @@ def main():
     metadata = dict(arguments=vars(args), counts=counts, before=before, after=after,
                     input_sha256=hashlib.sha256(input_bytes).hexdigest(),
                     product_sha256=hashlib.sha256(Path(args.product).read_bytes()).hexdigest(),
-                    input_address=C.addressof(x), output_address=C.addressof(y))
+                    input_address=input_address, output_address=output_address,
+                    placement=dict(input_page_offset=input_address % PAGE,
+                                   output_minus_input_mod_page=(output_address-input_address) % PAGE))
     (out/'metadata.json').write_text(json.dumps(metadata, indent=2)+'\n')
     timed = [r for r in records if r['kind']=='timed']
     if timed and not args.diagnostic and min(r['elapsed_ns'] for r in timed) < 250_000_000:
