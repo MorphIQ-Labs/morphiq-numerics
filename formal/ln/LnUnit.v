@@ -1,4 +1,4 @@
-(** The reciprocal-one cells admit the exact reduction z=x-1. The existing
+(** The reciprocal-one cells use the exact reduction z=x-1. The existing
     polynomial, error budget and decision remain unchanged. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz Bool List.
 From Flocq Require Import Core Sterbenz IEEE754.Binary IEEE754.Bits.
