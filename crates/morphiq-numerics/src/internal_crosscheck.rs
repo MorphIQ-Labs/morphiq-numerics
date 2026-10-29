@@ -255,6 +255,7 @@ fn internal_crosscheck_corpus() {
     let mut rng = SplitMix64::new(0x7163_726f_7373_0001);
     let mut out = String::new();
     normal::write(&mut out);
+    fast_corpus(&mut out);
     asin::write(&mut out);
     asinh::write(&mut out);
     atan2::write(&mut out);
@@ -1593,5 +1594,70 @@ fn logarithm_fallback_corpus(out: &mut String) {
             }
         }
         assert_eq!(rejected, 8, "logarithm fallback rejection coverage {kind}");
+    }
+}
+
+/// Explicit fast entry transcriptions, including screen neighbors and fallback
+/// inputs. Exp supplies its unchanged strong owner's result separately; the
+/// extraction verifies dispatch and the complete accelerated arithmetic.
+fn fast_corpus(out: &mut String) {
+    let mut write = |x: f64| {
+        writeln!(
+            out,
+            "fast_exp {:016x} {:016x} : {:016x}",
+            x.to_bits(),
+            crate::elementary::exp(x).to_bits(),
+            crate::fast::elementary::exp(x).to_bits()
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "fast_erfcx {:016x} : {:016x}",
+            x.to_bits(),
+            crate::fast::normal::erfcx(x).to_bits()
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "fast_normal {:016x} : {:016x}",
+            x.to_bits(),
+            crate::fast::normal::norm_cdf(x).to_bits()
+        )
+        .unwrap();
+    };
+    for x in [
+        0.0_f64,
+        -0.0,
+        f64::from_bits(1),
+        f64::MIN_POSITIVE,
+        -704.0,
+        704.0,
+        -0.5,
+        -1.0,
+        1.0,
+        16.0,
+        -8.0,
+        8.0,
+        -f64::from_bits(0x3de0_0000_0000_0000),
+        f64::from_bits(0x3de0_0000_0000_0000),
+        -745.0,
+        710.0,
+        f64::MAX,
+        -f64::MAX,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::from_bits(0x7ff8_1234_5678_9abc),
+        f64::from_bits(0xfff8_1234_5678_9abc),
+    ] {
+        write(x.next_down());
+        write(x);
+        write(x.next_up());
+    }
+    let mut rng = SplitMix64::new(0xfa57_2026_1027_0002);
+    for _ in 0..512 {
+        write(f64::from_bits(rng.next_u64()));
+        write(-704.0 + 1408.0 * unit(&mut rng));
+        write(-0.5 + 16.5 * unit(&mut rng));
+        write(-8.0 + 16.0 * unit(&mut rng));
     }
 }

@@ -97,6 +97,8 @@ impl Simd for Sse2 {
         fn and_u(a: __m128i, b: __m128i) -> __m128i;
         fn or_u(a: __m128i, b: __m128i) -> __m128i;
         fn sub_u(a: __m128i, b: __m128i) -> __m128i;
+        fn add_u(a: __m128i, b: __m128i) -> __m128i;
+        fn shl_u(a: __m128i, n: u32) -> __m128i;
         fn shr_u(a: __m128i, n: u32) -> __m128i;
         fn eq_u(a: __m128i, b: __m128i) -> Sse2Mask;
     }
@@ -185,6 +187,8 @@ impl Simd for Avx2 {
         fn and_u(a: __m256i, b: __m256i) -> __m256i;
         fn or_u(a: __m256i, b: __m256i) -> __m256i;
         fn sub_u(a: __m256i, b: __m256i) -> __m256i;
+        fn add_u(a: __m256i, b: __m256i) -> __m256i;
+        fn shl_u(a: __m256i, n: u32) -> __m256i;
         fn shr_u(a: __m256i, n: u32) -> __m256i;
         fn eq_u(a: __m256i, b: __m256i) -> Avx2Mask;
     }
@@ -248,6 +252,18 @@ impl Simd for Avx512 {
         Some(unsafe { avx512::mul_add(a, b, c) })
     }
 
+    #[inline(always)]
+    fn load_partial(self, values: &[f64]) -> __m512d {
+        // SAFETY: this token establishes AVX-512F; the helper checks the length
+        // and enables memory accesses only for the supplied slice elements.
+        unsafe { avx512::load_partial(values) }
+    }
+    #[inline(always)]
+    fn store_partial(self, value: __m512d, out: &mut [f64]) {
+        // SAFETY: this token establishes AVX-512F; the helper checks the length
+        // and stores only to the supplied slice elements.
+        unsafe { avx512::store_partial(value, out) }
+    }
     forward! { avx512;
         fn splat(x: f64) -> __m512d;
         fn splat_bits(x: u64) -> __m512i;
@@ -268,6 +284,8 @@ impl Simd for Avx512 {
         fn and_u(a: __m512i, b: __m512i) -> __m512i;
         fn or_u(a: __m512i, b: __m512i) -> __m512i;
         fn sub_u(a: __m512i, b: __m512i) -> __m512i;
+        fn add_u(a: __m512i, b: __m512i) -> __m512i;
+        fn shl_u(a: __m512i, n: u32) -> __m512i;
         fn shr_u(a: __m512i, n: u32) -> __m512i;
         fn eq_u(a: __m512i, b: __m512i) -> Avx512Mask;
     }
@@ -308,6 +326,7 @@ mod helpers {
             _mm_mul_pd, _mm_or_pd, _mm_or_si128, _mm_set1_epi64x, _mm_set1_pd, _mm_shuffle_epi32,
             _mm_srl_epi64, _mm_storeu_pd, _mm_sub_epi64, _mm_sub_pd, _mm_xor_pd,
         };
+        use core::arch::x86_64::{_mm_add_epi64, _mm_sll_epi64};
 
         use super::super::Sse2Mask;
 
@@ -435,6 +454,16 @@ mod helpers {
         }
         #[target_feature(enable = "sse2")]
         #[inline]
+        pub(in super::super) fn add_u(a: __m128i, b: __m128i) -> __m128i {
+            _mm_add_epi64(a, b)
+        }
+        #[target_feature(enable = "sse2")]
+        #[inline]
+        pub(in super::super) fn shl_u(a: __m128i, n: u32) -> __m128i {
+            _mm_sll_epi64(a, _mm_cvtsi64_si128(i64::from(n)))
+        }
+        #[target_feature(enable = "sse2")]
+        #[inline]
         pub(in super::super) fn shr_u(a: __m128i, n: u32) -> __m128i {
             // PSRLQ by the count in the low 64 bits; 64 or more gives 0.
             _mm_srl_epi64(a, _mm_cvtsi64_si128(i64::from(n)))
@@ -460,6 +489,7 @@ mod helpers {
             _mm256_set1_pd, _mm256_srl_epi64, _mm256_storeu_pd, _mm256_sub_epi64, _mm256_sub_pd,
             _mm256_xor_pd,
         };
+        use core::arch::x86_64::{_mm256_add_epi64, _mm256_sll_epi64};
 
         use super::super::Avx2Mask;
 
@@ -597,6 +627,16 @@ mod helpers {
         }
         #[target_feature(enable = "avx2,fma")]
         #[inline]
+        pub(in super::super) fn add_u(a: __m256i, b: __m256i) -> __m256i {
+            _mm256_add_epi64(a, b)
+        }
+        #[target_feature(enable = "avx2,fma")]
+        #[inline]
+        pub(in super::super) fn shl_u(a: __m256i, n: u32) -> __m256i {
+            _mm256_sll_epi64(a, _mm_cvtsi64_si128(i64::from(n)))
+        }
+        #[target_feature(enable = "avx2,fma")]
+        #[inline]
         pub(in super::super) fn shr_u(a: __m256i, n: u32) -> __m256i {
             // VPSRLQ by the count in the low 64 bits; 64 or more gives 0.
             _mm256_srl_epi64(a, _mm_cvtsi64_si128(i64::from(n)))
@@ -617,9 +657,32 @@ mod helpers {
             _mm512_or_si512, _mm512_set1_epi64, _mm512_set1_pd, _mm512_srl_epi64, _mm512_storeu_pd,
             _mm512_sub_epi64, _mm512_sub_pd, _mm512_xor_si512,
         };
+        use core::arch::x86_64::{
+            _mm512_add_epi64, _mm512_mask_storeu_pd, _mm512_maskz_loadu_pd, _mm512_sll_epi64,
+        };
 
         use super::super::Avx512Mask;
 
+        #[target_feature(enable = "avx512f")]
+        #[inline]
+        pub(in super::super) fn load_partial(values: &[f64]) -> __m512d {
+            assert!(values.len() <= 8, "partial load exceeds lane width");
+            #[allow(clippy::cast_possible_truncation)] // len <= 8, so the mask fits u8
+            let mask = ((1_u16 << values.len()) - 1) as u8;
+            // SAFETY: only the first values.len() lanes are enabled, each in
+            // the live slice; disabled lanes perform no memory access.
+            unsafe { _mm512_maskz_loadu_pd(mask, values.as_ptr()) }
+        }
+        #[target_feature(enable = "avx512f")]
+        #[inline]
+        pub(in super::super) fn store_partial(value: __m512d, out: &mut [f64]) {
+            assert!(out.len() <= 8, "partial store exceeds lane width");
+            #[allow(clippy::cast_possible_truncation)] // len <= 8, so the mask fits u8
+            let mask = ((1_u16 << out.len()) - 1) as u8;
+            // SAFETY: enabled lanes are exactly the elements of the exclusive
+            // output slice; disabled lanes perform no memory access.
+            unsafe { _mm512_mask_storeu_pd(out.as_mut_ptr(), mask, value) }
+        }
         #[target_feature(enable = "avx512f")]
         #[inline]
         pub(in super::super) fn splat(x: f64) -> __m512d {
@@ -731,6 +794,16 @@ mod helpers {
         #[inline]
         pub(in super::super) fn sub_u(a: __m512i, b: __m512i) -> __m512i {
             _mm512_sub_epi64(a, b)
+        }
+        #[target_feature(enable = "avx512f")]
+        #[inline]
+        pub(in super::super) fn add_u(a: __m512i, b: __m512i) -> __m512i {
+            _mm512_add_epi64(a, b)
+        }
+        #[target_feature(enable = "avx512f")]
+        #[inline]
+        pub(in super::super) fn shl_u(a: __m512i, n: u32) -> __m512i {
+            _mm512_sll_epi64(a, _mm_cvtsi64_si128(i64::from(n)))
         }
         #[target_feature(enable = "avx512f")]
         #[inline]

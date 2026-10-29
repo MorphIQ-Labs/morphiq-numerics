@@ -1,5 +1,6 @@
 //! Scaled complementary error function: table, reciprocal and reflection kernels.
 pub(crate) mod accurate;
+pub(crate) mod bounded;
 #[cfg(test)]
 pub(crate) use accurate::{asym as accurate_asym, reflected_exponential as accurate_reflected_exp};
 #[cfg(test)]

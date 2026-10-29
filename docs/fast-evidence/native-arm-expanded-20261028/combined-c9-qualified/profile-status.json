@@ -1,0 +1,23 @@
+[
+  {
+    "cell": "015",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": "Sampling process 84504 for 5 seconds with 1 millisecond of run time between samples\nSampling completed, processing symbols...\nSample analysis of process 84504 written to file /Users/stephen/Development/MorphIQ-Labs/worktrees/morphiq-numerics-arm-194/target/arm-194/integrated-c9-qualification/profile-015.txt\n",
+    "child_status": 0
+  },
+  {
+    "cell": "033",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": "Sampling process 84530 for 5 seconds with 1 millisecond of run time between samples\nSampling completed, processing symbols...\nSample analysis of process 84530 written to file /Users/stephen/Development/MorphIQ-Labs/worktrees/morphiq-numerics-arm-194/target/arm-194/integrated-c9-qualification/profile-033.txt\n",
+    "child_status": 0
+  },
+  {
+    "cell": "157",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": "Sampling process 84534 for 5 seconds with 1 millisecond of run time between samples\nSampling completed, processing symbols...\nSample analysis of process 84534 written to file /Users/stephen/Development/MorphIQ-Labs/worktrees/morphiq-numerics-arm-194/target/arm-194/integrated-c9-qualification/profile-157.txt\n",
+    "child_status": 0
+  }
+]

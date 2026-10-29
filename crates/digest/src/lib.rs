@@ -1129,6 +1129,7 @@ pub fn corpus_digest() -> [u8; 32] {
     tridiagonal_sign_section(&mut r);
     tridiagonal_unpivoted_section(&mut r);
     bivariate_normal_section(&mut r);
+    fast_section(&mut r);
 
     r.0.finalize().into()
 }
@@ -1879,6 +1880,81 @@ fn bivariate_normal_section(r: &mut Recorder) {
                 for p in &bounded[..len] {
                     r.f64(p.value);
                     r.f64(p.error);
+                }
+            }
+        }
+    }
+}
+
+/// Explicit fast APIs have their own corpus and seed. Appending this section
+/// leaves every existing section's inputs unchanged.
+fn fast_section(r: &mut Recorder) {
+    use morphiq_numerics::fast::{elementary as elementary_fast, normal as normal_fast};
+    type Scalar = fn(f64) -> f64;
+    type Slice = fn(&[f64], &mut [f64]);
+    let mut words = Words::new(0xfa57_2026_1027_0001);
+    let edges = [
+        0_u64,
+        1 << 63,
+        1,
+        (1 << 63) | 1,
+        0x0010_0000_0000_0000,
+        0x7fef_ffff_ffff_ffff,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0x7ff8_1234_5678_9abc,
+        0xfff8_1234_5678_9abc,
+        0x3de0_0000_0000_0000, // 2^-33
+        0x3fe0_0000_0000_0000, // 1/2
+        0x4020_0000_0000_0000, // 8
+        0x4030_0000_0000_0000, // 16
+        0x4086_0000_0000_0000, // 704
+    ];
+    for (name, scalar, slice, low, high) in [
+        (
+            "fast::exp",
+            elementary_fast::exp as Scalar,
+            elementary_fast::exp_slice as Slice,
+            -746.0,
+            710.0,
+        ),
+        (
+            "fast::erfcx",
+            normal_fast::erfcx,
+            normal_fast::erfcx_slice,
+            -28.0,
+            32.0,
+        ),
+        (
+            "fast::norm_cdf",
+            normal_fast::norm_cdf,
+            normal_fast::norm_cdf_slice,
+            -40.0,
+            40.0,
+        ),
+    ] {
+        r.label(name);
+        for &bits in &edges {
+            for sign in [0, 1 << 63] {
+                for neighbor in [bits.saturating_sub(1), bits, bits.saturating_add(1)] {
+                    r.f64(scalar(f64::from_bits(neighbor ^ sign)));
+                }
+            }
+        }
+        for i in 0..512 {
+            r.f64(scalar(batched_input(&mut words, &edges, i, low, high)));
+        }
+        r.label("slice");
+        for len in (0..=17).chain([31, 32, 33, 51, 52, 53, 63, 64, 65]) {
+            for sample in 0..8 {
+                let mut input = [0.0; 65];
+                let mut output = [0.0; 65];
+                for (i, x) in input[..len].iter_mut().enumerate() {
+                    *x = batched_input(&mut words, &edges, sample * 65 + i, low, high);
+                }
+                slice(&input[..len], &mut output[..len]);
+                for &y in &output[..len] {
+                    r.f64(y);
                 }
             }
         }

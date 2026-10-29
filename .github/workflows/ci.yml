@@ -2,7 +2,9 @@
 # documentation, dependency advisories and licenses, the MSRV, the no_std and
 # wasm builds, and the test suite on every tier-1 host.
 #
-# Stages, as `needs`: check -> test. Every job is a required status check in
+# Runtime tests follow the checks. Formal validation prepares its own inputs
+# and runs alongside the other checks after basic hygiene/formatting gates.
+# Every job is a required status check in
 # the "Main branch protection" ruleset; GitHub reports a job skipped behind a
 # failed stage as passing, so the failed job itself must be required. A job is
 # added to the ruleset in the same change that adds it here.
@@ -453,7 +455,10 @@ jobs:
   # visible to every pull request, and main reads only its own.
   formal:
     name: formal (coq)
-    needs: [commit-convention, repository-hygiene, secret-scan, fmt, clippy, audit, licenses, generators, generators-bivariate, msrv, no-std]
+    # This job builds its own Rust corpora and Gappa proofs; it consumes no
+    # artifacts from the other check jobs. Starting it independently shortens
+    # proof-failure feedback. All other checks remain required for merging.
+    needs: [commit-convention, repository-hygiene, secret-scan, fmt]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-24.04
     # The erfcx/normal cold build alone took 64 minutes on this runner; the

@@ -51,6 +51,8 @@ functions unnoticed.
 | `linalg::tridiagonal::solve_many_into` | orders 0, 1, 2, 3, 17; RHS counts 0–17 around every lane width; four scales including subnormals; shape/overflow/nonfinite errors | interleaved solution bits and typed errors |
 | `linalg::tridiagonal::sign_domain` | non-dominant systems, orders 0–17, RHS counts 0–17, four scales including subnormal; zero links, signed zeros and invalid signs/diagonals | scalar/SIMD solution bits, residual-only bounds and typed errors |
 
+| `fast::exp`, `fast::erfcx`, `fast::norm_cdf` and matching slices | signed special values, subnormals, screen boundaries and neighbors; 512 mixed scalar inputs per function; eight slices of each length 0–17, 31–33, 51–53 and 63–65 | every scalar and batched output; separate seed preserves all earlier corpus sections |
+
 ## Where it is checked
 
 The test `every_output_matches_the_committed_digest` runs:

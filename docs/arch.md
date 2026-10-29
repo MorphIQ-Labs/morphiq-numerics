@@ -36,11 +36,24 @@ scalar operation it names: `add`, `sub`, `mul`, `div` (IEEE 754 binary64,
 round-to-nearest-even), `abs` and `neg` (the sign bit), the ordered
 comparisons `lt` and `le` (false on NaN), the lane masks' `and_m`, `or_m`,
 `not_m`, `mask_bits`, `mask_from_bits` and `select`, the reinterpretations `to_bits` and
-`to_float`, the 64-bit word operations `and_u`, `or_u`, `sub_u` (wrapping),
-`shr_u` (logical, zero for a count of 64 or more) and `eq_u`, `splat` and `splat_bits`, and `load`, `load_bits` and `store` on
+`to_float`, the 64-bit word operations `and_u`, `or_u`, `add_u` and `sub_u`
+(wrapping), `shl_u` and `shr_u` (zero for a count of 64 or more), and `eq_u`, `splat` and `splat_bits`, and `load`, `load_bits` and `store` on
 `[f64; LANES]` and `[u64; LANES]` arrays. `mul_add(a, b, c)` returns `a·b + c`
 rounded once on a backend with a hardware fused multiply-add (`Simd::FMA`),
 and `None` on one without; it is never emulated.
+
+**Table and prefix memory operations.** `gather_wrapped(table, index)` requires
+a nonempty power-of-two array and masks each lane's index inside the owner,
+returning the selected `u64` word reinterpreted as binary64. Arbitrary input
+indices, including all-ones words, are valid. Every backend performs bounded
+scalar loads and assembles the result into lanes. This avoids hardware-gather
+latency on affected x86 hosts with the Gather Data Sampling mitigation; the
+bounded exp code-generation gate retains that choice.
+
+`load_partial` accepts at most `LANES` values and fills unused lanes with positive
+zero. `store_partial` writes only the supplied output prefix. Both reject longer
+slices before any intrinsic access. AVX-512 uses masked memory instructions;
+other backends copy through fixed-size lane arrays. Empty prefixes are valid.
 
 **Running a kernel.** A generic kernel implements `WithSimd` and runs through
 `Simd::vectorize` or `dispatch`. `vectorize` calls it inside a function
@@ -78,8 +91,14 @@ other, and `unsafe_op_in_unsafe_fn` is denied. No public function is
 2. **Unaligned loads and stores** (`vld1q_f64`, `_mm256_loadu_pd`, …): the
    pointer comes from an `[f64; LANES]` or `[u64; LANES]` array owned by the
    function, which is exactly the bytes the instruction reads or writes; the
-   unaligned forms need only the element's alignment.
-3. Nothing else: there are no raw-pointer slices, transmutes or `static mut`.
+   unaligned forms need only the element's alignment. For AVX-512 prefix
+   operations the checked slice length determines the mask, so only elements
+   belonging to the slice are accessed, including no accesses for an empty slice.
+Table gathers require no additional unsafe block: the default trait method
+checks the table shape, masks each index by `N - 1`, and reads the word through
+safe array indexing. The existing lane load then assembles those encodings.
+
+There are no raw-pointer slices, transmutes or `static mut`.
 
 **Masks.** Each backend's mask type (`NeonMask`, `Sse2Mask`, `Avx2Mask`,
 `Avx512Mask`) is a newtype with a private field, constructed only by the

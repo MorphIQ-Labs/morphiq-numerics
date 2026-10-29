@@ -1,0 +1,31 @@
+# Native canonical-reference comparison, 28 October 2026
+
+All seven frozen 52-value comparison pairs pass the predeclared relative cost rule: the one-sided 95% upper bound on the paired time ratio is below one. The separate absolute repeatability requirement fails for every pair; at least one member of each pair exceeds the 3% process-median range or block-drift limit. These are separate outcomes. No samples were dropped and the 3% rule was not relaxed.
+
+| Public fast API | Reference | Median ns / 52 (ours / reference) | Paired geometric mean ratio | Upper 95% ratio |
+| --- | --- | ---: | ---: | ---: |
+| prod_exp | core_math_exp | 194.66 / 335.04 | 0.5756 | 0.5836 |
+| prod_exp | sleef_exp_scalar_fma | 191.61 / 304.48 | 0.6337 | 0.6413 |
+| prod_exp_slice | sleef_exp_avx512 | 83.78 / 88.20 | 0.9492 | 0.9754 |
+| prod_erfcx | libcerf_erfcx | 307.30 / 389.28 | 0.7826 | 0.7990 |
+| prod_erfcx_slice | libcerf_erfcx | 283.62 / 388.98 | 0.7377 | 0.7479 |
+| prod_norm_cdf | scipy_ndtr | 526.68 / 568.61 | 0.9431 | 0.9700 |
+| prod_norm_cdf_slice | sleef_cdf_avx512 | 429.28 / 743.10 | 0.5734 | 0.5768 |
+
+Ratios are computed from paired samples, not by dividing the independently reported medians. A ratio below one favors Numerics. Every pair must pass; no aggregate hides a losing pair. There are ten fresh processes in two blocks of five, four alternating paired rounds per process, and a 30-second gap between blocks. Per-entry counts are frozen after an excluded calibration targeting 500 ms. Each timed sample follows an excluded half-count warmup. All 560 timed samples exceed 250 ms. The process is the uncertainty unit: median paired log ratio per process, then a Student-t upper confidence bound over ten processes (9 degrees of freedom).
+
+The host is an Intel i9-10920X running Linux, Rust 1.97.1, release thin LTO with one codegen unit, `simd,std`, no arithmetic flag override. CPU 2 is pinned; sibling CPU 14 records zero busy ticks over all ten process windows. The owner explicitly authorized unrelated CI activity on other cores; host snapshots retain that contention. Our builds, proofs, oracle checks and profiling were stopped during the campaign. Performance governor and turbo remain enabled. Frequency snapshots bracket the process after it has become idle and do not measure its active frequency. They cannot establish a frequency explanation for the variance.
+
+The source is `ca3fce4` (arithmetic introduced in `0f1325b`). The two lint fixes leave the public wrapper binary byte-identical. Wrapper SHA-256: `6ec6667f31f938b72e05d611f35a3bd5374a14d1f79f4f672dd64c6e29ee9198`. The timer invokes the actual public Rust scalar/slice wrappers. Scalar C references use the same function-pointer loop; SciPy uses its native Cython capsule with the extra dispatch argument fixed to one. SIMD references include their packet wrapper and scalar remainder. Calling-interface and dispatch differences remain part of the recorded comparison.
+
+References: CORE-MATH c7100a07428584639defdd64409e3621884c362b (correct rounding); SLEEF 3.9.0 / 906ca7512ee483296780a81a21b9ca715d40dfe1 (exp u10, erfc u15); libcerf 3.3 / 7e6b637031b5c6cbc89a5f7220bf4ef07518d035; SciPy 1.16.3 / NumPy 2.3.4. CDF SIMD is `0.5*erfc(-x/sqrt(2))`, including rounded scaling. Libcerf/SciPy/composed SLEEF are practical cost targets with independent error observations; they do not establish our proved bounds, cross-target identity or NaN payload semantics. SciPy erfcx is diagnostic only because retained observations exceed the 4u budget.
+
+The accelerated contracts remain relative 2^-51 for exp/erfcx and absolute 2^-49 for CDF. The new polynomial orders reuse generated constants and preserve strong fallback and special values. Focused Gappa/IEEE/Coq proofs pass for all three public entries, including every erfcx cell and the central CDF analytic remainder. Eight focused assumption reports contain no unexpected axioms. Full repository proof/extraction, test, lint and target gates belong to GitHub CI. The deliberately changed fast-output digest reported identically on Linux x86, Linux ARM, macOS, Windows, scalar FMA, AVX-512 emulation and embedded ARM is `788bafb0c6884018d8bd1991b95f6b344558c5f20c7a3a4e53b197936759aa8e`; the expected digest is updated for the changed fast arithmetic, not a changed input corpus or strong contract.
+
+Independent 256-bit observations pass 45,212 exp, 9,731 erfcx and 9,553 CDF inputs. Observed maxima are respectively 2.1673e-16 relative, 2.8433e-16 relative and 3.9086e-16 absolute. All 11,413 independently rounded fixtures pass with reference rounding uncertainty included. Public scalar/slice comparisons have zero mismatches over 214,690 cases, including special values, remainders and dispatch boundaries. These observations are not the whole-domain proof.
+
+An additional retained buffer-offset probe does not establish buffer alignment as the cause of the absolute timing variation: the same offsets can have markedly different timings in opposite sweep orders. It is an exploratory diagnostic, not another qualification attempt. The initiating cause of the remaining variance is unestablished.
+
+The claim is limited to these inputs, host, backends, interfaces and statistical rule. It does not establish stable absolute nanosecond budgets, dependency-chain latency, all batch sizes, adversarial/mixed populations, ARM native speed, or whole-consumer qualification. The broader obligations remain in [#194](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/194); the predeclared decision and host-condition clarification are in [#191](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/191).
+
+`observations.tar.gz` contains raw timed/warmup/calibration samples, host snapshots, exact input bits, error observations and witnesses, proof logs, the decision record and executed scripts. Reproduction requires rebuilding the pinned reference libraries using the archived reference metadata and retaining the relative evidence-directory layout expected by `external.py`. No external source or binary is bundled. Original failed campaigns and exploratory screens remain retained in the local evidence root; this archive contains their recorded screen samples as well as the final campaign.

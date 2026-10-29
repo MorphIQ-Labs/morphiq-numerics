@@ -1,0 +1,2943 @@
+{
+  "scope": "Two short samples per implementation per cell; exploratory point estimates only, not confidence qualification",
+  "source": "c9cb6814a2c693f3ea4835e6ab27e7da8dba7b6a",
+  "cells": [
+    {
+      "id": "000",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 0,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.8992190045106051,
+      "times": {
+        "prod_exp_slice": 1.39565983252082,
+        "sleef_exp_neon": 1.5520800000000001
+      }
+    },
+    {
+      "id": "001",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 1,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6237537920404738,
+      "times": {
+        "prod_exp_slice": 3.777514584473396,
+        "sleef_exp_neon": 6.0560987887802415
+      }
+    },
+    {
+      "id": "002",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 2,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8341691002797246,
+      "times": {
+        "prod_exp_slice": 6.031798793640242,
+        "sleef_exp_neon": 7.230906529164866
+      }
+    },
+    {
+      "id": "003",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 3,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6950325456726867,
+      "times": {
+        "prod_exp_slice": 8.28493804142889,
+        "sleef_exp_neon": 11.920215956808638
+      }
+    },
+    {
+      "id": "004",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 4,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6680965512545535,
+      "times": {
+        "prod_exp_slice": 8.634557236941685,
+        "sleef_exp_neon": 12.924115864282925
+      }
+    },
+    {
+      "id": "005",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 5,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6152375554471373,
+      "times": {
+        "prod_exp_slice": 10.911998908800108,
+        "sleef_exp_neon": 17.736236697822477
+      }
+    },
+    {
+      "id": "006",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 6,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.66366943557459,
+      "times": {
+        "prod_exp_slice": 12.465199480984115,
+        "sleef_exp_neon": 18.782241297871472
+      }
+    },
+    {
+      "id": "007",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 7,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6299622027145287,
+      "times": {
+        "prod_exp_slice": 14.861918940305998,
+        "sleef_exp_neon": 23.591762928419325
+      }
+    },
+    {
+      "id": "008",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 8,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.5874778104985161,
+      "times": {
+        "prod_exp_slice": 14.485668411465271,
+        "sleef_exp_neon": 24.65738816445368
+      }
+    },
+    {
+      "id": "009",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 9,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7264218728491083,
+      "times": {
+        "prod_exp_slice": 25.187401011726255,
+        "sleef_exp_neon": 34.673241477350395
+      }
+    },
+    {
+      "id": "010",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 10,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.601175885879165,
+      "times": {
+        "prod_exp_slice": 18.292242683102927,
+        "sleef_exp_neon": 30.42743914512171
+      }
+    },
+    {
+      "id": "011",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 11,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6003044351651686,
+      "times": {
+        "prod_exp_slice": 21.223598386463667,
+        "sleef_exp_neon": 35.354725274725276
+      }
+    },
+    {
+      "id": "012",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 12,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.5086969117902818,
+      "times": {
+        "prod_exp_slice": 18.51127098321343,
+        "sleef_exp_neon": 36.38958789442187
+      }
+    },
+    {
+      "id": "013",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 13,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.505642283891547,
+      "times": {
+        "prod_exp_slice": 20.886233766233765,
+        "sleef_exp_neon": 41.30634330160878
+      }
+    },
+    {
+      "id": "014",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 14,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.5380524914711586,
+      "times": {
+        "prod_exp_slice": 22.714405594405594,
+        "sleef_exp_neon": 42.215965829466214
+      }
+    },
+    {
+      "id": "015",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 15,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 2.245680979038276,
+      "times": {
+        "prod_exp_slice": 106.12786768255567,
+        "sleef_exp_neon": 47.2586572505973
+      }
+    },
+    {
+      "id": "016",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 16,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.4907587430688235,
+      "times": {
+        "prod_exp_slice": 23.614057330504963,
+        "sleef_exp_neon": 48.11744602417272
+      }
+    },
+    {
+      "id": "017",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 17,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.48605026198499046,
+      "times": {
+        "prod_exp_slice": 25.838687743049455,
+        "sleef_exp_neon": 53.160526315789475
+      }
+    },
+    {
+      "id": "018",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 31,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.47437424036458214,
+      "times": {
+        "prod_exp_slice": 44.76766325800848,
+        "sleef_exp_neon": 94.37203677754957
+      }
+    },
+    {
+      "id": "019",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 32,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.4582513549337178,
+      "times": {
+        "prod_exp_slice": 43.71075089903923,
+        "sleef_exp_neon": 95.38597197461996
+      }
+    },
+    {
+      "id": "020",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 33,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.4549180500771036,
+      "times": {
+        "prod_exp_slice": 45.89539314166955,
+        "sleef_exp_neon": 100.88716667516442
+      }
+    },
+    {
+      "id": "021",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 51,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.45988341829145657,
+      "times": {
+        "prod_exp_slice": 70.55395657890062,
+        "sleef_exp_neon": 153.41704826197108
+      }
+    },
+    {
+      "id": "022",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.4508908943315462,
+      "times": {
+        "prod_exp_slice": 69.5497837830556,
+        "sleef_exp_neon": 154.24969689433271
+      }
+    },
+    {
+      "id": "023",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 53,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.449945211447176,
+      "times": {
+        "prod_exp_slice": 71.630498332015,
+        "sleef_exp_neon": 159.1982679438394
+      }
+    },
+    {
+      "id": "024",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 63,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.4458447731151764,
+      "times": {
+        "prod_exp_slice": 86.03793188461944,
+        "sleef_exp_neon": 192.9773254567078
+      }
+    },
+    {
+      "id": "025",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 64,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.43309335043537645,
+      "times": {
+        "prod_exp_slice": 84.85965057547403,
+        "sleef_exp_neon": 195.93847490423724
+      }
+    },
+    {
+      "id": "026",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 65,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.4360985002702628,
+      "times": {
+        "prod_exp_slice": 87.10909090909091,
+        "sleef_exp_neon": 199.74636660090988
+      }
+    },
+    {
+      "id": "027",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 256,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.4363421685253069,
+      "times": {
+        "prod_exp_slice": 332.5316867078323,
+        "sleef_exp_neon": 762.0892746435214
+      }
+    },
+    {
+      "id": "028",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 4096,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.43587879774747273,
+      "times": {
+        "prod_exp_slice": 5281.066666666667,
+        "sleef_exp_neon": 12115.906288532675
+      }
+    },
+    {
+      "id": "029",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 65536,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.43753146528881814,
+      "times": {
+        "prod_exp_slice": 84679.16666666666,
+        "sleef_exp_neon": 193538.46153846156
+      }
+    },
+    {
+      "id": "030",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 0,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 3.9966661035715356,
+      "times": {
+        "prod_erfcx_slice": 1.2407849503686021,
+        "libcerf_erfcx": 0.31045499379090014
+      }
+    },
+    {
+      "id": "031",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 1,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7757978255370375,
+      "times": {
+        "prod_erfcx_slice": 2.80069966391604,
+        "libcerf_erfcx": 3.6100896028901435
+      }
+    },
+    {
+      "id": "032",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 2,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8250061940155805,
+      "times": {
+        "prod_erfcx_slice": 5.89192976432281,
+        "libcerf_erfcx": 7.141679428665646
+      }
+    },
+    {
+      "id": "033",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 3,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8927560193814782,
+      "times": {
+        "prod_erfcx_slice": 9.148439214344425,
+        "libcerf_erfcx": 10.24741252451333
+      }
+    },
+    {
+      "id": "034",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 4,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.9010416301085877,
+      "times": {
+        "prod_erfcx_slice": 12.294590164327868,
+        "libcerf_erfcx": 13.644863626163648
+      }
+    },
+    {
+      "id": "035",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 5,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8872928323663509,
+      "times": {
+        "prod_erfcx_slice": 15.35924232037884,
+        "libcerf_erfcx": 17.310229227724925
+      }
+    },
+    {
+      "id": "036",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 6,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8994147122430302,
+      "times": {
+        "prod_erfcx_slice": 18.45901047725449,
+        "libcerf_erfcx": 20.52335838627765
+      }
+    },
+    {
+      "id": "037",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 7,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8989517567269628,
+      "times": {
+        "prod_erfcx_slice": 21.534032731122334,
+        "libcerf_erfcx": 23.954603314338737
+      }
+    },
+    {
+      "id": "038",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 8,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.9017372311972877,
+      "times": {
+        "prod_erfcx_slice": 24.633828175762474,
+        "libcerf_erfcx": 27.318189072724373
+      }
+    },
+    {
+      "id": "039",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 9,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.734820130432677,
+      "times": {
+        "prod_erfcx_slice": 45.05845323741007,
+        "libcerf_erfcx": 61.31902403228766
+      }
+    },
+    {
+      "id": "040",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 10,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.9592708019460614,
+      "times": {
+        "prod_erfcx_slice": 32.78707458972845,
+        "libcerf_erfcx": 34.17916455208862
+      }
+    },
+    {
+      "id": "041",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 11,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.9451537330485675,
+      "times": {
+        "prod_erfcx_slice": 35.505769551563326,
+        "libcerf_erfcx": 37.56613163558106
+      }
+    },
+    {
+      "id": "042",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 12,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.9285726764868356,
+      "times": {
+        "prod_erfcx_slice": 38.010551558752994,
+        "libcerf_erfcx": 40.934385128111046
+      }
+    },
+    {
+      "id": "043",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 13,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.9089585493660509,
+      "times": {
+        "prod_erfcx_slice": 40.454852891444034,
+        "libcerf_erfcx": 44.50681818181818
+      }
+    },
+    {
+      "id": "044",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 14,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.9240006338666491,
+      "times": {
+        "prod_erfcx_slice": 44.201937167780926,
+        "libcerf_erfcx": 47.83756152072089
+      }
+    },
+    {
+      "id": "045",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 15,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.9060882311660794,
+      "times": {
+        "prod_erfcx_slice": 46.60330853580649,
+        "libcerf_erfcx": 51.433521519014676
+      }
+    },
+    {
+      "id": "046",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 16,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8822645976844454,
+      "times": {
+        "prod_erfcx_slice": 48.244645617134026,
+        "libcerf_erfcx": 54.68274001218557
+      }
+    },
+    {
+      "id": "047",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 17,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8689440453191632,
+      "times": {
+        "prod_erfcx_slice": 50.49813073639818,
+        "libcerf_erfcx": 58.1143642199081
+      }
+    },
+    {
+      "id": "048",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 31,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8067746529152212,
+      "times": {
+        "prod_erfcx_slice": 85.50112847947838,
+        "libcerf_erfcx": 105.97894736842105
+      }
+    },
+    {
+      "id": "049",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 32,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8070937855212251,
+      "times": {
+        "prod_erfcx_slice": 88.06111677669833,
+        "libcerf_erfcx": 109.10890203401581
+      }
+    },
+    {
+      "id": "050",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 33,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8001255430920027,
+      "times": {
+        "prod_erfcx_slice": 90.71399624212503,
+        "libcerf_erfcx": 113.37470353910982
+      }
+    },
+    {
+      "id": "051",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 51,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7782884102324051,
+      "times": {
+        "prod_erfcx_slice": 135.6920631004756,
+        "libcerf_erfcx": 174.3467605536571
+      }
+    },
+    {
+      "id": "052",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7774513274126731,
+      "times": {
+        "prod_erfcx_slice": 138.06900082175912,
+        "libcerf_erfcx": 177.59182594908833
+      }
+    },
+    {
+      "id": "053",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 53,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7626368755692344,
+      "times": {
+        "prod_erfcx_slice": 139.71083873275282,
+        "libcerf_erfcx": 183.19444444444446
+      }
+    },
+    {
+      "id": "054",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 63,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7876019744932153,
+      "times": {
+        "prod_erfcx_slice": 170.27798060758374,
+        "libcerf_erfcx": 216.19801133326206
+      }
+    },
+    {
+      "id": "055",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 64,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7907737099584387,
+      "times": {
+        "prod_erfcx_slice": 172.96944057507437,
+        "libcerf_erfcx": 218.73443489182927
+      }
+    },
+    {
+      "id": "056",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 65,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.790295191925433,
+      "times": {
+        "prod_erfcx_slice": 175.7074231214278,
+        "libcerf_erfcx": 222.3313831548736
+      }
+    },
+    {
+      "id": "057",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 256,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7707764132151135,
+      "times": {
+        "prod_erfcx_slice": 674.0331491712707,
+        "libcerf_erfcx": 874.4859567766209
+      }
+    },
+    {
+      "id": "058",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 4096,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7611184502563851,
+      "times": {
+        "prod_erfcx_slice": 10660.980810234541,
+        "libcerf_erfcx": 14006.993006993007
+      }
+    },
+    {
+      "id": "059",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 65536,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7587205799662622,
+      "times": {
+        "prod_erfcx_slice": 170762.71186440677,
+        "libcerf_erfcx": 225066.6666666667
+      }
+    },
+    {
+      "id": "060",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 0,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 1.0000497512437811,
+      "times": {
+        "prod_norm_cdf_slice": 3.417169384909511,
+        "sleef_cdf_neon": 3.4169993849401106
+      }
+    },
+    {
+      "id": "061",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 1,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.10052699952674228,
+      "times": {
+        "prod_norm_cdf_slice": 8.409234281720689,
+        "sleef_cdf_neon": 83.65149980910012
+      }
+    },
+    {
+      "id": "062",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 2,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.2462909206381619,
+      "times": {
+        "prod_norm_cdf_slice": 14.932492533753733,
+        "sleef_cdf_neon": 60.629488472666
+      }
+    },
+    {
+      "id": "063",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 3,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.1494298772787809,
+      "times": {
+        "prod_norm_cdf_slice": 21.350020656845082,
+        "sleef_cdf_neon": 142.87651870993534
+      }
+    },
+    {
+      "id": "064",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 4,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.2029211678857034,
+      "times": {
+        "prod_norm_cdf_slice": 24.145343299078185,
+        "sleef_cdf_neon": 118.98878540201483
+      }
+    },
+    {
+      "id": "065",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 5,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.14980632324990897,
+      "times": {
+        "prod_norm_cdf_slice": 30.1994396011208,
+        "sleef_cdf_neon": 201.58988583373534
+      }
+    },
+    {
+      "id": "066",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 6,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.19303907470933238,
+      "times": {
+        "prod_norm_cdf_slice": 34.36060685844414,
+        "sleef_cdf_neon": 177.99819497779117
+      }
+    },
+    {
+      "id": "067",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 7,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.15324283829381008,
+      "times": {
+        "prod_norm_cdf_slice": 39.918012825716374,
+        "sleef_cdf_neon": 260.4886027311906
+      }
+    },
+    {
+      "id": "068",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 8,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.18834753375463842,
+      "times": {
+        "prod_norm_cdf_slice": 44.47656344249668,
+        "sleef_cdf_neon": 236.14093880537135
+      }
+    },
+    {
+      "id": "069",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 9,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.20242995413397966,
+      "times": {
+        "prod_norm_cdf_slice": 69.89876467981387,
+        "sleef_cdf_neon": 345.2985255015712
+      }
+    },
+    {
+      "id": "070",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 10,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.18493126791224793,
+      "times": {
+        "prod_norm_cdf_slice": 54.44256045273401,
+        "sleef_cdf_neon": 294.3934850355736
+      }
+    },
+    {
+      "id": "071",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 11,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.16024558785962195,
+      "times": {
+        "prod_norm_cdf_slice": 60.381915392329645,
+        "sleef_cdf_neon": 376.80859859446053
+      }
+    },
+    {
+      "id": "072",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 12,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.1826394150059444,
+      "times": {
+        "prod_norm_cdf_slice": 64.62041061811422,
+        "sleef_cdf_neon": 353.8141567963903
+      }
+    },
+    {
+      "id": "073",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 13,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.16197489587594474,
+      "times": {
+        "prod_norm_cdf_slice": 70.5294088770136,
+        "sleef_cdf_neon": 435.43419796998353
+      }
+    },
+    {
+      "id": "074",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 14,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.18212905294443646,
+      "times": {
+        "prod_norm_cdf_slice": 75.2079225534817,
+        "sleef_cdf_neon": 412.9375370794135
+      }
+    },
+    {
+      "id": "075",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 15,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.21647219183583277,
+      "times": {
+        "prod_norm_cdf_slice": 112.7015539613646,
+        "sleef_cdf_neon": 520.6283218439194
+      }
+    },
+    {
+      "id": "076",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 16,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.18697507383720222,
+      "times": {
+        "prod_norm_cdf_slice": 87.79270836083317,
+        "sleef_cdf_neon": 469.5423114916035
+      }
+    },
+    {
+      "id": "077",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 17,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.17062247501183728,
+      "times": {
+        "prod_norm_cdf_slice": 94.2376110037258,
+        "sleef_cdf_neon": 552.316516315848
+      }
+    },
+    {
+      "id": "078",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 31,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.1530058850070987,
+      "times": {
+        "prod_norm_cdf_slice": 147.09562889238111,
+        "sleef_cdf_neon": 961.3723608445298
+      }
+    },
+    {
+      "id": "079",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 32,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.15944868428003564,
+      "times": {
+        "prod_norm_cdf_slice": 149.896390173584,
+        "sleef_cdf_neon": 940.0917345314986
+      }
+    },
+    {
+      "id": "080",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 33,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.15084470182710227,
+      "times": {
+        "prod_norm_cdf_slice": 153.99397763554103,
+        "sleef_cdf_neon": 1020.8776030599236
+      }
+    },
+    {
+      "id": "081",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 51,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.16123905307477623,
+      "times": {
+        "prod_norm_cdf_slice": 249.42171371719934,
+        "sleef_cdf_neon": 1546.9063416139484
+      }
+    },
+    {
+      "id": "082",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.16699239917600991,
+      "times": {
+        "prod_norm_cdf_slice": 253.89712602823195,
+        "sleef_cdf_neon": 1520.4112718964202
+      }
+    },
+    {
+      "id": "083",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 53,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.16213590440461387,
+      "times": {
+        "prod_norm_cdf_slice": 259.9294825261848,
+        "sleef_cdf_neon": 1603.1580634818852
+      }
+    },
+    {
+      "id": "084",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 63,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.16414875815742666,
+      "times": {
+        "prod_norm_cdf_slice": 311.5812505778298,
+        "sleef_cdf_neon": 1898.1639220140073
+      }
+    },
+    {
+      "id": "085",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 64,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.1675323318938909,
+      "times": {
+        "prod_norm_cdf_slice": 314.4720826441122,
+        "sleef_cdf_neon": 1877.0829432690507
+      }
+    },
+    {
+      "id": "086",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 65,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.1632878867991862,
+      "times": {
+        "prod_norm_cdf_slice": 320.5638104934933,
+        "sleef_cdf_neon": 1963.1818181818182
+      }
+    },
+    {
+      "id": "087",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 256,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.16544703548435394,
+      "times": {
+        "prod_norm_cdf_slice": 1238.8125,
+        "sleef_cdf_neon": 7487.668161434978
+      }
+    },
+    {
+      "id": "088",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 4096,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.16442367656502124,
+      "times": {
+        "prod_norm_cdf_slice": 19729.86247544204,
+        "sleef_cdf_neon": 119994.04761904762
+      }
+    },
+    {
+      "id": "089",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 65536,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.16517099595353088,
+      "times": {
+        "prod_norm_cdf_slice": 316343.75,
+        "sleef_cdf_neon": 1915250.0
+      }
+    },
+    {
+      "id": "090",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "core_math_exp"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6655635785968927,
+      "times": {
+        "prod_exp": 150.18331530231998,
+        "core_math_exp": 225.64833793779522
+      }
+    },
+    {
+      "id": "091",
+      "primitive": "exp",
+      "bank": "exp-wide",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "core_math_exp"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6634029592408776,
+      "times": {
+        "prod_exp": 150.35611251352327,
+        "core_math_exp": 226.64371694327923
+      }
+    },
+    {
+      "id": "092",
+      "primitive": "exp",
+      "bank": "exp-boundary",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "core_math_exp"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.664185406388148,
+      "times": {
+        "prod_exp": 150.16828945786753,
+        "core_math_exp": 226.09393102219053
+      }
+    },
+    {
+      "id": "093",
+      "primitive": "exp",
+      "bank": "exp-tails",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "core_math_exp"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6658640768133629,
+      "times": {
+        "prod_exp": 150.2659574468085,
+        "core_math_exp": 225.67061759201496
+      }
+    },
+    {
+      "id": "094",
+      "primitive": "exp",
+      "bank": "exp-mixed",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "core_math_exp"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 3.422238026787431,
+      "times": {
+        "prod_exp": 769.0361168622038,
+        "core_math_exp": 224.71730804304212
+      }
+    },
+    {
+      "id": "095",
+      "primitive": "exp",
+      "bank": "exp-fallback",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "core_math_exp"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 16.19040335998808,
+      "times": {
+        "prod_exp": 3969.140625,
+        "core_math_exp": 245.15390609779857
+      }
+    },
+    {
+      "id": "096",
+      "primitive": "exp",
+      "bank": "exp-special",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "core_math_exp"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.9967637607291013,
+      "times": {
+        "prod_exp": 177.15757213064217,
+        "core_math_exp": 177.7327578613582
+      }
+    },
+    {
+      "id": "097",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "sleef_exp_scalar_fma"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6092899127762794,
+      "times": {
+        "prod_exp": 150.32606082461837,
+        "sleef_exp_scalar_fma": 246.72337038971375
+      }
+    },
+    {
+      "id": "098",
+      "primitive": "exp",
+      "bank": "exp-wide",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "sleef_exp_scalar_fma"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6105327289820743,
+      "times": {
+        "prod_exp": 150.5739872580839,
+        "sleef_exp_scalar_fma": 246.62721605299043
+      }
+    },
+    {
+      "id": "099",
+      "primitive": "exp",
+      "bank": "exp-boundary",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "sleef_exp_scalar_fma"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6061128809971361,
+      "times": {
+        "prod_exp": 150.28098329126098,
+        "sleef_exp_scalar_fma": 247.9422365088642
+      }
+    },
+    {
+      "id": "100",
+      "primitive": "exp",
+      "bank": "exp-tails",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "sleef_exp_scalar_fma"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6071228535722952,
+      "times": {
+        "prod_exp": 150.04808270224785,
+        "sleef_exp_scalar_fma": 247.14616130717002
+      }
+    },
+    {
+      "id": "101",
+      "primitive": "exp",
+      "bank": "exp-mixed",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "sleef_exp_scalar_fma"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 3.0905738432204424,
+      "times": {
+        "prod_exp": 765.0532654006485,
+        "sleef_exp_scalar_fma": 247.5440821706583
+      }
+    },
+    {
+      "id": "102",
+      "primitive": "exp",
+      "bank": "exp-fallback",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "sleef_exp_scalar_fma"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 15.848331958548377,
+      "times": {
+        "prod_exp": 3914.998036906164,
+        "sleef_exp_scalar_fma": 247.02902785895188
+      }
+    },
+    {
+      "id": "103",
+      "primitive": "exp",
+      "bank": "exp-special",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "sleef_exp_scalar_fma"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.7171233844881834,
+      "times": {
+        "prod_exp": 176.94001585484014,
+        "sleef_exp_scalar_fma": 246.73580541669776
+      }
+    },
+    {
+      "id": "104",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_erfcx",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8534451987161209,
+      "times": {
+        "prod_erfcx": 153.06836198588616,
+        "libcerf_erfcx": 179.35347485246191
+      }
+    },
+    {
+      "id": "105",
+      "primitive": "erfcx",
+      "bank": "erfcx-wide",
+      "length": 52,
+      "pair": [
+        "prod_erfcx",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7530430337743822,
+      "times": {
+        "prod_erfcx": 171.49652074341583,
+        "libcerf_erfcx": 227.73800838956777
+      }
+    },
+    {
+      "id": "106",
+      "primitive": "erfcx",
+      "bank": "erfcx-boundary",
+      "length": 52,
+      "pair": [
+        "prod_erfcx",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6583350494464617,
+      "times": {
+        "prod_erfcx": 171.41147302727194,
+        "libcerf_erfcx": 260.3711790393013
+      }
+    },
+    {
+      "id": "107",
+      "primitive": "erfcx",
+      "bank": "erfcx-tails",
+      "length": 52,
+      "pair": [
+        "prod_erfcx",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8471981757064294,
+      "times": {
+        "prod_erfcx": 155.81962881213667,
+        "libcerf_erfcx": 183.9234706592796
+      }
+    },
+    {
+      "id": "108",
+      "primitive": "erfcx",
+      "bank": "erfcx-mixed",
+      "length": 52,
+      "pair": [
+        "prod_erfcx",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 1.2824757288594388,
+      "times": {
+        "prod_erfcx": 237.65986682168904,
+        "libcerf_erfcx": 185.31334470793473
+      }
+    },
+    {
+      "id": "109",
+      "primitive": "erfcx",
+      "bank": "erfcx-fallback",
+      "length": 52,
+      "pair": [
+        "prod_erfcx",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 2.8310070581465108,
+      "times": {
+        "prod_erfcx": 622.7195787097987,
+        "libcerf_erfcx": 219.96397957322634
+      }
+    },
+    {
+      "id": "110",
+      "primitive": "erfcx",
+      "bank": "erfcx-special",
+      "length": 52,
+      "pair": [
+        "prod_erfcx",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.8462275248027487,
+      "times": {
+        "prod_erfcx": 156.35490451179749,
+        "libcerf_erfcx": 184.76698042673928
+      }
+    },
+    {
+      "id": "111",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf",
+        "scipy_ndtr"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7482208468070489,
+      "times": {
+        "prod_norm_cdf": 313.7532253551776,
+        "scipy_ndtr": 419.33237585411496
+      }
+    },
+    {
+      "id": "112",
+      "primitive": "cdf",
+      "bank": "cdf-wide",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf",
+        "scipy_ndtr"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6690431455417444,
+      "times": {
+        "prod_norm_cdf": 337.5374667430034,
+        "scipy_ndtr": 504.5077720207254
+      }
+    },
+    {
+      "id": "113",
+      "primitive": "cdf",
+      "bank": "cdf-boundary",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf",
+        "scipy_ndtr"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7163353718678008,
+      "times": {
+        "prod_norm_cdf": 329.55769544638486,
+        "scipy_ndtr": 460.0606201911868
+      }
+    },
+    {
+      "id": "114",
+      "primitive": "cdf",
+      "bank": "cdf-tails",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf",
+        "scipy_ndtr"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6633262921463121,
+      "times": {
+        "prod_norm_cdf": 339.89492472973427,
+        "scipy_ndtr": 512.4098482964437
+      }
+    },
+    {
+      "id": "115",
+      "primitive": "cdf",
+      "bank": "cdf-mixed",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf",
+        "scipy_ndtr"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 1.0049294265336972,
+      "times": {
+        "prod_norm_cdf": 414.3834196891192,
+        "scipy_ndtr": 412.35076687768196
+      }
+    },
+    {
+      "id": "116",
+      "primitive": "cdf",
+      "bank": "cdf-fallback",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf",
+        "scipy_ndtr"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 1.86731594395809,
+      "times": {
+        "prod_norm_cdf": 686.3288195869238,
+        "scipy_ndtr": 367.54831007983285
+      }
+    },
+    {
+      "id": "117",
+      "primitive": "cdf",
+      "bank": "cdf-special",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf",
+        "scipy_ndtr"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.6895463728476898,
+      "times": {
+        "prod_norm_cdf": 194.33943689702699,
+        "scipy_ndtr": 281.8366458726244
+      }
+    },
+    {
+      "id": "118",
+      "primitive": "exp",
+      "bank": "exp-wide",
+      "length": 52,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.44357880493681795,
+      "times": {
+        "prod_exp_slice": 74.64564987160702,
+        "sleef_exp_neon": 168.28047021371844
+      }
+    },
+    {
+      "id": "119",
+      "primitive": "exp",
+      "bank": "exp-wide",
+      "length": 4096,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.4440960009203204,
+      "times": {
+        "prod_exp_slice": 5393.767705382436,
+        "sleef_exp_neon": 12145.499383477189
+      }
+    },
+    {
+      "id": "120",
+      "primitive": "exp",
+      "bank": "exp-boundary",
+      "length": 52,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.45308019672602706,
+      "times": {
+        "prod_exp_slice": 69.94382400883728,
+        "sleef_exp_neon": 154.37404793732708
+      }
+    },
+    {
+      "id": "121",
+      "primitive": "exp",
+      "bank": "exp-boundary",
+      "length": 4096,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.4263267728350839,
+      "times": {
+        "prod_exp_slice": 5280.266666666666,
+        "sleef_exp_neon": 12385.49160671463
+      }
+    },
+    {
+      "id": "122",
+      "primitive": "exp",
+      "bank": "exp-tails",
+      "length": 52,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.4515671653757985,
+      "times": {
+        "prod_exp_slice": 69.57521507638295,
+        "sleef_exp_neon": 154.07500901550668
+      }
+    },
+    {
+      "id": "123",
+      "primitive": "exp",
+      "bank": "exp-tails",
+      "length": 4096,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.4386372548045886,
+      "times": {
+        "prod_exp_slice": 5295.466666666667,
+        "sleef_exp_neon": 12072.54196642686
+      }
+    },
+    {
+      "id": "124",
+      "primitive": "exp",
+      "bank": "exp-mixed",
+      "length": 52,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 4.466167141536769,
+      "times": {
+        "prod_exp_slice": 689.9462513781698,
+        "sleef_exp_neon": 154.48285509994713
+      }
+    },
+    {
+      "id": "125",
+      "primitive": "exp",
+      "bank": "exp-mixed",
+      "length": 4096,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 3.717600238116738,
+      "times": {
+        "prod_exp_slice": 45233.03167420815,
+        "sleef_exp_neon": 12167.26618705036
+      }
+    },
+    {
+      "id": "126",
+      "primitive": "exp",
+      "bank": "exp-fallback",
+      "length": 52,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 25.829358362208744,
+      "times": {
+        "prod_exp_slice": 3985.9773964001674,
+        "sleef_exp_neon": 154.31964435601702
+      }
+    },
+    {
+      "id": "127",
+      "primitive": "exp",
+      "bank": "exp-fallback",
+      "length": 4096,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 25.01521947241526,
+      "times": {
+        "prod_exp_slice": 307621.21212121216,
+        "sleef_exp_neon": 12297.362110311751
+      }
+    },
+    {
+      "id": "128",
+      "primitive": "exp",
+      "bank": "exp-special",
+      "length": 52,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 1.10007601141,
+      "times": {
+        "prod_exp_slice": 170.07112894400876,
+        "sleef_exp_neon": 154.59943420275437
+      }
+    },
+    {
+      "id": "129",
+      "primitive": "exp",
+      "bank": "exp-special",
+      "length": 4096,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 1.0557835467905101,
+      "times": {
+        "prod_exp_slice": 12816.883116883117,
+        "sleef_exp_neon": 12139.688249400479
+      }
+    },
+    {
+      "id": "130",
+      "primitive": "erfcx",
+      "bank": "erfcx-wide",
+      "length": 52,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7514920085821372,
+      "times": {
+        "prod_erfcx_slice": 168.91880689072008,
+        "libcerf_erfcx": 224.77791508312154
+      }
+    },
+    {
+      "id": "131",
+      "primitive": "erfcx",
+      "bank": "erfcx-wide",
+      "length": 4096,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7076241001117273,
+      "times": {
+        "prod_erfcx_slice": 10564.49893390192,
+        "libcerf_erfcx": 14929.535232383809
+      }
+    },
+    {
+      "id": "132",
+      "primitive": "erfcx",
+      "bank": "erfcx-boundary",
+      "length": 52,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6495281693279674,
+      "times": {
+        "prod_erfcx_slice": 167.74990466400277,
+        "libcerf_erfcx": 258.2642487046632
+      }
+    },
+    {
+      "id": "133",
+      "primitive": "erfcx",
+      "bank": "erfcx-boundary",
+      "length": 4096,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7510730478091029,
+      "times": {
+        "prod_erfcx_slice": 11143.356643356645,
+        "libcerf_erfcx": 14836.581709145426
+      }
+    },
+    {
+      "id": "134",
+      "primitive": "erfcx",
+      "bank": "erfcx-tails",
+      "length": 52,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7747567618056507,
+      "times": {
+        "prod_erfcx_slice": 139.96530595114854,
+        "libcerf_erfcx": 180.65709504095832
+      }
+    },
+    {
+      "id": "135",
+      "primitive": "erfcx",
+      "bank": "erfcx-tails",
+      "length": 4096,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.6408310152087384,
+      "times": {
+        "prod_erfcx_slice": 10279.44214876033,
+        "libcerf_erfcx": 16040.8
+      }
+    },
+    {
+      "id": "136",
+      "primitive": "erfcx",
+      "bank": "erfcx-mixed",
+      "length": 52,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 1.1583743055950353,
+      "times": {
+        "prod_erfcx_slice": 205.8134715025907,
+        "libcerf_erfcx": 177.67441016992183
+      }
+    },
+    {
+      "id": "137",
+      "primitive": "erfcx",
+      "bank": "erfcx-mixed",
+      "length": 4096,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 1.1588829415847546,
+      "times": {
+        "prod_erfcx_slice": 16348.353552859619,
+        "libcerf_erfcx": 14106.993006993007
+      }
+    },
+    {
+      "id": "138",
+      "primitive": "erfcx",
+      "bank": "erfcx-fallback",
+      "length": 52,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 2.8145731808533516,
+      "times": {
+        "prod_erfcx_slice": 590.1949202598937,
+        "libcerf_erfcx": 209.69251191434728
+      }
+    },
+    {
+      "id": "139",
+      "primitive": "erfcx",
+      "bank": "erfcx-fallback",
+      "length": 4096,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 2.886627945680434,
+      "times": {
+        "prod_erfcx_slice": 46146.78899082569,
+        "libcerf_erfcx": 15986.400000000001
+      }
+    },
+    {
+      "id": "140",
+      "primitive": "erfcx",
+      "bank": "erfcx-special",
+      "length": 52,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.5829278569372482,
+      "times": {
+        "prod_erfcx_slice": 103.51295336787565,
+        "libcerf_erfcx": 177.5742094600546
+      }
+    },
+    {
+      "id": "141",
+      "primitive": "erfcx",
+      "bank": "erfcx-special",
+      "length": 4096,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.5465487704018769,
+      "times": {
+        "prod_erfcx_slice": 7634.865900383142,
+        "libcerf_erfcx": 13969.23076923077
+      }
+    },
+    {
+      "id": "142",
+      "primitive": "cdf",
+      "bank": "cdf-wide",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.17750615840113076,
+      "times": {
+        "prod_norm_cdf_slice": 270.23386140747925,
+        "sleef_cdf_neon": 1522.3914699162224
+      }
+    },
+    {
+      "id": "143",
+      "primitive": "cdf",
+      "bank": "cdf-wide",
+      "length": 4096,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.16946101475923073,
+      "times": {
+        "prod_norm_cdf_slice": 20298.0,
+        "sleef_cdf_neon": 119779.76190476191
+      }
+    },
+    {
+      "id": "144",
+      "primitive": "cdf",
+      "bank": "cdf-boundary",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.1767008945274517,
+      "times": {
+        "prod_norm_cdf_slice": 268.9675611596077,
+        "sleef_cdf_neon": 1522.1629855293222
+      }
+    },
+    {
+      "id": "145",
+      "primitive": "cdf",
+      "bank": "cdf-boundary",
+      "length": 4096,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.16867571817598348,
+      "times": {
+        "prod_norm_cdf_slice": 20260.162601626016,
+        "sleef_cdf_neon": 120113.09523809524
+      }
+    },
+    {
+      "id": "146",
+      "primitive": "cdf",
+      "bank": "cdf-tails",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.17563122628591477,
+      "times": {
+        "prod_norm_cdf_slice": 269.49294104968203,
+        "sleef_cdf_neon": 1534.4249809596345
+      }
+    },
+    {
+      "id": "147",
+      "primitive": "cdf",
+      "bank": "cdf-tails",
+      "length": 4096,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.17340725290306488,
+      "times": {
+        "prod_norm_cdf_slice": 20792.355371900827,
+        "sleef_cdf_neon": 119904.7619047619
+      }
+    },
+    {
+      "id": "148",
+      "primitive": "cdf",
+      "bank": "cdf-mixed",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.24751293983962783,
+      "times": {
+        "prod_norm_cdf_slice": 376.8485948787776,
+        "sleef_cdf_neon": 1522.5409836065573
+      }
+    },
+    {
+      "id": "149",
+      "primitive": "cdf",
+      "bank": "cdf-mixed",
+      "length": 4096,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.22633816250416416,
+      "times": {
+        "prod_norm_cdf_slice": 27116.120218579235,
+        "sleef_cdf_neon": 119803.57142857142
+      }
+    },
+    {
+      "id": "150",
+      "primitive": "cdf",
+      "bank": "cdf-fallback",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.43402485177631844,
+      "times": {
+        "prod_norm_cdf_slice": 661.3147331710206,
+        "sleef_cdf_neon": 1523.67941712204
+      }
+    },
+    {
+      "id": "151",
+      "primitive": "cdf",
+      "bank": "cdf-fallback",
+      "length": 4096,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.41252020975371906,
+      "times": {
+        "prod_norm_cdf_slice": 49490.14778325123,
+        "sleef_cdf_neon": 119970.23809523809
+      }
+    },
+    {
+      "id": "152",
+      "primitive": "cdf",
+      "bank": "cdf-special",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.10638045029958222,
+      "times": {
+        "prod_norm_cdf_slice": 161.8473629234162,
+        "sleef_cdf_neon": 1521.4013709063215
+      }
+    },
+    {
+      "id": "153",
+      "primitive": "cdf",
+      "bank": "cdf-special",
+      "length": 4096,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.11611056072434665,
+      "times": {
+        "prod_norm_cdf_slice": 13967.132867132867,
+        "sleef_cdf_neon": 120291.66666666667
+      }
+    },
+    {
+      "id": "154",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "core_math_exp"
+      ],
+      "mode": "latency",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7475971622344699,
+      "times": {
+        "prod_exp": 790.3148088660456,
+        "core_math_exp": 1057.139926138695
+      }
+    },
+    {
+      "id": "155",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_exp",
+        "sleef_exp_scalar_fma"
+      ],
+      "mode": "latency",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.7668456045400149,
+      "times": {
+        "prod_exp": 831.5489846206135,
+        "sleef_exp_scalar_fma": 1084.3760200195843
+      }
+    },
+    {
+      "id": "156",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_erfcx",
+        "libcerf_erfcx"
+      ],
+      "mode": "latency",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.8281319994027176,
+      "times": {
+        "prod_erfcx": 1018.018018018018,
+        "libcerf_erfcx": 1229.2943863445125
+      }
+    },
+    {
+      "id": "157",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf",
+        "scipy_ndtr"
+      ],
+      "mode": "latency",
+      "parity_required": true,
+      "reason": "comparable fast cost",
+      "ratio": 0.9958928238862023,
+      "times": {
+        "prod_norm_cdf": 1210.403120936281,
+        "scipy_ndtr": 1215.3949620934213
+      }
+    },
+    {
+      "id": "158",
+      "primitive": "exp",
+      "bank": "exp-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_exp_slice",
+        "sleef_exp_neon"
+      ],
+      "mode": "cache",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.9749463733572499,
+      "times": {
+        "prod_exp_slice": 7690.330007674596,
+        "sleef_exp_neon": 7887.951807228916
+      }
+    },
+    {
+      "id": "159",
+      "primitive": "erfcx",
+      "bank": "erfcx-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_erfcx_slice",
+        "libcerf_erfcx"
+      ],
+      "mode": "cache",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.9954188294843248,
+      "times": {
+        "prod_erfcx_slice": 7777.000777000778,
+        "libcerf_erfcx": 7812.792511700468
+      }
+    },
+    {
+      "id": "160",
+      "primitive": "cdf",
+      "bank": "cdf-ordinary",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "sleef_cdf_neon"
+      ],
+      "mode": "cache",
+      "parity_required": false,
+      "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation",
+      "ratio": 0.8642655141730764,
+      "times": {
+        "prod_norm_cdf_slice": 7875.688434303698,
+        "sleef_cdf_neon": 9112.579762989972
+      }
+    },
+    {
+      "id": "161",
+      "primitive": "cdf",
+      "bank": "cdf-tails",
+      "length": 52,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "composed_cdf_passes"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "Same propagated 2^-49 CDF budget; synthetic multi-pass composition cost diagnostic, not a separate consumer qualification",
+      "ratio": 1.1647214068995364,
+      "times": {
+        "prod_norm_cdf_slice": 269.99137838129104,
+        "composed_cdf_passes": 231.80768961738443
+      }
+    },
+    {
+      "id": "162",
+      "primitive": "cdf",
+      "bank": "cdf-tails",
+      "length": 4096,
+      "pair": [
+        "prod_norm_cdf_slice",
+        "composed_cdf_passes"
+      ],
+      "mode": "throughput",
+      "parity_required": false,
+      "reason": "Same propagated 2^-49 CDF budget; synthetic multi-pass composition cost diagnostic, not a separate consumer qualification",
+      "ratio": 1.2021276507608931,
+      "times": {
+        "prod_norm_cdf_slice": 20783.057851239668,
+        "composed_cdf_passes": 17288.561525129982
+      }
+    }
+  ],
+  "required_point_losses": [
+    "015"
+  ]
+}

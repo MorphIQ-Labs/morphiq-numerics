@@ -1,0 +1,7 @@
+{
+  "source_full": "ca3fce4807f68e7e6a1ccc20be4e8e70e1b4e2dd",
+  "wrapper_sha256": "6ec6667f31f938b72e05d611f35a3bd5374a14d1f79f4f672dd64c6e29ee9198",
+  "archive_files": 88,
+  "numerical_decision": "Retain the existing 4u relative / 16u absolute budgets; select the cheaper proved operation sequences. Every frozen comparator pair must have upper95 time ratio <=1; absolute repeatability is a separate unsatisfied criterion.",
+  "ci_observation_run": 40739938515
+}
