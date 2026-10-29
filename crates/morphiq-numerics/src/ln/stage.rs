@@ -61,10 +61,39 @@ pub(crate) fn normalized_parts(reduced: &super::Reduced) -> (f64, f64, f64, Opti
     let y = reduced.y();
     let i = reduced.stage_index;
     let r = f64::from_bits(R[i]);
-    let hh = f64::from_bits(y.to_bits() & !0x3ff);
-    let hl = y - hh;
-    let z = (hh * r - 1.0) + hl * r;
+    let z = residual(y, r);
     evaluate(f64::from(reduced.e), i, z)
+}
+
+/// The generated reciprocal makes h*rs-1 exactly representable on the
+/// reciprocal stage's proved domain. Hardware FMA and the split path agree.
+#[inline(always)]
+fn residual(h: f64, rs: f64) -> f64 {
+    #[cfg(all(
+        feature = "std",
+        any(
+            target_feature = "fma",
+            all(target_arch = "aarch64", target_feature = "neon")
+        )
+    ))]
+    {
+        // Reason: these targets provide hardware binary64 FMA; no platform
+        // libm fallback is possible. Exit: FMA becomes available in core.
+        #[allow(clippy::disallowed_methods)]
+        h.mul_add(rs, -1.0)
+    }
+    #[cfg(not(all(
+        feature = "std",
+        any(
+            target_feature = "fma",
+            all(target_arch = "aarch64", target_feature = "neon")
+        )
+    )))]
+    {
+        let hh = f64::from_bits(h.to_bits() & !0x3ff);
+        let hl = h - hh;
+        (hh * rs - 1.0) + hl * rs
+    }
 }
 
 #[inline(always)]

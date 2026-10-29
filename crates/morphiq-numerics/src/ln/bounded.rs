@@ -6,18 +6,33 @@
 #[inline]
 pub(crate) fn ln(x: f64) -> f64 {
     let bits = x.to_bits();
+    // One encoding interval screens normal positive finite arguments.
+    if bits.wrapping_sub(f64::MIN_POSITIVE.to_bits())
+        >= f64::INFINITY.to_bits() - f64::MIN_POSITIVE.to_bits()
+    {
+        return unusual(x);
+    }
     if super::stage::unit_cell(bits) {
         let (s, lo, _, _) = super::stage::unit_parts(x);
         return s + lo;
     }
-    // Positive finite encodings are precisely 1..INFINITY.to_bits().
-    // Wrapping subtraction excludes zero and every sign-bit encoding too.
-    if bits.wrapping_sub(1) >= f64::INFINITY.to_bits() - 1 {
-        return super::ln(x);
-    }
-    let reduced = super::Reduced::of(x);
+    let reduced = super::Reduced::normal_bits(bits, 0);
     let (s, lo, _, _) = super::stage::normalized_parts(&reduced);
     s + lo
+}
+
+// Return the final scalar value here, so the hot caller need not reserve
+// stack space for the subnormal normalizer's reduction record.
+#[cold]
+#[inline(never)]
+fn unusual(x: f64) -> f64 {
+    if x > 0.0 && x < f64::MIN_POSITIVE {
+        let reduced = super::Reduced::normal_bits((x * super::TWO_54).to_bits(), 54);
+        let (s, lo, _, _) = super::stage::normalized_parts(&reduced);
+        s + lo
+    } else {
+        super::ln(x)
+    }
 }
 
 #[cfg(feature = "simd")]
@@ -59,8 +74,20 @@ impl morphiq_numerics_arch::WithSimd for Slice<'_> {
         let bulk = self.input.len() / size * size;
         let (input, rest) = self.input.split_at(bulk);
         let (output, rest_out) = self.output.split_at_mut(bulk);
-        for (input, output) in input.chunks_exact(size).zip(output.chunks_exact_mut(size)) {
-            evaluate(k, input, output);
+        if K::LANES == 8 {
+            let mut inputs = input.chunks_exact(2 * size);
+            let mut outputs = output.chunks_exact_mut(2 * size);
+            for (input, output) in inputs.by_ref().zip(outputs.by_ref()) {
+                evaluate(k, &input[..size], &mut output[..size]);
+                evaluate(k, &input[size..], &mut output[size..]);
+            }
+            if !inputs.remainder().is_empty() {
+                evaluate(k, inputs.remainder(), outputs.into_remainder());
+            }
+        } else {
+            for (input, output) in input.chunks_exact(size).zip(output.chunks_exact_mut(size)) {
+                evaluate(k, input, output);
+            }
         }
         if !rest.is_empty() {
             evaluate(k, rest, rest_out);
@@ -82,12 +109,23 @@ impl<const N: usize> morphiq_numerics_arch::WithSimd for Packet<'_, N> {
     #[inline(always)]
     fn with<K: morphiq_numerics_arch::Simd>(self, k: K) {
         assert!(N >= K::LANES && N.is_multiple_of(K::LANES));
-        for (input, output) in self
-            .input
-            .chunks_exact(K::LANES)
-            .zip(self.output.chunks_exact_mut(K::LANES))
-        {
-            evaluate(k, input, output);
+        if K::LANES == 8 && N.is_multiple_of(2 * K::LANES) {
+            for (input, output) in self
+                .input
+                .chunks_exact(2 * K::LANES)
+                .zip(self.output.chunks_exact_mut(2 * K::LANES))
+            {
+                evaluate(k, &input[..K::LANES], &mut output[..K::LANES]);
+                evaluate(k, &input[K::LANES..], &mut output[K::LANES..]);
+            }
+        } else {
+            for (input, output) in self
+                .input
+                .chunks_exact(K::LANES)
+                .zip(self.output.chunks_exact_mut(K::LANES))
+            {
+                evaluate(k, input, output);
+            }
         }
     }
 }

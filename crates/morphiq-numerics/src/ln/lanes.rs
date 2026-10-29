@@ -118,9 +118,20 @@ fn fast_value<K: Simd, const NORMALIZED: bool>(k: K, (y, e): (K::F, K::F)) -> St
             k.add(e, k.load(re)),
         )
     };
-    let hh = k.to_float(k.and_u(hb, k.splat_bits(!0x3ff)));
-    let hl = k.sub(y, hh);
-    let z = k.add(k.sub(k.mul(hh, rs), k.splat(1.0)), k.mul(hl, rs));
+    let fused = if NORMALIZED {
+        k.mul_add(y, rs, k.splat(-1.0))
+    } else {
+        None
+    };
+    let z = if let Some(z) = fused {
+        // The reciprocal-stage residual is exactly representable. FMA
+        // therefore returns the split reduction's bits on this domain.
+        z
+    } else {
+        let hh = k.to_float(k.and_u(hb, k.splat_bits(!0x3ff)));
+        let hl = k.sub(y, hh);
+        k.add(k.sub(k.mul(hh, rs), k.splat(1.0)), k.mul(hl, rs))
+    };
     let ln1 = k.add(k.mul(e, k.splat(L1)), th);
     let ln0 = k.add(k.mul(e, k.splat(L0)), tl);
     let z2 = k.mul(z, z);

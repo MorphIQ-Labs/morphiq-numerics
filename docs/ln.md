@@ -230,6 +230,16 @@ assertions for zero log words and contiguity; it is not fitted to samples.
 `LnUnit.unit_parts_identical`, `unit_fast_identical` and
 `unit_strong_decision_identical` prove equivalence to the full stage and both
 entries. The strong path retains the same decision and accurate fallback.
+The normalized reciprocal stage uses hardware `fma(y,R,-1)` where available:
+NEON/AVX2/AVX-512 lanes, and scalar builds with `std` targeting FMA or NEON.
+The portable split remains the fallback. `LnExactFma.reduced_fma_identical`
+proves equality of the binary64 values themselves, including zero. The proof
+reuses the exact residual theorem, then checks the generated reciprocals as
+multiples of `2^-10`: on the normalizer's `2^-53` input grid, a zero residual
+requires the reciprocal numerator to divide `2^63`. A closed table check shows
+that only reciprocal one permits this, giving `y=1`; both reductions then
+produce positive zero. The general ln_1p reciprocal stage keeps its split.
+
 The boundary test covers every reciprocal cell and rejects both widening and
 narrowing this selected block. Independent mpmath fixtures include the cell
 boundaries and neighboring encodings; they enforce the published log bound.
@@ -661,9 +671,10 @@ alone doesn't claim.
 
 ### 7.8 Review points
 
-- **No FMA.** The 10-bit reciprocals and `h`'s 10-bit split make `z` exact
-  with plain multiplications on every target. An FMA kernel (`z = fma(h, rs,
-  −1)`, about 40% more proof) is a follow-up.
+- **Exact portable and fused reductions.** The 10-bit reciprocals and `h`'s
+  10-bit split make `z` exact on every target. Normalized ln may use hardware
+  FMA with a proof of the same bits (§3.1). The general ln_1p stage retains
+  the portable split.
 - **`J = 9` against `J = 10`.** `J = 10` (26 KiB) sends fewer arguments past H
   (`2^−9.7` against `2^−8.6` on `e^d`) and measured no faster. 14 KiB and
   `exp`'s 8 KiB table total 22 KiB, fitting a 32 KiB L1 data cache together.

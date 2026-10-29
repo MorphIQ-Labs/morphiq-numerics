@@ -245,6 +245,10 @@ the cross-target digest, not a separate Coq model of SIMD instructions.
    original layout and exponent handling. Masking the low ten significand bits
    produces `hh`; the lanes form
    `hl = h − hh` and `z = (hh·rs − 1) + hl·rs`, exactly as `stages::reduce`.
+   Normalized ln on a backend with hardware FMA computes `fma(y,rs,-1)`
+   instead. `LnExactFma.reduced_fma_identical` proves the exact same residual
+   bits, including positive zero; the non-FMA and general stages retain the
+   split. The polynomial and reconstruction operation order is unchanged.
 4. **The reconstruction** computes `E·L1`, `E·L0`, the degree-six polynomial,
    `(s, lo)` and `eps`, operation for operation as `ln::stage::parts`.
 5. **The interval test** in lanes (§3), followed by the shared double-word

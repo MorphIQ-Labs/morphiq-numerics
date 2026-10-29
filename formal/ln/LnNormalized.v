@@ -216,3 +216,13 @@ Proof.
  replace (bits-rd_u bits/2^52*2^52) with (bits+(-(rd_u bits/2^52))*2^52) by ring.
  apply rd_i_periodic.
 Qed.
+
+Theorem positive_normal_encoding_screen bits : (0<=bits<2^64)%Z ->
+ (((bits-2^52) mod 2^64 < 2046*2^52)%Z <-> (2^52<=bits<2047*2^52)%Z).
+Proof.
+ intros B. destruct (Z_lt_ge_dec bits (2^52)) as [Below|Above].
+ - replace ((bits-2^52) mod 2^64)%Z with (bits-2^52+2^64)%Z.
+   2: { apply Z.mod_unique with (-1)%Z; [left; lia|ring]. }
+   split; lia.
+ - rewrite Z.mod_small by lia. split; lia.
+Qed.

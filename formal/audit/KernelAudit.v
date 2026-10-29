@@ -943,6 +943,7 @@ Print Assumptions LnNormalized.fused_normalization.
 Print Assumptions LnNormalized.fused_signed_exponent.
 Print Assumptions LnNormalized.packed_pair_index.
 Print Assumptions LnNormalized.positive_encoding_screen.
+Print Assumptions LnNormalized.positive_normal_encoding_screen.
 Print Assumptions LnNormalized.clear_low_52.
 Print Assumptions LnNormalized.packed_tables_lossless.
 Print Assumptions FastExp.fast_exp_entry_ok.
@@ -975,3 +976,8 @@ Print Assumptions LnUnit.unit_strong_decision_identical.
 Print Assumptions LnUnit.unit_one.
 Print Assumptions LnUnit.unit_table_domain.
 Print Assumptions LnUnit.unit_encoding_screen.
+
+Require LnExactFma.
+Print Assumptions LnExactFma.reciprocal_dyadic_certificate.
+Print Assumptions LnExactFma.normalized_fma_identical.
+Print Assumptions LnExactFma.reduced_fma_identical.
