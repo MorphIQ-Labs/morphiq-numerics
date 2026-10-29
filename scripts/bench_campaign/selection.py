@@ -16,7 +16,8 @@ def family(cell, platform):
     if name.startswith('sleef_'):
         return 'sleef'
     return {'core_math_exp': 'core-math', 'libcerf_erfcx': 'libcerf',
-            'scipy_ndtr': 'scipy', 'strong-control': 'control'}[name]
+            'scipy_ndtr': 'scipy', 'strong-control': 'control',
+            'composed_cdf_passes': 'composition'}[name]
 
 
 def validate_full(cells, platform):

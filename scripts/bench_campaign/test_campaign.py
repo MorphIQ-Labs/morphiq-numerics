@@ -313,6 +313,14 @@ class SelectionTests(unittest.TestCase):
         plan = selection.select(full, 'arm-macos', 'full')
         self.assertEqual(plan['full_cell_count'], 163)
         self.assertEqual(plan['excluded_ids'], [])
+        self.assertEqual(selection.select(full, 'arm-macos', 'smoke')['selected_cell_count'], 4)
+        with tempfile.TemporaryDirectory() as directory:
+            native = Path(directory)
+            c.write(native / 'cells.json', full)
+            report = c.comparison_rows(native, 'arm-macos')
+            for row in report['cells'][-2:]:
+                self.assertEqual(row['comparison_kind'], 'composition-diagnostic')
+                self.assertFalse(row['required'])
 
     def test_smoke_covers_each_canonical_family_and_control(self):
         full = cells() + [{**cells()[1], 'id': 'long', 'length': 65536}]

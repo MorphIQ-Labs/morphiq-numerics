@@ -198,7 +198,8 @@ def comparison_rows(native, kind):
     for row in rows:
         reference = row['cell']['reference'] if kind == 'x86-linux' else row['cell']['pair'][1]
         row['reference'] = reference
-        row['comparison_kind'] = 'baseline-control' if reference == 'strong-control' else 'canonical'
+        row['comparison_kind'] = ('baseline-control' if reference == 'strong-control' else
+                                  'composition-diagnostic' if reference == 'composed_cdf_passes' else 'canonical')
         row['candidate_contract'] = 'strong' if row['comparison_kind'] == 'baseline-control' else 'fast'
         row['required'] = row['cell'][required_key]
     return {'complete': len(measured) == len(cells), 'cells': rows,
