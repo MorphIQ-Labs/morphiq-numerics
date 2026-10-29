@@ -199,8 +199,10 @@ screened outputs come from the corresponding strong scalar entry. No feature
 changes the selected contract or the scalar result bits.
 
 The derivation above is distinct from a sampled error result. Independent
-rounded reference fixtures include their half-ULP uncertainty when checking
-the fast bound. Mixed inputs, dispatch endpoints, SIMD remainders and retained
+reference fixtures include their oracle uncertainty when checking the fast
+bound. Exp fixtures retain a 192-bit interval reference, compared using exact
+arithmetic, so binary64 reference rounding cannot exhaust a valid result’s
+error budget. Rounded Gaussian references include their half-ULP uncertainty. Mixed inputs, dispatch endpoints, SIMD remainders and retained
 special values are checked separately. The extracted entry models exercise the
 same central/outer and accelerated/fallback decisions. Native measurements
 apply only to their recorded hosts, calling interfaces and input populations.
