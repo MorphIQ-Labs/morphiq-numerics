@@ -48,22 +48,15 @@ impl morphiq_numerics_arch::WithSimd for Slice<'_> {
     type Output = ();
     #[inline(always)]
     fn with<K: morphiq_numerics_arch::Simd>(self, k: K) {
-        let size = 2 * K::LANES;
+        let size = K::LANES;
         let bulk = self.input.len() / size * size;
         let (input, rest) = self.input.split_at(bulk);
         let (output, rest_out) = self.output.split_at_mut(bulk);
         for (input, output) in input.chunks_exact(size).zip(output.chunks_exact_mut(size)) {
-            for i in 0..2 {
-                let start = i * K::LANES;
-                evaluate(
-                    k,
-                    &input[start..start + K::LANES],
-                    &mut output[start..start + K::LANES],
-                );
-            }
-        }
-        for (input, output) in rest.chunks(K::LANES).zip(rest_out.chunks_mut(K::LANES)) {
             evaluate(k, input, output);
+        }
+        if !rest.is_empty() {
+            evaluate(k, rest, rest_out);
         }
     }
 }

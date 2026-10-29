@@ -936,6 +936,12 @@ Print Assumptions FastLn.fast_ln_public_ok.
 Print Assumptions FastLn.fast_ln_specials.
 Print Assumptions FastLn.fast_ln_regular_one.
 Print Assumptions FastLn.fast_ln_nan.
+
+Require LnNormalized.
+Print Assumptions LnNormalized.reduced_stage_exponent_zero.
+Print Assumptions LnNormalized.fused_normalization.
+Print Assumptions LnNormalized.clear_low_52.
+Print Assumptions LnNormalized.packed_tables_lossless.
 Print Assumptions FastExp.fast_exp_entry_ok.
 Print Assumptions FastExp.fast_exp_nonpositive_range.
 Print Assumptions FastErfcx.fast_erfcx_table_ok.

@@ -49,13 +49,23 @@ retain their existing generated bits and certificates. The strong entry
 retains its Ziv decision and accurate fallback; this entry has neither.
 The slice screens positive finite packets before arithmetic. A packet containing
 a special value finishes through the bounded scalar entry, which delegates
-only special values to the strong owner. Regular packets schedule pairs of
-vectors; the last partial packet is padded with 2 and only its valid prefix
+only special values to the strong owner. Regular packets use one flat loop over
+full vectors; the last partial packet is padded with 2 and only its valid prefix
 is stored. It stays in the selected SIMD width instead of entering a second
 backend for the remainder. One is accepted in these packets: the reciprocal
 and table terms are exactly one and zero, so the result is exact positive
 zero (`FastLn.fast_ln_regular_one`). This keeps the scalar arithmetic and
 outputs unchanged, including mixed packets and all slice lengths.
+
+The SIMD normalizer skips scaling for a packet of normal inputs and constructs
+the scalar normalizer's same significand and exponent directly from the input
+bits. Since that significand is already in the reciprocal stage's fundamental
+interval, the second reduction exponent is zero. These exact specializations
+and the lossless packed table layout are shared with strong `ln` lanes and
+proved in `LnNormalized.v`; [lanes.md](lanes.md#5-ln-and-ln_1p) gives the bit
+identities. They change neither polynomial evaluation nor any returned bit.
+The SIMD layout adds 8 KiB of read-only data; memory-pressure and strong-path
+control measurements are part of its cost qualification.
 
 `LnStageEvaluation.ln_eval_bounded` proves finite `s`, `lo` and `eps`, with
 `0 <= eps <= 2^-65`, and, for the exact logarithm,

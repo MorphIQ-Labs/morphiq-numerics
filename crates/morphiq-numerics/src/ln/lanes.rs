@@ -20,11 +20,24 @@ pub(crate) struct Ln;
 /// `ln_1p` as a lane kernel.
 pub(crate) struct Ln1p;
 
-/// `1 + 53/128`: the reduced significand `m ∈ [1, 2)` has index `i ≥ 53`
-/// exactly from it up.
-const HIGH_INDEX: f64 = 1.0 + 53.0 / 128.0;
 /// `2^52`, whose encoding's low bits hold an integer below `2^52` exactly.
 const TWO_52: f64 = f64::from_bits(0x4330_0000_0000_0000);
+
+/// Lossless layout of the generated reciprocal/log pairs. R has ten
+/// significant bits and exponent 1022 or 1023; TH has ten zero low bits.
+/// The assertions bind that layout to every generated entry, including zero.
+static PACKED_LOG: [[u64; 2]; 512] = {
+    let mut packed = [[0; 2]; 512];
+    let mut i = 0;
+    while i < 512 {
+        let hi = T[i].0.to_bits() | ((R[i] >> 43) & 1023);
+        assert!(hi & !1023 == T[i].0.to_bits());
+        assert!((1022 << 52) | ((hi & 1023) << 43) == R[i]);
+        packed[i] = [hi, T[i].1.to_bits()];
+        i += 1;
+    }
+    packed
+};
 
 /// `Reduced::of` on every lane of `x`, returning `(y, E)`; callers put 1 in
 /// the lanes they discard. Everything but the table loads is in lanes, as
@@ -34,31 +47,32 @@ const TWO_52: f64 = f64::from_bits(0x4330_0000_0000_0000);
 fn reduce<K: Simd>(k: K, x: K::F) -> (K::F, K::F) {
     // Step 1: a subnormal x is scaled by 2^54, exactly.
     let tiny = k.lt(x, k.splat(f64::MIN_POSITIVE));
-    let bits = k.to_bits(k.select(tiny, k.mul(x, k.splat(TWO_54)), x));
-    let fraction = k.and_u(bits, k.splat_bits(FRACTION));
-    // Step 2: m = 1.fraction; i is the fraction's top 7 bits, and i ≥ 53
-    // exactly when m ≥ 1 + 53/128. Then y = m/2 (exact: the encoding with
-    // exponent 1022), else y = m.
-    let m = k.to_float(k.or_u(fraction, k.splat_bits(1023 << 52)));
-    let high = k.le(k.splat(HIGH_INDEX), m);
-    let y = k.select(high, k.mul(m, k.splat(0.5)), m);
-    // E = biased − (1022 or 1023) − (54 if scaled): the biased exponent read
-    // as the integer below 2^52 in 2^52's encoding, every step exact.
-    let biased = k.sub(
-        k.to_float(k.or_u(k.shr_u(bits, 52), k.splat_bits(TWO_52.to_bits()))),
-        k.splat(TWO_52),
+    let (bits, offset) = if k.mask_bits(tiny) == 0 {
+        (k.to_bits(x), k.splat(TWO_52 + 1024.0))
+    } else {
+        (
+            k.to_bits(k.select(tiny, k.mul(x, k.splat(TWO_54)), x)),
+            k.select(tiny, k.splat(TWO_52 + 1078.0), k.splat(TWO_52 + 1024.0)),
+        )
+    };
+    // OFF is the encoding of the lower endpoint of Reduced::of's interval.
+    // Removing the high bits of bits-OFF leaves exactly its chosen y.
+    let u = k.sub_u(bits, k.splat_bits(OFF));
+    let y = k.to_float(k.sub_u(bits, k.and_u(u, k.splat_bits(!FRACTION))));
+    // Bias the signed exponent by 1024 before shifting. The resulting
+    // integer is in [2, 2048], so embedding it below 2^52 and subtracting
+    // 2^52+1024 (or +1078 after scaling) is exact binary64 arithmetic.
+    let biased = k.shr_u(k.add_u(u, k.splat_bits(1024 << 52)), 52);
+    let e = k.sub(
+        k.to_float(k.or_u(biased, k.splat_bits(TWO_52.to_bits()))),
+        offset,
     );
-    let offset = k.add(
-        k.select(high, k.splat(1022.0), k.splat(1023.0)),
-        k.select(tiny, k.splat(54.0), k.splat(0.0)),
-    );
-    let e = k.sub(biased, offset);
     (y, e)
 }
 
 /// `stage::parts`, operation for operation, after normalization.
 #[inline(always)]
-fn fast_value<K: Simd>(k: K, (y, e): (K::F, K::F)) -> StageH<K> {
+fn fast_value<K: Simd, const NORMALIZED: bool>(k: K, (y, e): (K::F, K::F)) -> StageH<K> {
     let hb = k.to_bits(y);
     let u = k.sub_u(hb, k.splat_bits(OFF));
     let words = k.store(k.to_float(u));
@@ -74,17 +88,42 @@ fn fast_value<K: Simd>(k: K, (y, e): (K::F, K::F)) -> StageH<K> {
         let i = ((u >> 43) & 511) as usize;
         #[allow(clippy::cast_possible_wrap, clippy::cast_precision_loss)] // signed 12-bit exponent
         {
-            re.as_mut()[lane] = ((u as i64) >> 52) as f64;
+            if !NORMALIZED {
+                re.as_mut()[lane] = ((u as i64) >> 52) as f64;
+            }
         }
-        r.as_mut()[lane] = f64::from_bits(R[i]);
-        (th.as_mut()[lane], tl.as_mut()[lane]) = T[i];
+        if NORMALIZED {
+            let [hi, lo] = PACKED_LOG[i];
+            th.as_mut()[lane] = f64::from_bits(hi);
+            tl.as_mut()[lane] = f64::from_bits(lo);
+        } else {
+            r.as_mut()[lane] = f64::from_bits(R[i]);
+            (th.as_mut()[lane], tl.as_mut()[lane]) = T[i];
+        }
     }
-    let rs = k.to_float(k.sub_u(k.to_bits(k.load(r)), k.and_u(u, k.splat_bits(!FRACTION))));
+    // Reduced::of already places y in [OFF, 2*OFF), so the stage's
+    // additional exponent is exactly zero on the normalized entry.
+    let (rs, th) = if NORMALIZED {
+        let packed = k.to_bits(k.load(th));
+        let r = k.or_u(
+            k.shl_u(k.and_u(packed, k.splat_bits(1023)), 43),
+            k.splat_bits(1022 << 52),
+        );
+        (
+            k.to_float(r),
+            k.to_float(k.and_u(packed, k.splat_bits(!1023))),
+        )
+    } else {
+        (
+            k.to_float(k.sub_u(k.to_bits(k.load(r)), k.and_u(u, k.splat_bits(!FRACTION)))),
+            k.load(th),
+        )
+    };
     let hh = k.to_float(k.and_u(hb, k.splat_bits(!0x3ff)));
     let hl = k.sub(y, hh);
     let z = k.add(k.sub(k.mul(hh, rs), k.splat(1.0)), k.mul(hl, rs));
-    let e = k.add(e, k.load(re));
-    let ln1 = k.add(k.mul(e, k.splat(L1)), k.load(th));
+    let e = if NORMALIZED { e } else { k.add(e, k.load(re)) };
+    let ln1 = k.add(k.mul(e, k.splat(L1)), th);
     let ln0 = k.add(k.mul(e, k.splat(L0)), k.load(tl));
     let z2 = k.mul(z, z);
     let t0 = k.sub(k.mul(z, k.splat(H[0])), k.splat(0.5));
@@ -107,7 +146,7 @@ fn fast_value<K: Simd>(k: K, (y, e): (K::F, K::F)) -> StageH<K> {
 /// supplies 37 <= x <= 2^45; NormalLogReciprocalStage proves this direct use.
 #[inline(always)]
 pub(crate) fn direct_parts<K: Simd>(k: K, x: K::F) -> StageH<K> {
-    fast_value(k, (x, k.splat(0.0)))
+    fast_value::<K, false>(k, (x, k.splat(0.0)))
 }
 
 /// Finish the interval test and return the mask of decided lanes.
@@ -218,7 +257,7 @@ pub(super) fn fast_ln<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
     let fast = k.and_m(inside, k.not_m(at_one));
     let scalar_lanes = !k.mask_bits(fast) & lanes_mask::<K>();
     (
-        fast_value(k, reduce(k, k.select(fast, xv, one))),
+        fast_value::<K, true>(k, reduce(k, k.select(fast, xv, one))),
         scalar_lanes,
     )
 }
@@ -228,7 +267,7 @@ pub(super) fn fast_ln<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
 /// residuals and table terms are zero, so this also returns exact +0.
 #[inline(always)]
 pub(super) fn bounded_positive<K: Simd>(k: K, x: K::F) -> K::F {
-    let (s, lo, _) = fast_value(k, reduce(k, x));
+    let (s, lo, _) = fast_value::<K, true>(k, reduce(k, x));
     k.add(s, lo)
 }
 
