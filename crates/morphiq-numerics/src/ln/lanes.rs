@@ -418,6 +418,7 @@ pub(super) fn stage_h<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
         let e = (((u >> 52) + 64) & 127) as usize;
         r.as_mut()[lane] = f64::from_bits(R[i]);
         (th.as_mut()[lane], tl.as_mut()[lane]) = T[i];
+        (eh.as_mut()[lane], el.as_mut()[lane]) = EL[e];
     }
     let rs = k.to_float(k.sub_u(k.to_bits(k.load(r)), k.and_u(u, k.splat_bits(!FRACTION))));
     let hh = k.to_float(k.and_u(hb, k.splat_bits(!0x3ff)));
