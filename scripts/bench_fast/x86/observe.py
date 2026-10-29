@@ -9,6 +9,7 @@ libs={name:C.CDLL(str(P/'qualification-bin'/f'{name}.so')) for name in ['auto','
 control=C.CDLL(str(P/'final-bin/control.so'));results=[]
 for primitive,symbol in [('exp','exp'),('erfcx','erfcx'),('cdf','norm_cdf')]:
  paths=sorted({c['input']['file'] for c in manifest['cells'] if c['primitive']==primitive});banks={path:json.loads(Path(path).read_text()) for path in paths}
+ if not banks:continue  # A declared subset may omit this primitive.
  words=sorted(set(w for bank in banks.values() for w in bank));xs={w:value(w) for w in words}
  functions={}
  for name,lib in libs.items():
@@ -42,10 +43,13 @@ for primitive,symbol in [('exp','exp'),('erfcx','erfcx'),('cdf','norm_cdf')]:
     continue
    ref=oracle(x);y=mp.mpf(value(expected[w]));error=abs(y-ref)/(1 if primitive=='cdf' else abs(ref));observations+=1
    writer.writerow([w,expected[w],mp.nstr(ref,85),mp.nstr(error,30)])
-   if error>worst:worst=error;witness=w
+   if witness is None or error>worst:worst=error;witness=w
    if error>budget:failures.append(w)
- with mp.workprec(512):
-  ref512=oracle(xs[witness]);error512=abs(mp.mpf(value(expected[witness]))-ref512)/(1 if primitive=='cdf' else abs(ref512))
- row=dict(primitive=primitive,unique_inputs=len(words),banks=len(banks),identity_checks=checks,mismatches=mismatches,fallback_mismatches=fallback_mismatches,observations=observations,budget=float(budget),max_error=float(worst),witness=witness,witness_error_512bit=mp.nstr(error512,50),failures=failures)
+ witness_error_512bit=None
+ if witness is not None:
+  with mp.workprec(512):
+   ref512=oracle(xs[witness]);error512=abs(mp.mpf(value(expected[witness]))-ref512)/(1 if primitive=='cdf' else abs(ref512))
+   witness_error_512bit=mp.nstr(error512,50)
+ row=dict(primitive=primitive,unique_inputs=len(words),banks=len(banks),identity_checks=checks,mismatches=mismatches,fallback_mismatches=fallback_mismatches,observations=observations,budget=float(budget),max_error=float(worst),witness=witness,witness_error_512bit=witness_error_512bit,failures=failures)
  results.append(row);(out/'summary.json').write_text(json.dumps(results,indent=2)+'\n');print(json.dumps(row),flush=True)
 assert not any(r['mismatches'] or r['fallback_mismatches'] or r['failures'] for r in results)
