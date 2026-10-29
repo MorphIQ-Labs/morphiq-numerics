@@ -276,3 +276,73 @@ pub(crate) fn slice(input: &[f64], output: &mut [f64]) {
 fn sse2(op: Slice<'_>) {
     run(morphiq_numerics_arch::Sse2::new(), op);
 }
+
+// Static builds select one-vector packets and short remainders before bulk
+// dispatch. Fixed-size references keep the remainder's length and ABI explicit;
+// arithmetic and domain/fallback ownership remain with exp and fixed.
+#[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+#[inline(always)]
+pub(crate) fn slice_static_avx512(input: &[f64], output: &mut [f64]) {
+    use morphiq_numerics_arch::{Avx2, Avx512, Sse2};
+    macro_rules! full {
+        ($k:expr, $n:literal) => {
+            fixed::<_, $n>($k, input.try_into().unwrap(), output.try_into().unwrap())
+        };
+    }
+    macro_rules! tail {
+        ($k:expr, $n:literal, $len:literal) => {
+            static_packet::<_, $n, $len>($k, input.try_into().unwrap(), output.try_into().unwrap())
+        };
+    }
+    match input.len() {
+        0 => (),
+        1 => scalar_packet(input, output),
+        2 => full!(Sse2::new(), 2),
+        3 => tail!(Sse2::new(), 2, 3),
+        4..=6 => {
+            if let Some(k) = Avx2::try_new() {
+                match input.len() {
+                    4 => full!(k, 4),
+                    5 => tail!(k, 4, 5),
+                    _ => tail!(k, 4, 6),
+                }
+            } else {
+                static_avx512_other(input, output);
+            }
+        }
+        8..=10 => {
+            let k = Avx512::try_new().expect("AVX-512F compile target");
+            match input.len() {
+                8 => full!(k, 8),
+                9 => tail!(k, 8, 9),
+                _ => tail!(k, 8, 10),
+            }
+        }
+        _ => static_avx512_other(input, output),
+    }
+}
+
+#[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+#[inline(never)]
+fn static_packet<K: morphiq_numerics_arch::Simd, const N: usize, const LEN: usize>(
+    k: K,
+    input: &[f64; LEN],
+    output: &mut [f64; LEN],
+) {
+    let (prefix, tail) = input.split_at(N);
+    let (prefix_out, rest) = output.split_at_mut(N);
+    for (&x, y) in tail.iter().zip(rest) {
+        *y = exp(x);
+    }
+    fixed::<K, N>(
+        k,
+        prefix.try_into().unwrap(),
+        prefix_out.try_into().unwrap(),
+    );
+}
+
+#[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
+#[inline(never)]
+fn static_avx512_other(input: &[f64], output: &mut [f64]) {
+    slice(input, output);
+}
