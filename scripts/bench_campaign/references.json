@@ -1,0 +1,30 @@
+{
+  "core-math": {
+    "repository": "https://gitlab.inria.fr/core-math/core-math.git",
+    "primitive": "exp",
+    "contract": "Correctly rounded binary64 exp; a stronger reference than the bounded fast API.",
+    "interface": "cr_exp(double) through the native C timer; independent throughput and dependency-chain latency.",
+    "special_values": "Include the declared native matrix's overflow, underflow, infinity and NaN cases; no NaN payload equivalence claim."
+  },
+  "sleef": {
+    "repository": "https://github.com/shibatch/sleef.git",
+    "primitive": "exp and composed normal CDF",
+    "contract": "Selected u10 exp and u15 erfc entry points. The composed CDF is 0.5*erfc(-x/sqrt(2)); a component bound is not a proof of the composed CDF bound.",
+    "interface": "Scalar FMA exp and native SSE2/AVX2/AVX-512 or NEON packet wrappers, including dispatch and remainder handling.",
+    "special_values": "Matrix special/mixed/fallback cells are diagnostic; do not transfer the product's determinism or special-value contract to SLEEF."
+  },
+  "libcerf": {
+    "repository": "https://jugit.fz-juelich.de/mlz/lib/cerf.git",
+    "primitive": "erfcx",
+    "contract": "Binary64 numerical reference; this harness does not establish a proved whole-domain relative or ULP bound for libcerf.",
+    "interface": "erfcx(double) through native C loops for scalar calls and scalar-in-a-batch comparison.",
+    "special_values": "Matrix special/mixed/fallback cells are diagnostic; no cross-target bit identity or NaN payload equivalence claim."
+  },
+  "scipy": {
+    "repository": "https://github.com/scipy/scipy",
+    "primitive": "normal CDF",
+    "contract": "SciPy 1.16.3 ndtr is a black-box binary64 reference. This harness does not establish a proved whole-domain bound or cross-target determinism for it.",
+    "interface": "scipy.special.cython_special __pyx_fuse_1ndtr capsule, double(double, int), called in the native timer without a Python loop.",
+    "special_values": "Special/mixed/fallback cells are diagnostic; no NaN payload equivalence claim."
+  }
+}

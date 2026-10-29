@@ -63,6 +63,8 @@ jobs:
           fetch-depth: 0
       - name: Check prose scope decisions
         run: python3 -m unittest discover -s ci -p test_prose_ci.py
+      - name: Benchmark campaign lifecycle and cost model
+        run: python3 -m unittest scripts.bench_campaign.test_campaign
       - name: Classify the complete change and check whitespace
         id: prose
         env:
