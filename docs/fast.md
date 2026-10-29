@@ -201,10 +201,16 @@ screened outputs come from the corresponding strong scalar entry. No feature
 changes the selected contract or the scalar result bits.
 
 The derivation above is distinct from a sampled error result. Independent
-reference fixtures include their oracle uncertainty when checking the fast
-bound. Exp fixtures retain a 192-bit interval reference, compared using exact
-arithmetic, so binary64 reference rounding cannot exhaust a valid result’s
-error budget. Rounded Gaussian references include their half-ULP uncertainty. Mixed inputs, dispatch endpoints, SIMD remainders and retained
+high/low reference fixtures reuse the elementary/normal oracle input bits and
+evaluate the mathematical definitions at 600 and 1000 bits. Both observations
+must lie within `high + low +/- (abs(high)*2^-104 + 2^-1074)`.
+The relative term retains 104 of a double-word's approximately 106 bits; the
+absolute term covers underflow when rounding the low word. The reference test
+uses independent integer arithmetic for the result error, oracle uncertainty
+and unchanged public bound. A single rounded binary64 reference can be too
+coarse to establish a valid near-bound result; reducing oracle uncertainty
+never increases the allowed primitive error. Mixed inputs, dispatch endpoints,
+SIMD remainders and retained
 special values are checked separately. The extracted entry models exercise the
 same central/outer and accelerated/fallback decisions. Native measurements
 apply only to their recorded hosts, calling interfaces and input populations.

@@ -138,9 +138,16 @@ impl<const N: usize> morphiq_numerics_arch::WithSimd for Packet<'_, N> {
     type Output = ();
     #[inline(always)]
     fn with<K: morphiq_numerics_arch::Simd>(self, k: K) {
+        assert!(N >= K::LANES);
         assert_eq!(N % K::LANES, 0);
-        let mut active = k.lt(k.splat(0.0), k.splat(704.0));
-        for input in self.input.chunks_exact(K::LANES) {
+        // Every fixed packet is nonempty. Seed with its first domain mask;
+        // constructing an all-true mask via a comparison adds real work on
+        // static AVX builds because the intrinsic is not constant-folded.
+        let (first, rest) = self.input.split_at(K::LANES);
+        let mut x = K::Array::default();
+        x.as_mut().copy_from_slice(first);
+        let mut active = k.lt(k.abs(k.load(x)), k.splat(704.0));
+        for input in rest.chunks_exact(K::LANES) {
             let mut x = K::Array::default();
             x.as_mut().copy_from_slice(input);
             active = k.and_m(active, k.lt(k.abs(k.load(x)), k.splat(704.0)));

@@ -171,17 +171,6 @@ def regression_cases():
     return [('regression', -0.6)]
 
 
-def reference_case(kind, x):
-    row = {'kind': kind, 'x': f'{to_bits(x):016x}', 'exp': f'{to_bits(exp_rn(x)):016x}'}
-    if abs(x) < 704:
-        # A rounded binary64 reference alone cannot certify every valid 4u
-        # approximation: its half-ULP uncertainty can exhaust the error budget.
-        # Retain the independent interval oracle's 192-bit relative enclosure.
-        _, m, e = precise(iv.exp, x)
-        row.update(fast_m=f'{m:048x}', fast_e=e)
-    return row
-
-
 def document():
     found = thresholds()
     cases = special_cases() + regression_cases() + table_4_cases() + near_midpoint_cases()
@@ -192,8 +181,6 @@ def document():
         'oracle': f'mpmath {mpmath.__version__} interval arithmetic, from 128 bits, '
                   'doubled until both ends of the enclosure round alike',
         'rounding': 'to nearest, ties to even; subnormals rounded once; overflow to +inf',
-        'fast_reference': 'For |x| < 704, fast_m * 2^fast_e approximates exp(x) '
-                          'with relative error <= 2^-192, from oracle.precise(iv.exp).',
         'sources': [
             'Lefevre and Muller, Worst cases for correct rounding of the elementary '
             'functions in double precision, revised 2003, Tables 2 and 4',
@@ -201,7 +188,10 @@ def document():
         ],
         'thresholds': {name: f'{to_bits(x):016x}' for name, x in found.items()},
         'precise': precise_cases(),
-        'cases': [reference_case(kind, x) for kind, x in cases],
+        'cases': [
+            {'kind': kind, 'x': f'{to_bits(x):016x}', 'exp': f'{to_bits(exp_rn(x)):016x}'}
+            for kind, x in cases
+        ],
     }
 
 
