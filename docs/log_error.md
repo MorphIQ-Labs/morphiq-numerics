@@ -11,7 +11,7 @@ representable binary64 constant.
 | API and domain | Exact real target `L` | Absolute error in log units |
 |---|---|---|
 | `ln(x)`, finite `x > 0` | `ln x` | `abs(L̂ − L) ≤ u·abs(L)` |
-| `ln_1p(x)`, finite `x > −1` | `ln(1 + x)`, with exact `1 + x` | `abs(L̂ − L) ≤ (u + 2^−122)·abs(L) + η` |
+| `ln_1p(x)`, finite `x > −1` | `ln(1 + x)`, with exact `1 + x` | `abs(L̂ − L) ≤ (u + 2^−122)·abs(L)` |
 | `log_norm_cdf(x)`, finite `x`, no result overflow | `ln(Φ(x))` | `abs(L̂ − L) ≤ (u + 2^−111)·abs(L) + η` |
 | `expm1(x)`, finite nonzero `x`, no result overflow | `ln(abs(exp(x) − 1))` | `abs(ln(abs(expm1(x))) − L) ≤ ρ/(1 − ρ) < 2^−52`, where `ρ = u + 2^−117` |
 
@@ -29,10 +29,11 @@ largest result binade has spacing `2^−43`; a uniform bound over positive
 finite binary64 inputs is `2^−44` log units. `ln(1)` is exact zero.
 
 **`ln_1p`:** [ln.md §7](ln.md) establishes pre-rounding relative error
-`ε = 2^−123` on the accurate path. Final rounding gives
-`[u + (1 + u)ε]·abs(L) + η`, bounded by the table's expression.
-Correctly rounded stages and the tiny-input return satisfy the same bound.
-The additive term covers gradual underflow; signed-zero inputs are exact.
+`ε = 2^−123` on the accurate path. Results are never subnormal: for
+`abs(x) < 2^−54` the return is `x` itself, and otherwise `abs(L) > 2^−55`.
+So final rounding gives `[u + (1 + u)ε]·abs(L)`, bounded by the table's
+expression. Correctly rounded stages and the tiny-input return satisfy the
+same bound; signed-zero inputs are exact.
 
 **Log-CDF:** the [normal-family contract](normal.md#numerical-contract)
 proves `L̂ = L·(1+d)+a` with `abs(d) ≤ u + 2^−111` and `abs(a) ≤ η`.
@@ -68,7 +69,7 @@ abs(L̂ − L) ≤ (α·abs(L̂) + η)/(1 − α).
 ```
 
 Alternatively, bound `abs(L) ≤ M` over the consumer's input domain and
-use `B = α·M + η`. For `ln`, take `η = 0`.
+use `B = α·M + η`. For `ln` and `ln_1p`, take `η = 0`.
 
 For finite `x < 0`, `ln(−expm1(x))` targets `ln(1 − exp(x))`. With
 `q̂ = expm1(x)`, its total absolute log error is at most
