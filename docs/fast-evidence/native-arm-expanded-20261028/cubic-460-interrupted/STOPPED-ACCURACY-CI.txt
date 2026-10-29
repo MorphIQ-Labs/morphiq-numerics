@@ -1,2 +1,0 @@
-2026-10-29T00:13:23.766553+00:00
-Stopped owned benchmark runner after CI fast accuracy-bound failure on cubic source at exp(-643.913158226603), before independent witness investigation. All partial observations retained; this campaign is not accepted.

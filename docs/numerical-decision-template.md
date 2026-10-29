@@ -34,13 +34,15 @@ additional precision or fallback using the contract obligation it establishes.
 - Exact source/toolchain/features/backend/comparator versions and input bits:
 - Independent reference, provenance and reference uncertainty:
 - Bound certificates, generated constants, worst-case and boundary witnesses:
-- Retained raw timing and error results, reproduction commands and host state:
+- Versioned reproduction commands/input generators; source/comparator pins and host state:
+- Raw timing/error results and failed attempts available through review (outside Git):
 
 | Candidate / region | Proved bound | Observed error | Latency/spread and throughput | Fast-path/fallback rate and cost | Outcome |
 | --- | --- | --- | --- | --- | --- |
 | <strong/fast candidate> | <domain and certificate> | <with reference uncertainty> | <scalar, batch, interface> | <ordinary, difficult and mixed lanes> | <meets both / rejected / unestablished> |
 
-Retain refusals and failed attempts. Separate dependent latency from throughput,
+Retain refusals and failed attempts through review; record the decision and
+limitations in the owning issue/PR. Raw runs need not be permanently committed. Separate dependent latency from throughput,
 instrumented diagnostics from native timings, and unlike contracts/interfaces.
 Include consumer results separately when a consumer adoption is claimed.
 

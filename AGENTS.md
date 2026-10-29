@@ -77,13 +77,26 @@ Each path records its selection domain or acceptance certificate, maximum refine
 
 ## Performance Evidence
 
-Use pinned implementations and exact input bits on the same native host. Record CPU/ISA, OS/toolchain, features/flags, power/frequency/thermal conditions and host contention. Warm up, alternate paired runs, retain raw samples and rejected attempts, and report medians and spread. Separate independent throughput, dependency-chain latency, public wrapper/FFI overhead, dispatch/remainders, allocations, memory passes, table/code footprints and fallback rates. Keep oracle checks and profiling/allocation instrumentation outside uninstrumented timings. CI and emulation establish correctness, not native speed; structural code-generation checks remain useful CI gates.
+Use pinned implementations and exact input bits on the same native host. Record CPU/ISA, OS/toolchain, features/flags, power/frequency/thermal conditions and host contention. Warm up, alternate paired runs, retain raw samples and rejected attempts through review, and report medians and spread. Separate independent throughput, dependency-chain latency, public wrapper/FFI overhead, dispatch/remainders, allocations, memory passes, table/code footprints and fallback rates. Keep oracle checks and profiling/allocation instrumentation outside uninstrumented timings. CI and emulation establish correctness, not native speed; structural code-generation checks remain useful CI gates.
 
 Cover ordinary, boundary, cancellation, subnormal/overflow, screened/mixed-lane and fallback-heavy inputs; distinguish adversarial cases from representative frequencies. Include short slices and SIMD remainders as well as large batches, native ARM/x86 coverage, unchanged control workloads, and compositions as well as primitives. Consumer end-to-end qualification is distinct from a public synthetic workload. No reduced work, changed seed/reduction order or unannounced accuracy change counts as a speedup.
 
 Before declaring parity or accepting a regression, the owning issue must specify the comparator/workload/hardware matrix and decision rule: repetitions and stability controls, uncertainty or equivalence treatment, and whether every required cell must pass or a justified aggregation applies. Do not infer a universal nanosecond budget, fallback ceiling or permitted slowdown from one experiment. Missing criteria or missing measurements leave the corresponding performance claim unestablished.
 
 The decision record presents error and cost together for the same source, settings, exact inputs and output set. Report proved bounds separately from observed maxima and reference uncertainty. Show fast-path coverage, fallback frequency and fallback latency/cost by input region and for representative mixtures, including mixed SIMD lanes. Compare strong and fast APIs as distinct contracts; benchmark both when the choice changes a consumer's decision. Tightening a tolerance or adding a runtime check requires its consumer benefit and measured cost in the same review. Loosening a bound requires an independently justified contract change, never fitting the bound to failing samples. Stop investigating once the predeclared decision is supported; a missing required measurement is still unestablished. The record and PR template are review controls, not an automated timing gate; CI proof/oracle and native performance enforcement remain as specified above.
+
+### Benchmark record retention
+
+Commit the methodology: runnable harnesses, deterministic input generators,
+comparator/tool pins, build flags, host requirements and acceptance rules. Keep
+new generated timing samples, profiles, logs, binaries and run archives under
+ignored `target/` or temporary CI artifacts. Preserve all samples and failed
+attempts through review; never filter outliers or retry until a pass. Record the
+source revision, host, decision and limitations in the owning issue/PR. Once
+review is complete, permanent raw-run retention is optional, not a Git gate.
+Correctness fixtures, worst-case witnesses, coefficient generators, certificates
+and proof inputs remain versioned. Existing historical measurement directories
+are not migrated incidentally. See [the native fast benchmark procedure](scripts/bench_fast/README.md).
 
 ## How a Correctly Rounded Function Is Built
 
