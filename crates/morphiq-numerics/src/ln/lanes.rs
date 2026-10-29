@@ -223,6 +223,15 @@ pub(super) fn fast_ln<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
     )
 }
 
+/// Rounded reciprocal stage for a packet of finite positive inputs.
+/// The bounded slice screens the whole packet before entering. At one all
+/// residuals and table terms are zero, so this also returns exact +0.
+#[inline(always)]
+pub(super) fn bounded_positive<K: Simd>(k: K, x: K::F) -> K::F {
+    let (s, lo, _) = fast_value(k, reduce(k, x));
+    k.add(s, lo)
+}
+
 impl Kernel for Ln1p {
     fn scalar(x: f64) -> f64 {
         ln_1p(x)

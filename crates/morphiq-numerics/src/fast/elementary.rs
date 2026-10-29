@@ -21,7 +21,7 @@ pub fn ln(x: f64) -> f64 {
 pub fn ln_slice(x: &[f64], out: &mut [f64]) {
     assert_eq!(x.len(), out.len(), "ln_slice: slices of different lengths");
     #[cfg(feature = "simd")]
-    crate::lanes::map::<crate::ln::bounded::Ln>(x, out);
+    crate::ln::bounded::slice(x, out);
     #[cfg(not(feature = "simd"))]
     for (o, &x) in out.iter_mut().zip(x) {
         *o = ln(x);

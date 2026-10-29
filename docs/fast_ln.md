@@ -25,7 +25,7 @@ Correct rounding and faithful rounding are not promised.
 | Finite positive input | Mixed absolute bound above | One fixed reciprocal stage; compare scalar throughput and dependent latency with pinned CORE-MATH log and SLEEF u10 log |
 | `1/2 <= x <= 2` | Absolute bound at most `2^-53 * ln(2) + 2^-65`; exact `ln(1)=+0` | Near-one cancellation remains in the reduced residual; no fixed absolute rounding tolerance is used in the oracle |
 | Other finite positive inputs, including subnormals | Equivalently relative `2^-53 + 2^-65/abs(L)` | Exact normalization and the same fixed stage; no arbitrary-precision fallback |
-| Zeros, negatives, infinities, NaNs | Existing strong-owner bits, including NaN payloads and `ln(±0)=-∞` | Special lanes delegate individually; mixed packets retain regular lane arithmetic |
+| Zeros, negatives, infinities, NaNs | Existing strong-owner bits, including NaN payloads and `ln(±0)=-∞` | Packets containing special values delegate to the bounded scalar entry |
 
 For a consumer using the returned value, exact real arithmetic gives
 `abs(Y-L) <= (2^-53*abs(Y) + 2^-65)/(1-2^-53)`.
@@ -47,9 +47,15 @@ There are no refinement iterations or unsupported positive finite inputs.
 The 512-cell reciprocal table, split log table and degree-six correction
 retain their existing generated bits and certificates. The strong entry
 retains its Ziv decision and accurate fallback; this entry has neither.
-Screened SIMD lanes get benign input before evaluation, then their special
-values come from the strong scalar owner. This preserves valid arithmetic
-in mixed packets and the same special-value conventions.
+The slice screens positive finite packets before arithmetic. A packet containing
+a special value finishes through the bounded scalar entry, which delegates
+only special values to the strong owner. Regular packets schedule pairs of
+vectors; the last partial packet is padded with 2 and only its valid prefix
+is stored. It stays in the selected SIMD width instead of entering a second
+backend for the remainder. One is accepted in these packets: the reciprocal
+and table terms are exactly one and zero, so the result is exact positive
+zero (`FastLn.fast_ln_regular_one`). This keeps the scalar arithmetic and
+outputs unchanged, including mixed packets and all slice lengths.
 
 `LnStageEvaluation.ln_eval_bounded` proves finite `s`, `lo` and `eps`, with
 `0 <= eps <= 2^-65`, and, for the exact logarithm,

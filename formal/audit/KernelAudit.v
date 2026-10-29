@@ -934,6 +934,7 @@ Require FastLn.
 Print Assumptions FastLn.fast_ln_regular_ok.
 Print Assumptions FastLn.fast_ln_public_ok.
 Print Assumptions FastLn.fast_ln_specials.
+Print Assumptions FastLn.fast_ln_regular_one.
 Print Assumptions FastLn.fast_ln_nan.
 Print Assumptions FastExp.fast_exp_entry_ok.
 Print Assumptions FastExp.fast_exp_nonpositive_range.

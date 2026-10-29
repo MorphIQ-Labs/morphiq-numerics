@@ -116,3 +116,7 @@ Proof. vm_compute; repeat split; reflexivity. Qed.
 
 Theorem fast_ln_nan x : is_nan 53 1024 x=true -> fast_ln_public64 x=x.
 Proof. intros H; unfold fast_ln_public64; rewrite H; reflexivity. Qed.
+
+(** The positive SIMD packet includes one without a scalar lane fallback. *)
+Theorem fast_ln_regular_one : fast_ln_regular64 (b64_of_bits 4607182418800017408) = c_zero.
+Proof. vm_compute; reflexivity. Qed.

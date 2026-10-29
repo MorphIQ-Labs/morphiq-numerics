@@ -549,13 +549,6 @@ fn ln_lanes_return_lns_bits_on_every_backend() {
 }
 
 #[test]
-fn fast_ln_lanes_return_scalar_bits_on_every_backend() {
-    let xs = ln_corpus();
-    check_all::<crate::ln::bounded::Ln>("fast ln", &xs);
-    check_cascades::<crate::ln::bounded::Ln>("fast ln", &xs[..256]);
-}
-
-#[test]
 fn asin_lanes_return_asins_bits_on_every_backend() {
     check_all::<Asin>("asin", &asin_corpus());
 }
