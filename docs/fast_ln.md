@@ -57,18 +57,6 @@ and table terms are exactly one and zero, so the result is exact positive
 zero (`FastLn.fast_ln_regular_one`). This keeps the scalar arithmetic and
 outputs unchanged, including mixed packets and all slice lengths.
 
-The bounded lane specialization uses an 8 KiB lossless packed layout of the
-existing generated table. Each reciprocal has ten significant bits and an
-exponent of 1022 or 1023; each log high word has at least ten zero low bits.
-Its low ten bits hold the reciprocal's low exponent bit and nine fraction
-bits. Masking restores the log high word; shifting by 43 and OR-ing the
-exponent base `1022 << 52` restores the reciprocal. The log low word is stored
-unchanged. Compile-time assertions verify both recovered words against every
-original entry and reject any future generator that breaks these invariants.
-This changes storage and loads only: there is no rounding or new coefficient.
-The scalar and strong lane entries retain the original tables. The extra
-8 KiB and the source specialization are part of the measured cost decision.
-
 `LnStageEvaluation.ln_eval_bounded` proves finite `s`, `lo` and `eps`, with
 `0 <= eps <= 2^-65`, and, for the exact logarithm,
 
