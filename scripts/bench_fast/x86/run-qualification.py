@@ -10,11 +10,13 @@ if receipt.exists():assert receipt.read_text().strip()==frozen
 else:receipt.write_text(frozen+'\n')
 for c in cells:
  assert hashlib.sha256(Path(c['product']).read_bytes()).hexdigest()==next(b['sha256'] for b in manifest['builds'] if b['name']==c['backend'])
+ if c.get('control_product'):
+  assert hashlib.sha256(Path(c['control_product']).read_bytes()).hexdigest()==next(b['control_sha256'] for b in manifest['builds'] if b['name']==c['backend'])
  words=json.loads(Path(c['input']['file']).read_text());assert hashlib.sha256(b''.join(bytes.fromhex(w) for w in words)).hexdigest()==c['input']['sha256']
 
 def command(c,out,proc):
  args=[sys.executable,str(P/'qualify-cell.py'),'--product',c['product'],'--primitive',c['primitive'],'--length',str(c['length']),'--population',c['input']['file'],'--kind',c['kind'],'--reference',c['reference'],'--counts',str(out/'counts.json'),'--target-ms','600','--cache-slots',str(c.get('cache_slots',1)),'--process',proc,'--out',str(out/proc)]
- if c['control']:args+=['--symbol-prefix','control_','--reference-product',str(P/'final-bin/control.so')]
+ if c['control']:args+=['--symbol-prefix','control_','--reference-product',str(c.get('control_product') or P/'final-bin/control.so')]
  return args
 
 def summaries():
@@ -53,7 +55,12 @@ for block in range(2):
     result=subprocess.run(command(c,out,proc),stdout=stream,stderr=subprocess.STDOUT)
    if result.returncode:raise SystemExit(f'Failed {c["id"]}/{proc}; evidence retained. See {out/(proc+".log")}')
    done.write_text(str(time.time())+'\n')
-  if block==1:summaries()
+  if block==1:
+   rows=summaries()
+   failed=[r['id'] for r in rows if r['required'] and not r['passes']]
+   if failed and manifest.get('stop_on_required_failure',False):
+    (root/'result.json').write_text(json.dumps(dict(complete=False,all_required_pass=False,failures=failed,reason='Stopped at first completed required failure; all attempts retained'),indent=2)+'\n')
+    raise SystemExit('Required parity failed: '+', '.join(failed))
   if (index+1)%10==0:print(f'Block {block+1}/2: {index+1}/{len(cells)} cells',flush=True)
 rows=summaries();assert len(rows)==len(cells)
 failures=[r for r in rows if r['required'] and not r['passes']]

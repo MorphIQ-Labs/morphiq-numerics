@@ -230,3 +230,67 @@ python scripts/bench_fast/freeze.py target/ln-ordinary-001 --verify
 Use a new output directory for every changed candidate. The adapter keeps
 its ln wrapper separate from the historical matrix's control wrapper, so
 building pre-ln strong controls does not require a nonexistent fast API.
+
+## Full logarithm matrix
+
+`x86/prepare-ln.py --full` also prepares the ln campaign on native x86 Linux
+or Apple Silicon macOS. The shared timer and runner support both; the directory
+name is historical. Supply the clean control checkout at the declared baseline,
+and build pinned CORE-MATH's `src/binary64/log/log.c` with the same command above,
+substituting `log/log.c` and `libcorelog.so` (or `.dylib`). On x86 the reference
+build may use `-march=native`; record it in the reference receipt. Keep the
+SLEEF reference build receipt and exact binary hashes with the run.
+
+```sh
+python scripts/bench_fast/x86/prepare-ln.py --full --platform x86-linux \
+  --control-source /path/to/clean-baseline --cpu 2 \
+  --reference-bin target/bench-fast-refs/bin --out target/ln-full-001
+python target/ln-full-001/observe-ln.py
+```
+
+On Apple Silicon substitute `--platform arm-macos` and add
+`--sleef-include target/bench-fast-refs/sleef-build/include`. macOS records the
+power configuration and uses USER_INITIATED QoS; it cannot pin this process to
+a CPU. Record the actual core scheduling, thermal/power conditions and competing
+load with the returned run. An x86 result does not fill an ARM cell.
+
+The versioned `x86/ln-matrix.py` declares 330 x86 cells (244 parity-required)
+and 126 ARM cells (94 required). It covers automatic dispatch plus x86 builds
+with a static SSE2, AVX2/FMA or AVX-512 ceiling; public wrappers can select a
+narrower width on short inputs. Ordinary and exponent-spanning inputs cover
+lengths 0–17 and large batches, with additional automatic-dispatch boundaries.
+Every build covers near-one cancellation, subnormals, reduction/table boundaries,
+and mixed positive packets at lengths 52 and 4096. Scalar throughput and dependent
+latency compare against SLEEF u10 and correctly rounded CORE-MATH. SLEEF u10 is a
+selected diagnostic accuracy reference with a looser worst-case guarantee than
+the mixed ln bound; observations report its error against that bound without
+claiming equal guarantees. NaN-payload differences make special/mixed-special
+comparisons diagnostic, with no parity claim. Strong-path before/after controls
+are separately reviewed, never silently treated as accepted regressions.
+
+The exact input banks, their hashes and all cell settings are emitted before
+measurement. Independent observations check the public mixed bound, exact
+`ln(1)=+0`, existing special semantics, every timed slice/remainder against
+scalar bits, and shared strong paths against the baseline. CORE-MATH scalar
+outputs are checked for nearest-even equality to the high-precision observation.
+The reference uncertainty allowance is reported separately from observed error;
+these observations supplement the existing proofs and independent fixtures.
+
+The synthetic `exp(ln(x))` composition uses positive normal inputs with binary
+exponents from -900 to 900. If `d = 2^-53*|ln(x)| + 2^-65`, its relative error
+bound is `expm1(d)*(1+2^-51) + 2^-51`, using the fast exp bound on this range.
+It has separate scalar throughput/latency cells and strong composition controls.
+It does not qualify a consumer's distinct composed error or workload budget.
+
+Use `screen-ln.py` before qualification for a one-process exploratory screen:
+150 ms calibration target, two alternating paired rounds, all samples retained.
+It never establishes parity. Stop tuning a candidate when a required cell misses
+materially, investigate the measured cost, and retain that attempt. No repeated
+unchanged-candidate runs to obtain a favorable result. Finish all builds,
+observations, code inspection and allocation/profile diagnostics before timing.
+
+Freeze and run `run-qualification.py` with the same ten-process, two-block,
+600 ms protocol above. Every required cell must meet the upper-95% ratio rule;
+there is no aggregation across cells. This matrix stops on its first completed
+required failure and records incomplete qualification explicitly. Preserve the
+entire failed attempt before changing source or predeclaring another campaign.

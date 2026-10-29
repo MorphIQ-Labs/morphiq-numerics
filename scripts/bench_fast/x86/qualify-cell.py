@@ -6,8 +6,10 @@ import hashlib
 import json
 import math
 import os
+import platform
 from pathlib import Path
 import struct
+import subprocess
 import time
 
 P = Path(__file__).resolve().parent
@@ -17,6 +19,11 @@ KEEP = []
 
 
 def host():
+    if platform.system() == 'Darwin':
+        return dict(utc=time.time(), platform=platform.platform(),
+                    affinity='macOS does not provide CPU affinity for this process',
+                    cpuinfo=subprocess.check_output(['sysctl', '-a'], text=True, stderr=subprocess.DEVNULL),
+                    power=subprocess.check_output(['pmset', '-g'], text=True))
     return dict(utc=time.time(), affinity=sorted(os.sched_getaffinity(0)),
                 cpu_stat=Path('/proc/stat').read_text(),
                 load=Path('/proc/loadavg').read_text(),
@@ -53,7 +60,7 @@ def main():
     ap.add_argument('--cache-slots', type=int, default=1)
     ap.add_argument('--product', required=True)
     ap.add_argument('--reference', required=True)
-    ap.add_argument('--primitive', choices=['exp', 'erfcx', 'cdf', 'ln'], required=True)
+    ap.add_argument('--primitive', choices=['exp', 'erfcx', 'cdf', 'ln', 'ln_exp'], required=True)
     ap.add_argument('--length', type=int, required=True)
     ap.add_argument('--population', default='ordinary')
     ap.add_argument('--kind', choices=['vector', 'scalar', 'latency'], default='vector')
@@ -65,15 +72,18 @@ def main():
     ap.add_argument('--symbol-prefix', default='prod_')
     ap.add_argument('--reference-product')
     args = ap.parse_args()
-    os.sched_setaffinity(0, {json.loads((P/'config.json').read_text())['cpu']})
+    if platform.system() != 'Darwin':
+        os.sched_setaffinity(0, {json.loads((P/'config.json').read_text())['cpu']})
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=False)
     native = C.CDLL(str(P/'bin/native-matrix.so'))
+    if platform.system() == 'Darwin' and native.bench_set_qos() != 0:
+        raise RuntimeError('Cannot establish USER_INITIATED QoS')
     for name in ['measure1', 'measure2', 'measure_packet', 'measure_chain1', 'measure_chain2']:
         method = getattr(native, name)
         method.argtypes = [C.c_void_p, D, D, C.c_size_t, C.c_uint64]
         method.restype = C.c_uint64
-    symbol = dict(exp='exp', erfcx='erfcx', cdf='norm_cdf', ln='ln')[args.primitive]
+    symbol = dict(exp='exp', erfcx='erfcx', cdf='norm_cdf', ln='ln', ln_exp='ln_exp')[args.primitive]
     symbol = args.symbol_prefix + symbol + ('_slice' if args.kind == 'vector' else '')
     product = pointer(Path(args.product), symbol)
     entries = {'ours': (product, 'measure_packet' if args.kind == 'vector' else 'measure1')}
@@ -81,14 +91,20 @@ def main():
         ref = pointer(Path(args.reference_product), symbol)
         method = 'measure_packet' if args.kind == 'vector' else 'measure1'
     elif args.reference.startswith('sleef_'):
-        if args.reference in ['sleef_exp_scalar_fma', 'sleef_ln_scalar_fma']:
-            ref = pointer(E/'libsleef.so.3', 'Sleef_logd1_u10purecfma' if args.primitive == 'ln' else 'Sleef_expd1_u10purecfma')
+        if args.reference in ['sleef_exp_scalar_fma', 'sleef_ln_scalar_fma', 'sleef_ln_scalar_purec']:
+            library = E/('libsleef.3.9.0.dylib' if platform.system() == 'Darwin' else 'libsleef.so.3')
+            function = 'Sleef_logd1_u10purec' if args.reference == 'sleef_ln_scalar_purec' else 'Sleef_logd1_u10purecfma' if args.primitive == 'ln' else 'Sleef_expd1_u10purecfma'
+            ref = pointer(library, function)
             method = 'measure1'
+        elif args.reference == 'sleef_ln_exp_scalar_fma':
+            ref, method = C.cast(native.sleef_ln_exp_scalar_fma, C.c_void_p).value, 'measure1'
         else:
             ref = C.cast(getattr(native, args.reference), C.c_void_p).value
             method = 'measure_packet'
     elif args.reference == 'core_math_exp':
         ref, method = pointer(E/'libcoreexp.so', 'cr_exp'), 'measure1'
+    elif args.reference == 'core_math_ln':
+        ref, method = pointer(E/('libcorelog.dylib' if platform.system() == 'Darwin' else 'libcorelog.so'), 'cr_log'), 'measure1'
     elif args.reference == 'libcerf_erfcx':
         ref, method = pointer(E/'libcerf.so', 'erfcx'), 'measure1'
     elif args.reference == 'scipy_ndtr':
