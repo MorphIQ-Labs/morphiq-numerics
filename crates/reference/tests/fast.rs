@@ -1,67 +1,63 @@
-//! The explicit fast domains against retained independent rounded references.
+//! Explicit fast contracts against independent high/low oracle intervals.
 use morphiq_numerics::fast::{elementary, normal};
+use morphiq_numerics_reference::Exact;
 use serde_json::Value;
 
 fn word(value: &Value) -> f64 {
     f64::from_bits(u64::from_str_radix(value.as_str().unwrap(), 16).unwrap())
 }
 
-#[test]
-fn accelerated_domains_meet_their_bound_including_reference_rounding() {
-    let small = f64::from_bits(0x3de0_0000_0000_0000);
-    type Scalar = fn(f64) -> f64;
-    for (name, fixture, key, function) in [
-        (
-            "exp",
-            include_str!("../fixtures/exp.json"),
-            "exp",
-            elementary::exp as Scalar,
-        ),
-        (
-            "erfcx",
-            include_str!("../fixtures/erfcx.json"),
-            "y",
-            normal::erfcx,
-        ),
-        (
-            "cdf",
-            include_str!("../fixtures/normal.json"),
-            "cdf",
-            normal::norm_cdf,
-        ),
-    ] {
-        let data: Value = serde_json::from_str(fixture).unwrap();
-        let mut observed = 0;
-        for row in data["cases"].as_array().unwrap() {
-            let x = word(&row["x"]);
-            let accelerated = match name {
-                "exp" => x.abs() < 704.0,
-                "erfcx" => (-0.5..16.0).contains(&x) && x.abs() >= small,
-                "cdf" => (small..=8.0).contains(&x.abs()),
-                _ => unreachable!(),
-            };
-            if !accelerated {
-                continue;
-            }
-            let reference = word(&row[key]);
-            let actual = function(x);
-            let uncertainty =
-                (reference.next_up() - reference).max(reference - reference.next_down()) * 0.5;
-            let error_upper = ((actual - reference).abs() + uncertainty).next_up();
-            let cap_lower = if name == "cdf" {
-                f64::from_bits(0x3ce0_0000_0000_0000)
-            } else {
-                (reference.abs().next_down() * f64::from_bits(0x3cc0_0000_0000_0000)).next_down()
-            };
-            assert!(
-                actual.is_finite() && error_upper <= cap_lower,
-                "{name}({x:?}): {error_upper:e} > {cap_lower:e}"
-            );
-            observed += 1;
-        }
-        assert!(
-            observed > 100,
-            "empty or unexpectedly small {name} reference population"
-        );
+fn within_bound(actual: f64, high: f64, low: f64, relative: bool) -> bool {
+    if !actual.is_finite() {
+        return false;
     }
+    let high = Exact::of(high);
+    let reference = &high + &Exact::of(low);
+    // The generator independently encloses both precision observations in this
+    // interval. Exact integer arithmetic keeps oracle uncertainty and the
+    // public error budget separate, including subnormal low words.
+    let uncertainty = &(&high.abs() * &Exact::power_of_two(-104)) + &Exact::power_of_two(-1074);
+    if reference <= uncertainty {
+        return false;
+    }
+    let error_upper = &(&Exact::of(actual) - &reference).abs() + &uncertainty;
+    let cap_lower = if relative {
+        &(&reference - &uncertainty) * &Exact::power_of_two(-51)
+    } else {
+        Exact::power_of_two(-49)
+    };
+    error_upper <= cap_lower
+}
+
+#[test]
+fn accelerated_domains_meet_their_bound_including_reference_uncertainty() {
+    let data: Value = serde_json::from_str(include_str!("../fixtures/fast.json")).unwrap();
+    let mut observed = [0; 3];
+    for row in data["cases"].as_array().unwrap() {
+        let name = row["primitive"].as_str().unwrap();
+        let x = word(&row["x"]);
+        let (index, actual, relative) = match name {
+            "exp" => (0, elementary::exp(x), true),
+            "erfcx" => (1, normal::erfcx(x), true),
+            "cdf" => (2, normal::norm_cdf(x), false),
+            _ => unreachable!("unknown fixture primitive"),
+        };
+        assert!(
+            within_bound(actual, word(&row["high"]), word(&row["low"]), relative),
+            "{name}({x:?}): {actual:?} exceeds the public bound including oracle uncertainty"
+        );
+        observed[index] += 1;
+    }
+    assert!(observed.iter().all(|&n| n > 100), "empty oracle population");
+}
+
+#[test]
+fn oracle_interval_rejects_results_outside_the_public_budget() {
+    let ulp = f64::from_bits(0x3cb0_0000_0000_0000);
+    assert!(within_bound(1.0 + ulp, 1.0, 0.0, true));
+    assert!(!within_bound(1.0 + 4.0 * ulp, 1.0, 0.0, true));
+    assert!(within_bound(1.0 + ulp, 1.0, 0.0, false));
+    assert!(!within_bound(1.0 + 16.0 * ulp, 1.0, 0.0, false));
+    assert!(!within_bound(f64::INFINITY, 1.0, 0.0, true));
+    assert!(!within_bound(f64::NAN, 1.0, 0.0, false));
 }
