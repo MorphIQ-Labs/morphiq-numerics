@@ -314,3 +314,15 @@ It verifies output bits against the uninstrumented scalar entry and requires a
 this instrumentation is separate from timing and does not establish macOS
 allocation behavior. The published crates' no-alloc dependency boundary remains
 the structural guarantee on every platform.
+
+
+The ln x86 matrix declares two execution groups before qualification. The
+first contains the observed short-call/bulk boundary cases and scalar
+CORE-MATH comparisons near parity; the second contains every remaining cell.
+Each group completes two full blocks of five fresh processes per cell, with
+the same 600 ms calibration target, 250 ms minimum sample, paired order and
+confidence rule. The runner rejects missing, duplicated or unknown cell IDs.
+A required failure stops the entire campaign. Staging changes execution order
+only: acceptance still requires all 394 cells measured and all 244 required
+cells passing. Native ARM and manifests without groups retain the original
+single-group schedule.

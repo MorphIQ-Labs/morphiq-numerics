@@ -112,6 +112,7 @@ codegen-units=1
                   builds=builds,cells=cells,stop_on_required_failure=args.full,
                   reference_sha256={name:digest(refs/name) for name in names},
                   protocol=dict(upper95_t9=1.8331129326536335))
+    if args.full and not arm: manifest['execution_groups'] = module.execution_groups(cells)
     (out/'qualification-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print(out, len(cells),'cells',sum(c['required_parity'] for c in cells),'required')
 

@@ -95,3 +95,27 @@ def matrix(out, builds, arm, full):
                 add(backend,region,n,kind,'baseline',primitive='ln_1p',control=True,required=False)
     assert len({c['id'] for c in cells})==len(cells)
     return cells
+
+
+def execution_groups(cells):
+    """Qualify the observed x86 boundary cases before the rest of the matrix.
+
+    Membership is declared before qualification; every cell still receives the
+    same ten-process two-block test, and every required cell must pass.
+    """
+    def critical(c):
+        if c['control'] or not c['required_parity'] or c['primitive'] != 'ln':
+            return False
+        backend, region, n, kind = c['backend'], c['population'], c['length'], c['kind']
+        if backend == 'auto':
+            if c['reference'] == 'core_math_ln':
+                return region == 'wide' or (region == 'ordinary' and kind == 'latency')
+            if kind == 'vector':
+                if region in ['ordinary', 'wide']:
+                    return n in [8, 16, 32, 33, 64, 65, 256, 4096]
+                return n == 4096 and region in ['near_one', 'subnormal', 'mixed_positive']
+        return kind == 'vector' and ((backend == 'avx512' and n in [16, 17] and region in ['ordinary', 'wide'])
+                                     or (backend == 'avx2' and region == 'wide' and n == 13))
+    first = [c['id'] for c in cells if critical(c)]
+    rest = [c['id'] for c in cells if not critical(c)]
+    return [first, rest] if first and rest else [[c['id'] for c in cells]]
