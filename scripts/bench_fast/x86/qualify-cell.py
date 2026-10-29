@@ -30,6 +30,13 @@ def pointer(path, symbol):
 
 
 def inputs(primitive, population, length):
+    if primitive == 'ln' and population in ['ordinary', 'wide']:
+        if population == 'ordinary':
+            return [.5 + 1.5*(i % 52)/51 for i in range(length)]
+        # Positive normal encodings spanning every exponent, with exact fractions.
+        return [struct.unpack('>d', struct.pack('>Q',
+            ((1 + i % 2046) << 52) | ((i * 0x9e3779b97f4a7c15) & ((1 << 52)-1))))[0]
+            for i in range(length)]
     if population == 'ordinary':
         from inputs import ordinary_packets
         words=ordinary_packets()[primitive]
@@ -46,7 +53,7 @@ def main():
     ap.add_argument('--cache-slots', type=int, default=1)
     ap.add_argument('--product', required=True)
     ap.add_argument('--reference', required=True)
-    ap.add_argument('--primitive', choices=['exp', 'erfcx', 'cdf'], required=True)
+    ap.add_argument('--primitive', choices=['exp', 'erfcx', 'cdf', 'ln'], required=True)
     ap.add_argument('--length', type=int, required=True)
     ap.add_argument('--population', default='ordinary')
     ap.add_argument('--kind', choices=['vector', 'scalar', 'latency'], default='vector')
@@ -66,7 +73,7 @@ def main():
         method = getattr(native, name)
         method.argtypes = [C.c_void_p, D, D, C.c_size_t, C.c_uint64]
         method.restype = C.c_uint64
-    symbol = dict(exp='exp', erfcx='erfcx', cdf='norm_cdf')[args.primitive]
+    symbol = dict(exp='exp', erfcx='erfcx', cdf='norm_cdf', ln='ln')[args.primitive]
     symbol = args.symbol_prefix + symbol + ('_slice' if args.kind == 'vector' else '')
     product = pointer(Path(args.product), symbol)
     entries = {'ours': (product, 'measure_packet' if args.kind == 'vector' else 'measure1')}
@@ -74,8 +81,8 @@ def main():
         ref = pointer(Path(args.reference_product), symbol)
         method = 'measure_packet' if args.kind == 'vector' else 'measure1'
     elif args.reference.startswith('sleef_'):
-        if args.reference == 'sleef_exp_scalar_fma':
-            ref = pointer(E/'libsleef.so.3', 'Sleef_expd1_u10purecfma')
+        if args.reference in ['sleef_exp_scalar_fma', 'sleef_ln_scalar_fma']:
+            ref = pointer(E/'libsleef.so.3', 'Sleef_logd1_u10purecfma' if args.primitive == 'ln' else 'Sleef_expd1_u10purecfma')
             method = 'measure1'
         else:
             ref = C.cast(getattr(native, args.reference), C.c_void_p).value

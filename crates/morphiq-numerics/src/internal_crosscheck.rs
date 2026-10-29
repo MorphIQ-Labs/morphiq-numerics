@@ -1604,6 +1604,13 @@ fn fast_corpus(out: &mut String) {
     let mut write = |x: f64| {
         writeln!(
             out,
+            "fast_ln {:016x} : {:016x}",
+            x.to_bits(),
+            crate::fast::elementary::ln(x).to_bits()
+        )
+        .unwrap();
+        writeln!(
+            out,
             "fast_exp {:016x} {:016x} : {:016x}",
             x.to_bits(),
             crate::elementary::exp(x).to_bits(),

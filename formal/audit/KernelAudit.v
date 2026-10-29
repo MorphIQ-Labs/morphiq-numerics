@@ -930,6 +930,12 @@ Print Assumptions BvnRefineHigh.high_neg_diff_composite.
 Print Assumptions BvnRefineHigh.high_neg_zero_composite.
 
 Require FastExp FastErfcx FastNormalArgument FastNormalAnalytic FastNormal.
+Require FastLn.
+Print Assumptions FastLn.fast_ln_regular_ok.
+Print Assumptions FastLn.fast_ln_public_ok.
+Print Assumptions FastLn.fast_ln_specials.
+Print Assumptions FastLn.fast_ln_regular_one.
+Print Assumptions FastLn.fast_ln_nan.
 Print Assumptions FastExp.fast_exp_entry_ok.
 Print Assumptions FastExp.fast_exp_nonpositive_range.
 Print Assumptions FastErfcx.fast_erfcx_table_ok.

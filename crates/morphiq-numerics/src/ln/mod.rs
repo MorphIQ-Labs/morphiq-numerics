@@ -4,6 +4,7 @@
 //! [`docs/ln.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/ln.md);
 //! section numbers below refer to it.
 
+pub(crate) mod bounded;
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;
 pub(crate) mod stage;

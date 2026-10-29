@@ -6,6 +6,15 @@
 typedef double (*scalar1)(double);
 typedef double (*scalar2)(double,int);
 typedef void (*packet)(const double*,double*,size_t);
+extern double Sleef_logd1_u10purecfma(double);
+extern double Sleef_logd1_u10purec(double);
+extern __m128d Sleef_logd2_u10sse2(__m128d);
+extern __m256d Sleef_logd4_u10avx2(__m256d);
+extern __m512d Sleef_logd8_u10avx512f(__m512d);
+double sleef_ln_scalar(double x){return Sleef_logd1_u10purecfma(x);}
+void sleef_ln_sse2(const double*x,double*y,size_t n){size_t i=0;for(;i+2<=n;i+=2)_mm_storeu_pd(y+i,Sleef_logd2_u10sse2(_mm_loadu_pd(x+i)));for(;i<n;i++)y[i]=Sleef_logd1_u10purec(x[i]);}
+__attribute__((target("avx2,fma"))) void sleef_ln_avx2(const double*x,double*y,size_t n){size_t i=0;for(;i+4<=n;i+=4)_mm256_storeu_pd(y+i,Sleef_logd4_u10avx2(_mm256_loadu_pd(x+i)));for(;i<n;i++)y[i]=Sleef_logd1_u10purecfma(x[i]);}
+__attribute__((target("avx512f,fma"))) void sleef_ln_avx512(const double*x,double*y,size_t n){size_t i=0;for(;i+8<=n;i+=8)_mm512_storeu_pd(y+i,Sleef_logd8_u10avx512f(_mm512_loadu_pd(x+i)));for(;i<n;i++)y[i]=Sleef_logd1_u10purecfma(x[i]);}
 static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000000000ULL+t.tv_nsec;}
 #define BARRIER(x,y) __asm__ volatile("" : : "r"(x),"r"(y) : "memory")
 uint64_t measure1(scalar1 f,const double*x,double*y,size_t n,uint64_t it){for(size_t w=0;w<100;w++){for(size_t i=0;i<n;i++)y[i]=f(x[i]);BARRIER(x,y);}uint64_t start=now_ns();for(uint64_t r=0;r<it;r++){BARRIER(x,y);for(size_t i=0;i<n;i++)y[i]=f(x[i]);BARRIER(x,y);}return now_ns()-start;}
