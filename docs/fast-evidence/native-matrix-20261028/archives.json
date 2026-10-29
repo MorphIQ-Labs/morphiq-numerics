@@ -1,0 +1,12 @@
+{
+  "qualification.tar.gz": {
+    "files": 27201,
+    "bytes": 75485424,
+    "sha256": "351a66e602180281f3aaadd282b85518a4beecb964526765a1e83a76b140a0eb"
+  },
+  "diagnostics.tar.gz": {
+    "files": 18356,
+    "bytes": 36998413,
+    "sha256": "b9ae906e3aa133dcd0f708d461f8a2ee11aeb1497dc371238002740b033a5ec8"
+  }
+}

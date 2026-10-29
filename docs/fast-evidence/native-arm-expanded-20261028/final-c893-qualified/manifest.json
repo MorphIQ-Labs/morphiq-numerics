@@ -1,0 +1,23 @@
+{
+  "source": "c89351345ca83006ab0f9926b957e72daefeb356",
+  "start_utc": "2026-10-29T01:07:49.869815+00:00",
+  "end_utc": "2026-10-29T03:03:38.493323+00:00",
+  "elapsed_seconds": 6948.623508,
+  "cells": 163,
+  "required": 125,
+  "diagnostic": 38,
+  "measured_processes": 1630,
+  "samples": {
+    "warmup": 6520,
+    "timed": 6520
+  },
+  "minimum_timed_ms": 587.775,
+  "max_required_upper95": 0.9812215218799202,
+  "worst_required_cell": "157",
+  "frozen_hashes_verified": true,
+  "linked_dependency_verified": true,
+  "allocation_binary_verified": true,
+  "ci_checks_passed": 30,
+  "reference_pins": "../manifest.json",
+  "later_source_changes": "x86 fe6af560/b1bb429 not automatically qualified; reconcile source and compiled target effects before combined release sign-off"
+}

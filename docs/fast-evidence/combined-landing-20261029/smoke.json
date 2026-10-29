@@ -1,0 +1,68 @@
+{
+  "source": "65becb36f1b788f0d08bc14cfd44af182d9021da",
+  "successful_cells": 8,
+  "cells": [
+    {
+      "cell": "auto-cdf-latency-scipy_ndtr-ordinary-52",
+      "timed_samples": 4,
+      "median_ours_ns": 1079.1767789498535,
+      "median_reference_ns": 1188.3006617282786
+    },
+    {
+      "cell": "auto-cdf-scalar-scipy_ndtr-ordinary-52",
+      "timed_samples": 4,
+      "median_ours_ns": 410.7927488730743,
+      "median_reference_ns": 563.5352848021578
+    },
+    {
+      "cell": "auto-erfcx-vector-libcerf_erfcx-ordinary-0",
+      "timed_samples": 4,
+      "median_ours_ns": 1.6435142348375391,
+      "median_reference_ns": 0.24143435188762186
+    },
+    {
+      "cell": "auto-erfcx-vector-libcerf_erfcx-ordinary-3",
+      "timed_samples": 4,
+      "median_ours_ns": 17.409584381467685,
+      "median_reference_ns": 22.51009320268126
+    },
+    {
+      "cell": "auto-erfcx-vector-libcerf_erfcx-ordinary-52",
+      "timed_samples": 4,
+      "median_ours_ns": 282.3440170282751,
+      "median_reference_ns": 403.96084321592264
+    },
+    {
+      "cell": "auto-erfcx-vector-libcerf_erfcx-ordinary-8",
+      "timed_samples": 4,
+      "median_ours_ns": 54.2881339342364,
+      "median_reference_ns": 61.41413025310955
+    },
+    {
+      "cell": "auto-erfcx-vector-libcerf_erfcx-ordinary-9",
+      "timed_samples": 4,
+      "median_ours_ns": 64.27568218659943,
+      "median_reference_ns": 68.90674562624731
+    },
+    {
+      "cell": "strong-control-corrected",
+      "timed_samples": 4,
+      "median_ours_ns": 606.4130956420572,
+      "median_reference_ns": 601.1443619053393
+    }
+  ],
+  "qualification": false,
+  "setup_failure": "Initial strong-control calibration omitted required pointer arguments and failed before measuring; original log retained; corrected setup ran separately. No production failure.",
+  "full_matrix_followup": 243,
+  "timed_samples": 32,
+  "completed_cells": [
+    "auto-erfcx-vector-libcerf_erfcx-ordinary-0",
+    "auto-erfcx-vector-libcerf_erfcx-ordinary-3",
+    "auto-erfcx-vector-libcerf_erfcx-ordinary-8",
+    "auto-erfcx-vector-libcerf_erfcx-ordinary-9",
+    "auto-erfcx-vector-libcerf_erfcx-ordinary-52",
+    "strong-control-corrected",
+    "auto-cdf-scalar-scipy_ndtr-ordinary-52",
+    "auto-cdf-latency-scipy_ndtr-ordinary-52"
+  ]
+}
