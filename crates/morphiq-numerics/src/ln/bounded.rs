@@ -13,6 +13,27 @@ pub(crate) fn ln(x: f64) -> f64 {
     s + lo
 }
 
+/// Lossless layout of the existing generated reciprocal/log words. The
+/// reciprocal has ten significant bits and exponent 1022 or 1023; the
+/// high logarithm has at least ten zero low bits. Fail compilation if a
+/// future generator changes either invariant. No coefficient is rounded.
+#[cfg(feature = "simd")]
+pub(super) static PACKED: [[u64; 2]; 512] = {
+    let mut packed = [[0; 2]; 512];
+    let mut i = 0;
+    while i < packed.len() {
+        let reciprocal = super::stage_tables::R[i];
+        let high = super::stage_tables::T[i].0.to_bits();
+        let low = super::stage_tables::T[i].1.to_bits();
+        let merged = high | ((reciprocal >> 43) & 1023);
+        assert!(merged & !1023 == high);
+        assert!((1022 << 52) | ((merged & 1023) << 43) == reciprocal);
+        packed[i] = [merged, low];
+        i += 1;
+    }
+    packed
+};
+
 #[cfg(feature = "simd")]
 #[cold]
 #[inline(never)]

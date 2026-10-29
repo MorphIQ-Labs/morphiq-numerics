@@ -58,7 +58,12 @@ fn reduce<K: Simd>(k: K, x: K::F) -> (K::F, K::F) {
 
 /// `stage::parts`, operation for operation, after normalization.
 #[inline(always)]
-fn fast_value<K: Simd>(k: K, (y, e): (K::F, K::F)) -> StageH<K> {
+fn fast_value<K: Simd>(k: K, input: (K::F, K::F)) -> StageH<K> {
+    fast_value_tables::<K, false>(k, input)
+}
+
+#[inline(always)]
+fn fast_value_tables<K: Simd, const PACKED: bool>(k: K, (y, e): (K::F, K::F)) -> StageH<K> {
     let hb = k.to_bits(y);
     let u = k.sub_u(hb, k.splat_bits(OFF));
     let words = k.store(k.to_float(u));
@@ -76,8 +81,15 @@ fn fast_value<K: Simd>(k: K, (y, e): (K::F, K::F)) -> StageH<K> {
         {
             re.as_mut()[lane] = ((u as i64) >> 52) as f64;
         }
-        r.as_mut()[lane] = f64::from_bits(R[i]);
-        (th.as_mut()[lane], tl.as_mut()[lane]) = T[i];
+        if PACKED {
+            let [high, low] = super::bounded::PACKED[i];
+            r.as_mut()[lane] = f64::from_bits((1022 << 52) | ((high & 1023) << 43));
+            th.as_mut()[lane] = f64::from_bits(high & !1023);
+            tl.as_mut()[lane] = f64::from_bits(low);
+        } else {
+            r.as_mut()[lane] = f64::from_bits(R[i]);
+            (th.as_mut()[lane], tl.as_mut()[lane]) = T[i];
+        }
     }
     let rs = k.to_float(k.sub_u(k.to_bits(k.load(r)), k.and_u(u, k.splat_bits(!FRACTION))));
     let hh = k.to_float(k.and_u(hb, k.splat_bits(!0x3ff)));
@@ -228,7 +240,7 @@ pub(super) fn fast_ln<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
 /// residuals and table terms are zero, so this also returns exact +0.
 #[inline(always)]
 pub(super) fn bounded_positive<K: Simd>(k: K, x: K::F) -> K::F {
-    let (s, lo, _) = fast_value(k, reduce(k, x));
+    let (s, lo, _) = fast_value_tables::<K, true>(k, reduce(k, x));
     k.add(s, lo)
 }
 
@@ -406,7 +418,6 @@ pub(super) fn stage_h<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
         let e = (((u >> 52) + 64) & 127) as usize;
         r.as_mut()[lane] = f64::from_bits(R[i]);
         (th.as_mut()[lane], tl.as_mut()[lane]) = T[i];
-        (eh.as_mut()[lane], el.as_mut()[lane]) = EL[e];
     }
     let rs = k.to_float(k.sub_u(k.to_bits(k.load(r)), k.and_u(u, k.splat_bits(!FRACTION))));
     let hh = k.to_float(k.and_u(hb, k.splat_bits(!0x3ff)));
