@@ -1631,6 +1631,13 @@ fn fast_corpus(out: &mut String) {
             crate::fast::normal::norm_cdf(x).to_bits()
         )
         .unwrap();
+        writeln!(
+            out,
+            "fast_log_cdf {:016x} : {:016x}",
+            x.to_bits(),
+            crate::fast::normal::log_norm_cdf(x).to_bits()
+        )
+        .unwrap();
     };
     for x in [
         0.0_f64,

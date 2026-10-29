@@ -106,9 +106,13 @@ let compute op args =
       (match args with
        | [x] -> show_bits (x_fast_ln (z_of_u64 (hex x)))
        | _ -> failwith "fast_ln takes an input word")
-  | "fast_erfcx" | "fast_normal" ->
+  | "fast_erfcx" | "fast_normal" | "fast_log_cdf" ->
       (match args with
-       | [x] -> show_bits ((if op = "fast_erfcx" then x_fast_erfcx else x_fast_normal) (z_of_u64 (hex x)))
+       | [x] -> let f = match op with
+             | "fast_erfcx" -> x_fast_erfcx
+             | "fast_normal" -> x_fast_normal
+             | _ -> x_fast_log_cdf in
+           show_bits (f (z_of_u64 (hex x)))
        | _ -> failwith (op ^ " takes a word"))
   | "erfcx_entry" ->
       (match args with

@@ -16,6 +16,7 @@ fn main() {
                 "ln" => (fast::elementary::ln, fast::elementary::ln_slice),
                 "erfcx" => (fast::normal::erfcx, fast::normal::erfcx_slice),
                 "cdf" => (fast::normal::norm_cdf, fast::normal::norm_cdf_slice),
+                "log_cdf" => (fast::normal::log_norm_cdf, fast::normal::log_norm_cdf_slice),
                 _ => panic!("unknown primitive"),
             };
             let mut out = [0.0; 53];
@@ -37,7 +38,16 @@ fn main() {
         "MORPHIQ_FAST_BENCH_ITERATIONS must be positive"
     );
     eprintln!("timed_iterations={iterations}; values_per_call=52; warmup_calls=100");
-    let functions: [(&str, Scalar, Slice, Scalar, Slice, f64, f64); 4] = [
+    let functions: [(&str, Scalar, Slice, Scalar, Slice, f64, f64); 5] = [
+        (
+            "log_cdf",
+            normal::log_norm_cdf,
+            normal::log_norm_cdf_slice,
+            fast::normal::log_norm_cdf,
+            fast::normal::log_norm_cdf_slice,
+            -6.0,
+            3.0,
+        ),
         (
             "ln",
             elementary::ln,

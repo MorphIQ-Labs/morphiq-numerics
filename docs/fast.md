@@ -15,10 +15,12 @@ feature changes an existing API's numerical identity.
 | `fast::elementary::ln` | All finite `x > 0` | Absolute `2^-53 * abs(ln(x)) + 2^-65`; exact at one |
 | `fast::normal::erfcx` | `-0.5 <= x < 16`, `abs(x) >= 2^-33` | Relative `2^-51` |
 | `fast::normal::norm_cdf` | `2^-33 <= abs(x) <= 8` | Absolute `2^-49` |
+| `fast::normal::log_norm_cdf` | `-22.5 <= x <= -2^-33` or `2^-33 <= x <= 8` | Absolute `2^-51 * abs(ln Φ(x)) + 2^-48`, natural-log units |
 
 Each function has a matching `_slice(x, out)` API. Results in the accelerated
 domains are finite and normal, except the logarithm's exact zero at one.
-The logarithm's derivation and log-unit budget are in [fast_ln.md](fast_ln.md).
+The logarithm's derivation and log-unit budget are in [fast_ln.md](fast_ln.md);
+the log-CDF's are in [fast_log_cdf.md](fast_log_cdf.md).
 The CDF has no relative-tail guarantee inside
 its accelerated domain. Correct rounding and
 faithful rounding are not the fast contract. Scalar and slice results must be
@@ -203,6 +205,19 @@ The positive complement rounds with absolute error below `u` (its magnitude
 is below two). The total is therefore below `9u < 16u = 2^-49`.
 This is an absolute bound; multiplying by a relative-tail budget would be
 incorrect. Beyond `abs(x)=8`, the existing strong tail path supplies the result.
+
+**Log-CDF.** The bounded log-CDF composes the kernels above with the bounded
+logarithm ([fast_log_cdf.md](fast_log_cdf.md)). For `-22.5 <= x <= -2^-33`
+it returns `RN(RN(t + ln_fast(table_erfcx(z))) - LN2_HIGH)` with the CDF's
+`t = RN(-a²/2)` and `z = RN(a/sqrt 2)`, whose proofs extend to `a <= 22.5`
+(`z < 16` keeps the table in its certified domain). For `2^-33 <= x <= 8` it
+forms the CDF's lower tail `q` and returns Kahan's corrected logarithm of the
+complement, `RN(ln_fast(w) * RN(q / RN(1 - w)))` with `w = RN(1 - q)`. The
+error is bounded in natural-log units by `2^-51 * abs(ln Φ(x)) + 2^-48`: the
+`abs(L)` term covers the rounding of `a²/2` and the two final operations, the
+constant the table, logarithm and argument-formation errors. The slice kernel
+evaluates one table lookup, one exponential and one logarithm per packet and
+selects the branch per lane; screened lanes take the strong result.
 
 The CDF SIMD path follows the scalar branch selection and arithmetic sequence.
 Central and outer lanes receive benign inputs before inactive arithmetic;

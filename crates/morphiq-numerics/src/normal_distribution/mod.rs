@@ -11,6 +11,8 @@ mod tables;
 
 /// Generated nearest-binary64 high word, shared with the bounded CDF.
 pub(crate) const INV_SQRT2_HIGH: f64 = tables::INV_SQRT2.0;
+/// The generated high word of `ln 2` (`NormalConstants.normal_ln2_hi`).
+pub(crate) const LN2_HIGH: f64 = tables::LN2.0;
 /// Existing generated central coefficients, projected to their high words.
 pub(crate) const CENTER_HIGH: [f64; 13] = {
     let mut a = [0.0; 13];
