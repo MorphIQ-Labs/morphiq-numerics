@@ -35,7 +35,7 @@ pub fn erfcx(x: f64) -> f64 {
 pub fn norm_cdf(x: f64) -> f64 {
     let a = x.abs();
     if !(MIN_MAGNITUDE..=8.0).contains(&a) {
-        return crate::normal::norm_cdf(x);
+        return norm_cdf_fallback(x);
     }
     if a <= 1.0 {
         return central(x);
@@ -47,6 +47,13 @@ pub fn norm_cdf(x: f64) -> f64 {
     // The composition needs the table below erfcx's public magnitude screen.
     let lower = (0.5 * exponential) * crate::erfcx::bounded::table(scaled);
     if x < 0.0 { lower } else { 1.0 - lower }
+}
+
+// Keep the strong entry's register requirements out of the accelerated caller.
+#[cold]
+#[inline(never)]
+fn norm_cdf_fallback(x: f64) -> f64 {
+    crate::normal::norm_cdf(x)
 }
 
 /// Degree-25 integrated Gaussian Taylor polynomial on |x| <= 1.
@@ -69,12 +76,46 @@ pub(super) fn central(x: f64) -> f64 {
 ///
 /// # Panics
 /// If the input and output lengths differ.
+#[inline]
 pub fn erfcx_slice(x: &[f64], out: &mut [f64]) {
     assert_eq!(
         x.len(),
         out.len(),
         "erfcx_slice: slices of different lengths"
     );
+    if x.len() <= 8 {
+        if !x.is_empty() {
+            out[0] = erfcx(x[0]);
+        }
+        if x.len() >= 2 {
+            out[1] = erfcx(x[1]);
+        }
+        if x.len() >= 3 {
+            out[2] = erfcx(x[2]);
+        }
+        if x.len() >= 4 {
+            out[3] = erfcx(x[3]);
+        }
+        if x.len() >= 5 {
+            out[4] = erfcx(x[4]);
+        }
+        if x.len() >= 6 {
+            out[5] = erfcx(x[5]);
+        }
+        if x.len() >= 7 {
+            out[6] = erfcx(x[6]);
+        }
+        if x.len() == 8 {
+            out[7] = erfcx(x[7]);
+        }
+        return;
+    }
+    erfcx_slice_loop(x, out);
+}
+
+// Keep the long loop's saved registers out of the short-slice caller.
+#[inline(never)]
+fn erfcx_slice_loop(x: &[f64], out: &mut [f64]) {
     for (o, &x) in out.iter_mut().zip(x) {
         *o = erfcx(x);
     }

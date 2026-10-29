@@ -1,0 +1,40 @@
+{
+  "source": "5aa5d4a116c8f8da3835d46d1cef94687ab26646",
+  "host": "Apple M1 Pro / macOS 27.0.1 native ARM64",
+  "source_unchanged": true,
+  "protocol": "https://github.com/MorphIQ-Labs/morphiq-numerics/issues/194#issuecomment-6477822141",
+  "claims": "Seven frozen 52-value fast public-call comparisons only; wider #194 remains open",
+  "oracle": "Retained independent 256-bit mpmath references in ../native-parity-20261028/observations.tar.gz; source hashes recorded per primitive",
+  "assistance": "OpenAI Codex: ARM benchmark adapter, campaign/replay scripts and evidence packaging. No library numerical code changed; external reference implementations used as black boxes.",
+  "references": {
+    "core-math": {
+      "revision": "c7100a07428584639defdd64409e3621884c362b",
+      "remote": "https://gitlab.inria.fr/core-math/core-math.git",
+      "status": ""
+    },
+    "sleef": {
+      "revision": "906ca7512ee483296780a81a21b9ca715d40dfe1",
+      "remote": "https://github.com/shibatch/sleef.git",
+      "status": ""
+    },
+    "libcerf": {
+      "revision": "7e6b637031b5c6cbc89a5f7220bf4ef07518d035",
+      "remote": "https://jugit.fz-juelich.de/mlz/lib/cerf.git",
+      "status": "",
+      "built_library": "libcerf.3.1.dylib"
+    },
+    "python_packages": [
+      "mpmath==1.3.0",
+      "numpy==2.3.4",
+      "scipy==1.16.3"
+    ],
+    "build_commands": {
+      "core": "clang -O3 -fPIC -dynamiclib -mcpu=apple-m1 -frounding-math -ffp-contract=off refs/core-math/src/binary64/exp/exp.c -o campaign/bin/libcoreexp.dylib",
+      "native": "clang -O3 -fPIC -dynamiclib -ffp-contract=off -I sleef-build/include campaign/native.c sleef-build/lib/libsleef.3.9.0.dylib -Wl,-rpath,@loader_path -o campaign/bin/libnativebench.dylib",
+      "rust": "env RUSTFLAGS= CARGO_ENCODED_RUSTFLAGS= RUSTC_WRAPPER= RUSTC_WORKSPACE_WRAPPER= CARGO_TARGET_DIR=wrapper-build cargo build --release --manifest-path campaign/wrapper/Cargo.toml",
+      "sleef": "cmake -S refs/sleef -B sleef-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DSLEEF_BUILD_TESTS=OFF -DSLEEF_BUILD_SCALAR_LIB=ON -DSLEEF_BUILD_GNUABI_LIBS=OFF -DSLEEF_ENABLE_TLFLOAT=OFF; cmake --build sleef-build -j4",
+      "libcerf": "cmake -S refs/libcerf -B cerf-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_TESTING=OFF -DLIB_MAN=OFF -DLIB_RUN=OFF -DCERF_CPP=OFF; cmake --build cerf-build --target cerf -j2"
+    },
+    "compiler": "Apple clang 21.0.0; native arm64-apple-darwin27"
+  }
+}
