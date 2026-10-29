@@ -52,7 +52,7 @@ objdump -d --no-show-raw-insn --demangle=rust "$binary" | awk '
         printf "fused operation in %s\n", fn > "/dev/stderr"
         fused++
     }
-    /v(p)?gather/ && fn ~ /(exp::bounded::|fast::lanes::Cdf)/ {
+    /v(p)?gather/ && fn ~ /(exp::bounded::|fast::lanes::(Cdf|Erfcx))/ {
         printf "hardware gather in bounded kernel %s\n", fn > "/dev/stderr"
         gather++
     }

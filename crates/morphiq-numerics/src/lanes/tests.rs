@@ -704,6 +704,35 @@ fn erfcx_lanes_all_backends_and_cascades() {
     check_cascades::<crate::erfcx::lanes::Erfcx>("erfcx", &xs);
 }
 
+/// The explicit fast kernels: the erfcx corpus, which spans both accelerated
+/// domains and their strong fallbacks, plus the fast screens' neighbors.
+fn fast_corpus() -> Vec<f64> {
+    let mut xs = crate::erfcx::tests::corpus();
+    for boundary in [
+        -8.0,
+        -1.0,
+        -0.5,
+        -crate::fast::normal::MIN_MAGNITUDE,
+        crate::fast::normal::MIN_MAGNITUDE,
+        1.0,
+        8.0,
+        16.0,
+    ] {
+        xs.extend([boundary.next_down(), boundary, boundary.next_up()]);
+    }
+    xs
+}
+
+#[test]
+fn fast_erfcx_lanes_all_cascades() {
+    check_cascades::<crate::fast::lanes::Erfcx>("fast::erfcx", &fast_corpus());
+}
+
+#[test]
+fn fast_cdf_lanes_all_cascades() {
+    check_cascades::<crate::fast::lanes::Cdf>("fast::norm_cdf", &fast_corpus());
+}
+
 /// Pairs `(y, x)` for `atan2`: the reference fixture's, every pair of special
 /// values, ratios across the unit interval at every scale, the segment and
 /// form boundaries, and random encodings.

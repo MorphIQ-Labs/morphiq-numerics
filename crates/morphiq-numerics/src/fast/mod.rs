@@ -8,7 +8,7 @@
 
 pub mod elementary;
 #[cfg(feature = "simd")]
-mod lanes;
+pub(crate) mod lanes;
 pub mod normal;
 
 #[cfg(test)]

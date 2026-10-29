@@ -133,8 +133,12 @@ and `FastErfcx` connect the certificates to the IEEE operations and public scree
 `generators/fast_certificates.py` replays the arithmetic certificates from the
 existing generated constants. The strong compensated evaluator is unchanged.
 
-The public erfcx slice runs the inlined scalar evaluator. CDF's vector
-composition shares a lane version with exactly the same operation order.
+The public erfcx slice runs a lane version of this evaluator with exactly
+the same operation order, through the library's backend cascade
+([lanes.md](lanes.md) §1). Each lane's table reduction and coefficient loads
+are scalar; the polynomial is vector arithmetic; a lane the scalar screen
+rejects takes the strong scalar result, so every output is the scalar
+function's bits. CDF's vector composition shares the same lane kernel.
 Tiny arguments, negative reflection, reciprocal tails and extreme outputs
 retain their original strong owners.
 

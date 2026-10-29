@@ -2,7 +2,41 @@
 use crate::lanes::{Kernel, lanes_mask};
 use morphiq_numerics_arch::Simd;
 
-pub(super) struct Cdf;
+/// The public bounded erfcx on lanes: the table polynomial where the scalar
+/// screen accepts, the strong owner for every other lane.
+pub(crate) struct Erfcx;
+
+impl Kernel for Erfcx {
+    fn scalar(x: f64) -> f64 {
+        super::normal::erfcx(x)
+    }
+    #[inline(always)]
+    fn lanes<K: Simd>(k: K, input: K::Array) -> K::Array {
+        let x = k.load(input);
+        // The scalar screen's comparisons; a NaN lane fails them.
+        let active = k.and_m(
+            k.and_m(k.le(k.splat(-0.5), x), k.lt(x, k.splat(16.0))),
+            k.le(k.splat(super::normal::MIN_MAGNITUDE), k.abs(x)),
+        );
+        let active_bits = k.mask_bits(active);
+        let mut out = K::Array::default();
+        if active_bits != 0 {
+            // Inactive lanes evaluate the table at 1, inside its domain.
+            let safe = k.select(active, x, k.splat(1.0));
+            out = k.store(crate::erfcx::bounded::lanes(k, safe));
+        }
+        if active_bits != lanes_mask::<K>() {
+            for (i, value) in out.as_mut().iter_mut().enumerate() {
+                if active_bits >> i & 1 == 0 {
+                    *value = crate::normal::erfcx(input.as_ref()[i]);
+                }
+            }
+        }
+        out
+    }
+}
+
+pub(crate) struct Cdf;
 
 impl Kernel for Cdf {
     fn scalar(x: f64) -> f64 {

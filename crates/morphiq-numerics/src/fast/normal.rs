@@ -4,7 +4,7 @@
 //! error bounds below. They are not whole-domain rounding claims.
 
 /// Exact `2^-33`, the lower magnitude screen of these approximation domains.
-pub(super) const MIN_MAGNITUDE: f64 = f64::from_bits((1023_u64 - 33) << 52);
+pub(crate) const MIN_MAGNITUDE: f64 = f64::from_bits((1023_u64 - 33) << 52);
 
 /// Scaled complementary error function, `exp(x²) erfc(x)`.
 ///
@@ -74,48 +74,21 @@ pub(super) fn central(x: f64) -> f64 {
 
 /// Apply [`erfcx`] to a slice, preserving its scalar result bits.
 ///
+/// With `simd`, whole chunks evaluate the table polynomial in lanes and a
+/// lane outside the accelerated domain takes the strong result, so every
+/// output is the scalar function's bits.
+///
 /// # Panics
 /// If the input and output lengths differ.
-#[inline]
 pub fn erfcx_slice(x: &[f64], out: &mut [f64]) {
     assert_eq!(
         x.len(),
         out.len(),
         "erfcx_slice: slices of different lengths"
     );
-    if x.len() <= 8 {
-        if !x.is_empty() {
-            out[0] = erfcx(x[0]);
-        }
-        if x.len() >= 2 {
-            out[1] = erfcx(x[1]);
-        }
-        if x.len() >= 3 {
-            out[2] = erfcx(x[2]);
-        }
-        if x.len() >= 4 {
-            out[3] = erfcx(x[3]);
-        }
-        if x.len() >= 5 {
-            out[4] = erfcx(x[4]);
-        }
-        if x.len() >= 6 {
-            out[5] = erfcx(x[5]);
-        }
-        if x.len() >= 7 {
-            out[6] = erfcx(x[6]);
-        }
-        if x.len() == 8 {
-            out[7] = erfcx(x[7]);
-        }
-        return;
-    }
-    erfcx_slice_loop(x, out);
-}
-
-// Keep the long loop's saved registers out of the short-slice caller.
-#[inline(never)]
-fn erfcx_slice_loop(x: &[f64], out: &mut [f64]) {
+    #[cfg(feature = "simd")]
+    crate::lanes::map::<super::lanes::Erfcx>(x, out);
+    #[cfg(not(feature = "simd"))]
     for (o, &x) in out.iter_mut().zip(x) {
         *o = erfcx(x);
     }
