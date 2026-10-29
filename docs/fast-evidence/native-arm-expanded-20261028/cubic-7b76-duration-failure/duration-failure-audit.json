@@ -1,0 +1,1655 @@
+{
+  "utc": "2026-10-29T00:58:00.956513+00:00",
+  "source": "7b76da58acb8addc0d47bff9d8264d37d7ac095d",
+  "measured_processes_complete": 643,
+  "timed_observations_retained": 2574,
+  "short_observations": 321,
+  "minimum_ms": 121.934,
+  "affected_cells": 31,
+  "affected_required_cells": 17,
+  "cells": [
+    {
+      "cell": {
+        "id": "002",
+        "primitive": "exp",
+        "bank": "exp-ordinary",
+        "length": 2,
+        "pair": [
+          "prod_exp_slice",
+          "sleef_exp_neon"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "002",
+          "primitive": "exp",
+          "bank": "exp-ordinary",
+          "length": 2,
+          "pair": [
+            "prod_exp_slice",
+            "sleef_exp_neon"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:39:48.542125+00:00",
+        "pid": 96921,
+        "load_before": [
+          22.1953125,
+          11.42578125,
+          6.78173828125
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          22.1953125,
+          11.42578125,
+          6.78173828125
+        ],
+        "end_utc": "2026-10-29T00:39:49.761461+00:00"
+      },
+      "counts": {
+        "prod_exp_slice": 57376459,
+        "sleef_exp_neon": 33990389
+      },
+      "samples": 12,
+      "short": 5,
+      "minimum_ms": 244.615
+    },
+    {
+      "cell": {
+        "id": "054",
+        "primitive": "erfcx",
+        "bank": "erfcx-ordinary",
+        "length": 63,
+        "pair": [
+          "prod_erfcx_slice",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "054",
+          "primitive": "erfcx",
+          "bank": "erfcx-ordinary",
+          "length": 63,
+          "pair": [
+            "prod_erfcx_slice",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:40:30.123117+00:00",
+        "pid": 97225,
+        "load_before": [
+          18.76318359375,
+          12.00146484375,
+          7.2109375
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          20.06298828125,
+          12.3828125,
+          7.37353515625
+        ],
+        "end_utc": "2026-10-29T00:40:31.397798+00:00"
+      },
+      "counts": {
+        "prod_erfcx_slice": 1359020,
+        "libcerf_erfcx": 1527713
+      },
+      "samples": 12,
+      "short": 6,
+      "minimum_ms": 232.05
+    },
+    {
+      "cell": {
+        "id": "104",
+        "primitive": "erfcx",
+        "bank": "erfcx-ordinary",
+        "length": 52,
+        "pair": [
+          "prod_erfcx",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "104",
+          "primitive": "erfcx",
+          "bank": "erfcx-ordinary",
+          "length": 52,
+          "pair": [
+            "prod_erfcx",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:41:35.850275+00:00",
+        "pid": 639,
+        "load_before": [
+          12.990234375,
+          11.85791015625,
+          7.544921875
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          12.990234375,
+          11.85791015625,
+          7.544921875
+        ],
+        "end_utc": "2026-10-29T00:41:37.511367+00:00"
+      },
+      "counts": {
+        "prod_erfcx": 791999,
+        "libcerf_erfcx": 828751
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 121.934
+    },
+    {
+      "cell": {
+        "id": "105",
+        "primitive": "erfcx",
+        "bank": "erfcx-wide",
+        "length": 52,
+        "pair": [
+          "prod_erfcx",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "105",
+          "primitive": "erfcx",
+          "bank": "erfcx-wide",
+          "length": 52,
+          "pair": [
+            "prod_erfcx",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:41:37.998285+00:00",
+        "pid": 1191,
+        "load_before": [
+          12.990234375,
+          11.85791015625,
+          7.544921875
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          12.990234375,
+          11.85791015625,
+          7.544921875
+        ],
+        "end_utc": "2026-10-29T00:41:40.154608+00:00"
+      },
+      "counts": {
+        "prod_erfcx": 969468,
+        "libcerf_erfcx": 728296
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 164.349
+    },
+    {
+      "cell": {
+        "id": "106",
+        "primitive": "erfcx",
+        "bank": "erfcx-boundary",
+        "length": 52,
+        "pair": [
+          "prod_erfcx",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "106",
+          "primitive": "erfcx",
+          "bank": "erfcx-boundary",
+          "length": 52,
+          "pair": [
+            "prod_erfcx",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:41:40.610087+00:00",
+        "pid": 1743,
+        "load_before": [
+          14.83251953125,
+          12.25830078125,
+          7.71142578125
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          14.83251953125,
+          12.25830078125,
+          7.71142578125
+        ],
+        "end_utc": "2026-10-29T00:41:42.622296+00:00"
+      },
+      "counts": {
+        "prod_erfcx": 1017051,
+        "libcerf_erfcx": 609559
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 157.687
+    },
+    {
+      "cell": {
+        "id": "107",
+        "primitive": "erfcx",
+        "bank": "erfcx-tails",
+        "length": 52,
+        "pair": [
+          "prod_erfcx",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "107",
+          "primitive": "erfcx",
+          "bank": "erfcx-tails",
+          "length": 52,
+          "pair": [
+            "prod_erfcx",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:41:43.067390+00:00",
+        "pid": 2263,
+        "load_before": [
+          14.83251953125,
+          12.25830078125,
+          7.71142578125
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          14.83251953125,
+          12.25830078125,
+          7.71142578125
+        ],
+        "end_utc": "2026-10-29T00:41:44.177211+00:00"
+      },
+      "counts": {
+        "prod_erfcx": 943963,
+        "libcerf_erfcx": 696107
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 124.261
+    },
+    {
+      "cell": {
+        "id": "108",
+        "primitive": "erfcx",
+        "bank": "erfcx-mixed",
+        "length": 52,
+        "pair": [
+          "prod_erfcx",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "108",
+          "primitive": "erfcx",
+          "bank": "erfcx-mixed",
+          "length": 52,
+          "pair": [
+            "prod_erfcx",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:41:44.690541+00:00",
+        "pid": 2515,
+        "load_before": [
+          14.83251953125,
+          12.25830078125,
+          7.71142578125
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          17.80859375,
+          12.91796875,
+          7.970703125
+        ],
+        "end_utc": "2026-10-29T00:41:46.611868+00:00"
+      },
+      "counts": {
+        "prod_erfcx": 779455,
+        "libcerf_erfcx": 1000532
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 178.639
+    },
+    {
+      "cell": {
+        "id": "109",
+        "primitive": "erfcx",
+        "bank": "erfcx-fallback",
+        "length": 52,
+        "pair": [
+          "prod_erfcx",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "109",
+          "primitive": "erfcx",
+          "bank": "erfcx-fallback",
+          "length": 52,
+          "pair": [
+            "prod_erfcx",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:41:47.087388+00:00",
+        "pid": 2833,
+        "load_before": [
+          17.80859375,
+          12.91796875,
+          7.970703125
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          17.80859375,
+          12.91796875,
+          7.970703125
+        ],
+        "end_utc": "2026-10-29T00:41:49.073942+00:00"
+      },
+      "counts": {
+        "prod_erfcx": 303959,
+        "libcerf_erfcx": 896823
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 185.432
+    },
+    {
+      "cell": {
+        "id": "110",
+        "primitive": "erfcx",
+        "bank": "erfcx-special",
+        "length": 52,
+        "pair": [
+          "prod_erfcx",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "110",
+          "primitive": "erfcx",
+          "bank": "erfcx-special",
+          "length": 52,
+          "pair": [
+            "prod_erfcx",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:41:49.453652+00:00",
+        "pid": 3143,
+        "load_before": [
+          17.80859375,
+          12.91796875,
+          7.970703125
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          23.18896484375,
+          14.1142578125,
+          8.421875
+        ],
+        "end_utc": "2026-10-29T00:41:51.166710+00:00"
+      },
+      "counts": {
+        "prod_erfcx": 1213466,
+        "libcerf_erfcx": 1155283
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 183.84
+    },
+    {
+      "cell": {
+        "id": "111",
+        "primitive": "cdf",
+        "bank": "cdf-ordinary",
+        "length": 52,
+        "pair": [
+          "prod_norm_cdf",
+          "scipy_ndtr"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "111",
+          "primitive": "cdf",
+          "bank": "cdf-ordinary",
+          "length": 52,
+          "pair": [
+            "prod_norm_cdf",
+            "scipy_ndtr"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:41:51.597214+00:00",
+        "pid": 3421,
+        "load_before": [
+          23.18896484375,
+          14.1142578125,
+          8.421875
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          23.18896484375,
+          14.1142578125,
+          8.421875
+        ],
+        "end_utc": "2026-10-29T00:41:53.389241+00:00"
+      },
+      "counts": {
+        "prod_norm_cdf": 644132,
+        "scipy_ndtr": 488908
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 173.858
+    },
+    {
+      "cell": {
+        "id": "112",
+        "primitive": "cdf",
+        "bank": "cdf-wide",
+        "length": 52,
+        "pair": [
+          "prod_norm_cdf",
+          "scipy_ndtr"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "112",
+          "primitive": "cdf",
+          "bank": "cdf-wide",
+          "length": 52,
+          "pair": [
+            "prod_norm_cdf",
+            "scipy_ndtr"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:41:53.739859+00:00",
+        "pid": 3701,
+        "load_before": [
+          23.18896484375,
+          14.1142578125,
+          8.421875
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          23.18896484375,
+          14.1142578125,
+          8.421875
+        ],
+        "end_utc": "2026-10-29T00:41:55.415010+00:00"
+      },
+      "counts": {
+        "prod_norm_cdf": 696742,
+        "scipy_ndtr": 479196
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 195.7
+    },
+    {
+      "cell": {
+        "id": "113",
+        "primitive": "cdf",
+        "bank": "cdf-boundary",
+        "length": 52,
+        "pair": [
+          "prod_norm_cdf",
+          "scipy_ndtr"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "113",
+          "primitive": "cdf",
+          "bank": "cdf-boundary",
+          "length": 52,
+          "pair": [
+            "prod_norm_cdf",
+            "scipy_ndtr"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:41:55.754119+00:00",
+        "pid": 4074,
+        "load_before": [
+          26.296875,
+          14.9091796875,
+          8.7353515625
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          26.296875,
+          14.9091796875,
+          8.7353515625
+        ],
+        "end_utc": "2026-10-29T00:41:57.553804+00:00"
+      },
+      "counts": {
+        "prod_norm_cdf": 683970,
+        "scipy_ndtr": 411501
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 186.054
+    },
+    {
+      "cell": {
+        "id": "124",
+        "primitive": "exp",
+        "bank": "exp-mixed",
+        "length": 52,
+        "pair": [
+          "prod_exp_slice",
+          "sleef_exp_neon"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "124",
+          "primitive": "exp",
+          "bank": "exp-mixed",
+          "length": 52,
+          "pair": [
+            "prod_exp_slice",
+            "sleef_exp_neon"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:42:11.895979+00:00",
+        "pid": 4840,
+        "load_before": [
+          26.5634765625,
+          15.53173828125,
+          9.0654296875
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          26.5634765625,
+          15.53173828125,
+          9.0654296875
+        ],
+        "end_utc": "2026-10-29T00:42:13.137947+00:00"
+      },
+      "counts": {
+        "prod_exp_slice": 485345,
+        "sleef_exp_neon": 1393272
+      },
+      "samples": 12,
+      "short": 6,
+      "minimum_ms": 217.103
+    },
+    {
+      "cell": {
+        "id": "125",
+        "primitive": "exp",
+        "bank": "exp-mixed",
+        "length": 4096,
+        "pair": [
+          "prod_exp_slice",
+          "sleef_exp_neon"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "125",
+          "primitive": "exp",
+          "bank": "exp-mixed",
+          "length": 4096,
+          "pair": [
+            "prod_exp_slice",
+            "sleef_exp_neon"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:42:13.405843+00:00",
+        "pid": 4845,
+        "load_before": [
+          26.5634765625,
+          15.53173828125,
+          9.0654296875
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          26.5634765625,
+          15.53173828125,
+          9.0654296875
+        ],
+        "end_utc": "2026-10-29T00:42:15.335516+00:00"
+      },
+      "counts": {
+        "prod_exp_slice": 4504,
+        "sleef_exp_neon": 14492
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 176.822
+    },
+    {
+      "cell": {
+        "id": "126",
+        "primitive": "exp",
+        "bank": "exp-fallback",
+        "length": 52,
+        "pair": [
+          "prod_exp_slice",
+          "sleef_exp_neon"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "126",
+          "primitive": "exp",
+          "bank": "exp-fallback",
+          "length": 52,
+          "pair": [
+            "prod_exp_slice",
+            "sleef_exp_neon"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:42:15.612522+00:00",
+        "pid": 4980,
+        "load_before": [
+          28.19970703125,
+          16.0537109375,
+          9.28759765625
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          28.19970703125,
+          16.0537109375,
+          9.28759765625
+        ],
+        "end_utc": "2026-10-29T00:42:17.191409+00:00"
+      },
+      "counts": {
+        "prod_exp_slice": 45799,
+        "sleef_exp_neon": 1603754
+      },
+      "samples": 12,
+      "short": 9,
+      "minimum_ms": 183.651
+    },
+    {
+      "cell": {
+        "id": "128",
+        "primitive": "exp",
+        "bank": "exp-special",
+        "length": 52,
+        "pair": [
+          "prod_exp_slice",
+          "sleef_exp_neon"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "128",
+          "primitive": "exp",
+          "bank": "exp-special",
+          "length": 52,
+          "pair": [
+            "prod_exp_slice",
+            "sleef_exp_neon"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:42:19.125597+00:00",
+        "pid": 5313,
+        "load_before": [
+          28.19970703125,
+          16.0537109375,
+          9.28759765625
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          27.783203125,
+          16.1689453125,
+          9.36767578125
+        ],
+        "end_utc": "2026-10-29T00:42:20.721645+00:00"
+      },
+      "counts": {
+        "prod_exp_slice": 1262204,
+        "sleef_exp_neon": 1651401
+      },
+      "samples": 12,
+      "short": 6,
+      "minimum_ms": 203.173
+    },
+    {
+      "cell": {
+        "id": "129",
+        "primitive": "exp",
+        "bank": "exp-special",
+        "length": 4096,
+        "pair": [
+          "prod_exp_slice",
+          "sleef_exp_neon"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "129",
+          "primitive": "exp",
+          "bank": "exp-special",
+          "length": 4096,
+          "pair": [
+            "prod_exp_slice",
+            "sleef_exp_neon"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:42:20.966486+00:00",
+        "pid": 5450,
+        "load_before": [
+          27.783203125,
+          16.1689453125,
+          9.36767578125
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          27.783203125,
+          16.1689453125,
+          9.36767578125
+        ],
+        "end_utc": "2026-10-29T00:42:22.346211+00:00"
+      },
+      "counts": {
+        "prod_exp_slice": 21876,
+        "sleef_exp_neon": 17959
+      },
+      "samples": 12,
+      "short": 6,
+      "minimum_ms": 219.237
+    },
+    {
+      "cell": {
+        "id": "130",
+        "primitive": "erfcx",
+        "bank": "erfcx-wide",
+        "length": 52,
+        "pair": [
+          "prod_erfcx_slice",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "130",
+          "primitive": "erfcx",
+          "bank": "erfcx-wide",
+          "length": 52,
+          "pair": [
+            "prod_erfcx_slice",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:42:22.620292+00:00",
+        "pid": 5585,
+        "load_before": [
+          27.783203125,
+          16.1689453125,
+          9.36767578125
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          27.783203125,
+          16.1689453125,
+          9.36767578125
+        ],
+        "end_utc": "2026-10-29T00:42:24.132559+00:00"
+      },
+      "counts": {
+        "prod_erfcx_slice": 1131808,
+        "libcerf_erfcx": 1028553
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 191.377
+    },
+    {
+      "cell": {
+        "id": "132",
+        "primitive": "erfcx",
+        "bank": "erfcx-boundary",
+        "length": 52,
+        "pair": [
+          "prod_erfcx_slice",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "132",
+          "primitive": "erfcx",
+          "bank": "erfcx-boundary",
+          "length": 52,
+          "pair": [
+            "prod_erfcx_slice",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:42:26.216474+00:00",
+        "pid": 5855,
+        "load_before": [
+          35.80810546875,
+          18.025390625,
+          10.0625
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          35.80810546875,
+          18.025390625,
+          10.0625
+        ],
+        "end_utc": "2026-10-29T00:42:28.606746+00:00"
+      },
+      "counts": {
+        "prod_erfcx_slice": 801622,
+        "libcerf_erfcx": 655818
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 135.674
+    },
+    {
+      "cell": {
+        "id": "133",
+        "primitive": "erfcx",
+        "bank": "erfcx-boundary",
+        "length": 4096,
+        "pair": [
+          "prod_erfcx_slice",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "133",
+          "primitive": "erfcx",
+          "bank": "erfcx-boundary",
+          "length": 4096,
+          "pair": [
+            "prod_erfcx_slice",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:42:29.166199+00:00",
+        "pid": 6086,
+        "load_before": [
+          35.80810546875,
+          18.025390625,
+          10.0625
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          46.1533203125,
+          20.46533203125,
+          10.97021484375
+        ],
+        "end_utc": "2026-10-29T00:42:30.931954+00:00"
+      },
+      "counts": {
+        "prod_erfcx_slice": 16848,
+        "libcerf_erfcx": 14334
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 189.321
+    },
+    {
+      "cell": {
+        "id": "134",
+        "primitive": "erfcx",
+        "bank": "erfcx-tails",
+        "length": 52,
+        "pair": [
+          "prod_erfcx_slice",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "134",
+          "primitive": "erfcx",
+          "bank": "erfcx-tails",
+          "length": 52,
+          "pair": [
+            "prod_erfcx_slice",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:42:31.324715+00:00",
+        "pid": 6243,
+        "load_before": [
+          46.1533203125,
+          20.46533203125,
+          10.97021484375
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          46.1533203125,
+          20.46533203125,
+          10.97021484375
+        ],
+        "end_utc": "2026-10-29T00:42:33.282399+00:00"
+      },
+      "counts": {
+        "prod_erfcx_slice": 1285776,
+        "libcerf_erfcx": 1079634
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 179.134
+    },
+    {
+      "cell": {
+        "id": "135",
+        "primitive": "erfcx",
+        "bank": "erfcx-tails",
+        "length": 4096,
+        "pair": [
+          "prod_erfcx_slice",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "135",
+          "primitive": "erfcx",
+          "bank": "erfcx-tails",
+          "length": 4096,
+          "pair": [
+            "prod_erfcx_slice",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:42:33.614157+00:00",
+        "pid": 6393,
+        "load_before": [
+          46.1533203125,
+          20.46533203125,
+          10.97021484375
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          46.1533203125,
+          20.46533203125,
+          10.97021484375
+        ],
+        "end_utc": "2026-10-29T00:42:35.480608+00:00"
+      },
+      "counts": {
+        "prod_erfcx_slice": 16947,
+        "libcerf_erfcx": 12813
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 175.516
+    },
+    {
+      "cell": {
+        "id": "136",
+        "primitive": "erfcx",
+        "bank": "erfcx-mixed",
+        "length": 52,
+        "pair": [
+          "prod_erfcx_slice",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "136",
+          "primitive": "erfcx",
+          "bank": "erfcx-mixed",
+          "length": 52,
+          "pair": [
+            "prod_erfcx_slice",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:42:35.779522+00:00",
+        "pid": 6561,
+        "load_before": [
+          57.271484375,
+          23.19677734375,
+          11.98974609375
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          57.271484375,
+          23.19677734375,
+          11.98974609375
+        ],
+        "end_utc": "2026-10-29T00:42:37.330153+00:00"
+      },
+      "counts": {
+        "prod_erfcx_slice": 1058264,
+        "libcerf_erfcx": 1249681
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 219.623
+    },
+    {
+      "cell": {
+        "id": "137",
+        "primitive": "erfcx",
+        "bank": "erfcx-mixed",
+        "length": 4096,
+        "pair": [
+          "prod_erfcx_slice",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "137",
+          "primitive": "erfcx",
+          "bank": "erfcx-mixed",
+          "length": 4096,
+          "pair": [
+            "prod_erfcx_slice",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:42:37.600461+00:00",
+        "pid": 6696,
+        "load_before": [
+          57.271484375,
+          23.19677734375,
+          11.98974609375
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          57.271484375,
+          23.19677734375,
+          11.98974609375
+        ],
+        "end_utc": "2026-10-29T00:42:39.229268+00:00"
+      },
+      "counts": {
+        "prod_erfcx_slice": 12036,
+        "libcerf_erfcx": 16849
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 198.024
+    },
+    {
+      "cell": {
+        "id": "138",
+        "primitive": "erfcx",
+        "bank": "erfcx-fallback",
+        "length": 52,
+        "pair": [
+          "prod_erfcx_slice",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "138",
+          "primitive": "erfcx",
+          "bank": "erfcx-fallback",
+          "length": 52,
+          "pair": [
+            "prod_erfcx_slice",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:42:39.520998+00:00",
+        "pid": 6836,
+        "load_before": [
+          57.271484375,
+          23.19677734375,
+          11.98974609375
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          66.77880859375,
+          25.7333984375,
+          12.95068359375
+        ],
+        "end_utc": "2026-10-29T00:42:41.143020+00:00"
+      },
+      "counts": {
+        "prod_erfcx_slice": 348590,
+        "libcerf_erfcx": 918551
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 193.965
+    },
+    {
+      "cell": {
+        "id": "139",
+        "primitive": "erfcx",
+        "bank": "erfcx-fallback",
+        "length": 4096,
+        "pair": [
+          "prod_erfcx_slice",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "139",
+          "primitive": "erfcx",
+          "bank": "erfcx-fallback",
+          "length": 4096,
+          "pair": [
+            "prod_erfcx_slice",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:42:41.558690+00:00",
+        "pid": 6982,
+        "load_before": [
+          66.77880859375,
+          25.7333984375,
+          12.95068359375
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          66.77880859375,
+          25.7333984375,
+          12.95068359375
+        ],
+        "end_utc": "2026-10-29T00:42:43.269892+00:00"
+      },
+      "counts": {
+        "prod_erfcx_slice": 4262,
+        "libcerf_erfcx": 13656
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 197.903
+    },
+    {
+      "cell": {
+        "id": "140",
+        "primitive": "erfcx",
+        "bank": "erfcx-special",
+        "length": 52,
+        "pair": [
+          "prod_erfcx_slice",
+          "libcerf_erfcx"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "140",
+          "primitive": "erfcx",
+          "bank": "erfcx-special",
+          "length": 52,
+          "pair": [
+            "prod_erfcx_slice",
+            "libcerf_erfcx"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:42:43.561697+00:00",
+        "pid": 7138,
+        "load_before": [
+          66.77880859375,
+          25.7333984375,
+          12.95068359375
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          66.77880859375,
+          25.7333984375,
+          12.95068359375
+        ],
+        "end_utc": "2026-10-29T00:42:45.117327+00:00"
+      },
+      "counts": {
+        "prod_erfcx_slice": 1987487,
+        "libcerf_erfcx": 1315167
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 207.877
+    },
+    {
+      "cell": {
+        "id": "144",
+        "primitive": "cdf",
+        "bank": "cdf-boundary",
+        "length": 52,
+        "pair": [
+          "prod_norm_cdf_slice",
+          "sleef_cdf_neon"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "144",
+          "primitive": "cdf",
+          "bank": "cdf-boundary",
+          "length": 52,
+          "pair": [
+            "prod_norm_cdf_slice",
+            "sleef_cdf_neon"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:42:49.751821+00:00",
+        "pid": 7249,
+        "load_before": [
+          72.32177734375,
+          27.56396484375,
+          13.67138671875
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          71.8154296875,
+          28.20166015625,
+          13.9775390625
+        ],
+        "end_utc": "2026-10-29T00:42:50.732268+00:00"
+      },
+      "counts": {
+        "prod_norm_cdf_slice": 900671,
+        "sleef_cdf_neon": 146463
+      },
+      "samples": 12,
+      "short": 12,
+      "minimum_ms": 224.887
+    },
+    {
+      "cell": {
+        "id": "145",
+        "primitive": "cdf",
+        "bank": "cdf-boundary",
+        "length": 4096,
+        "pair": [
+          "prod_norm_cdf_slice",
+          "sleef_cdf_neon"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "145",
+          "primitive": "cdf",
+          "bank": "cdf-boundary",
+          "length": 4096,
+          "pair": [
+            "prod_norm_cdf_slice",
+            "sleef_cdf_neon"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:42:51.033260+00:00",
+        "pid": 7251,
+        "load_before": [
+          71.8154296875,
+          28.20166015625,
+          13.9775390625
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          71.8154296875,
+          28.20166015625,
+          13.9775390625
+        ],
+        "end_utc": "2026-10-29T00:42:52.525489+00:00"
+      },
+      "counts": {
+        "prod_norm_cdf_slice": 12340,
+        "sleef_cdf_neon": 1980
+      },
+      "samples": 10,
+      "short": 10,
+      "minimum_ms": 237.596
+    },
+    {
+      "cell": {
+        "id": "147",
+        "primitive": "cdf",
+        "bank": "cdf-tails",
+        "length": 4096,
+        "pair": [
+          "prod_norm_cdf_slice",
+          "sleef_cdf_neon"
+        ],
+        "mode": "throughput",
+        "parity_required": true,
+        "reason": "comparable fast cost"
+      },
+      "calibration": {
+        "cell": {
+          "id": "147",
+          "primitive": "cdf",
+          "bank": "cdf-tails",
+          "length": 4096,
+          "pair": [
+            "prod_norm_cdf_slice",
+            "sleef_cdf_neon"
+          ],
+          "mode": "throughput",
+          "parity_required": true,
+          "reason": "comparable fast cost"
+        },
+        "utc": "2026-10-29T00:42:54.470069+00:00",
+        "pid": 7254,
+        "load_before": [
+          71.8154296875,
+          28.20166015625,
+          13.9775390625
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          77.275390625,
+          30.0576171875,
+          14.7158203125
+        ],
+        "end_utc": "2026-10-29T00:42:55.893219+00:00"
+      },
+      "counts": {
+        "prod_norm_cdf_slice": 12106,
+        "sleef_cdf_neon": 2054
+      },
+      "samples": 8,
+      "short": 5,
+      "minimum_ms": 237.669
+    },
+    {
+      "cell": {
+        "id": "152",
+        "primitive": "cdf",
+        "bank": "cdf-special",
+        "length": 52,
+        "pair": [
+          "prod_norm_cdf_slice",
+          "sleef_cdf_neon"
+        ],
+        "mode": "throughput",
+        "parity_required": false,
+        "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+      },
+      "calibration": {
+        "cell": {
+          "id": "152",
+          "primitive": "cdf",
+          "bank": "cdf-special",
+          "length": 52,
+          "pair": [
+            "prod_norm_cdf_slice",
+            "sleef_cdf_neon"
+          ],
+          "mode": "throughput",
+          "parity_required": false,
+          "reason": "empty/strong fallback/special/cache diagnostic; unmatched guarantees or instrumentation"
+        },
+        "utc": "2026-10-29T00:43:02.423034+00:00",
+        "pid": 7317,
+        "load_before": [
+          72.2080078125,
+          29.791015625,
+          14.71142578125
+        ],
+        "qos": "QOS_CLASS_USER_INITIATED",
+        "qos_result": 0,
+        "affinity": "macOS unbound",
+        "load_after": [
+          72.2080078125,
+          29.791015625,
+          14.71142578125
+        ],
+        "end_utc": "2026-10-29T00:43:03.747968+00:00"
+      },
+      "counts": {
+        "prod_norm_cdf_slice": 1265357,
+        "sleef_cdf_neon": 204635
+      },
+      "samples": 8,
+      "short": 4,
+      "minimum_ms": 205.813
+    }
+  ]
+}

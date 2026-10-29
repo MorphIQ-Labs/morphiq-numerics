@@ -1,0 +1,215 @@
+{
+  "scope": "Independent exact-bank observations for pinned practical references; sampled agreement does not establish their whole-domain bound or Numerics target/special-value guarantees",
+  "cells": [
+    {
+      "name": "core_math_exp",
+      "primitive": "exp",
+      "accelerated_samples": 8278,
+      "max_accelerated_error": "0.0000000000000001097069472654573893957736648384960314008314794287039621020885678984174964552",
+      "metric": "relative",
+      "worst_input": "c077f4e6f20e6f21",
+      "production_fast_budget_exceeded": [],
+      "special_observations": [
+        {
+          "input": "7ff0000000000000",
+          "output": "7ff0000000000000",
+          "production": "7ff0000000000000",
+          "same_bits": true
+        },
+        {
+          "input": "7ff8123456789abc",
+          "output": "7ff8123456789abc",
+          "production": "7ff8123456789abc",
+          "same_bits": true
+        },
+        {
+          "input": "fff0000000000000",
+          "output": "0000000000000000",
+          "production": "0000000000000000",
+          "same_bits": true
+        },
+        {
+          "input": "fff8123456789abc",
+          "output": "fff8123456789abc",
+          "production": "fff8123456789abc",
+          "same_bits": true
+        }
+      ]
+    },
+    {
+      "name": "sleef_exp_scalar_fma",
+      "primitive": "exp",
+      "accelerated_samples": 8278,
+      "max_accelerated_error": "0.0000000000000001300589106853086704479014133414114423954585225954978707607875368219448517367",
+      "metric": "relative",
+      "worst_input": "c085965a040c4392",
+      "production_fast_budget_exceeded": [],
+      "special_observations": [
+        {
+          "input": "7ff0000000000000",
+          "output": "7ff0000000000000",
+          "production": "7ff0000000000000",
+          "same_bits": true
+        },
+        {
+          "input": "7ff8123456789abc",
+          "output": "7ff8123456789abc",
+          "production": "7ff8123456789abc",
+          "same_bits": true
+        },
+        {
+          "input": "fff0000000000000",
+          "output": "0000000000000000",
+          "production": "0000000000000000",
+          "same_bits": true
+        },
+        {
+          "input": "fff8123456789abc",
+          "output": "fff8123456789abc",
+          "production": "fff8123456789abc",
+          "same_bits": true
+        }
+      ]
+    },
+    {
+      "name": "sleef_exp_neon",
+      "primitive": "exp",
+      "accelerated_samples": 8278,
+      "max_accelerated_error": "0.0000000000000001300589106853086704479014133414114423954585225954978707607875368219448517367",
+      "metric": "relative",
+      "worst_input": "c085965a040c4392",
+      "production_fast_budget_exceeded": [],
+      "special_observations": [
+        {
+          "input": "7ff0000000000000",
+          "output": "7ff0000000000000",
+          "production": "7ff0000000000000",
+          "same_bits": true
+        },
+        {
+          "input": "7ff8123456789abc",
+          "output": "7ff8123456789abc",
+          "production": "7ff8123456789abc",
+          "same_bits": true
+        },
+        {
+          "input": "fff0000000000000",
+          "output": "0000000000000000",
+          "production": "0000000000000000",
+          "same_bits": true
+        },
+        {
+          "input": "fff8123456789abc",
+          "output": "fff8123456789abc",
+          "production": "fff8123456789abc",
+          "same_bits": true
+        }
+      ]
+    },
+    {
+      "name": "libcerf_erfcx",
+      "primitive": "erfcx",
+      "accelerated_samples": 2630,
+      "max_accelerated_error": "0.000000000000000266780121886069756290429768148653676358163119441853114115879199891066503744",
+      "metric": "relative",
+      "worst_input": "402e0d8247bf9108",
+      "production_fast_budget_exceeded": [],
+      "special_observations": [
+        {
+          "input": "7ff0000000000000",
+          "output": "0000000000000000",
+          "production": "0000000000000000",
+          "same_bits": true
+        },
+        {
+          "input": "7ff8123456789abc",
+          "output": "7ff8123456789abc",
+          "production": "7ff8123456789abc",
+          "same_bits": true
+        },
+        {
+          "input": "fff0000000000000",
+          "output": "7ff0000000000000",
+          "production": "7ff0000000000000",
+          "same_bits": true
+        },
+        {
+          "input": "fff8123456789abc",
+          "output": "fff8123456789abc",
+          "production": "fff8123456789abc",
+          "same_bits": true
+        }
+      ]
+    },
+    {
+      "name": "sleef_cdf_neon",
+      "primitive": "cdf",
+      "accelerated_samples": 5164,
+      "max_accelerated_error": "0.00000000000000009890607287588026604741765179925289982820856283853197631242367020284307112207",
+      "metric": "absolute",
+      "worst_input": "3fef800000000001",
+      "production_fast_budget_exceeded": [],
+      "special_observations": [
+        {
+          "input": "7ff0000000000000",
+          "output": "3ff0000000000000",
+          "production": "3ff0000000000000",
+          "same_bits": true
+        },
+        {
+          "input": "7ff8123456789abc",
+          "output": "7ff8000000000000",
+          "production": "7ff8123456789abc",
+          "same_bits": false
+        },
+        {
+          "input": "fff0000000000000",
+          "output": "0000000000000000",
+          "production": "0000000000000000",
+          "same_bits": true
+        },
+        {
+          "input": "fff8123456789abc",
+          "output": "7ff8000000000000",
+          "production": "fff8123456789abc",
+          "same_bits": false
+        }
+      ]
+    },
+    {
+      "name": "scipy_ndtr",
+      "primitive": "cdf",
+      "accelerated_samples": 5164,
+      "max_accelerated_error": "0.0000000000000001182153338903877991771501629023604043740882033264889318571590153467580259191",
+      "metric": "absolute",
+      "worst_input": "3ff1a4691a4691a8",
+      "production_fast_budget_exceeded": [],
+      "special_observations": [
+        {
+          "input": "7ff0000000000000",
+          "output": "3ff0000000000000",
+          "production": "3ff0000000000000",
+          "same_bits": true
+        },
+        {
+          "input": "7ff8123456789abc",
+          "output": "7ff8000000000000",
+          "production": "7ff8123456789abc",
+          "same_bits": false
+        },
+        {
+          "input": "fff0000000000000",
+          "output": "0000000000000000",
+          "production": "0000000000000000",
+          "same_bits": true
+        },
+        {
+          "input": "fff8123456789abc",
+          "output": "7ff8000000000000",
+          "production": "fff8123456789abc",
+          "same_bits": false
+        }
+      ]
+    }
+  ]
+}

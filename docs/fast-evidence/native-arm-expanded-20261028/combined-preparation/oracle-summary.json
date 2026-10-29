@@ -1,0 +1,45 @@
+{
+  "scope": "Independent 256-bit mathematical oracle replay on the new ARM candidate; historical x86 bit changes are diagnostic, not a same-source target comparison",
+  "same_source_x86_comparison": "pending matching x86 candidate observations",
+  "cells": [
+    {
+      "primitive": "exp",
+      "cases": 45212,
+      "oracle_source": "upstream-packet/prod_exp-observations.csv",
+      "oracle_source_sha256": "f9e9b95f90e3ab1432bf6fc0afa60bd9f80e88bf0090abe52c6255e151410b61",
+      "metric": "relative",
+      "bound": "0.000000000000000444089209850062616169452667236328125",
+      "max_error": "0.0000000000000003079379441056849811810780400723816993458522645905964525417219568703573006419",
+      "witness": "c06fcbee3b5b3da7",
+      "accuracy_failures": [],
+      "scalar_slice_mismatches": [],
+      "historical_x86_output_changes_count": 12021
+    },
+    {
+      "primitive": "erfcx",
+      "cases": 9731,
+      "oracle_source": "upstream-packet/prod_erfcx-observations.csv",
+      "oracle_source_sha256": "7a7b7bcd183250c079362a8b393b36dffe88394121fc41271ef3ac725abe16df",
+      "metric": "relative",
+      "bound": "0.000000000000000444089209850062616169452667236328125",
+      "max_error": "0.0000000000000002843263788173226437865366958379162803402516647779148956991476074347903152252",
+      "witness": "3fe8278000000000",
+      "accuracy_failures": [],
+      "scalar_slice_mismatches": [],
+      "historical_x86_output_changes_count": 0
+    },
+    {
+      "primitive": "cdf",
+      "cases": 9553,
+      "oracle_source": "upstream-packet/prod_norm_cdf-observations.csv",
+      "oracle_source_sha256": "7d4f88b0a01d3067cf9a7f80850b12b7282aabf7fcc7fe3d2d91699be2ac8866",
+      "metric": "absolute",
+      "bound": "0.0000000000000017763568394002504646778106689453125",
+      "max_error": "0.0000000000000003908512677872264651851915560582625604168695779336888732459599269286961151888",
+      "witness": "3fefd00000000000",
+      "accuracy_failures": [],
+      "scalar_slice_mismatches": [],
+      "historical_x86_output_changes_count": 983
+    }
+  ]
+}

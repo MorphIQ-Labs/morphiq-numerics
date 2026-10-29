@@ -1,0 +1,8 @@
+{
+  "utc": "2026-10-29T00:57:21.393748+00:00",
+  "source": "7b76da58acb8addc0d47bff9d8264d37d7ac095d",
+  "reason": "Measured samples below the predeclared 250ms minimum following contended calibration. Stop cannot produce accepted qualification; retain all data. No samples or counts replaced. Later #240 a8cc587 is outside this frozen source.",
+  "owned_runner_pid": 90909,
+  "qualification": "incomplete; failed duration prerequisite",
+  "unrelated_processes": "not stopped"
+}
