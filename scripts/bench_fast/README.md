@@ -129,6 +129,14 @@ For x86 replace the directory with `target/bench-fast-x86` and use
 `run-qualification.py`. Do not modify frozen files between these steps.
 Verify hashes again after any post-timing diagnostics.
 
+Every x86 cell process, calibration included, places its buffers identically:
+the input on a page boundary and the output 2 KiB modulo 4 KiB past the input's
+end. Allocator state otherwise differs between processes, and a short slice's
+speed depends on the output's 4 KiB offset from its input (store-to-load
+aliasing; up to 1.8x on Sapphire Rapids, #243). Each process records the
+placement in its metadata. The ARM harness allocates in native code and has not
+yet been given a declared placement.
+
 Calibration uses only the current host, not counts from a previous run. It
 retains every pilot, targets 600 ms per timed sample, and only increases counts.
 Every accepted timed sample must be at least 250 ms. Each cell has ten independent
