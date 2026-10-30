@@ -105,6 +105,35 @@ fn evaluate_pair<K: morphiq_numerics_arch::Simd>(k: K, input: &[f64], output: &m
     k.store_partial(b, out_b);
 }
 
+#[cfg(feature = "simd")]
+#[inline(always)]
+fn evaluate_quad<K: morphiq_numerics_arch::Simd>(k: K, input: &[f64], output: &mut [f64]) {
+    let values = core::array::from_fn(|i| {
+        let mut x = K::Array::default();
+        x.as_mut()
+            .copy_from_slice(&input[i * K::LANES..(i + 1) * K::LANES]);
+        k.load(x)
+    });
+    #[inline(always)]
+    fn normal<K: morphiq_numerics_arch::Simd>(k: K, x: K::F) -> K::M {
+        k.and_m(
+            k.le(k.splat(f64::MIN_POSITIVE), x),
+            k.lt(x, k.splat(f64::INFINITY)),
+        )
+    }
+    let normal = k.and_m(
+        k.and_m(normal(k, values[0]), normal(k, values[1])),
+        k.and_m(normal(k, values[2]), normal(k, values[3])),
+    );
+    if k.mask_bits(normal) != (1 << K::LANES) - 1 {
+        return general_packets(k, input, output);
+    }
+    let values = super::lanes::bounded_normal_quad(k, values);
+    for (x, out) in values.into_iter().zip(output.chunks_exact_mut(K::LANES)) {
+        k.store_partial(x, out);
+    }
+}
+
 // Keep subnormal scaling and mixed-special handling off the normal path.
 // The general loop preserves each packet's scalar/SIMD selection, and
 // vectorize keeps every lane operation inside its backend's feature boundary.
@@ -133,8 +162,13 @@ impl<const SPECIALIZE_NORMAL: bool> morphiq_numerics_arch::WithSimd
         let (input, rest) = self.input.split_at(bulk);
         let (output, rest_out) = self.output.split_at_mut(bulk);
         if SPECIALIZE_NORMAL && K::LANES == 8 {
-            let mut inputs = input.chunks_exact(2 * size);
-            let mut outputs = output.chunks_exact_mut(2 * size);
+            let mut inputs = input.chunks_exact(4 * size);
+            let mut outputs = output.chunks_exact_mut(4 * size);
+            for (input, output) in inputs.by_ref().zip(outputs.by_ref()) {
+                evaluate_quad(k, input, output);
+            }
+            let mut inputs = inputs.remainder().chunks_exact(2 * size);
+            let mut outputs = outputs.into_remainder().chunks_exact_mut(2 * size);
             for (input, output) in inputs.by_ref().zip(outputs.by_ref()) {
                 evaluate_pair(k, input, output);
             }
@@ -172,15 +206,13 @@ impl<const N: usize> morphiq_numerics_arch::WithSimd for Packet<'_, N> {
         assert!(N >= K::LANES && N.is_multiple_of(K::LANES));
         assert!(N.is_power_of_two() && N <= 64);
         if K::LANES == 8 && N.is_multiple_of(2 * K::LANES) {
-            // These are the existing fixed 16/32/64-value calls. Explicit
-            // pairs avoid a tiny loop hoisting every stage constant at entry.
-            evaluate_pair(k, &self.input[..16], &mut self.output[..16]);
-            if N >= 32 {
-                evaluate_pair(k, &self.input[16..32], &mut self.output[16..32]);
-            }
-            if N >= 64 {
-                evaluate_pair(k, &self.input[32..48], &mut self.output[32..48]);
-                evaluate_pair(k, &self.input[48..64], &mut self.output[48..64]);
+            if N == 16 {
+                evaluate_pair(k, self.input, self.output);
+            } else {
+                evaluate_quad(k, &self.input[..32], &mut self.output[..32]);
+                if N == 64 {
+                    evaluate_quad(k, &self.input[32..], &mut self.output[32..]);
+                }
             }
         } else {
             for (input, output) in self
@@ -273,7 +305,7 @@ pub(crate) fn slice(input: &[f64], output: &mut [f64]) {
         }
         return;
     }
-    let work = Slice { input, output };
+    let work = Slice::<true> { input, output };
     #[cfg(target_arch = "x86_64")]
     {
         use morphiq_numerics_arch::{Avx2, Avx512, Sse2};

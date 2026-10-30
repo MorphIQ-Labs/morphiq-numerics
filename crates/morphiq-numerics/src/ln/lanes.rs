@@ -83,7 +83,12 @@ fn normalized_bits<K: Simd>(k: K, bits: K::U, offset: K::F) -> (K::F, K::F) {
 
 /// `stage::parts`, operation for operation, after normalization.
 #[inline(always)]
-fn fast_value<K: Simd, const NORMALIZED: bool>(k: K, (y, e): (K::F, K::F)) -> StageH<K> {
+fn fast_value<K: Simd, const NORMALIZED: bool>(k: K, reduced: (K::F, K::F)) -> StageH<K> {
+    evaluate_stage(k, stage_fields::<K, NORMALIZED>(k, reduced))
+}
+
+#[inline(always)]
+fn stage_fields<K: Simd, const NORMALIZED: bool>(k: K, (y, e): (K::F, K::F)) -> (K::F, K::F, K::F) {
     let hb = k.to_bits(y);
     let u = k.sub_u(hb, k.splat_bits(OFF));
     let (rs, th, tl, e) = if NORMALIZED {
@@ -144,6 +149,11 @@ fn fast_value<K: Simd, const NORMALIZED: bool>(k: K, (y, e): (K::F, K::F)) -> St
     };
     let ln1 = k.add(k.mul(e, k.splat(L1)), th);
     let ln0 = k.add(k.mul(e, k.splat(L0)), tl);
+    (z, ln1, ln0)
+}
+
+#[inline(always)]
+fn evaluate_stage<K: Simd>(k: K, (z, ln1, ln0): (K::F, K::F, K::F)) -> StageH<K> {
     let z2 = k.mul(z, z);
     let t0 = k.sub(k.mul(z, k.splat(H[0])), k.splat(0.5));
     let t1 = k.add(k.mul(z, k.splat(H[2])), k.splat(H[1]));
@@ -306,6 +316,26 @@ pub(super) fn bounded_normal_pair<K: Simd>(k: K, a: K::F, b: K::F) -> (K::F, K::
     let (sa, la, _) = fast_value::<K, true>(k, a);
     let (sb, lb, _) = fast_value::<K, true>(k, b);
     (k.add(sa, la), k.add(sb, lb))
+}
+
+/// Four independent positive normal packets. Preparing their table and
+/// exponent terms together exposes independent polynomial dependencies.
+#[inline(always)]
+pub(super) fn bounded_normal_quad<K: Simd>(k: K, values: [K::F; 4]) -> [K::F; 4] {
+    let [a, b, c, d] = values;
+    let a = reduce_normal(k, a);
+    let b = reduce_normal(k, b);
+    let c = reduce_normal(k, c);
+    let d = reduce_normal(k, d);
+    let a = stage_fields::<K, true>(k, a);
+    let b = stage_fields::<K, true>(k, b);
+    let c = stage_fields::<K, true>(k, c);
+    let d = stage_fields::<K, true>(k, d);
+    let (sa, la, _) = evaluate_stage(k, a);
+    let (sb, lb, _) = evaluate_stage(k, b);
+    let (sc, lc, _) = evaluate_stage(k, c);
+    let (sd, ld, _) = evaluate_stage(k, d);
+    [k.add(sa, la), k.add(sb, lb), k.add(sc, lc), k.add(sd, ld)]
 }
 
 impl Kernel for Ln1p {
