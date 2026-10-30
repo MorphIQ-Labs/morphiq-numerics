@@ -55,7 +55,9 @@ two words. It masks each index by `N-2` and loads that even word and its
 successor into separate vectors, preserving every bit. AVX-512 loads each pair
 with one unaligned 128-bit load and transposes the pairs; other backends use
 bounded scalar loads. For tables fitting 32-bit indices, AVX-512 narrows only
-after masking, so no significant index bit is lost. No hardware gather is used.
+after masking, so no significant index bit is lost. On little-endian x86,
+two adjacent 32-bit indices share each 64-bit transfer to scalar registers;
+masking and shifting recover their original order. No hardware gather is used.
 
 `load_partial` accepts at most `LANES` values and fills unused lanes with positive
 zero. `store_partial` writes only the supplied output prefix. Both reject longer

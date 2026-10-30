@@ -695,11 +695,22 @@ mod helpers {
                 let mask = (N - 2) as i64;
                 let narrowed =
                     _mm512_cvtepi64_epi32(_mm512_and_si512(index, _mm512_set1_epi64(mask)));
-                let mut indices = [0_u32; 8];
-                // SAFETY: indices has the 32 bytes written by the unaligned
+                // x86 is little-endian: each u64 holds two adjacent u32
+                // indices. Extracting both halves shares their lane transfer.
+                let mut pairs = [0_u64; 4];
+                // SAFETY: pairs has the 32 bytes written by the unaligned
                 // AVX store; this AVX-512F helper also has AVX enabled.
-                unsafe { _mm256_storeu_si256(indices.as_mut_ptr().cast(), narrowed) };
-                indices.map(u64::from)
+                unsafe { _mm256_storeu_si256(pairs.as_mut_ptr().cast(), narrowed) };
+                [
+                    pairs[0] & u64::from(u32::MAX),
+                    pairs[0] >> 32,
+                    pairs[1] & u64::from(u32::MAX),
+                    pairs[1] >> 32,
+                    pairs[2] & u64::from(u32::MAX),
+                    pairs[2] >> 32,
+                    pairs[3] & u64::from(u32::MAX),
+                    pairs[3] >> 32,
+                ]
             } else {
                 store(_mm512_castsi512_pd(index)).map(f64::to_bits)
             };
