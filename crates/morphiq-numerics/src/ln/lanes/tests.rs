@@ -29,7 +29,7 @@ impl WithSimd for FastValues<'_> {
                     continue;
                 }
                 let reduced = Reduced::of(xi);
-                let want = crate::ln::stage::parts(reduced.e, reduced.y);
+                let want = crate::ln::stage::parts(reduced.e, reduced.y());
                 assert_eq!(
                     (
                         hi.as_ref()[i].to_bits(),
@@ -239,7 +239,7 @@ fn undecided_logarithm_lanes_complete_alone_together_and_with_specials() {
                 return false;
             }
             let r = Reduced::of(x);
-            crate::ln::stage::parts(r.e, r.y).3.is_none()
+            crate::ln::stage::parts(r.e, r.y()).3.is_none()
         })
         .collect();
     let ln1p: std::vec::Vec<_> = ln_1p_corpus()

@@ -3,6 +3,14 @@ from pathlib import Path
 import csv,hashlib,json,math,os,statistics,subprocess,sys,time
 P=Path(__file__).resolve().parent
 manifest_path=P/'qualification-manifest.json';manifest=json.loads(manifest_path.read_text());cells=manifest['cells']
+# Each group completes two five-process blocks. The groups must be a strict
+# partition of the full matrix: staging cannot omit or retry a cell.
+by_id={c['id']:c for c in cells}
+group_ids=manifest.get('execution_groups', [list(by_id)])
+flat=[ident for group in group_ids for ident in group]
+if not all(group_ids) or len(flat)!=len(cells) or len(set(flat))!=len(flat) or set(flat)!=set(by_id):
+ raise SystemExit('Execution groups must partition every matrix cell exactly once')
+groups=[[by_id[ident] for ident in group] for group in group_ids]
 root=P/'qualification';root.mkdir(exist_ok=True)
 frozen=hashlib.sha256(manifest_path.read_bytes()).hexdigest()
 receipt=root/'manifest.sha256'
@@ -10,11 +18,13 @@ if receipt.exists():assert receipt.read_text().strip()==frozen
 else:receipt.write_text(frozen+'\n')
 for c in cells:
  assert hashlib.sha256(Path(c['product']).read_bytes()).hexdigest()==next(b['sha256'] for b in manifest['builds'] if b['name']==c['backend'])
+ if c.get('control_product'):
+  assert hashlib.sha256(Path(c['control_product']).read_bytes()).hexdigest()==next(b['control_sha256'] for b in manifest['builds'] if b['name']==c['backend'])
  words=json.loads(Path(c['input']['file']).read_text());assert hashlib.sha256(b''.join(bytes.fromhex(w) for w in words)).hexdigest()==c['input']['sha256']
 
 def command(c,out,proc):
  args=[sys.executable,str(P/'qualify-cell.py'),'--product',c['product'],'--primitive',c['primitive'],'--length',str(c['length']),'--population',c['input']['file'],'--kind',c['kind'],'--reference',c['reference'],'--counts',str(out/'counts.json'),'--target-ms','600','--cache-slots',str(c.get('cache_slots',1)),'--process',proc,'--out',str(out/proc)]
- if c['control']:args+=['--symbol-prefix','control_','--reference-product',str(P/'final-bin/control.so')]
+ if c['control']:args+=['--symbol-prefix','control_','--reference-product',str(c.get('control_product') or P/'final-bin/control.so')]
  return args
 
 def summaries():
@@ -40,21 +50,27 @@ def summaries():
    writer=csv.DictWriter(stream,fieldnames=list(rows[0]));writer.writeheader();writer.writerows(rows)
  return rows
 
-for block in range(2):
- for index,c in enumerate(cells):
-  out=root/c['id'];out.mkdir(exist_ok=True)
-  processes=(['calibration'] if block==0 else [])+[str(i) for i in range(block*5,(block+1)*5)]
-  for proc in processes:
-   done=out/(proc+'.complete')
-   if done.exists():continue
-   if (out/proc).exists():raise SystemExit(f'Incomplete/invalid attempt retained at {out/proc}; no automatic retry or count change')
-   (root/'status.json').write_text(json.dumps(dict(block=block+1,cell=index+1,total=len(cells),id=c['id'],process=proc,utc=time.time()),indent=2)+'\n')
-   with (out/(proc+'.log')).open('w') as stream:
-    result=subprocess.run(command(c,out,proc),stdout=stream,stderr=subprocess.STDOUT)
-   if result.returncode:raise SystemExit(f'Failed {c["id"]}/{proc}; evidence retained. See {out/(proc+".log")}')
-   done.write_text(str(time.time())+'\n')
-  if block==1:summaries()
-  if (index+1)%10==0:print(f'Block {block+1}/2: {index+1}/{len(cells)} cells',flush=True)
+for group_index,group in enumerate(groups):
+ for block in range(2):
+  for index,c in enumerate(group):
+   out=root/c['id'];out.mkdir(exist_ok=True)
+   processes=(['calibration'] if block==0 else [])+[str(i) for i in range(block*5,(block+1)*5)]
+   for proc in processes:
+    done=out/(proc+'.complete')
+    if done.exists():continue
+    if (out/proc).exists():raise SystemExit(f'Incomplete/invalid attempt retained at {out/proc}; no automatic retry or count change')
+    (root/'status.json').write_text(json.dumps(dict(group=group_index+1,groups=len(groups),block=block+1,cell=index+1,total=len(group),id=c['id'],process=proc,utc=time.time()),indent=2)+'\n')
+    with (out/(proc+'.log')).open('w') as stream:
+     result=subprocess.run(command(c,out,proc),stdout=stream,stderr=subprocess.STDOUT)
+    if result.returncode:raise SystemExit(f'Failed {c["id"]}/{proc}; evidence retained. See {out/(proc+".log")}')
+    done.write_text(str(time.time())+'\n')
+   if block==1:
+    rows=summaries()
+    failed=[r['id'] for r in rows if r['required'] and not r['passes']]
+    if failed and manifest.get('stop_on_required_failure',False):
+     (root/'result.json').write_text(json.dumps(dict(complete=False,all_required_pass=False,failures=failed,reason='Stopped at first completed required failure; all attempts retained'),indent=2)+'\n')
+     raise SystemExit('Required parity failed: '+', '.join(failed))
+   if (index+1)%10==0:print(f'Group {group_index+1}/{len(groups)}, block {block+1}/2: {index+1}/{len(group)} cells',flush=True)
 rows=summaries();assert len(rows)==len(cells)
 failures=[r for r in rows if r['required'] and not r['passes']]
 result=dict(complete=True,cells=len(rows),required=sum(c['required_parity'] for c in cells),failures=[r['id'] for r in failures],all_required_pass=not failures)

@@ -50,6 +50,15 @@ scalar loads and assembles the result into lanes. This avoids hardware-gather
 latency on affected x86 hosts with the Gather Data Sampling mitigation; the
 bounded exp code-generation gate retains that choice.
 
+`gather_pair_wrapped(table, index)` requires a power-of-two table of at least
+two words. It masks each index by `N-2` and loads that even word and its
+successor into separate vectors, preserving every bit. AVX-512 loads each pair
+with one unaligned 128-bit load and transposes the pairs; other backends use
+bounded scalar loads. For tables fitting 32-bit indices, AVX-512 narrows only
+after masking, so no significant index bit is lost. On little-endian x86,
+two adjacent 32-bit indices share each 64-bit transfer to scalar registers;
+masking and shifting recover their original order. No hardware gather is used.
+
 `load_partial` accepts at most `LANES` values and fills unused lanes with positive
 zero. `store_partial` writes only the supplied output prefix. Both reject longer
 slices before any intrinsic access. AVX-512 uses masked memory instructions;
@@ -94,9 +103,11 @@ other, and `unsafe_op_in_unsafe_fn` is denied. No public function is
    unaligned forms need only the element's alignment. For AVX-512 prefix
    operations the checked slice length determines the mask, so only elements
    belonging to the slice are accessed, including no accesses for an empty slice.
-Table gathers require no additional unsafe block: the default trait method
-checks the table shape, masks each index by `N - 1`, and reads the word through
-safe array indexing. The existing lane load then assembles those encodings.
+Single-word table gathers use safe array indexing after checking the shape and
+masking by `N-1`. Paired gathers similarly mask by `N-2`. The AVX-512 pair
+load's pointer comes from a checked two-word slice, which supplies exactly the
+16 bytes read; its temporary index store writes exactly eight `u32` words.
+The backend token supplies the instruction-set precondition for both accesses.
 
 There are no raw-pointer slices, transmutes or `static mut`.
 

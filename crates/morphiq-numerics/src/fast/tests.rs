@@ -58,7 +58,7 @@ fn mixed_slices_preserve_fast_scalar_bits_and_remainders() {
         (normal::erfcx, normal::erfcx_slice),
         (normal::norm_cdf, normal::norm_cdf_slice),
     ] {
-        for n in [0, 1, 2, 3, 7, 8, 9, 51, 52, 53, 256, 257] {
+        for n in (0..=17).chain([51, 52, 53, 256, 257]) {
             let mut out = [0.0; 257];
             slice(&xs[..n], &mut out[..n]);
             for (x, actual) in xs[..n].iter().zip(&out[..n]) {

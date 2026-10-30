@@ -206,6 +206,44 @@ finite `x > 0`, `x ≠ 1`, a decided value is `RN(ln x)`; every real within
 §4 and §6. The accurate path and special-value results are unchanged.
 `ln_slice` performs the same stage in lanes ([lanes.md](lanes.md) §5).
 
+The scalar normalizer computes the same pair with integer encodings:
+`u = bits - OFF` (wrapping), `y_bits = bits - (u & !FRACTION)`, and
+`e = (u as i64 >> 52) - scaled`. `LnNormalized.fused_normalization` and
+`fused_signed_exponent` prove equality to the case split above. This exact
+normalizer is also shared by log2, log10 and ln_1p's fallback. It changes no
+returned bit. The reciprocal stage accepts a `Reduced` value for its normalized
+entry: its second exponent is proved zero, so it loads the unscaled reciprocal
+and uses `e` directly. The general entry used by the normal log tail retains
+its additional reduction; the polynomial and interval test are shared.
+
+The normalizer keeps the reduced significand as integer bits and retains the
+nine-bit reciprocal-stage cell before normalization; `normalized_cell_index`
+proves that exponent removal cannot change this cell. Subnormal scaling runs
+in a separate cold function so normal inputs do not pay a speculative multiply.
+
+For `1-2^-9 <= x < 1+2^-9`, generated cells 298–300 have reciprocal one and
+both log words zero. The scalar stage uses the exact Sterbenz difference
+`z=x-1`, then the unchanged polynomial and error estimate. Its low word is
+`0+q`, retaining the ordinary stage's positive-zero canonicalization at one.
+The cutoff is derived by scanning the generated reciprocal table, with constant
+assertions for zero log words and contiguity; it is not fitted to samples.
+`LnUnit.unit_parts_identical`, `unit_fast_identical` and
+`unit_strong_decision_identical` prove equivalence to the full stage and both
+entries. The strong path retains the same decision and accurate fallback.
+The normalized reciprocal stage uses hardware `fma(y,R,-1)` where available:
+NEON/AVX2/AVX-512 lanes, and scalar builds with `std` targeting FMA or NEON.
+The portable split remains the fallback. `LnExactFma.reduced_fma_identical`
+proves equality of the binary64 values themselves, including zero. The proof
+reuses the exact residual theorem, then checks the generated reciprocals as
+multiples of `2^-10`: on the normalizer's `2^-53` input grid, a zero residual
+requires the reciprocal numerator to divide `2^63`. A closed table check shows
+that only reciprocal one permits this, giving `y=1`; both reductions then
+produce positive zero. The general ln_1p reciprocal stage keeps its split.
+
+The boundary test covers every reciprocal cell and rejects both widening and
+narrowing this selected block. Independent mpmath fixtures include the cell
+boundaries and neighboring encodings; they enforce the published log bound.
+
 ## 4. Double-word fallback (after [DLM] §3.3)
 
 **Decision 2: [DLM]'s portable evaluation, on the crate's proved double-word
@@ -633,9 +671,10 @@ alone doesn't claim.
 
 ### 7.8 Review points
 
-- **No FMA.** The 10-bit reciprocals and `h`'s 10-bit split make `z` exact
-  with plain multiplications on every target. An FMA kernel (`z = fma(h, rs,
-  −1)`, about 40% more proof) is a follow-up.
+- **Exact portable and fused reductions.** The 10-bit reciprocals and `h`'s
+  10-bit split make `z` exact on every target. Normalized ln may use hardware
+  FMA with a proof of the same bits (§3.1). The general ln_1p stage retains
+  the portable split.
 - **`J = 9` against `J = 10`.** `J = 10` (26 KiB) sends fewer arguments past H
   (`2^−9.7` against `2^−8.6` on `e^d`) and measured no faster. 14 KiB and
   `exp`'s 8 KiB table total 22 KiB, fitting a 32 KiB L1 data cache together.

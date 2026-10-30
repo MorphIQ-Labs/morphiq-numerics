@@ -218,16 +218,37 @@ the cross-target digest, not a separate Coq model of SIMD instructions.
 
 **`ln`:**
 1. **The screen** per lane: NaN, `x ≤ 0`, `+∞` and `1` go to `ln`.
-2. **The reduction** in lanes, as `Reduced::of` computes it: a subnormal `x`
-   scaled by `2^54` (selected per lane); `m = 1.fraction` from the encoding;
-   `i ≥ 53` exactly when `m ≥ 1 + 53/128`, and then `y = m/2`, which is the
-   encoding with exponent 1022, else `y = m`; `E` as the biased exponent less
-   1022 or 1023 and less 54 if scaled, the biased exponent read as an integer
-   below `2^52` from `2^52`'s encoding, every step exact in binary64 (small
-   integers).
+2. **The reduction** returns exactly `Reduced::of`'s significand and exponent.
+   A packet of normal inputs skips subnormal scaling. Otherwise a subnormal
+   `x` is scaled by `2^54`, selected per lane. For the resulting normal
+   encoding `b`, let `u = b - OFF`, wrapping modulo `2^64`. Clearing the low
+   52 bits of `u` and subtracting it from `b` constructs the same `y` as the
+   scalar exponent-1022/1023 choice. The exponent before scaling correction is
+   `((u + 1024*2^52) mod 2^64) >> 52`, less 1024. Its biased value is in
+   `[2, 2048]`; embedding it below the encoding of `2^52` and subtracting
+   `2^52+1024` (or `2^52+1078` after scaling) gives the exact integer exponent
+   in binary64. `LnNormalized.fused_normalization` proves the integer identity.
 3. **The reciprocal reduction:** the 512-entry table index and loads are per
-   lane. Masking the low ten significand bits produces `hh`; the lanes form
+   lane. The normalized `y` already lies in `[0x1.6ap-1, 0x1.6ap0)`, so
+   `LnNormalized.reduced_stage_exponent_zero` permits removing the shared
+   stage's second exponent extraction and reciprocal scaling. A lossless
+   8 KiB layout packs the reciprocal into the log high word's ten unused low
+   bits, retaining the log low word. SIMD masking and shifting recover the
+   original words. The flat pair layout scales the cell index in lanes before
+   extracting scalar indices, allowing eight-byte indexed loads without a
+   separate shift for each lane. `packed_pair_index` proves both word indices
+   remain in the 1024-word layout. Constant assertions and `LnNormalized.packed_tables_lossless`
+   check every generated entry. `gather_pair_wrapped` bounds both words inside
+   the arch crate. AVX-512 narrows masked indices before extraction and loads
+   each adjacent pair in one 128-bit operation, then transposes the pair words.
+   The general reciprocal stage retains its
+   original layout and exponent handling. Masking the low ten significand bits
+   produces `hh`; the lanes form
    `hl = h − hh` and `z = (hh·rs − 1) + hl·rs`, exactly as `stages::reduce`.
+   Normalized ln on a backend with hardware FMA computes `fma(y,rs,-1)`
+   instead. `LnExactFma.reduced_fma_identical` proves the exact same residual
+   bits, including positive zero; the non-FMA and general stages retain the
+   split. The polynomial and reconstruction operation order is unchanged.
 4. **The reconstruction** computes `E·L1`, `E·L0`, the degree-six polynomial,
    `(s, lo)` and `eps`, operation for operation as `ln::stage::parts`.
 5. **The interval test** in lanes (§3), followed by the shared double-word

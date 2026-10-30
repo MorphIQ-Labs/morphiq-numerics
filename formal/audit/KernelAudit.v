@@ -936,6 +936,17 @@ Print Assumptions FastLn.fast_ln_public_ok.
 Print Assumptions FastLn.fast_ln_specials.
 Print Assumptions FastLn.fast_ln_regular_one.
 Print Assumptions FastLn.fast_ln_nan.
+
+Require LnNormalized.
+Print Assumptions LnNormalized.reduced_stage_exponent_zero.
+Print Assumptions LnNormalized.fused_normalization.
+Print Assumptions LnNormalized.fused_signed_exponent.
+Print Assumptions LnNormalized.packed_pair_index.
+Print Assumptions LnNormalized.positive_encoding_screen.
+Print Assumptions LnNormalized.positive_normal_encoding_screen.
+Print Assumptions LnNormalized.normal_reduction_identical.
+Print Assumptions LnNormalized.clear_low_52.
+Print Assumptions LnNormalized.packed_tables_lossless.
 Print Assumptions FastExp.fast_exp_entry_ok.
 Print Assumptions FastExp.fast_exp_nonpositive_range.
 Print Assumptions FastErfcx.fast_erfcx_table_ok.
@@ -957,3 +968,17 @@ Print Assumptions FastErfcxEvaluation.fast_table_ieee.
 Print Assumptions FastErfcxCertificates.fast_table_certificate.
 Print Assumptions FastNormalCentralAnalytic.gaussian_integral_weighted_remainder.
 Print Assumptions FastNormalCentral.fast_normal_center_ok.
+
+Print Assumptions LnNormalized.normalized_cell_index.
+Require LnUnit.
+Print Assumptions LnUnit.unit_parts_identical.
+Print Assumptions LnUnit.unit_fast_identical.
+Print Assumptions LnUnit.unit_strong_decision_identical.
+Print Assumptions LnUnit.unit_one.
+Print Assumptions LnUnit.unit_table_domain.
+Print Assumptions LnUnit.unit_encoding_screen.
+
+Require LnExactFma.
+Print Assumptions LnExactFma.reciprocal_dyadic_certificate.
+Print Assumptions LnExactFma.normalized_fma_identical.
+Print Assumptions LnExactFma.reduced_fma_identical.

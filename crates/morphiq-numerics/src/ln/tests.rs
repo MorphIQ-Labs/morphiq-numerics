@@ -37,7 +37,7 @@ fn every_unrounded_ln_is_within_its_certified_bound() {
     assert_eq!(cases.len(), 1200);
     for (x, reference) in cases {
         let reduced = Reduced::of(x);
-        let (s, lo, eps, _) = super::stage::parts(reduced.e, reduced.y);
+        let (s, lo, eps, _) = super::stage::parts(reduced.e, reduced.y());
         let exact = |x| Exact::of(Q128::from_f64(x));
         let error = exact(s).add(&exact(lo)).sub(&reference).abs();
         assert!(
@@ -106,7 +106,7 @@ fn ln_fast_path_agrees_with_the_accurate_path_and_mostly_decides() {
         let reduced = Reduced::of(x);
         tried += 1;
         let accurate = reduced.accurate_value(reduced.z_exact()).to_f64();
-        if let Some(y) = super::stage::parts(reduced.e, reduced.y).3 {
+        if let Some(y) = super::stage::parts(reduced.e, reduced.y()).3 {
             assert_eq!(
                 y.to_bits(),
                 accurate.to_bits(),
@@ -310,7 +310,7 @@ fn decided_by(x: f64) -> (&'static str, f64) {
         return ("screen", super::ln(x));
     }
     let reduced = Reduced::of(x);
-    if let Some(y) = super::stage::parts(reduced.e, reduced.y).3 {
+    if let Some(y) = super::stage::parts(reduced.e, reduced.y()).3 {
         return ("stage", y);
     }
     if let Some(y) = decide(reduced.fast_value()) {
