@@ -9,7 +9,7 @@ From Interval Require Import Tactic.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add RoundingConstant RoundingCore RoundingTest Encodings.
 Require Import ExpFast StageGappa ErfcxConstants ErfcxDecision ErfcxGaussianTarget ErfcxPublicModel NormalConstants
   NormalComparisons NormalErfcxSensitivity NormalErfcxFastScaled NormalTailAnalytic
-  NormalFastDispatch NormalAccurateCentralCdf NormalPublicEntry NormalPublicModel
+  NormalTailRange NormalFastDispatch NormalAccurateCentralCdf NormalPublicEntry NormalPublicModel
   FastExp FastErfcx FastLn FastNormalArgument FastNormal.
 Open Scope R_scope.
 
@@ -454,12 +454,39 @@ Proof.
   split;[lra|nra].
 Qed.
 
+(** Relative-perturbation identities, proved once in an empty context: the
+    field tactic is slow in a large one. *)
+Lemma fast_logcdf_split_rel x y : y<>0 -> x=y*(1+(x-y)/y).
+Proof. intros Y;field;exact Y. Qed.
+Lemma fast_logcdf_split_ratio x y : y<>0 -> x=y*(1+(x/y-1)).
+Proof. intros Y;field;exact Y. Qed.
+Lemma fast_logcdf_ratio_split x s e1 e2 : s<>0 -> 1+e1<>0 ->
+  x/(s*(1+e1))*(1+e2)=x/s*((1+e2)/(1+e1)).
+Proof. intros S E;field;split;assumption. Qed.
+Lemma fast_logcdf_ratio_minus x s e1 e2 : s<>0 -> 1+e1<>0 ->
+  x/s*((1+e2)/(1+e1))-x/s=x/s*((e2-e1)/(1+e1)).
+Proof. intros S E;field;split;assumption. Qed.
+Lemma fast_logcdf_div_minus_one x y : y<>0 -> x/y-1=(x-y)/y.
+Proof. intros Y;field;exact Y. Qed.
+Lemma fast_logcdf_mul_div_cancel a b c : c<>0 -> a*c*(b/c)=a*b.
+Proof. intros C;field;exact C. Qed.
+
+(** One more relative factor: the bounds add, plus their product's dust. *)
+Lemma fast_logcdf_factor_step p d a b : Rabs(p-1)<=a*bpow radix2(-53) ->
+  Rabs d<=b*bpow radix2(-53) -> 0<=a<=200 -> 0<=b<=200 ->
+  Rabs(p*(1+d)-1)<=(a+b+/100)*bpow radix2(-53).
+Proof.
+  intros P D A Bb;apply Rabs_le_inv in P,D.
+  replace(p*(1+d)-1)with((p-1)+d+(p-1)*d)by ring.
+  apply Rabs_le;bpow_num_all;split;nra.
+Qed.
+
 Definition fast_logcdf_lower_allowance a :=
-  if Rle_dec a 1 then 20 else if Rle_dec a 2 then 25 else 56.
+  if Rle_dec a 1 then 20 else if Rle_dec a 2 then 26 else 57.
 
 Theorem fast_logcdf_lower_relative a : finite a -> bpow radix2(-33)<=B a<=8 ->
   finite(fast_normal_lower64 a) /\
-  bpow radix2(-52)<=B(fast_normal_lower64 a)<=51/100 /\
+  5/4*bpow radix2(-52)<=B(fast_normal_lower64 a)<=51/100 /\
   Rabs(B(fast_normal_lower64 a)-normal_tail(B a))<=
     fast_logcdf_lower_allowance(B a)*bpow radix2(-53)*normal_tail(B a).
 Proof.
@@ -487,20 +514,20 @@ Proof.
   set(d2:=exp(B t)/exp(-q)-1).
   set(d3:=(B f-gaussian_erfcx(B z))/gaussian_erfcx(B z)).
   set(d4:=(gaussian_erfcx(B z)-gaussian_erfcx y)/gaussian_erfcx y).
-  assert (E1 : B e=exp(B t)*(1+d1))by(unfold d1;field;lra).
-  assert (E2 : exp(B t)=exp(-q)*(1+d2))by(unfold d2;field;lra).
-  assert (E3 : B f=gaussian_erfcx(B z)*(1+d3))by(unfold d3;field;lra).
-  assert (E4 : gaussian_erfcx(B z)=gaussian_erfcx y*(1+d4))by(unfold d4;field;lra).
+  assert (E1 : B e=exp(B t)*(1+d1))by(exact(fast_logcdf_split_rel(B e)(exp(B t))ltac:(lra))).
+  assert (E2 : exp(B t)=exp(-q)*(1+d2))by(exact(fast_logcdf_split_ratio(exp(B t))(exp(-q))ltac:(lra))).
+  assert (E3 : B f=gaussian_erfcx(B z)*(1+d3))by(exact(fast_logcdf_split_rel(B f)(gaussian_erfcx(B z))ltac:(lra))).
+  assert (E4 : gaussian_erfcx(B z)=gaussian_erfcx y*(1+d4))by(exact(fast_logcdf_split_rel(gaussian_erfcx(B z))(gaussian_erfcx y)ltac:(lra))).
   assert (D1 : Rabs d1<=bpow radix2(-51)).
   { unfold d1,Rdiv;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq(exp(B t)))by lra.
     apply(Rmult_le_reg_r(exp(B t)));[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;exact Eerror. }
   assert (D2 : Rabs d2<=33*bpow radix2(-53)).
   { unfold d2;replace(exp(B t)/exp(-q))with(exp(B t+q)).
     - pose proof(Rabs_le_inv _ _ Terror)as Te.
-      assert (Q : 0<=q<=32)by(unfold q;nra).
-      assert (V : -/2<=B t+q<=/2)by(bpow_num_all;nra).
+      assert (Q : 0<=q<=32)by(unfold q;clear - A;bpow_num_all;nra).
+      assert (V : -/2<=B t+q<=/2)by(clear - Te Q;bpow_num_all;nra).
       pose proof(fast_logcdf_exp_small(B t+q)V)as X.
-      apply Rabs_le;bpow_num_all;split;nra.
+      clear - X V Q Te;apply Rabs_le;bpow_num_all;split;nra.
     - rewrite exp_plus;unfold Rdiv;f_equal;rewrite <-exp_Ropp;f_equal;ring. }
   assert (D3 : Rabs d3<=bpow radix2(-51)).
   { unfold d3,Rdiv;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq(gaussian_erfcx(B z)))by lra.
@@ -523,7 +550,11 @@ Proof.
     rewrite Rabs_pos_eq by apply bpow_ge_0.
     eapply Rle_lt_trans with 1;[bpow_num_all;nra|change 1 with(bpow radix2 0);apply bpow_lt;lia].
   - rewrite Half in He;change(bpow radix2(-1))with(/2)in He.
-    assert (Product : B(fmul(erfcx_pow2(-1))e)*B f=B e*B f/2)by(rewrite He;unfold Rdiv;ring).
+    (* As in FastNormal: build the equality directly; rewriting He stalls. *)
+    assert (Product : B(fmul(erfcx_pow2(-1))e)*B f=B e*B f/2).
+    { transitivity((/2*B e)*B f).
+      - exact(f_equal(fun h:R=>h*B f)He).
+      - exact(fast_normal_half_product(B e)(B f)). }
     assert (Ppos : 0<B e*B f/2)by(pose proof(bpow_gt_0 radix2(-47));pose proof(bpow_gt_0 radix2(-9));nra).
     (* The exact product is the tail times the four perturbation factors. *)
     assert (Tail : normal_tail(B a)=exp(-q)*gaussian_erfcx y/2).
@@ -537,15 +568,17 @@ Proof.
     assert(Mbound : bnd 1 0 (B(fmul(erfcx_pow2(-1))e)*B f)).
     { rewrite Product;unfold bnd;rewrite Rmult_1_l;change(bpow radix2 0)with 1;rewrite Rabs_pos_eq;lra. }
     destruct(fmul_bnd 1 0 (fmul(erfcx_pow2(-1))e)f Fhe Ff ltac:(lia)ltac:(lia)ltac:(lia)ltac:(lia)Mbound)as[Fl' [L _]].
-    rewrite Product in L;fold(fast_normal_lower64 a)in L.
+    assert (Lv : B(fast_normal_lower64 a)=rndF(B e*B f/2))by exact(eq_trans L(f_equal rndF Product)).
+    clear L;rename Lv into L.
     assert (Normal : bpow radix2(-1022)<=Rabs(B e*B f/2)).
     { rewrite Rabs_pos_eq by lra;eapply Rle_trans with(bpow radix2(-57));[apply bpow_le;lia|].
-      pose proof(bpow_gt_0 radix2(-47));pose proof(bpow_gt_0 radix2(-9));bpow_num_all;nra. }
-    pose proof(rnd_rel _ Normal)as Round.
-    change(Rabs(rndF(B e*B f/2)-B e*B f/2)<=bpow radix2(-53)*Rabs(B e*B f/2))in Round.
-    rewrite <-L in Round.
+      pose proof(bpow_gt_0 radix2(-47))as P47;pose proof(bpow_gt_0 radix2(-9))as P9;clear - E F P47 P9;bpow_num_all;nra. }
+    pose proof(rnd_rel _ Normal)as Round0.
+    change(Rabs(rndF(B e*B f/2)-B e*B f/2)<=bpow radix2(-53)*Rabs(B e*B f/2))in Round0.
+    (* Transport along L without a rewrite search over the entry's terms. *)
+    pose proof(eq_ind_r(fun v=>Rabs(v-B e*B f/2)<=bpow radix2(-53)*Rabs(B e*B f/2))Round0 L)as Round.
     set(d5:=(B(fast_normal_lower64 a)-B e*B f/2)/(B e*B f/2)).
-    assert (E5 : B(fast_normal_lower64 a)=B e*B f/2*(1+d5))by(unfold d5;field;lra).
+    assert (E5 : B(fast_normal_lower64 a)=B e*B f/2*(1+d5))by(exact(fast_logcdf_split_rel(B(fast_normal_lower64 a))(B e*B f/2)ltac:(lra))).
     assert (D5 : Rabs d5<=bpow radix2(-53)).
     { unfold d5,Rdiv at 1;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq(B e*B f/2))by lra.
       apply(Rmult_le_reg_r(B e*B f/2));[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra.
@@ -554,21 +587,35 @@ Proof.
     assert (Id : B(fast_normal_lower64 a)=normal_tail(B a)*((1+d1)*(1+d2)*(1+d3)*(1+d4)*(1+d5))).
     { rewrite E5,Pid;unfold Rdiv;ring. }
     pose proof(Rabs_le_inv _ _ D5)as R5.
-    assert (Range : bpow radix2(-52)<=B(fast_normal_lower64 a)<=51/100).
-    {
-      (* tail(8) >= exp(-32) erfcx(8/sqrt 2)/2 >= 2^-52 (1 + 56u). *)
-      assert (Tlow : 3*bpow radix2(-52)/10*3<=normal_tail(B a)).
+    (* The five factors chained two at a time, first with the flat bounds. *)
+    assert (S1 : Rabs((1+d1)-1)<=4*bpow radix2(-53))by(replace(1+d1-1)with d1 by ring;bpow_num_all;lra).
+    assert (D3' : Rabs d3<=4*bpow radix2(-53))by(bpow_num_all;lra).
+    assert (D5' : Rabs d5<=1*bpow radix2(-53))by(bpow_num_all;lra).
+    assert (Pflat : Rabs((1+d1)*(1+d2)*(1+d3)*(1+d4)*(1+d5)-1)<=57*bpow radix2(-53)).
+    { pose proof(fast_logcdf_factor_step _ _ _ _ S1 D2 ltac:(lra)ltac:(lra))as S2.
+      pose proof(fast_logcdf_factor_step _ _ _ _ S2 D3' ltac:(lra)ltac:(lra))as S3.
+      pose proof(fast_logcdf_factor_step _ _ _ _ S3 D4flat ltac:(lra)ltac:(lra))as S4.
+      pose proof(fast_logcdf_factor_step _ _ _ _ S4 D5' ltac:(lra)ltac:(lra))as S5.
+      eapply Rle_trans;[exact S5|bpow_num_all;lra]. }
+    pose proof(Rabs_le_inv _ _ Pflat)as Pf.
+    assert (Range : 5/4*bpow radix2(-52)<=B(fast_normal_lower64 a)<=51/100).
+    { (* tail(a) >= exp(-32) erfcx(8/sqrt 2)/2 > 1.3 2^-52. *)
+      assert (Tlow : 13/10*bpow radix2(-52)<=normal_tail(B a)).
       { rewrite Tail.
-        assert (Edown : exp(-32)<=exp(-q))by(apply exp_le;unfold q;nra).
+        assert (Edown : exp(-32)<=exp(-q))by(apply exp_le;unfold q;clear - A;bpow_num_all;nra).
         assert (Fdown : inv_sqrt_pi/(2*6)<=gaussian_erfcx y).
         { destruct(Rle_dec 1 y)as[Large|Small].
           - pose proof(normal_erfcx_large_lower y Large)as Low.
-            eapply Rle_trans;[|exact Low];apply Rmult_le_compat_l;[lra|];apply Rinv_le_contravar;lra.
+            eapply Rle_trans;[|exact Low];apply Rmult_le_compat_l;[apply Rlt_le,inv_sqrt_pi_positive|];apply Rinv_le_contravar;lra.
           - pose proof(normal_erfcx_small_lower y ltac:(lra))as Low;unfold inv_sqrt_pi in *;
             eapply Rle_trans;[|exact Low];interval with(i_prec 80). }
         assert (Cval : 56/100<inv_sqrt_pi)by(unfold inv_sqrt_pi;interval with(i_prec 80)).
-        bpow_num_all;unfold Rdiv in *;interval with(i_prec 120). }
-      rewrite Id;split;bpow_num_all;nra. }
+        assert (Fdown' : 46/1000<=gaussian_erfcx y)by lra.
+        assert (Estep : 13/10*bpow radix2(-52)<=exp(-32)*(46/1000)/2)by(bpow_num_all;interval with(i_prec 80)).
+        eapply Rle_trans;[exact Estep|].
+        unfold Rdiv;apply Rmult_le_compat_r;[lra|].
+        apply Rmult_le_compat;[left;apply exp_pos|lra|exact Edown|exact Fdown']. }
+      rewrite Id;clear - Pf Tlow Tup Tpos;bpow_num_all;split;nra. }
     split;[exact Fl|];split;[exact Range|].
     rewrite Id;replace(normal_tail(B a)*((1+d1)*(1+d2)*(1+d3)*(1+d4)*(1+d5))-normal_tail(B a))
       with(normal_tail(B a)*((1+d1)*(1+d2)*(1+d3)*(1+d4)*(1+d5)-1))by ring.
@@ -579,23 +626,37 @@ Proof.
       Rabs d2<=(qmax+2*qmax*qmax*bpow radix2(-53))*bpow radix2(-53)).
     { intros qmax Qm Qr;unfold d2;replace(exp(B t)/exp(-q))with(exp(B t+q)).
       - pose proof(Rabs_le_inv _ _ Terror)as Te.
-        assert (Q : 0<=q)by(unfold q;nra).
-        assert (Tq : -(qmax*bpow radix2(-53))<=B t+q<=qmax*bpow radix2(-53))by(bpow_num_all;nra).
-        assert (V : -/2<=B t+q<=/2)by(bpow_num_all;nra).
+        assert (Q : 0<=q)by(unfold q;clear - A;bpow_num_all;nra).
+        assert (Tq : -(qmax*bpow radix2(-53))<=B t+q<=qmax*bpow radix2(-53))by(clear - Te Q Qm Qr;bpow_num_all;nra).
+        assert (V : -/2<=B t+q<=/2)by(clear - Tq Qr;bpow_num_all;nra).
         pose proof(fast_logcdf_exp_small(B t+q)V)as X.
-        apply Rabs_le;bpow_num_all;split;nra.
+        clear - X Tq Qr;apply Rabs_le;bpow_num_all;split;nra.
       - rewrite exp_plus;unfold Rdiv;f_equal;rewrite <-exp_Ropp;f_equal;ring. }
     unfold fast_logcdf_lower_allowance.
+    (* Chain the five factors two at a time with the region's bounds. *)
     destruct(Rle_dec(B a)1)as[Small|NotSmall].
-    + assert (Ysmall : y<=1).
+    + assert (Ysmall : y<=70711/100000).
       { unfold y;apply Rmult_le_reg_r with(sqrt 2);[interval|];unfold Rdiv;rewrite Rmult_assoc,Rinv_l,Rmult_1_r by interval;interval with(i_prec 80). }
-      specialize(D4scaled Ysmall);pose proof(Rabs_le_inv _ _ D4scaled)as R4s.
-      pose proof(D2of(/2)ltac:(unfold q;nra)ltac:(lra))as D2s;pose proof(Rabs_le_inv _ _ D2s)as R2s.
-      apply Rabs_le;bpow_num_all;split;interval with(i_prec 120).
+      assert (D4' : Rabs d4<=99/10*bpow radix2(-53)).
+      { eapply Rle_trans;[apply D4scaled;lra|];clear - Ysmall Ypos;bpow_num_all;nra. }
+      pose proof(D2of(/2)ltac:(unfold q;clear - Small A;bpow_num_all;nra)ltac:(lra))as D2s.
+      pose proof(fast_logcdf_factor_step _ _ _ _ S1 D2s ltac:(lra)ltac:(bpow_num_all;lra))as S2.
+      pose proof(fast_logcdf_factor_step _ _ _ _ S2 D3' ltac:(bpow_num_all;lra)ltac:(lra))as S3.
+      pose proof(fast_logcdf_factor_step _ _ _ _ S3 D4' ltac:(bpow_num_all;lra)ltac:(lra))as S4.
+      pose proof(fast_logcdf_factor_step _ _ _ _ S4 D5' ltac:(bpow_num_all;lra)ltac:(lra))as S5.
+      eapply Rle_trans;[exact S5|bpow_num_all;lra].
     + destruct(Rle_dec(B a)2)as[Middle|Large].
-      * pose proof(D2of 2 ltac:(unfold q;nra)ltac:(lra))as D2m;pose proof(Rabs_le_inv _ _ D2m)as R2m.
-        apply Rabs_le;bpow_num_all;split;interval with(i_prec 120).
-      * apply Rabs_le;bpow_num_all;split;interval with(i_prec 120).
+      * pose proof(D2of 2 ltac:(unfold q;clear - Middle A;bpow_num_all;nra)ltac:(lra))as D2m.
+        pose proof(fast_logcdf_factor_step _ _ _ _ S1 D2m ltac:(lra)ltac:(bpow_num_all;lra))as S2.
+        pose proof(fast_logcdf_factor_step _ _ _ _ S2 D3' ltac:(bpow_num_all;lra)ltac:(lra))as S3.
+        pose proof(fast_logcdf_factor_step _ _ _ _ S3 D4flat ltac:(bpow_num_all;lra)ltac:(lra))as S4.
+        pose proof(fast_logcdf_factor_step _ _ _ _ S4 D5' ltac:(bpow_num_all;lra)ltac:(lra))as S5.
+        eapply Rle_trans;[exact S5|bpow_num_all;lra].
+      * pose proof(fast_logcdf_factor_step _ _ _ _ S1 D2 ltac:(lra)ltac:(lra))as S2.
+        pose proof(fast_logcdf_factor_step _ _ _ _ S2 D3' ltac:(lra)ltac:(lra))as S3.
+        pose proof(fast_logcdf_factor_step _ _ _ _ S3 D4flat ltac:(lra)ltac:(lra))as S4.
+        pose proof(fast_logcdf_factor_step _ _ _ _ S4 D5' ltac:(lra)ltac:(lra))as S5.
+        eapply Rle_trans;[exact S5|bpow_num_all;lra].
 Qed.
 
 Lemma fast_logcdf_cdf_complement a : normal_cdf a=1-normal_tail a.
@@ -649,6 +710,210 @@ Proof.
   apply Rabs_le_inv in D;apply Rabs_le;bpow_num_all;split;interval with(i_prec 120).
 Qed.
 
+(** The quantities of the positive branch as reals: [Q] the rounded lower
+    tail, [Wv = RN(1 - Q)], [Dv = RN(1 - Wv)], [Gv] the bounded logarithm of
+    [Wv], [Rv = RN(Q / Dv)] and [Y = RN(Gv Rv)]. These lemmas carry the
+    arithmetic in a small context; the theorem below supplies the IEEE facts. *)
+
+Lemma fast_logcdf_ratio_range Q Wv Dv :
+  5/4*bpow radix2(-52)<=Q<=51/100 ->
+  Rabs(Wv-(1-Q))<=bpow radix2(-54) ->
+  Rabs(Dv-(1-Wv))<=bpow radix2(-53)*(1-Wv) ->
+  0<Dv /\ 4/5<=Q/Dv<=4/3.
+Proof.
+  intros HQ HW HD.
+  pose proof(Rabs_le_inv _ _ HW)as We;pose proof(Rabs_le_inv _ _ HD)as De;pose proof(bpow_gt_0 radix2(-52))as P52.
+  destruct HQ as[Qlo Qhi].
+  assert (Dlow : (1-bpow radix2(-53))*(Q-bpow radix2(-54))<=Dv)by(bpow_num_all;nra).
+  assert (Dup : Dv<=(1+bpow radix2(-53))*(Q+bpow radix2(-54)))by(bpow_num_all;nra).
+  assert (Dpos : 0<Dv)by(bpow_num_all;nra).
+  split;[exact Dpos|].
+  split.
+  - apply(Rmult_le_reg_r Dv);[lra|];unfold Rdiv;rewrite(Rmult_assoc Q),(Rinv_l Dv),Rmult_1_r by lra;bpow_num_all;nra.
+  - apply(Rmult_le_reg_r Dv);[lra|];unfold Rdiv;rewrite(Rmult_assoc Q),(Rinv_l Dv),Rmult_1_r by lra;bpow_num_all;nra.
+Qed.
+
+Lemma fast_logcdf_log_range Wv : /4<=Wv<=1-bpow radix2(-52) ->
+  -7/5<=ln Wv<= -bpow radix2(-52) /\ Rabs(ln Wv)=-ln Wv.
+Proof.
+  intros HWr.
+  assert (LnW : -7/5<=ln Wv<= -bpow radix2(-52)).
+  { split.
+    - apply Rle_trans with(ln(/4));[interval with(i_prec 80)|apply ln_le;lra].
+    - apply Rle_trans with(ln(1-bpow radix2(-52)));[apply ln_le;lra|bpow_num_all;interval with(i_prec 120)]. }
+  split;[exact LnW|apply Rabs_left1;pose proof(bpow_gt_0 radix2(-52));lra].
+Qed.
+
+Lemma fast_logcdf_product_range Q Wv Dv Gv Rv :
+  5/4*bpow radix2(-52)<=Q<=51/100 ->
+  Rabs(Wv-(1-Q))<=bpow radix2(-54) ->
+  /4<=Wv<=1-bpow radix2(-52) ->
+  Rabs(Dv-(1-Wv))<=bpow radix2(-53)*(1-Wv) ->
+  Rabs(Gv-ln Wv)<=bpow radix2(-53)*Rabs(ln Wv)+bpow radix2(-65) ->
+  Rabs(Rv-Q/Dv)<=bpow radix2(-53)*(Q/Dv) ->
+  Gv<0 /\ 3/4<=Rv<=134/100 /\ Gv*Rv<0 /\ -2<=Gv*Rv<=2 /\ bpow radix2(-1022)<=Rabs(Gv*Rv).
+Proof.
+  intros HQ HW HWr HD HG HR.
+  destruct(fast_logcdf_ratio_range Q Wv Dv HQ HW HD)as[Dpos Ratio].
+  destruct(fast_logcdf_log_range Wv HWr)as[LnW LabsEq].
+  pose proof(Rabs_le_inv _ _ HG)as Ge;pose proof(Rabs_le_inv _ _ HR)as Re.
+  rewrite LabsEq in Ge.
+  assert (Gneg : Gv<0)by(bpow_num_all;lra).
+  assert (Gabs : -141/100<=Gv<=141/100)by(bpow_num_all;lra).
+  assert (Gmag : bpow radix2(-53)<=-Gv)by(bpow_num_all;lra).
+  assert (Rr : 3/4<=Rv<=134/100)by(bpow_num_all;lra).
+  assert (Pneg : Gv*Rv<0)by nra.
+  assert (P1 : -2<=Gv*Rv)by nra.
+  assert (P2 : Gv*Rv<=2)by nra.
+  assert (P3 : bpow radix2(-1022)<=Rabs(Gv*Rv))by(rewrite Rabs_left by exact Pneg;bpow_num_all;nra).
+  destruct Rr as[Rr1 Rr2].
+  repeat split;assumption.
+Qed.
+
+(** The whole positive branch over the reals: the complement's logarithm,
+    Kahan's corrected ratio, the two roundings, and the final budget. *)
+Lemma fast_logcdf_positive_real Q Wv Dv Gv Rv Y L :
+  5/4*bpow radix2(-52)<=Q<=51/100 ->
+  Rabs(Wv-(1-Q))<=bpow radix2(-54) ->
+  /4<=Wv<=1-bpow radix2(-52) ->
+  Rabs(Dv-(1-Wv))<=bpow radix2(-53)*(1-Wv) ->
+  Rabs(Gv-ln Wv)<=bpow radix2(-53)*Rabs(ln Wv)+bpow radix2(-65) ->
+  Rabs(Rv-Q/Dv)<=bpow radix2(-53)*(Q/Dv) ->
+  Rabs(Y-Gv*Rv)<=bpow radix2(-53)*Rabs(Gv*Rv) ->
+  Rabs(ln(1-Q)-L)<=21*bpow radix2(-53) ->
+  Y<0 /\ Rabs(Y-L)<=fast_logcdf_budget L.
+Proof.
+  intros HQ HW HWr HD HG HR HY HL.
+  destruct(fast_logcdf_ratio_range Q Wv Dv HQ HW HD)as[Dpos Ratio].
+  destruct(fast_logcdf_log_range Wv HWr)as[LnW LabsEq].
+  destruct(fast_logcdf_product_range Q Wv Dv Gv Rv HQ HW HWr HD HG HR)as[Gneg [RvRange [Pneg [Pbox Pnormal]]]].
+  pose proof(Rabs_le_inv _ _ HY)as Yr0.
+  rewrite(Rabs_left(Gv*Rv))in Yr0 by exact Pneg.
+  assert (Yneg : Y<0)by(bpow_num_all;lra).
+  split;[exact Yneg|].
+  destruct HQ as[Qlo Qhi].
+  set(Lh:=ln(1-Q))in *.
+  set(delta:=Wv-(1-Q))in *.
+  pose proof(Rabs_le_inv _ _ HW)as Dl.
+  pose proof(bpow_gt_0 radix2(-52))as P52.
+  assert (Qpos : 0<Q)by lra.
+  assert (Qup : Q<=51/100)by lra.
+  (* sigma = 1 - w = Q - delta, within a quarter of Q. *)
+  set(sigma:=1-Wv)in *.
+  assert (SigmaId : sigma=Q-delta)by(unfold sigma,delta;ring).
+  assert (SigmaRange : 3/4*Q<=sigma<=5/4*Q)by(bpow_num_all;lra).
+  assert (SigmaPos : 0<sigma)by lra.
+  assert (Ratio' : 4/5<=Q/sigma<=4/3).
+  { split;apply(Rmult_le_reg_r sigma);try lra;unfold Rdiv;rewrite(Rmult_assoc Q),(Rinv_l sigma),Rmult_1_r by lra;lra. }
+  (* The logarithm of w splits as Lh + ln(1 + eps). *)
+  set(eps:=delta/(1-Q)).
+  assert (Epsid : Wv=(1-Q)*(1+eps))by(exact(fast_logcdf_split_rel Wv(1-Q)ltac:(lra))).
+  assert (Eps : Rabs eps<=bpow radix2(-54)*(100/49)).
+  { unfold eps,Rdiv;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq(1-Q))by lra.
+    apply(Rmult_le_reg_r(1-Q));[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;bpow_num_all;nra. }
+  pose proof(Rabs_le_inv _ _ Eps)as El.
+  assert (LnWsplit : ln Wv=Lh+ln(1+eps)).
+  { rewrite Epsid,ln_mult;[reflexivity|lra|bpow_num_all;lra]. }
+  assert (LnEps : Rabs(ln(1+eps))<=21/10*bpow radix2(-54)).
+  { apply Rabs_le;bpow_num_all;split;interval with(i_prec 120). }
+  pose proof(Rabs_le_inv _ _ LnEps)as LnEl.
+  (* |Lh| <= 1.41 Q and |Lh| <= 3/4. *)
+  assert (Lhneg : Lh<0)by(unfold Lh;rewrite <-ln_1;apply ln_increasing;lra).
+  assert (LhRel : -Lh<=141/100*Q).
+  { unfold Lh;assert (Qr : bpow radix2(-52)<=Q<=51/100)by(bpow_num_all;lra).
+    clear - Qr;bpow_num_all.
+    destruct(Rle_dec Q(/4))as[Small|Large].
+    - (* ln z <= z - 1 at z = 1/(1-Q): -ln(1-Q) <= Q/(1-Q) <= 4/3 Q. *)
+      assert (Z : 0<1-Q)by lra.
+      pose proof(exp_ineq1_le(/(1-Q)-1))as E.
+      assert (Lx : ln(/(1-Q))<=/(1-Q)-1).
+      { rewrite <-(ln_exp(/(1-Q)-1));apply ln_le;[apply Rinv_0_lt_compat;lra|lra]. }
+      rewrite ln_Rinv in Lx by lra.
+      assert (R : /(1-Q)-1=Q/(1-Q))by(field;lra).
+      assert (R2 : Q/(1-Q)<=4/3*Q).
+      { apply Rmult_le_reg_r with(1-Q);[lra|];unfold Rdiv;rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;nra. }
+      lra.
+    - assert (Q4 : /4<=Q<=51/100)by lra.
+      assert (H0 : -ln(1-Q)-141/100*Q<=0)by(clear - Q4;interval with(i_bisect Q,i_prec 60)).
+      lra. }
+  assert (LhAbs : -Lh<=3/4).
+  { unfold Lh;eapply Rle_trans with(-ln(1-51/100));[apply Ropp_le_contravar,ln_le;lra|interval with(i_prec 80)]. }
+  (* Kahan's identity: ln(w) Q/sigma - Lh = Lh (Q/sigma - 1) + ln(1+eps) Q/sigma. *)
+  assert (RatioMinus : Rabs(Q/sigma-1)<=4/3*bpow radix2(-54)/Q).
+  { rewrite(fast_logcdf_div_minus_one Q sigma)by lra.
+    replace(Q-sigma)with delta by(rewrite SigmaId;ring).
+    unfold Rdiv;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq sigma)by lra.
+    apply(Rmult_le_reg_r sigma);[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra.
+    apply Rle_trans with(bpow radix2(-54));[exact HW|].
+    apply(Rmult_le_reg_r Q);[lra|].
+    replace(4*/3*bpow radix2(-54)*/Q*sigma*Q)with(4*/3*bpow radix2(-54)*sigma*(Q*/Q))by ring.
+    rewrite Rinv_r by lra;rewrite Rmult_1_r;bpow_num_all;lra. }
+  assert (Kahan : Rabs(ln Wv*(Q/sigma)-Lh)<=5/2*bpow radix2(-53)).
+  { rewrite LnWsplit;replace((Lh+ln(1+eps))*(Q/sigma)-Lh)with(Lh*(Q/sigma-1)+ln(1+eps)*(Q/sigma))by(unfold Rdiv;ring).
+    eapply Rle_trans;[apply Rabs_triang|].
+    rewrite !Rabs_mult,(Rabs_pos_eq(Q/sigma))by lra.
+    pose proof(Rabs_le_inv _ _ RatioMinus)as Rm.
+    assert (First : Rabs Lh*Rabs(Q/sigma-1)<=141/100*Q*(4/3*bpow radix2(-54)/Q)).
+    { apply Rmult_le_compat;try apply Rabs_pos;[rewrite Rabs_left by lra;lra|exact RatioMinus]. }
+    rewrite(fast_logcdf_mul_div_cancel(141/100)(4/3*bpow radix2(-54))Q)in First by lra.
+    assert (Second : Rabs(ln(1+eps))*(Q/sigma)<=21/10*bpow radix2(-54)*(4/3)).
+    { apply Rmult_le_compat;try apply Rabs_pos;try lra;exact LnEps. }
+    bpow_num_all;lra. }
+  (* The computed ratio against Q/sigma: two relative roundings. *)
+  assert (Dv_id : Dv=sigma*(1+(Dv-sigma)/sigma))by(exact(fast_logcdf_split_rel Dv sigma ltac:(lra))).
+  set(e1:=(Dv-sigma)/sigma).
+  assert (E1 : Rabs e1<=bpow radix2(-53)).
+  { unfold e1,Rdiv;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq sigma)by lra.
+    apply(Rmult_le_reg_r sigma);[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;exact HD. }
+  pose proof(Rabs_le_inv _ _ E1)as E1l.
+  set(e2:=(Rv-Q/Dv)/(Q/Dv)).
+  assert (QD : 0<Q/Dv)by(apply Rdiv_lt_0_compat;lra).
+  assert (Rv_id : Rv=Q/Dv*(1+e2))by(exact(fast_logcdf_split_rel Rv(Q/Dv)ltac:(lra))).
+  assert (E2 : Rabs e2<=bpow radix2(-53)).
+  { unfold e2,Rdiv at 1;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq(Q/Dv))by lra.
+    apply(Rmult_le_reg_r(Q/Dv));[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;exact HR. }
+  pose proof(Rabs_le_inv _ _ E2)as E2l.
+  assert (Rv_sigma : Rv=Q/sigma*((1+e2)/(1+e1))).
+  { rewrite Rv_id,Dv_id;fold e1;apply fast_logcdf_ratio_split;[lra|bpow_num_all;lra]. }
+  assert (RvErr : Rabs(Rv-Q/sigma)<=4/3*(201/100*bpow radix2(-53))).
+  { rewrite Rv_sigma,fast_logcdf_ratio_minus by(bpow_num_all;lra).
+    rewrite Rabs_mult,(Rabs_pos_eq(Q/sigma))by lra.
+    apply Rmult_le_compat;try apply Rabs_pos;try lra.
+    apply Rabs_le;bpow_num_all;split;interval with(i_prec 80). }
+  pose proof(Rabs_le_inv _ _ RvErr)as RvE.
+  (* |ln w| against |Lh|. *)
+  assert (LnWabs : Rabs(ln Wv)<= -Lh+21/10*bpow radix2(-54)).
+  { rewrite LnWsplit;eapply Rle_trans;[apply Rabs_triang|];rewrite(Rabs_left Lh)by lra;lra. }
+  pose proof(Rabs_pos(ln Wv))as LnWpos.
+  (* Assemble: Y - L = (Y - Gv Rv) + (Gv Rv - ln w Q/sigma) + (ln w Q/sigma - Lh) + (Lh - L). *)
+  assert (Prod : Rabs(Gv*Rv-ln Wv*(Q/sigma))<=(bpow radix2(-53)*Rabs(ln Wv)+bpow radix2(-65))*(27/20)+Rabs(ln Wv)*(4/3*(201/100*bpow radix2(-53)))).
+  { replace(Gv*Rv-ln Wv*(Q/sigma))with((Gv-ln Wv)*Rv+ln Wv*(Rv-Q/sigma))by(unfold Rdiv;ring).
+    eapply Rle_trans;[apply Rabs_triang|].
+    rewrite !Rabs_mult,(Rabs_pos_eq Rv)by lra.
+    assert (A1 : Rabs(Gv-ln Wv)*Rv<=(bpow radix2(-53)*Rabs(ln Wv)+bpow radix2(-65))*(27/20)).
+    { apply Rmult_le_compat;try apply Rabs_pos;try lra;exact HG. }
+    assert (A2 : Rabs(ln Wv)*Rabs(Rv-Q/sigma)<=Rabs(ln Wv)*(4/3*(201/100*bpow radix2(-53)))).
+    { apply Rmult_le_compat_l;[apply Rabs_pos|exact RvErr]. }
+    lra. }
+  pose proof(Rabs_le_inv _ _ Prod)as Pr.
+  assert (GvRv : Rabs(Gv*Rv)<=(Rabs(ln Wv)*(1+bpow radix2(-53))+bpow radix2(-65))*(27/20)).
+  { rewrite Rabs_mult,(Rabs_pos_eq Rv)by lra;apply Rmult_le_compat;try apply Rabs_pos;try lra.
+    pose proof(Rabs_le_inv _ _ HG)as Ge2;pose proof(Rle_abs(ln Wv))as La2;
+    pose proof(Rabs_le_inv(ln Wv)(Rabs(ln Wv))(Rle_refl _))as Lb;apply Rabs_le;split;lra. }
+  pose proof(Rabs_le_inv _ _ HY)as Yr.
+  assert (Labs : Rabs L>= -Lh-21*bpow radix2(-53)).
+  { pose proof(Rabs_le_inv _ _ HL)as C2;pose proof(Rle_abs(-L))as C3;rewrite Rabs_Ropp in C3;lra. }
+  assert (Lsmall : Rabs L<=1).
+  { pose proof(Rabs_le_inv _ _ HL)as C2;apply Rabs_le;bpow_num_all;lra. }
+  pose proof(Rabs_le_inv _ _ Kahan)as Kl.
+  pose proof(Rabs_le_inv _ _ HL)as Lql.
+  unfold fast_logcdf_budget.
+  clear - Yr Pr Kl Lql LnWabs GvRv Labs Lsmall LnWpos.
+  apply Rabs_le;bpow_num_all;split;lra.
+Qed.
+
+(** The IEEE sequence: each rounding is one correctly rounded operation whose
+    value and error the real lemmas consume. *)
 Theorem fast_logcdf_positive_ok a : finite a -> bpow radix2(-33)<=B a<=8 ->
   finite(fast_logcdf_positive64 a) /\
   B(fast_logcdf_positive64 a)<0 /\
@@ -656,31 +921,28 @@ Theorem fast_logcdf_positive_ok a : finite a -> bpow radix2(-33)<=B a<=8 ->
 Proof.
   intros Fa A.
   assert (Apos : 0<B a)by(pose proof(bpow_gt_0 radix2(-33));lra).
-  destruct(fast_logcdf_lower_relative a Fa A)as[Fq [[Qlo Qhi] Qrel]].
+  destruct(fast_logcdf_lower_relative a Fa A)as[Fq [Qrange Qrel]].
   set(qh:=fast_normal_lower64 a)in *.
-  destruct(normal_tail_range(B a)Apos)as[Tpos Tup].
-  set(q:=normal_tail(B a))in *.
   destruct(erfcx_pow2_ok 0 ltac:(lia))as[Fone One];change(bpow radix2 0)with 1 in One.
+  pose proof(bpow_gt_0 radix2(-52))as P52.
   (* w = RN(1 - qh): within 2^-54 of 1 - qh, in [1/4, 1 - 2^-52]. *)
   assert (Wbound : bnd 1 0 (B(erfcx_pow2 0)-B qh)).
-  { rewrite One;unfold bnd;rewrite Rmult_1_l;change(bpow radix2 0)with 1;apply Rabs_le;
-    pose proof(bpow_gt_0 radix2(-52));lra. }
+  { rewrite One;unfold bnd;rewrite Rmult_1_l;change(bpow radix2 0)with 1;apply Rabs_le;bpow_num_all;lra. }
   destruct(fsub_bnd 1 0 (erfcx_pow2 0)qh Fone Fq ltac:(lia)ltac:(lia)ltac:(lia)ltac:(lia)Wbound)as[Fw [W _]].
   rewrite One in W;set(w:=fsub(erfcx_pow2 0)qh)in *.
   assert (Werror : Rabs(B w-(1-B qh))<=bpow radix2(-54)).
-  { rewrite W;apply(rnd_err_below _ 0);[lia|];rewrite Rabs_pos_eq by(pose proof(bpow_gt_0 radix2(-52));lra);
-    change(bpow radix2 0)with 1;lra. }
+  { rewrite W;apply(rnd_err_below _ 0);[lia|];rewrite Rabs_pos_eq by(bpow_num_all;lra);
+    change(bpow radix2 0)with 1;bpow_num_all;lra. }
   assert (Wup : B w<=1-bpow radix2(-52)).
-  { rewrite W;replace(1-bpow radix2(-52))with(IZR(2^52-1)*bpow radix2(-52))by(bpow_num_all;lra).
+  { rewrite W;replace(1-bpow radix2(-52))with(IZR 4503599627370495*bpow radix2(-52))by(bpow_num_all;lra).
     apply round_le_generic;[exact _|exact _|apply bnd_fmt;lia|bpow_num_all;lra]. }
   assert (Wlow : /4<=B w).
   { rewrite W;change(/4)with(bpow radix2(-2));apply round_ge_generic;[exact _|exact _| |bpow_num_all;lra].
     apply generic_format_bpow;unfold FLT_exp,emin,prec;lia. }
-  assert (Wpos : 0<B w)by lra.
-  assert (Wone : B w<>1)by(pose proof(bpow_gt_0 radix2(-52));lra).
-  (* d = RN(1 - w): relative rounding, positive. *)
+  assert (Wrange : /4<=B w<=1-bpow radix2(-52))by lra.
+  (* d = RN(1 - w): one relative rounding. *)
   assert (Dexact : bpow radix2(-52)-bpow radix2(-54)<=1-B w<=3/4).
-  { pose proof(Rabs_le_inv _ _ Werror);pose proof(bpow_gt_0 radix2(-52));bpow_num_all;lra. }
+  { pose proof(Rabs_le_inv _ _ Werror);bpow_num_all;lra. }
   assert (Dbound : bnd 1 0 (B(erfcx_pow2 0)-B w)).
   { rewrite One;unfold bnd;rewrite Rmult_1_l;change(bpow radix2 0)with 1;apply Rabs_le;bpow_num_all;lra. }
   destruct(fsub_bnd 1 0 (erfcx_pow2 0)w Fone Fw ltac:(lia)ltac:(lia)ltac:(lia)ltac:(lia)Dbound)as[Fd [D _]].
@@ -690,25 +952,13 @@ Proof.
   pose proof(rnd_rel _ Dnormal)as Derror.
   change(Rabs(rndF(1-B w)-(1-B w))<=bpow radix2(-53)*Rabs(1-B w))in Derror.
   rewrite <-D in Derror.
-  rewrite Rabs_pos_eq in Derror by(bpow_num_all;lra).
-  pose proof(Rabs_le_inv _ _ Derror)as De.
-  assert (Dpos : 0<B d)by(bpow_num_all;lra).
-  (* The logarithm of w. *)
+  rewrite(Rabs_pos_eq(1-B w))in Derror by(bpow_num_all;lra).
+  destruct(fast_logcdf_ratio_range(B qh)(B w)(B d)Qrange Werror Derror)as[Dpos Ratio].
+  (* g = ln_fast(w). *)
+  assert (Wpos : 0<B w)by lra.
   destruct(fast_logcdf_ln_ok w Fw Wpos)as[Fg Gerror].
   set(g:=fast_ln_regular64 w)in *.
-  assert (LnW : -3/2<=ln(B w)<= -bpow radix2(-52)).
-  { split.
-    - eapply Rle_trans;[|apply ln_le;[lra|exact Wlow]];interval with(i_prec 80).
-    - eapply Rle_trans;[apply ln_le;[lra|exact Wup]|];bpow_num_all;interval with(i_prec 120). }
-  assert (Gneg : B g<0)by(pose proof(Rabs_le_inv _ _ Gerror)as E;pose proof(Rabs_le_inv (ln(B w))(3/2)ltac:(apply Rabs_le;lra));bpow_num_all;nra).
   (* r = RN(qh / d). *)
-  assert (Ratio : 7/8<=B qh/B d<=4/3).
-  { pose proof(Rabs_le_inv _ _ Werror)as We;pose proof(bpow_gt_0 radix2(-52)).
-    assert (Dlow : (1-bpow radix2(-53))*(B qh-bpow radix2(-54))<=B d)by(bpow_num_all;nra).
-    assert (Dup : B d<=(1+bpow radix2(-53))*(B qh+bpow radix2(-54)))by(bpow_num_all;nra).
-    split.
-    - apply(Rmult_le_reg_r(B d));[lra|];unfold Rdiv;rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;bpow_num_all;nra.
-    - apply(Rmult_le_reg_r(B d));[lra|];unfold Rdiv;rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;bpow_num_all;nra. }
   assert (Rbound : bnd 1 1 (B qh/B d)).
   { unfold bnd;rewrite Rmult_1_l;change(bpow radix2 1)with 2;apply Rabs_le;lra. }
   destruct(fdiv_bnd 1 1 qh d Fq ltac:(lra)ltac:(lia)ltac:(lia)ltac:(lia)ltac:(lia)Rbound)as[Fr [R _]].
@@ -717,141 +967,23 @@ Proof.
   pose proof(rnd_rel _ Rnormal)as Rerror.
   change(Rabs(rndF(B qh/B d)-B qh/B d)<=bpow radix2(-53)*Rabs(B qh/B d))in Rerror.
   rewrite <-R in Rerror.
-  rewrite Rabs_pos_eq in Rerror by lra.
-  pose proof(Rabs_le_inv _ _ Rerror)as Re.
-  assert (Rpos : 0<B r)by(bpow_num_all;nra).
-  (* The product. *)
+  rewrite(Rabs_pos_eq(B qh/B d))in Rerror by lra.
+  (* The product: its range from the real lemma, then one rounding. *)
+  destruct(fast_logcdf_product_range(B qh)(B w)(B d)(B g)(B r)Qrange Werror Wrange Derror Gerror Rerror)
+    as[Gneg [Rr [Pneg [Pbox Pnormal]]]].
   assert (Pbound : bnd 1 1 (B g*B r)).
-  { unfold bnd;rewrite Rmult_1_l;change(bpow radix2 1)with 2;apply Rabs_le.
-    pose proof(Rabs_le_inv _ _ Gerror)as Ge;pose proof(Rabs_le_inv (ln(B w))(3/2)ltac:(apply Rabs_le;lra));bpow_num_all;nra. }
+  { unfold bnd;rewrite Rmult_1_l;change(bpow radix2 1)with 2;apply Rabs_le;exact Pbox. }
   destruct(fmul_bnd 1 1 g r Fg Fr ltac:(lia)ltac:(lia)ltac:(lia)ltac:(lia)Pbound)as[Fp [P _]].
-  fold(fast_logcdf_positive64 a)in Fp,P.
-  assert (Pneg : B g*B r<0)by nra.
-  assert (Pnormal : bpow radix2(-1022)<=Rabs(B g*B r)).
-  { rewrite Rabs_left by lra.
-    pose proof(Rabs_le_inv _ _ Gerror)as Ge;pose proof(bpow_gt_0 radix2(-52)).
-    assert (Gmag : bpow radix2(-53)<=-B g).
-    { apply Rabs_le_inv in Gerror. bpow_num_all;nra. }
-    bpow_num_all;nra. }
+  unfold fast_logcdf_positive64;fold qh;fold w;fold d;fold g;fold r.
   pose proof(rnd_rel _ Pnormal)as Perror.
   change(Rabs(rndF(B g*B r)-B g*B r)<=bpow radix2(-53)*Rabs(B g*B r))in Perror.
   rewrite <-P in Perror.
-  rewrite Rabs_left in Perror by lra.
-  pose proof(Rabs_le_inv _ _ Perror)as Pe.
-  (* The result is negative. *)
-  assert (Result_neg : B(fast_logcdf_positive64 a)<0)by(bpow_num_all;nra).
-  split;[exact Fp|];split;[exact Result_neg|].
-  (* The target: ln Φ(a) = ln(1 - tail a). *)
+  (* The target and the complement's perturbation. *)
   rewrite fast_logcdf_cdf_complement.
   pose proof(fast_logcdf_complement_log(B a)(B qh)A Qrel)as Complement.
-  set(L:=ln(1-q))in *;set(Lh:=ln(1-B qh))in *.
-  pose proof(Rabs_le_inv _ _ Complement)as Lql.
-  (* Names for the real quantities. *)
-  set(Q:=B qh)in *;set(Wv:=B w)in *;set(Dv:=B d)in *;set(Gv:=B g)in *;set(Rv:=B r)in *.
-  set(delta:=Wv-(1-Q))in *.
-  assert (Delta : Rabs delta<=bpow radix2(-54))by exact Werror.
-  pose proof(Rabs_le_inv _ _ Delta)as Dl.
-  assert (Qpos : 0<Q)by(pose proof(bpow_gt_0 radix2(-52));lra).
-  assert (Qup : Q<=51/100)by lra.
-  (* sigma = 1 - w = Q - delta, within a quarter of Q. *)
-  set(sigma:=1-Wv)in *.
-  assert (SigmaId : sigma=Q-delta)by(unfold sigma,delta;ring).
-  assert (SigmaRange : 3/4*Q<=sigma<=5/4*Q)by(pose proof(bpow_gt_0 radix2(-52));bpow_num_all;lra).
-  assert (SigmaPos : 0<sigma)by lra.
-  assert (Ratio' : 4/5<=Q/sigma<=4/3).
-  { split;apply(Rmult_le_reg_r sigma);try lra;unfold Rdiv;rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;lra. }
-  (* The logarithm of w splits as Lh + ln(1 + eps). *)
-  set(eps:=delta/(1-Q)).
-  assert (Epsid : Wv=(1-Q)*(1+eps))by(unfold eps,delta;field;lra).
-  assert (Eps : Rabs eps<=bpow radix2(-54)*(100/49)).
-  { unfold eps,Rdiv;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq(1-Q))by lra.
-    apply(Rmult_le_reg_r(1-Q));[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;nra. }
-  pose proof(Rabs_le_inv _ _ Eps)as El.
-  assert (LnWsplit : ln Wv=Lh+ln(1+eps)).
-  { rewrite Epsid,ln_mult;[reflexivity|lra|bpow_num_all;lra]. }
-  assert (LnEps : Rabs(ln(1+eps))<=21/10*bpow radix2(-54)).
-  { apply Rabs_le;bpow_num_all;split;interval with(i_prec 120). }
-  pose proof(Rabs_le_inv _ _ LnEps)as LnEl.
-  (* |Lh| <= 1.4 Q and |Lh| <= 3/4. *)
-  assert (Lhneg : Lh<0)by(unfold Lh;rewrite <-ln_1;apply ln_increasing;lra).
-  assert (LhRel : -Lh<=7/5*Q).
-  { unfold Lh;assert (Qr : bpow radix2(-52)<=Q<=51/100)by lra;bpow_num_all;interval with(i_prec 120). }
-  assert (LhAbs : -Lh<=3/4).
-  { unfold Lh;eapply Rle_trans with(-ln(1-51/100));[apply Ropp_le_contravar,ln_le;lra|interval with(i_prec 80)]. }
-  (* Kahan's identity: ln(w) Q/sigma - Lh = Lh (Q/sigma - 1) + ln(1+eps) Q/sigma. *)
-  assert (RatioMinus : Rabs(Q/sigma-1)<=4/3*bpow radix2(-54)/Q).
-  { replace(Q/sigma-1)with(delta/sigma)by(rewrite SigmaId;field;lra).
-    unfold Rdiv;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq sigma)by lra.
-    apply(Rmult_le_reg_r sigma);[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra.
-    apply Rle_trans with(bpow radix2(-54));[exact Delta|].
-    apply(Rmult_le_reg_r Q);[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;lra. }
-  assert (Kahan : Rabs(ln Wv*(Q/sigma)-Lh)<=5/2*bpow radix2(-53)).
-  { rewrite LnWsplit;replace((Lh+ln(1+eps))*(Q/sigma)-Lh)with(Lh*(Q/sigma-1)+ln(1+eps)*(Q/sigma))by(unfold Rdiv;ring).
-    eapply Rle_trans;[apply Rabs_triang|].
-    rewrite !Rabs_mult,(Rabs_pos_eq(Q/sigma))by lra.
-    pose proof(Rabs_le_inv _ _ RatioMinus)as Rm.
-    assert (First : Rabs Lh*Rabs(Q/sigma-1)<=7/5*Q*(4/3*bpow radix2(-54)/Q)).
-    { apply Rmult_le_compat;try apply Rabs_pos;[rewrite Rabs_left by lra;lra|exact RatioMinus]. }
-    replace(7/5*Q*(4/3*bpow radix2(-54)/Q))with(7/5*(4/3)*bpow radix2(-54))in First by(field;lra).
-    assert (Second : Rabs(ln(1+eps))*(Q/sigma)<=21/10*bpow radix2(-54)*(4/3)).
-    { apply Rmult_le_compat;try apply Rabs_pos;try lra;exact LnEps. }
-    bpow_num_all;lra. }
-  (* The computed ratio against Q/sigma: two relative roundings. *)
-  assert (Dv_id : Dv=sigma*(1+(Dv-sigma)/sigma))by(field;lra).
-  set(e1:=(Dv-sigma)/sigma).
-  assert (E1 : Rabs e1<=bpow radix2(-53)).
-  { unfold e1,Rdiv;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq sigma)by lra.
-    apply(Rmult_le_reg_r sigma);[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;exact Derror. }
-  pose proof(Rabs_le_inv _ _ E1)as E1l.
-  set(e2:=(Rv-Q/Dv)/(Q/Dv)).
-  assert (QD : 0<Q/Dv)by(apply Rdiv_lt_0_compat;lra).
-  assert (Rv_id : Rv=Q/Dv*(1+e2))by(unfold e2;field;lra).
-  assert (E2 : Rabs e2<=bpow radix2(-53)).
-  { unfold e2,Rdiv at 1;rewrite Rabs_mult,Rabs_Rinv,(Rabs_pos_eq(Q/Dv))by lra.
-    apply(Rmult_le_reg_r(Q/Dv));[lra|];rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra;exact Rerror. }
-  pose proof(Rabs_le_inv _ _ E2)as E2l.
-  assert (Rv_sigma : Rv=Q/sigma*((1+e2)/(1+e1))).
-  { rewrite Rv_id,Dv_id;fold e1;field;split;[lra|bpow_num_all;lra]. }
-  assert (RvErr : Rabs(Rv-Q/sigma)<=4/3*(201/100*bpow radix2(-53))).
-  { rewrite Rv_sigma;replace(Q/sigma*((1+e2)/(1+e1))-Q/sigma)with(Q/sigma*((e2-e1)/(1+e1)))by(field;bpow_num_all;lra).
-    rewrite Rabs_mult,(Rabs_pos_eq(Q/sigma))by lra.
-    apply Rmult_le_compat;try apply Rabs_pos;try lra.
-    apply Rabs_le;bpow_num_all;split;interval with(i_prec 80). }
-  pose proof(Rabs_le_inv _ _ RvErr)as RvE.
-  assert (RvRange : 3/4<=Rv<=27/20)by(bpow_num_all;lra).
-  (* The logarithm's error, and |ln w| against |Lh|. *)
-  pose proof(Rabs_le_inv _ _ Gerror)as Ge.
-  assert (LnWabs : Rabs(ln Wv)<= -Lh+21/10*bpow radix2(-54)).
-  { rewrite LnWsplit;eapply Rle_trans;[apply Rabs_triang|];rewrite(Rabs_left Lh)by lra;lra. }
-  pose proof(Rabs_le_inv _ _ LnWabs)as LnWl.
-  (* Assemble: Y - L = (Y - Gv Rv) + (Gv Rv - ln w Q/sigma) + (ln w Q/sigma - Lh) + (Lh - L). *)
-  assert (Prod : Rabs(Gv*Rv-ln Wv*(Q/sigma))<=(Rabs(ln Wv)+bpow radix2(-65)*4/3)*bpow radix2(-53)*(27/20)+Rabs(ln Wv)*(4/3*(201/100*bpow radix2(-53)))).
-  { replace(Gv*Rv-ln Wv*(Q/sigma))with((Gv-ln Wv)*Rv+ln Wv*(Rv-Q/sigma))by(unfold Rdiv;ring).
-    eapply Rle_trans;[apply Rabs_triang|].
-    rewrite !Rabs_mult,(Rabs_pos_eq Rv)by lra.
-    assert (A1 : Rabs(Gv-ln Wv)*Rv<=(bpow radix2(-53)*Rabs(ln Wv)+bpow radix2(-65))*(27/20)).
-    { apply Rmult_le_compat;try apply Rabs_pos;try lra;exact Gerror. }
-    assert (A2 : Rabs(ln Wv)*Rabs(Rv-Q/sigma)<=Rabs(ln Wv)*(4/3*(201/100*bpow radix2(-53)))).
-    { apply Rmult_le_compat_l;[apply Rabs_pos|exact RvErr]. }
-    bpow_num_all;nra. }
-  pose proof(Rabs_le_inv _ _ Prod)as Pr.
-  pose proof(Rabs_pos(ln Wv))as LnWpos.
-  (* The final rounding, relative to Gv Rv. *)
-  assert (GvRv : Rabs(Gv*Rv)<=(Rabs(ln Wv)*(1+bpow radix2(-53))+bpow radix2(-65))*(27/20)).
-  { rewrite Rabs_mult,(Rabs_pos_eq Rv)by lra;apply Rmult_le_compat;try apply Rabs_pos;try lra.
-    apply Rabs_le_inv in Gerror;apply Rabs_le;split;nra. }
-  pose proof(Rabs_le_inv _ _ GvRv)as GR.
-  rewrite Rabs_left in Perror by lra.
-  assert (Yround : Rabs(B(fast_logcdf_positive64 a)-Gv*Rv)<=bpow radix2(-53)*Rabs(Gv*Rv)).
-  { rewrite Rabs_left in Perror by lra;rewrite <-Rabs_left by lra;exact Perror. }
-  pose proof(Rabs_le_inv _ _ Yround)as Yr.
-  (* |L| is at least |Lh| - 21u, so the |L| term covers the relative pieces. *)
-  unfold fast_logcdf_budget.
-  assert (Labs : Rabs L>= -Lh-21*bpow radix2(-53))by(apply Rabs_le_inv in Complement;apply Rle_ge;eapply Rle_trans;[|apply Rle_abs];lra).
-  assert (Lsmall : Rabs L<=1).
-  { apply Rabs_le_inv in Complement;apply Rabs_le;bpow_num_all;lra. }
-  pose proof(Rabs_le_inv _ _ Kahan)as Kl.
-  apply Rabs_le;bpow_num_all;split;nra.
+  destruct(fast_logcdf_positive_real(B qh)(B w)(B d)(B g)(B r)(B(fmul g r))(ln(1-normal_tail(B a)))
+    Qrange Werror Wrange Derror Gerror Rerror Perror Complement)as[Neg Error].
+  split;[exact Fp|];split;[exact Neg|exact Error].
 Qed.
 
 (** * Dispatch *)
@@ -869,9 +1001,11 @@ Proof.
   unfold fast_logcdf_screen64;rewrite andb_true_iff,(normal_le_true _ _ Fmin Fa),Min,B_abs.
   destruct(normal_lt x normal_zero)eqn:Sign.
   - apply normal_lt_true in Sign;try assumption;rewrite Zero in Sign.
-    rewrite(normal_le_true _ _ Fa Flim),Lim,B_abs;tauto.
+    rewrite(normal_le_true _ _ Fa Flim),Lim,B_abs;cbv iota.
+    split;[intros[H1 H2];left;repeat split;lra|intros[[_ [H1 H2]]|[H0 _]];[split;lra|lra]].
   - apply normal_lt_false in Sign;try assumption;rewrite Zero in Sign.
-    rewrite(normal_le_true _ _ Fa Fmax),Max,B_abs;change(bpow radix2 3)with 8;tauto.
+    rewrite(normal_le_true _ _ Fa Fmax),Max,B_abs;change(bpow radix2 3)with 8;cbv iota.
+    split;[intros[H1 H2];right;repeat split;lra|intros[[H0 _]|[_ [H1 H2]]];[lra|split;lra]].
 Qed.
 
 (** The accelerated entry: finite, negative, within the mixed budget of
@@ -891,16 +1025,16 @@ Proof.
   - apply normal_lt_true in Sign;try assumption;rewrite Zero in Sign.
     destruct Domain as[[_ D]|[P _]];[|lra].
     rewrite Rabs_left in D by exact Sign.
-    destruct(fast_logcdf_negative_ok(b64_abs x)Fa ltac:(rewrite B_abs,Rabs_left by exact Sign;exact D))as[F [Neg Error]].
-    rewrite B_abs,Rabs_left in Error by exact Sign.
+    destruct(fast_logcdf_negative_ok(b64_abs x)Fa ltac:(rewrite B_abs,(Rabs_left(B x)Sign);exact D))as[F [Neg Error]].
+    rewrite B_abs,(Rabs_left(B x)Sign)in Error.
     assert(Target : normal_cdf(B x)=normal_tail(-B x)).
-    { rewrite normal_tail_negative_cdf,Ropp_involutive;reflexivity. }
+    { symmetry;rewrite <-(Rabs_left(B x)Sign);apply normal_negative_cdf;lra. }
     rewrite Target;split;[exact F|];split;[lra|exact Error].
   - apply normal_lt_false in Sign;try assumption;rewrite Zero in Sign.
     destruct Domain as[[N _]|[_ D]];[lra|].
     rewrite Rabs_pos_eq in D by exact Sign.
-    destruct(fast_logcdf_positive_ok(b64_abs x)Fa ltac:(rewrite B_abs,Rabs_pos_eq by exact Sign;exact D))as[F [Neg Error]].
-    rewrite B_abs,Rabs_pos_eq in Error by exact Sign.
+    destruct(fast_logcdf_positive_ok(b64_abs x)Fa ltac:(rewrite B_abs,(Rabs_pos_eq(B x)Sign);exact D))as[F [Neg Error]].
+    rewrite B_abs,(Rabs_pos_eq(B x)Sign)in Error.
     split;[exact F|];split;[exact Neg|exact Error].
 Qed.
 
@@ -912,7 +1046,7 @@ Theorem fast_logcdf_fallback_contract x : fast_logcdf_screen64 x=false ->
   normal_contract NormalLogCdf x (fast_logcdf_entry64 x).
 Proof. intros Screen;rewrite fast_logcdf_fallback by exact Screen;apply normal_public_contract. Qed.
 
-Theorem fast_logcdf_nonfinite x : is_finite 53 1024 x=false ->
+Theorem fast_logcdf_nonfinite x : Binary.is_finite 53 1024 x=false ->
   fast_logcdf_entry64 x=normal_entry64 NormalLogCdf x.
 Proof.
   intros Nonfinite;destruct x as[s|s|s p Hp|s m e Hm];try discriminate.

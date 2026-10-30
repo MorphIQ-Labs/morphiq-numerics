@@ -88,16 +88,19 @@ the table's two (`2^-51` and the argument sensitivity, proportional to `y` on
 
 ```
 w = RN(1 - q̂)                        # |w - (1 - q̂)| <= 2^-54; 1/4 <= w <= 1 - 2^-52
-d = RN(1 - w)                        # relative u; d = q̂ + δ + δ', 7/8 <= q̂/d <= 4/3
+d = RN(1 - w)                        # relative u; d = q̂ + δ + δ', 4/5 <= q̂/d <= 4/3
 g = fast_ln(w)
 Y = RN(g * RN(q̂ / d))
 ```
 
 This is Kahan's corrected logarithm: `ln(1 - q̂) = ln(w) * q̂/(q̂ + δ)` up to
-`ln(1 - q̂)·δ/(q̂ + δ) + ln(1 - δ/(1 - q̂))·q̂/(q̂ + δ)`, each below `1.5u`
-because `|ln(1 - q̂)| <= 1.4 q̂` for `q̂ <= 0.51`. The division and the
-product round relative to `abs(L) <= 0.72`. `fast_logcdf_positive_ok` proves
-the same mixed bound and `Y < 0`.
+`ln(1 - q̂)·δ/(q̂ + δ) + ln(1 - δ/(1 - q̂))·q̂/(q̂ + δ)`, together below
+`2.5u` because `|ln(1 - q̂)| <= 1.41 q̂` for `q̂ <= 0.51`. The division and
+the product round relative to `abs(L) <= 0.75`. The real-valued lemmas
+`fast_logcdf_ratio_range`, `fast_logcdf_product_range` and
+`fast_logcdf_positive_real` carry this arithmetic; `fast_logcdf_positive_ok`
+supplies the IEEE facts for each rounding and proves the same mixed bound and
+`Y < 0`.
 
 **Dispatch.** `fast_logcdf_screen64` is the scalar screen: magnitude at least
 `2^-33`, and at most `22.5` for negative or `8` for other inputs; a NaN fails
