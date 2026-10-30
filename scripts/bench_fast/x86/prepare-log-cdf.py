@@ -100,7 +100,10 @@ codegen-units=1
         run(['cc', '-O3', '-fPIC', '-shared', '-ffp-contract=off', '-DNO_SLEEF',
              str(HERE / (timer + '.c')), '-o', str(out / 'bin' / (timer + '.so'))])
     product = out / 'build/release/liblog_cdf_bench_wrapper.so'
-    risk_product = out / 'risk-build/release/librisk_log_cdf_bench_wrapper.so'
+    # The comparator library lives under references/, which freeze.py hashes.
+    (out / 'references').mkdir()
+    risk_product = out / 'references/librisk_log_norm_cdf.so'
+    shutil.copy2(out / 'risk-build/release/librisk_log_cdf_bench_wrapper.so', risk_product)
     (out / 'final-bin').mkdir()
     shutil.copy2(product, out / 'final-bin/control.so')
     digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
