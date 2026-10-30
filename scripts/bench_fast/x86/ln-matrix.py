@@ -112,9 +112,9 @@ def execution_groups(cells):
                 return region == 'wide' or (region == 'ordinary' and kind == 'latency')
             if kind == 'vector':
                 if region in ['ordinary', 'wide']:
-                    return n in [8, 16, 32, 33, 64, 65, 256, 4096]
+                    return n in list(range(8, 18)) + [32, 33, 64, 65, 256, 4096]
                 return n == 4096 and region in ['near_one', 'subnormal', 'mixed_positive']
-        return kind == 'vector' and ((backend == 'avx512' and n in [16, 17] and region in ['ordinary', 'wide'])
+        return kind == 'vector' and ((backend == 'avx512' and n in range(8, 18) and region in ['ordinary', 'wide'])
                                      or (backend == 'avx2' and region == 'wide' and n == 13))
     first = [c['id'] for c in cells if critical(c)]
     rest = [c['id'] for c in cells if not critical(c)]

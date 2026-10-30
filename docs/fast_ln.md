@@ -62,10 +62,10 @@ The fixed 16/32/64-value calls explicitly unroll the same packet work to avoid
 materializing every stage constant for a tiny loop. Per-lane arithmetic is
 unchanged. Fixed power-of-two packets and one/two-element scalar remainders
 use the established bounded-exp dispatch structure to avoid bulk-loop setup on
-short calls. On x86, an eight-lane packet with zero, one or two remaining
-values has a direct public entry; the general dispatcher is outlined to keep
-its stack frame off these short calls. The same packet owner handles all
-special inputs. A single-element remainder in the general loop uses the bounded
+short calls. On x86, an eight-lane packet with zero through three remaining
+values, or two full eight-lane packets, has a direct public entry; the general
+dispatcher is outlined to keep its stack frame off these short calls. The
+same packet owner handles all special inputs. A single-element remainder in the general loop uses the bounded
 scalar entry inside the current backend wrapper, avoiding a padded vector and
 its prefix copies. Other partial packets are padded with 2 and only their valid
 prefix is stored. They stay in the selected SIMD width instead of entering a

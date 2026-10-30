@@ -389,14 +389,21 @@ fn run<K: morphiq_numerics_arch::Simd>(k: K, work: Slice<'_>) {
 
 #[cfg(feature = "simd")]
 pub(crate) fn slice(input: &[f64], output: &mut [f64]) {
-    // Keep a single AVX-512 packet and its short tails out of the general
-    // dispatcher's stack frame. The packet owner retains every lane screen.
+    // Keep one/two AVX-512 packets and the single packet's short tails out
+    // of the general dispatcher's frame. Packet owners retain every screen.
     #[cfg(target_arch = "x86_64")]
-    if (8..=10).contains(&input.len())
+    if ((8..=11).contains(&input.len()) || input.len() == 16)
         && let Some(k) = morphiq_numerics_arch::Avx512::try_new()
     {
         if input.len() == 8 {
             return fixed::<_, 8>(
+                k,
+                input.try_into().expect("fixed packet"),
+                output.try_into().expect("fixed packet"),
+            );
+        }
+        if input.len() == 16 {
+            return fixed::<_, 16>(
                 k,
                 input.try_into().expect("fixed packet"),
                 output.try_into().expect("fixed packet"),
