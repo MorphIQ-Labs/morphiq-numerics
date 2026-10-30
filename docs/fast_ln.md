@@ -62,9 +62,11 @@ The fixed 16/32/64-value calls explicitly unroll the same packet work to avoid
 materializing every stage constant for a tiny loop. Per-lane arithmetic is
 unchanged. Fixed power-of-two packets and one/two-element scalar remainders
 use the established bounded-exp dispatch structure to avoid bulk-loop setup on
-short calls. Otherwise the last partial packet is padded with 2 and only its valid prefix
-is stored. It stays in the selected SIMD width instead of entering a second
-backend for the remainder. One is accepted in these packets: the reciprocal
+short calls. A single-element remainder in the general loop uses the bounded
+scalar entry inside the current backend wrapper, avoiding a padded vector and
+its prefix copies. Other partial packets are padded with 2 and only their valid
+prefix is stored. They stay in the selected SIMD width instead of entering a
+second backend for the remainder. One is accepted in these packets: the reciprocal
 and table terms are exactly one and zero, so the result is exact positive
 zero (`FastLn.fast_ln_regular_one`). This keeps the scalar arithmetic and
 outputs unchanged, including mixed packets and all slice lengths.

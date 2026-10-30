@@ -180,7 +180,11 @@ impl<const SPECIALIZE_NORMAL: bool> morphiq_numerics_arch::WithSimd
                 evaluate_general(k, input, output);
             }
         }
-        if !rest.is_empty() {
+        if rest.len() == 1 {
+            // A single remainder needs no padding, table lanes or copy-out.
+            // Reuse the same bounded scalar owner inside the backend wrapper.
+            rest_out[0] = ln(rest[0]);
+        } else if !rest.is_empty() {
             if SPECIALIZE_NORMAL {
                 evaluate(k, rest, rest_out);
             } else {
