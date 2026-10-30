@@ -65,6 +65,30 @@ pub(crate) fn normalized_parts(reduced: &super::Reduced) -> (f64, f64, f64, Opti
     evaluate(f64::from(reduced.e), i, z)
 }
 
+/// Scalar stage using the detected backend's exact FMA residual. The
+/// remaining operations are scalar and identical to `normalized_parts`.
+#[cfg(all(
+    feature = "simd",
+    feature = "std",
+    target_arch = "x86_64",
+    not(target_feature = "fma")
+))]
+#[inline(always)]
+pub(crate) fn normalized_parts_with_fma<K: morphiq_numerics_arch::Simd>(
+    k: K,
+    reduced: &super::Reduced,
+) -> (f64, f64, f64, Option<f64>) {
+    let y = reduced.y();
+    let i = reduced.stage_index;
+    let r = f64::from_bits(R[i]);
+    let z = if let Some(z) = k.mul_add(k.splat(y), k.splat(r), k.splat(-1.0)) {
+        k.store(z).as_ref()[0]
+    } else {
+        residual(y, r)
+    };
+    evaluate(f64::from(reduced.e), i, z)
+}
+
 /// The generated reciprocal makes h*rs-1 exactly representable on the
 /// reciprocal stage's proved domain. Hardware FMA and the split path agree.
 #[inline(always)]

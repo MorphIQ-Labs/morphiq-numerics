@@ -3,7 +3,7 @@
 
 /// The strong entry owns specials; every positive finite nonunit input uses
 /// one reciprocal stage, without a rounding test or precision escalation.
-#[inline]
+#[inline(always)]
 pub(crate) fn ln(x: f64) -> f64 {
     let bits = x.to_bits();
     // One encoding interval screens normal positive finite arguments.
@@ -16,9 +16,96 @@ pub(crate) fn ln(x: f64) -> f64 {
         let (s, lo, _, _) = super::stage::unit_parts(x);
         return s + lo;
     }
-    let reduced = super::Reduced::normal_bits(bits, 0);
+    #[cfg(all(
+        feature = "simd",
+        feature = "std",
+        target_arch = "x86_64",
+        not(target_feature = "fma")
+    ))]
+    {
+        use morphiq_numerics_arch::Simd;
+        match BACKEND.get() {
+            Some(Some(k)) => k.vectorize(ScalarNormal(x)),
+            Some(None) => portable_normal(x),
+            None => initialize_scalar(x),
+        }
+    }
+    #[cfg(not(all(
+        feature = "simd",
+        feature = "std",
+        target_arch = "x86_64",
+        not(target_feature = "fma")
+    )))]
+    {
+        let reduced = super::Reduced::normal_bits(bits, 0);
+        let (s, lo, _, _) = super::stage::normalized_parts(&reduced);
+        s + lo
+    }
+}
+
+#[cfg(all(
+    feature = "simd",
+    feature = "std",
+    target_arch = "x86_64",
+    not(target_feature = "fma")
+))]
+#[inline(never)]
+fn portable_normal(x: f64) -> f64 {
+    let reduced = super::Reduced::normal_bits(x.to_bits(), 0);
     let (s, lo, _, _) = super::stage::normalized_parts(&reduced);
     s + lo
+}
+
+#[cfg(all(
+    feature = "simd",
+    feature = "std",
+    target_arch = "x86_64",
+    not(target_feature = "fma")
+))]
+static BACKEND: std::sync::OnceLock<Option<morphiq_numerics_arch::Avx2>> =
+    std::sync::OnceLock::new();
+
+#[cfg(all(
+    feature = "simd",
+    feature = "std",
+    target_arch = "x86_64",
+    not(target_feature = "fma")
+))]
+#[cold]
+#[inline(never)]
+fn initialize_scalar(x: f64) -> f64 {
+    use morphiq_numerics_arch::Simd;
+    match *BACKEND.get_or_init(morphiq_numerics_arch::Avx2::try_new) {
+        Some(k) => k.vectorize(ScalarNormal(x)),
+        None => portable_normal(x),
+    }
+}
+
+// Constructed only after the positive-normal and reciprocal-one screens.
+// Keep normalization and reconstruction inside the existing feature wrapper,
+// so the exact FMA residual does not require a separate arithmetic call.
+#[cfg(all(
+    feature = "simd",
+    feature = "std",
+    target_arch = "x86_64",
+    not(target_feature = "fma")
+))]
+struct ScalarNormal(f64);
+
+#[cfg(all(
+    feature = "simd",
+    feature = "std",
+    target_arch = "x86_64",
+    not(target_feature = "fma")
+))]
+impl morphiq_numerics_arch::WithSimd for ScalarNormal {
+    type Output = f64;
+    #[inline(always)]
+    fn with<K: morphiq_numerics_arch::Simd>(self, k: K) -> f64 {
+        let reduced = super::Reduced::normal_bits(self.0.to_bits(), 0);
+        let (s, lo, _, _) = super::stage::normalized_parts_with_fma(k, &reduced);
+        s + lo
+    }
 }
 
 // Return the final scalar value here, so the hot caller need not reserve

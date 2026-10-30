@@ -92,8 +92,18 @@ including its strong rounding decision, and checks positive zero at one.
 Normalized scalar and SIMD stages may use hardware FMA for the exactly
 representable residual. `LnExactFma.v` proves bit identity to the portable
 split, including positive zero; the fallback, polynomial and public bound
-remain unchanged. Scalar hardware use requires `std` and an FMA/NEON target;
-lane hardware use follows the existing backend token.
+remain unchanged. Scalar hardware use requires `std` and an FMA/NEON target,
+or `std` plus `simd` on x86-64 with the existing detected AVX2/FMA token.
+The latter caches that token in a standard `OnceLock`; cold initialization
+and the portable normal fallback are outlined so the steady-state entry can
+tail-call the feature wrapper without spilling its input. Classification and
+the reciprocal-one shortcut precede this dispatch. The wrapper broadcasts the
+normalized operands, extracts lane zero of the exact fused residual, and uses
+the same scalar reconstruction; code generation lowers this to scalar FMA.
+The token is acquired through the existing architecture API, and unsupported
+builds or hardware retain the split path. Lane hardware use follows the same
+backend tokens. Native qualification includes the public dispatch cost after
+warmup; first-use initialization is outside these steady-state timings.
 
 The SIMD layout adds 8 KiB of read-only data; memory-pressure and strong-path
 control measurements are part of its cost qualification.
