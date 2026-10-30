@@ -21,7 +21,7 @@ pub(crate) fn ln(x: f64) -> f64 {
 /// exact positive zero (`FastLn.fast_ln_regular_one`), as in the lane packets.
 #[inline(always)]
 pub(crate) fn regular(x: f64) -> f64 {
-    debug_assert!(x >= f64::MIN_POSITIVE && x < f64::INFINITY);
+    debug_assert!((f64::MIN_POSITIVE..f64::INFINITY).contains(&x));
     let bits = x.to_bits();
     if super::stage::unit_cell(bits) {
         let (s, lo, _, _) = super::stage::unit_parts(x);
