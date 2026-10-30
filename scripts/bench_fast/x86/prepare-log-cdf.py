@@ -31,7 +31,7 @@ def bank(lo, hi, n=52):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--out', type=Path, required=True)
-    ap.add_argument('--risk', type=Path, required=True, help='ferro-risk checkout (crates/ferro-risk)')
+    ap.add_argument('--risk', type=Path, required=True, help='morphiq-risk-rs checkout (contains crates/morphiq-risk)')
     ap.add_argument('--cpu', type=int, default=2)
     args = ap.parse_args()
     if (platform.system(), platform.machine()) != ('Linux', 'x86_64'):
@@ -39,8 +39,8 @@ def main():
     out = args.out.resolve()
     out.relative_to((ROOT / 'target').resolve())
     risk = args.risk.resolve()
-    if not (risk / 'crates/ferro-risk/Cargo.toml').is_file():
-        ap.error('--risk must point at a ferro-risk checkout')
+    if not (risk / 'crates/morphiq-risk/Cargo.toml').is_file():
+        ap.error('--risk must point at a morphiq-risk-rs checkout')
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         ap.error('Commit the candidate before preparing a comparison')
     risk_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=risk, text=True).strip()
@@ -75,7 +75,7 @@ edition="2024"
 [lib]
 crate-type=["cdylib"]
 [dependencies]
-ferro-risk={path=''' + json.dumps(str(risk / 'crates/ferro-risk')) + '''}
+morphiq-risk={path=''' + json.dumps(str(risk / 'crates/morphiq-risk')) + '''}
 [profile.release]
 lto="thin"
 codegen-units=1

@@ -339,7 +339,7 @@ single-group schedule.
 
 The `x86/prepare-log-cdf.py` adapter times the bounded `log_norm_cdf`
 against Risk's own `log_norm_cdf` (Cody rational erfcx with the platform
-logarithm), built from a pinned `ferro-risk` checkout as a C-ABI library
+logarithm), built from a pinned `morphiq-risk-rs` checkout as a C-ABI library
 with the same symbol names, so the runner's `--reference-product` path pairs
 the two in one process. Three 52-value populations, exact values off the
 dyadic grid: ordinary `[-3, 3]`, wide `[-8, 8]` and negative tail `[-22, -8]`,
@@ -353,7 +353,7 @@ product and reference library hashes.
 
 ```sh
 python scripts/bench_fast/x86/prepare-log-cdf.py --cpu 2 \
-  --risk ../ferro-risk --out target/issue-192/logcdf-001
+  --risk ../morphiq-risk-rs --out target/issue-192/logcdf-001
 python scripts/bench_fast/freeze.py target/issue-192/logcdf-001
 python target/issue-192/logcdf-001/run-qualification.py
 python scripts/bench_fast/freeze.py target/issue-192/logcdf-001 --verify
