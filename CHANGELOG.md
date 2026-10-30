@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.18](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.17...v0.0.18) - 2026-10-30
+
+### Performance
+
+- *(ln)* specialize exact scalar and SIMD reductions
+
 ## [0.0.17](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.16...v0.0.17) - 2026-10-29
 
 ### Added
