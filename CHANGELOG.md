@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.17](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.16...v0.0.17) - 2026-10-29
+
+### Added
+
+- *(fast)* add bounded ln scalar and SIMD primitives ([#249](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/249))
+
 ## [0.0.16](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.15...v0.0.16) - 2026-10-29
 
 ### Added
