@@ -3,7 +3,7 @@
 //! hold within the reported bounds. Reference values are in
 //! `crates/reference/tests/bivariate_normal.rs`.
 //!
-//! The properties are ported from ferro-risk's
+//! The properties are ported from MorphIQ Risk's
 //! `tests/bivariate_normal_property.rs` at commit `72db248c` (proptest
 //! strategies replaced by seeded SplitMix64 draws, so a failure replays).
 
@@ -511,7 +511,7 @@ fn angular_range_is_the_correctly_rounded_asin() {
     }
 }
 
-/// The invariants of ferro-risk's `bvn_bounded_invariants` fuzz target
+/// The invariants of MorphIQ Risk's `bvn_bounded_invariants` fuzz target
 /// (commit `72db248c`), over arbitrary binary64 bit patterns: NaN in, NaN
 /// out; otherwise a probability with a finite bound never looser than the
 /// contract; swapped arguments identical; the reflection identity within the
