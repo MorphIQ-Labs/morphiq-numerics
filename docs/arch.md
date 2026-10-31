@@ -45,10 +45,15 @@ and `None` on one without; it is never emulated.
 **Table and prefix memory operations.** `gather_wrapped(table, index)` requires
 a nonempty power-of-two array and masks each lane's index inside the owner,
 returning the selected `u64` word reinterpreted as binary64. Arbitrary input
-indices, including all-ones words, are valid. Every backend performs bounded
-scalar loads and assembles the result into lanes. This avoids hardware-gather
-latency on affected x86 hosts with the Gather Data Sampling mitigation; the
-bounded exp code-generation gate retains that choice.
+indices, including all-ones words, are valid. AVX-512 masks the indices and
+issues one hardware gather (`vgatherqpd`). The other backends perform bounded
+scalar loads and assemble the result into lanes. On AVX-512, assembly costs
+about twenty shuffle and extract operations per vector on the ports that also
+execute 512-bit arithmetic: a hardware gather made bounded exp 1.4-1.8x faster
+on Granite Rapids. The gather costs about 5-15% on AMD Turin and more on Intel
+hosts with the Gather Data Sampling mitigation, where it is not the faster
+choice. The bounded exp code-generation gate requires the AVX-512 gather and
+rejects one elsewhere.
 
 `gather_pair_wrapped(table, index)` requires a power-of-two table of at least
 two words. It masks each index by `N-2` and loads that even word and its
@@ -103,8 +108,10 @@ other, and `unsafe_op_in_unsafe_fn` is denied. No public function is
    unaligned forms need only the element's alignment. For AVX-512 prefix
    operations the checked slice length determines the mask, so only elements
    belonging to the slice are accessed, including no accesses for an empty slice.
-Single-word table gathers use safe array indexing after checking the shape and
-masking by `N-1`. Paired gathers similarly mask by `N-2`. The AVX-512 pair
+Single-word table gathers mask by `N-1` after checking the shape; the scalar
+backends then use safe array indexing, and the AVX-512 gather's eight addresses,
+scaled by eight bytes from the array base, are exactly elements of the live
+array. Paired gathers similarly mask by `N-2`. The AVX-512 pair
 load's pointer comes from a checked two-word slice, which supplies exactly the
 16 bytes read; its temporary index store writes exactly eight `u32` words.
 The backend token supplies the instruction-set precondition for both accesses.

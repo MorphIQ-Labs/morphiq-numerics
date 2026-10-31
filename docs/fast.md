@@ -89,10 +89,14 @@ This order avoids a subnormal correction product near the negative end of
 the domain. `FastExp.fast_exp_entry_ok` composes the polynomial, table and
 reconstruction bounds to establish the existing relative `4u` guarantee.
 
-The slice path evaluates the same operations using bounded scalar table loads
-assembled into SIMD lanes. Hardware gather is deliberately avoided: its
-latency can dominate on processors with the Gather Data Sampling microcode
-mitigation ([Intel performance analysis](https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/resources/gds-mitigation-performance-analysis.html)).
+The slice path evaluates the same operations per lane. AVX-512 reads the table
+with one hardware gather; SSE2 and AVX2 assemble bounded scalar table loads
+into lanes. On AVX-512 that assembly occupies the ports executing 512-bit
+arithmetic, and the gather made the bulk loop 1.4-1.8x faster on Granite Rapids.
+The gather is slower on processors with the Gather Data Sampling microcode
+mitigation ([Intel performance analysis](https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/resources/gds-mitigation-performance-analysis.html))
+and about 5-15% slower on AMD Turin; neither is the qualification profile.
+Both lookups read the same table words, so the choice never changes a result.
 A full-vector domain check precedes arithmetic. A packet containing a screened
 input finishes through the scalar fast/strong owners; this preserves the
 scalar bits and keeps invalid intermediates out of inactive lanes. Cold slice
@@ -115,7 +119,9 @@ and scalar arithmetic, including strong fallback ownership.
 The SSE2 fallback loop and scalar-remainder helper are kept outside the runtime
 dispatcher so their register needs do not burden every selected backend. The architecture
 API owns index masking and prefix-length validation. The lane code-generation
-gate rejects hardware gather in these bounded kernels.
+gate requires the hardware gather in the AVX-512 exp kernels, permits it in
+the AVX-512 CDF and log-CDF kernels that inline the same lookup, and rejects it
+in every other bounded kernel.
 
 **Scaled erfc.** The bounded path retains the original table reduction,
 177 cells, degree-nine polynomials and generated coefficient bits. It evaluates
