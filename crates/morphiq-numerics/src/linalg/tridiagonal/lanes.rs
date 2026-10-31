@@ -1,4 +1,4 @@
-// The Thomas recurrence is adapted from FerroRisk at
+// The Thomas recurrence is adapted from MorphIQ Risk at
 // 100880f67b9da1c66e9a9d03ba9e1a5ad876eb5c, under its MIT license.
 // Copyright (c) 2026 MorphIQ Labs. See THIRD_PARTY_NOTICES.md in this crate.
 //! Independent RHS columns, with the scalar recurrence in every lane.

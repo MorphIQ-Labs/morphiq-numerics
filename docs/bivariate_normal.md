@@ -18,11 +18,11 @@ what remains; nothing below claims more than the checks named here establish.
 | Independent MPFR/mpmath reference, two precisions, second route (section 7) | done |
 | Generator for the quadrature rules, replayed by `check_generators.sh` | done |
 | Correctly rounded `asin` (#41) | done: the table's angle is `elementary::asin(rho)` (section 5) |
-| Relative accuracy of small probabilities (FerroRisk's tail construction) | not ported: refused instead (section 8) |
+| Relative accuracy of small probabilities (MorphIQ Risk's tail construction) | not ported: refused instead (section 8) |
 | ARM NEON, SSE2, AVX2+FMA and AVX-512F lanes returning the scalar bits, with slice and paired entry points (section 12) | done for the low-correlation quadrature: bit equality, digest and mutation witnesses (section 12); AVX2 and AVX-512F not yet run here (CI) |
 | Coq proof of the error budget | **proved** for both branches (`formal/bivariate/`), from the named hypotheses of section 6 |
 | The kernel the proofs describe | the scalar kernel is transcribed over the proved binary64 operations (`formal/bivariate/BvnKernel.v`), **extracted and compared bit for bit** with this code on 14 134 cases, and its operations are proved equal to the proofs' rounding model (section 6.5); the hypotheses that remain are listed there |
-| Same-host scalar and batch timings against the FerroRisk baseline | **not measured in this change**: timings belong to the performance epic #149 (native x86 #216, hardware-sqrt #217), and the repository has no bivariate benchmark binary yet; the machine-independent work per call is counted in section 9 |
+| Same-host scalar and batch timings against the MorphIQ Risk baseline | **not measured in this change**: timings belong to the performance epic #149 (native x86 #216, hardware-sqrt #217), and the repository has no bivariate benchmark binary yet; the machine-independent work per call is counted in section 9 |
 
 ## 2. Specification
 
@@ -79,7 +79,7 @@ rule's nodes, which come in `+-` pairs about the interval's centre and are
 summed in node order as a double-word (`two_sum` of each term, the
 low parts added in order), which rounds once rather than once per node.
 
-Two regimes (Genz 2004 for the split and the low branch; FerroRisk at commit
+Two regimes (Genz 2004 for the split and the low branch; MorphIQ Risk at commit
 `72db248c` for the structure):
 
 * **Low correlation, `|rho| < 0.925`.** The Gauss-Legendre sum above. The
@@ -89,14 +89,14 @@ Two regimes (Genz 2004 for the split and the low branch; FerroRisk at commit
   Gauss-Legendre panels (16 nodes above `s = 0.095`, 15 below) integrate the
   integrand directly, with a double-word sum of the node terms, and below
   `s = 0.003` Genz's closed-form moments replace the last panel. This is not
-  Genz's `BVND` series: FerroRisk's transcription of that series (20 nodes
+  Genz's `BVND` series: MorphIQ Risk's transcription of that series (20 nodes
   and a Taylor-corrected subtraction) was `2.58e-16` from the exact value at
   `(-0.21101192279835226, -0.0014549743776884816, 0.925)` against a published
   `2.5e-16`, because the series' integrand is flat at zero with an essential
   singularity there, so no quadrature rule has a proved remainder for it.
   The kernel and its proof are in `docs/bivariate_normal_high.md`.
 
-The split at `0.925` is Genz's. FerroRisk measured the reflection residual of
+The split at `0.925` is Genz's. MorphIQ Risk measured the reflection residual of
 the low branch at `1.11e-16` through `|rho| = 0.95` and `1.2e-13` at `0.97`;
 the high branch is proved up to `|rho| < 1`, so the split's margin is the
 low branch's, about `0.025`, on the side that matters.
@@ -178,7 +178,7 @@ selects, for every threshold pair with `|x|, |y| <= 64`:
 
 `absolute_error_bound(rho)` returns that bound (rounded up in the fourth digit),
 `BoundedProbability::error` carries it, and `ABSOLUTE_ERROR_BOUND = 3.721e-16` is
-the largest. FerroRisk's published `2.5e-16` is therefore proved only up to
+the largest. MorphIQ Risk's published `2.5e-16` is therefore proved only up to
 `|rho| < 0.29`; it was a measured figure, and for the high-correlation branch it
 was false (section 3: `bivariate_norm_cdf(-0.21101192279835226, -0.0014549743776884816, 0.925)`
 was `2.58e-16` from the exact value). The closed-form regimes (independent,
@@ -328,11 +328,11 @@ reading. The lanes' own run is in section 12.
   Genz rule is never called. Inputs are exact binary64.
 * **Cases.** The grid is every correlation (each rule limit and split at
   adjacent doubles, `+-(1 - 2^-k)` for several `k`, the extremes) against 21
-  threshold pairs; 8 required hard cases from FerroRisk's issue #380; 200 random
-  cases; and 1 158 rows imported from FerroRisk's reference corpus
+  threshold pairs; 8 required hard cases from MorphIQ Risk's issue #380; 200 random
+  cases; and 1 158 rows imported from MorphIQ Risk's reference corpus
   (section 10), each re-evaluated by this oracle rather than copied, and
   recorded with any disagreement.
-* **Properties** (`bivariate_normal/tests.rs`, ported from FerroRisk's
+* **Properties** (`bivariate_normal/tests.rs`, ported from MorphIQ Risk's
   `bivariate_normal_property.rs` and fuzz target): reflection
   `Phi2(a, b, rho) + Phi2(a, -b, -rho) = Phi(a)` within the two bounds,
   including at the unit-correlation edge; monotonicity within the bounds;
@@ -434,7 +434,7 @@ relative accuracy from regressing (`4.7e-9` worst, at 6 nodes where Genz's
 rule has 6), and `no_rule_has_fewer_nodes_than_the_canonical_implementation`
 keeps the node count at or above Genz's at every correlation.
 
-## 8. The deep-tail negative-correlation corner (ferro-risk #380)
+## 8. The deep-tail negative-correlation corner (MorphIQ Risk #380)
 
 For `x, y` both well below zero and `rho < 0` the true value is far below the
 rounding floor of the sum `Phi(x) Phi(y) + (asr/4 pi) S`, whose two terms
@@ -449,7 +449,7 @@ cancel to about one part in `1e16`:
 The reflection `Phi2(x, y, rho) = Phi(x) - Phi2(x, -y, -rho)` moves the problem
 to positive correlation where each term is well conditioned and cancels
 *worse* (`2.03e18` against `1e16`), so no rearrangement of the quadrature
-recovers the digits. FerroRisk's `bivariate_norm_cdf_bounded` recovered a
+recovers the digits. MorphIQ Risk's `bivariate_norm_cdf_bounded` recovered a
 relative bound below `1e-3` for `|rho| < 0.925` by integrating the conditional
 density `int phi(t) Phi((y - rho t)/s) dt`, whose log-integrand is concave
 with `-1/s^2 <= g'' <= -1`, with tangent-line tails, four 16/32-point panels
@@ -467,7 +467,7 @@ mirrors), are required cases in the fixture (`kind = "hard"`), and the test
 `hard_cases_are_bounded_absolutely_and_refuse_relative_use` asserts both the
 absolute bound and that the reported error is not smaller than the value. A function
 that returns such values to relative accuracy would be a separate one with its own
-proved remainder bound on the discretization, which FerroRisk's construction
+proved remainder bound on the discretization, which MorphIQ Risk's construction
 lacked; this one does not claim it.
 
 ## 9. Performance
@@ -511,15 +511,15 @@ adds a code path the extracted comparison (section 6.5) does not cover.
 ## 10. Provenance and port inventory
 
 The implementation, the rule structure, the semantics of the bounded form and
-the contract constants are ported from FerroRisk, commit `72db248c`
+the contract constants are ported from MorphIQ Risk, commit `72db248c`
 (`origin/main`, v0.41.4, MorphIQ Labs, same ownership and licensing as this
 repository; see `docs/PROVENANCE.md`). Genz (2004) is the published algorithm.
-The low branch is a fresh transcription of Genz's published algorithm in this library's idiom, and the high branch is this library's own panel scheme (the pull request records the consultation as `docs/PROVENANCE.md` asks; FerroRisk's own origin for its transcription is in-house, and the owner should confirm it before the FerroRisk copy is deleted): correctly rounded
+The low branch is a fresh transcription of Genz's published algorithm in this library's idiom, and the high branch is this library's own panel scheme (the pull request records the consultation as `docs/PROVENANCE.md` asks; MorphIQ Risk's own origin for its transcription is in-house, and the owner should confirm it before the MorphIQ Risk copy is deleted): correctly rounded
 `exp`, `sincos`, `sqrt` and `norm_cdf` replace the platform libm and
-FerroRisk's, the nodes are generated rather than pasted, and `asin` is not
-taken from libm. Item by item (the list FerroRisk's deletion cites):
+MorphIQ Risk's, the nodes are generated rather than pasted, and `asin` is not
+taken from libm. Item by item (the list MorphIQ Risk's deletion cites):
 
-| FerroRisk item | Disposition |
+| MorphIQ Risk item | Disposition |
 | --- | --- |
 | `numerics/bivariate_normal.rs`: Genz low regime, regime classifier, (the high regime is replaced, section 3), saturation limits, degenerate limits, probability clamp | **ported** (this module) |
 | `BoundedProbability`, `bivariate_norm_cdf_bounded` semantics | **ported** with a correlation-dependent proved bound; the `2.5e-16`, `1e-3` and `1e-13` constants are **not** carried over (section 6); the sub-floor relative construction is **refused**, not deferred (section 8) |
@@ -531,14 +531,14 @@ taken from libm. Item by item (the list FerroRisk's deletion cites):
 | `testing/data/bivariate_normal_reference.json` (3 762 rows) | **ported as test-only**: 1 158 rows (BS2002 families dropped, the body and tail families thinned to every tenth row) re-evaluated by this oracle; the other 2 604 rows are in git history at `72db248c` and were **not ported** because the thinned set covers every family and regime edge |
 | `testing/calibration/generate_bivariate_normal_reference.py` | **not ported**: replaced by `generators/bivariate_normal_reference.py` (a different route; the earlier script is the cross-check source) |
 | `testing/mutations/bivariate_normal.toml` (21 faults) | **not ported**: this library has no mutation harness; the faults map to tests here: the split (`B1`) and every rule limit are held by `results_are_continuous_across_every_rule_limit` and by fixture rows on both sides; the high regime's node terms, `two_sum` accumulation, closed form and reflection branch by the high-correlation fixture rows (including rows at the counterexample) and the proof's operation sequence; the unit-edge snap (`B24`) by `reflection_holds_at_the_unit_correlation_edge`; NaN handling by `nan_and_out_of_range_inputs_*` |
-| SPEC section 7.3 and ferro-risk #380 cancellation analysis | **ported** as section 8; the corner is a required fixture case |
-| `formal/lean-math/FerroRisk/AmericanBivariate.lean` (5 laws: Gaussian marginal, two complement identities, comonotone and countermonotone closed forms) | **not ported**: this repository's proofs are Coq/Gappa, not Lean. Their statements are the proof targets of the remaining work; their runtime counterparts are tested: reflection (the two complements) and the degenerate closed forms |
+| SPEC section 7.3 and MorphIQ Risk #380 cancellation analysis | **ported** as section 8; the corner is a required fixture case |
+| `AmericanBivariate.lean` (5 laws: Gaussian marginal, two complement identities, comonotone and countermonotone closed forms) | **not ported**: this repository's proofs are Coq/Gappa, not Lean. Their statements are the proof targets of the remaining work; their runtime counterparts are tested: reflection (the two complements) and the degenerate closed forms |
 | `benches/numerics.rs` bivariate entries (`bivariate_norm_cdf`, `_high_correlation`, `_hoisted_golden_rho`) | **not ported**: there is no bivariate benchmark binary here yet; the matrix they covered (one-shot at several correlations, repeated-`rho`, table construction) is the one the performance epic runs (section 9) |
 
 ## 11. Remaining work, in order
 
 1. Add a bivariate benchmark binary and measure the one-shot, repeated-`rho`
-   and lane paths on ARM and native x86 (#216), against the FerroRisk baseline,
+   and lane paths on ARM and native x86 (#216), against the MorphIQ Risk baseline,
    on a quiet host: the performance epic (#149).
 
 ## 12. Batch evaluation and lanes

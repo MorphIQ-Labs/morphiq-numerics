@@ -87,7 +87,7 @@ fn the_reusable_evaluator_returns_the_one_shot_bits() {
     }
 }
 
-/// The deep-tail negative-correlation corner of ferro-risk's issue #380 is a
+/// The deep-tail negative-correlation corner of MorphIQ Risk's issue #380 is a
 /// required case set. The value is returned to the absolute bound, and where
 /// the value is smaller than that bound the reported error is not smaller than
 /// the value: the result refuses to look relative (docs/bivariate_normal.md
