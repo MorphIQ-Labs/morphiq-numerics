@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.20](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.19...v0.0.20) - 2026-10-31
+
+### Performance
+
+- *(simd)* read the AVX-512 exp table with a hardware gather ([#258](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/258))
+
 ## [0.0.19](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.18...v0.0.19) - 2026-10-31
 
 ### Added
