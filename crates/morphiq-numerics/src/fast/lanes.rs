@@ -47,7 +47,8 @@ impl Kernel for Cdf {
 /// are in `[2^-33, 8]`.
 #[inline(always)]
 fn lower<K: Simd>(k: K, a: K::F) -> K::F {
-    let exponential = crate::exp::bounded::in_domain_lanes(k, k.mul(k.mul(k.splat(-0.5), a), a));
+    let exponential =
+        crate::exp::bounded::in_domain_precise_lanes(k, k.mul(k.mul(k.splat(-0.5), a), a));
     let scaled = k.mul(a, k.splat(crate::normal_distribution::INV_SQRT2_HIGH));
     k.mul(
         k.mul(k.splat(0.5), exponential),
@@ -91,7 +92,7 @@ impl Kernel for LogCdf {
             let q = k.mul(
                 k.mul(
                     k.splat(0.5),
-                    crate::exp::bounded::in_domain_lanes(k, exp_arg),
+                    crate::exp::bounded::in_domain_precise_lanes(k, exp_arg),
                 ),
                 f,
             );

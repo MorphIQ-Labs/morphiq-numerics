@@ -286,7 +286,7 @@ these observations supplement the existing proofs and independent fixtures.
 
 The synthetic `exp(ln(x))` composition uses positive normal inputs with binary
 exponents from -900 to 900. If `d = 2^-53*|ln(x)| + 2^-65`, its relative error
-bound is `expm1(d)*(1+2^-51) + 2^-51`, using the fast exp bound on this range.
+bound is `expm1(d)*(1+2^-38) + 2^-38`, using the fast exp bound on this range.
 It has separate scalar throughput/latency cells and strong composition controls.
 It does not qualify a consumer's distinct composed error or workload budget.
 
@@ -362,3 +362,51 @@ python scripts/bench_fast/freeze.py target/issue-192/logcdf-001 --verify
 The same host, duration, pairing and retention rules apply. This scoped
 comparison does not establish the broader #192 workload/length/ARM matrix,
 mixed or fallback-heavy banks, or consumer qualification.
+
+## Focused Linux exp latency comparison
+
+`x86/prepare-exp-latency.py` runs on native x86-64 or AArch64 Linux. It
+stages the existing paired runner around already
+built C-ABI wrappers exporting `prod_exp`, `prod_exp_slice`, `prod_norm_cdf_slice`
+and `control_exp`. Build baseline and candidate with the same release profile
+(thin LTO, one codegen unit, `simd,std`, no ambient Rust flags), using the
+`x86/matrix-wrapper/src/lib.rs` adapter and `prepare.py` build procedure.
+Keep the baseline binary before rebuilding the candidate. Supply the existing
+`native-matrix.c` and `native-cache.c` shared timers and pinned CORE-MATH/SLEEF
+binaries. `glibc_exp` resolves the system libm through its public ABI; no glibc
+source is needed. Record the distribution's glibc version and libm binary hash
+alongside the comparator build receipts.
+
+```sh
+python scripts/bench_fast/x86/prepare-exp-latency.py \
+  --out target/exp-latency-001 --cpu 3 \
+  --product /path/to/candidate.so --baseline /path/to/baseline.so \
+  --native /path/to/native-matrix.so --native-cache /path/to/native-cache.so \
+  --core-math /path/to/libcoreexp.so --sleef /path/to/libsleef.so.3
+python scripts/bench_fast/freeze.py target/exp-latency-001
+python target/exp-latency-001/run-qualification.py
+python scripts/bench_fast/freeze.py target/exp-latency-001 --verify
+```
+
+Finish builds, proofs and oracle checks before timing. Twenty-two cells separate
+dependent latency, scalar throughput, slice lengths 1/8/52/53/4096, mixed
+fallback packets, wide inputs and unchanged CDF/strong-exp controls. Three
+latency cells must independently improve against the baseline under the shared
+ten-process confidence rule. Other cells are regression/comparator diagnostics;
+a successful required-cell result alone is not competitor or release acceptance.
+Review throughput and controls separately. Discount/density inputs are declared
+synthetic pricing-domain banks, not captured consumer frequencies. Report each measured architecture separately; one host cannot establish speed
+on another. This adapter does not establish an end-to-end pricing/IV budget.
+
+On AArch64 Linux, compile both Rust wrappers natively with the same manifest
+profile and `simd,std`; the slice entry selects NEON. Build pinned SLEEF 3.9
+with its scalar library enabled, GNUABI and tests disabled, and CORE-MATH
+with `-O3 -fPIC -shared -march=native -frounding-math -ffp-contract=off`.
+The shared timer is portable: compile `x86/native-matrix.c` with
+`-O3 -fPIC -shared -ffp-contract=off -I/path/to/sleef/include`, link that
+host’s `libsleef.so.3`, and give the loader its library directory. Compile
+`x86/native-cache.c` with `-O3 -fPIC -shared`. Pass those native binaries
+to the same adapter. Before timing, run the release reference suite and the
+fast scalar/slice tests on that host, including its determinism digest.
+Retain OS/glibc, CPU, compiler and binary hashes; Linux/ARM measurements do
+not establish macOS/Apple-libm performance.
