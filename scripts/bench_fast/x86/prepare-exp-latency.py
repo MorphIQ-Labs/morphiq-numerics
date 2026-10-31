@@ -80,8 +80,9 @@ for n in [1, 8, 52, 53, 4096]:
 add('latency', 'wide')
 add('vector', 'mixed', 53)
 add('vector', 'ordinary', primitive='cdf')
-add('latency', 'ordinary', control=True)
-cells[-1]['id'] += '-strong-control'
+for kind in ['latency', 'scalar']:
+    add(kind, 'ordinary', control=True)
+    cells[-1]['id'] += '-strong-control'
 manifest = dict(cells=cells, builds=[dict(name='auto',sha256=pins['product.so']['sha256'],
                     control_sha256=pins['baseline.so']['sha256'])],
                 protocol=dict(processes=10, blocks=2, paired_rounds_per_process=2,

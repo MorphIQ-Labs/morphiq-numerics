@@ -387,7 +387,7 @@ python target/exp-latency-001/run-qualification.py
 python scripts/bench_fast/freeze.py target/exp-latency-001 --verify
 ```
 
-Finish builds, proofs and oracle checks before timing. Twenty-one cells separate
+Finish builds, proofs and oracle checks before timing. Twenty-two cells separate
 dependent latency, scalar throughput, slice lengths 1/8/52/53/4096, mixed
 fallback packets, wide inputs and unchanged CDF/strong-exp controls. Three
 latency cells must independently improve against the baseline under the shared
