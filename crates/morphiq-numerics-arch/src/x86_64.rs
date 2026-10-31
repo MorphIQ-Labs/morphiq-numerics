@@ -265,6 +265,12 @@ impl Simd for Avx512 {
         unsafe { avx512::store_partial(value, out) }
     }
     #[inline(always)]
+    fn gather_wrapped<const N: usize>(self, table: &[u64; N], index: __m512i) -> __m512d {
+        // SAFETY: this token establishes AVX-512F. The helper masks every
+        // index by N-1 before its table access.
+        unsafe { avx512::gather_wrapped(table, index) }
+    }
+    #[inline(always)]
     fn gather_pair_wrapped<const N: usize>(
         self,
         table: &[u64; N],
@@ -679,6 +685,23 @@ mod helpers {
         use core::arch::x86_64::{_mm256_storeu_si256, _mm512_cvtepi64_epi32};
 
         use super::super::Avx512Mask;
+
+        #[target_feature(enable = "avx512f")]
+        #[inline]
+        pub(in super::super) fn gather_wrapped<const N: usize>(
+            table: &[u64; N],
+            index: __m512i,
+        ) -> __m512d {
+            assert!(
+                N.is_power_of_two(),
+                "gather table length must be a positive power of two"
+            );
+            #[allow(clippy::cast_possible_wrap)] // a Rust array cannot exceed isize::MAX bytes
+            let index = _mm512_and_si512(index, _mm512_set1_epi64((N - 1) as i64));
+            // SAFETY: masked indices are in 0..N; scale eight addresses exactly
+            // the u64 elements of the live array. This helper has AVX-512F.
+            unsafe { core::arch::x86_64::_mm512_i64gather_pd::<8>(index, table.as_ptr().cast()) }
+        }
 
         #[target_feature(enable = "avx512f")]
         #[inline]

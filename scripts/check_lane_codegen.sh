@@ -16,8 +16,11 @@
 # The batched tridiagonal solve must also contain packed division in both
 # vector widths, with no fused operations: scalar-only dispatch would satisfy
 # numerical tests while failing to provide the promised SIMD implementation.
-# Bounded exp must use scalar table loads assembled into lanes: hardware
-# gather caused a native regression on hosts with the GDS microcode mitigation.
+# Bounded exp's AVX-512 kernels must read their table with a hardware gather:
+# assembling scalar loads occupied the 512-bit arithmetic ports and made them
+# 1.4-1.8x slower on Granite Rapids. Every other bounded kernel must not gather:
+# it regressed on hosts with the GDS microcode mitigation and on AMD Turin. The
+# AVX-512 CDF and log-CDF lanes inline the exp lookup, so they may gather too.
 # Exit 1 on a violation, 2 when the check cannot run or the
 # binary has no AVX2 or AVX-512F kernels to check. x86-64 only; needs objdump.
 set -eu
@@ -53,6 +56,8 @@ objdump -d --no-show-raw-insn --demangle=rust "$binary" | awk '
         fused++
     }
     /v(p)?gather/ && fn ~ /(exp::bounded::|ln::bounded::|fast::lanes::(Cdf|LogCdf))/ {
+        if (fn ~ /exp::bounded::/ && fn ~ /avx512_run/) { exp_avx512_gather++; next }
+        if (fn ~ /(exp::bounded::|fast::lanes::(Cdf|LogCdf))/ && fn ~ /(avx512_run|x86_64::Avx512)/) next
         printf "hardware gather in bounded kernel %s\n", fn > "/dev/stderr"
         gather++
     }
@@ -63,8 +68,8 @@ objdump -d --no-show-raw-insn --demangle=rust "$binary" | awk '
     }
     END {
         if (!avx2 || !avx512) { print "no AVX2 or AVX-512F kernels in the binary" > "/dev/stderr"; exit 2 }
-        if (!exp_avx2 || !exp_avx512 || gather) {
-            print "bounded exp requires AVX2/AVX-512 kernels without hardware gather" > "/dev/stderr"
+        if (!exp_avx2 || !exp_avx512 || !exp_avx512_gather || gather) {
+            print "bounded exp requires an AVX-512 hardware gather and no other bounded gather" > "/dev/stderr"
             exit 1
         }
         if (!tri_avx2 || !tri_avx512 || fused) {
