@@ -947,6 +947,12 @@ Print Assumptions LnNormalized.positive_normal_encoding_screen.
 Print Assumptions LnNormalized.normal_reduction_identical.
 Print Assumptions LnNormalized.clear_low_52.
 Print Assumptions LnNormalized.packed_tables_lossless.
+Require FastLogCdf.
+Print Assumptions FastLogCdf.fast_logcdf_negative_ok.
+Print Assumptions FastLogCdf.fast_logcdf_positive_ok.
+Print Assumptions FastLogCdf.fast_logcdf_entry_ok.
+Print Assumptions FastLogCdf.fast_logcdf_fallback.
+Print Assumptions FastLogCdf.fast_logcdf_nonfinite.
 Print Assumptions FastExp.fast_exp_entry_ok.
 Print Assumptions FastExp.fast_exp_nonpositive_range.
 Print Assumptions FastErfcx.fast_erfcx_table_ok.

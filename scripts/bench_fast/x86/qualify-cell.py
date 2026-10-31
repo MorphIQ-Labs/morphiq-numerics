@@ -68,7 +68,7 @@ def main():
     ap.add_argument('--cache-slots', type=int, default=1)
     ap.add_argument('--product', required=True)
     ap.add_argument('--reference', required=True)
-    ap.add_argument('--primitive', choices=['exp', 'erfcx', 'cdf', 'ln', 'ln_exp', 'log2', 'log10', 'ln_1p'], required=True)
+    ap.add_argument('--primitive', choices=['exp', 'erfcx', 'cdf', 'ln', 'ln_exp', 'log2', 'log10', 'ln_1p', 'log_cdf'], required=True)
     ap.add_argument('--length', type=int, required=True)
     ap.add_argument('--population', default='ordinary')
     ap.add_argument('--kind', choices=['vector', 'scalar', 'latency'], default='vector')
@@ -91,7 +91,7 @@ def main():
         method = getattr(native, name)
         method.argtypes = [C.c_void_p, D, D, C.c_size_t, C.c_uint64]
         method.restype = C.c_uint64
-    symbol = dict(exp='exp', erfcx='erfcx', cdf='norm_cdf', ln='ln', ln_exp='ln_exp', log2='log2', log10='log10', ln_1p='ln_1p')[args.primitive]
+    symbol = dict(exp='exp', erfcx='erfcx', cdf='norm_cdf', ln='ln', ln_exp='ln_exp', log2='log2', log10='log10', ln_1p='ln_1p', log_cdf='log_norm_cdf')[args.primitive]
     symbol = args.symbol_prefix + symbol + ('_slice' if args.kind == 'vector' else '')
     product = pointer(Path(args.product), symbol)
     entries = {'ours': (product, 'measure_packet' if args.kind == 'vector' else 'measure1')}
@@ -115,9 +115,9 @@ def main():
         ref, method = pointer(E/('libcorelog.dylib' if platform.system() == 'Darwin' else 'libcorelog.so'), 'cr_log'), 'measure1'
     elif args.reference == 'libcerf_erfcx':
         ref, method = pointer(E/'libcerf.so', 'erfcx'), 'measure1'
-    elif args.reference == 'scipy_ndtr':
+    elif args.reference in ['scipy_ndtr', 'scipy_log_ndtr']:
         import scipy.special.cython_special as cy
-        obj = cy.__pyx_capi__['__pyx_fuse_1ndtr']
+        obj = cy.__pyx_capi__['__pyx_fuse_1ndtr' if args.reference == 'scipy_ndtr' else '__pyx_fuse_1log_ndtr']
         name = C.pythonapi.PyCapsule_GetName
         name.argtypes, name.restype = [C.py_object], C.c_char_p
         get = C.pythonapi.PyCapsule_GetPointer

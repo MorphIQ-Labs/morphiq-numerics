@@ -40,13 +40,20 @@ pub fn norm_cdf(x: f64) -> f64 {
     if a <= 1.0 {
         return central(x);
     }
-    // The screen above establishes a <= 8; fast_normal_exponent_ok proves
-    // that this rounded argument is in [-32, 0], inside exp's kernel domain.
+    let lower = lower(a);
+    if x < 0.0 { lower } else { 1.0 - lower }
+}
+
+/// The lower tail `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` for
+/// `2^-33 <= a <= 8`, established by the caller: `fast_normal_exponent_ok`
+/// proves the rounded exponent is in `[-32, 0]`, inside exp's kernel domain,
+/// and the table kernel is entered below erfcx's public magnitude screen
+/// (`FastNormal.fast_normal_lower_ok`).
+#[inline]
+pub(super) fn lower(a: f64) -> f64 {
     let exponential = crate::exp::bounded::in_domain((-0.5 * a) * a);
     let scaled = a * crate::normal_distribution::INV_SQRT2_HIGH;
-    // The composition needs the table below erfcx's public magnitude screen.
-    let lower = (0.5 * exponential) * crate::erfcx::bounded::table(scaled);
-    if x < 0.0 { lower } else { 1.0 - lower }
+    (0.5 * exponential) * crate::erfcx::bounded::table(scaled)
 }
 
 // Keep the strong entry's register requirements out of the accelerated caller.
@@ -54,6 +61,54 @@ pub fn norm_cdf(x: f64) -> f64 {
 #[inline(never)]
 fn norm_cdf_fallback(x: f64) -> f64 {
     crate::normal::norm_cdf(x)
+}
+
+/// Largest negative magnitude the bounded log-CDF accelerates: its scaled
+/// argument `RN(a / sqrt(2))` stays below the erfcx table's upper limit 16.
+pub(super) const NEG_LIMIT: f64 = 22.5;
+
+/// Natural logarithm of the standard-normal CDF, `ln(Phi(x))`.
+///
+/// On `-22.5 <= x <= -2^-33` it evaluates
+/// `-a²/2 + ln(erfcx(a/sqrt(2))) - ln(2)` for `a = -x`, with the table
+/// polynomial and the bounded logarithm. On `2^-33 <= x <= 8` it forms the
+/// lower tail `q = Phi(-x)` as [`norm_cdf`] does and returns `ln(1 - q)`
+/// through the logarithm of the rounded complement, corrected by the ratio
+/// of the exact to the rounded difference. The absolute error in natural-log
+/// units is bounded as stated in `docs/fast.md`. Every other input,
+/// including tiny magnitudes, the far negative tail, saturation, overflow,
+/// infinities and NaNs, uses [`crate::normal::log_norm_cdf`].
+#[must_use]
+#[inline]
+pub fn log_norm_cdf(x: f64) -> f64 {
+    let a = x.abs();
+    if x < 0.0 {
+        if !(MIN_MAGNITUDE..=NEG_LIMIT).contains(&a) {
+            return log_norm_cdf_fallback(x);
+        }
+        // t = RN(-a²/2) in [-253.125, 0]; z = RN(a/sqrt 2) < 16 (table domain).
+        let t = (-0.5 * a) * a;
+        let scaled = a * crate::normal_distribution::INV_SQRT2_HIGH;
+        let g = crate::ln::bounded::regular(crate::erfcx::bounded::table(scaled));
+        (t + g) - crate::normal_distribution::LN2_HIGH
+    } else {
+        // A NaN magnitude fails the screen and keeps its strong-owner result.
+        if !(MIN_MAGNITUDE..=8.0).contains(&a) {
+            return log_norm_cdf_fallback(x);
+        }
+        let q = lower(a);
+        // q >= Phi(-8)(1 - 2^-47) > 2^-51, so w < 1 and 1 - w = q + delta is
+        // exact (Sterbenz) with |delta| <= 2^-54: ln(1 - q) = ln(w) * q/(q + delta)
+        // up to the correction's second-order term.
+        let w = 1.0 - q;
+        crate::ln::bounded::regular(w) * (q / (1.0 - w))
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn log_norm_cdf_fallback(x: f64) -> f64 {
+    crate::normal::log_norm_cdf(x)
 }
 
 /// Degree-25 integrated Gaussian Taylor polynomial on |x| <= 1.
@@ -136,5 +191,23 @@ pub fn norm_cdf_slice(x: &[f64], out: &mut [f64]) {
     #[cfg(not(feature = "simd"))]
     for (o, &x) in out.iter_mut().zip(x) {
         *o = norm_cdf(x);
+    }
+}
+
+/// Apply [`log_norm_cdf`] to a slice, preserving its scalar result bits.
+///
+/// # Panics
+/// If the input and output lengths differ.
+pub fn log_norm_cdf_slice(x: &[f64], out: &mut [f64]) {
+    assert_eq!(
+        x.len(),
+        out.len(),
+        "log_norm_cdf_slice: slices of different lengths"
+    );
+    #[cfg(feature = "simd")]
+    crate::lanes::map::<super::lanes::LogCdf>(x, out);
+    #[cfg(not(feature = "simd"))]
+    for (o, &x) in out.iter_mut().zip(x) {
+        *o = log_norm_cdf(x);
     }
 }

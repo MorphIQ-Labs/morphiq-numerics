@@ -1939,6 +1939,13 @@ fn fast_section(r: &mut Recorder) {
             0.5,
             2.0,
         ),
+        (
+            "fast::log_norm_cdf",
+            normal_fast::log_norm_cdf,
+            normal_fast::log_norm_cdf_slice,
+            -40.0,
+            40.0,
+        ),
     ] {
         r.label(name);
         for &bits in &edges {

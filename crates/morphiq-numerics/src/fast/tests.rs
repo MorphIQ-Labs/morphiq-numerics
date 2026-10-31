@@ -31,6 +31,7 @@ fn mixed_slices_preserve_fast_scalar_bits_and_remainders() {
     let mut offset = 16;
     for boundary in [
         -704.0,
+        -normal::NEG_LIMIT,
         -8.0,
         -1.0,
         -0.5,
@@ -57,6 +58,7 @@ fn mixed_slices_preserve_fast_scalar_bits_and_remainders() {
         (elementary::ln, elementary::ln_slice),
         (normal::erfcx, normal::erfcx_slice),
         (normal::norm_cdf, normal::norm_cdf_slice),
+        (normal::log_norm_cdf, normal::log_norm_cdf_slice),
     ] {
         for n in (0..=17).chain([51, 52, 53, 256, 257]) {
             let mut out = [0.0; 257];
@@ -127,4 +129,56 @@ fn unaccelerated_inputs_retain_strong_results() {
             crate::normal::erfcx(x).to_bits()
         );
     }
+    for x in [
+        -40.0,
+        -normal::NEG_LIMIT.next_up(),
+        -normal::MIN_MAGNITUDE.next_down(),
+        0.0,
+        -0.0,
+        normal::MIN_MAGNITUDE.next_down(),
+        8.0_f64.next_up(),
+        40.0,
+        f64::NEG_INFINITY,
+        f64::INFINITY,
+        f64::from_bits(0x7ff8_1234_5678_9abc),
+        f64::from_bits(0xfff8_0000_0000_0001),
+    ] {
+        assert_eq!(
+            normal::log_norm_cdf(x).to_bits(),
+            crate::normal::log_norm_cdf(x).to_bits(),
+            "x={x:?}"
+        );
+    }
+}
+
+/// The accelerated log-CDF agrees with the strong owner to the published
+/// log-unit budget, is negative, finite and normal, and the two sides of its
+/// scalar branch meet the strong value at the same scale around zero.
+#[test]
+fn log_cdf_accelerated_domain_tracks_the_strong_owner() {
+    let budget = |strong: f64| {
+        f64::from_bits(0x3cc0_0000_0000_0000) * strong.abs() + f64::from_bits(0x3cf0_0000_0000_0000)
+    };
+    let mut worst = 0.0_f64;
+    for i in 0..=45_000 {
+        let x = -normal::NEG_LIMIT + (normal::NEG_LIMIT + 8.0) * f64::from(i) / 45_000.0;
+        if x.abs() < normal::MIN_MAGNITUDE {
+            continue;
+        }
+        let fast = normal::log_norm_cdf(x);
+        let strong = crate::normal::log_norm_cdf(x);
+        assert!(
+            fast.is_finite() && fast < 0.0 && fast.is_normal(),
+            "x={x:?} -> {fast:?}"
+        );
+        let error = (fast - strong).abs();
+        worst = worst.max(error / budget(strong));
+        assert!(
+            error <= budget(strong),
+            "x={x:?}: fast {fast:?} strong {strong:?}"
+        );
+    }
+    // The strong owner is itself within 2^-53 relative; this is a sampled
+    // sanity check against the published budget, not the proof of it.
+    assert!(worst < 1.0);
 }

@@ -334,3 +334,31 @@ A required failure stops the entire campaign. Staging changes execution order
 only: acceptance still requires all 394 cells measured and all 244 required
 cells passing. Native ARM and manifests without groups retain the original
 single-group schedule.
+
+## Focused log-CDF comparison
+
+The `x86/prepare-log-cdf.py` adapter times the bounded `log_norm_cdf`
+against Risk's own `log_norm_cdf` (Cody rational erfcx with the platform
+logarithm), built from a pinned `morphiq-risk-rs` checkout as a C-ABI library
+with the same symbol names, so the runner's `--reference-product` path pairs
+the two in one process. Three 52-value populations, exact values off the
+dyadic grid: ordinary `[-3, 3]`, wide `[-8, 8]` and negative tail `[-22, -8]`,
+each with scalar throughput, dependent latency and the automatic slice (Risk
+has no log-CDF slice: its packet entry is the scalar loop it would run), plus
+the unchanged strong `normal::log_norm_cdf` slice as a drift control. The
+native timers are compiled with `-DNO_SLEEF`; `qualify-cell.py` also offers
+SciPy `log_ndtr` (`--reference scipy_log_ndtr`) as a diagnostic. The manifest
+records both source revisions, whether the Risk checkout was dirty, and the
+product and reference library hashes.
+
+```sh
+python scripts/bench_fast/x86/prepare-log-cdf.py --cpu 2 \
+  --risk ../morphiq-risk-rs --out target/issue-192/logcdf-001
+python scripts/bench_fast/freeze.py target/issue-192/logcdf-001
+python target/issue-192/logcdf-001/run-qualification.py
+python scripts/bench_fast/freeze.py target/issue-192/logcdf-001 --verify
+```
+
+The same host, duration, pairing and retention rules apply. This scoped
+comparison does not establish the broader #192 workload/length/ARM matrix,
+mixed or fallback-heavy banks, or consumer qualification.

@@ -295,7 +295,7 @@ pub(super) fn fast_ln<K: Simd>(k: K, x: &K::Array) -> (StageH<K>, u64) {
 /// The bounded slice screens the whole packet before entering. At one all
 /// residuals and table terms are zero, so this also returns exact +0.
 #[inline(always)]
-pub(super) fn bounded_positive<K: Simd>(k: K, x: K::F) -> K::F {
+pub(crate) fn bounded_positive<K: Simd>(k: K, x: K::F) -> K::F {
     let (s, lo, _) = fast_value::<K, true>(k, reduce(k, x));
     k.add(s, lo)
 }
