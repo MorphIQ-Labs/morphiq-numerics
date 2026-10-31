@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.19](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.18...v0.0.19) - 2026-10-31
+
+### Added
+
+- *(fast)* bounded normal log-CDF scalar and SIMD primitives ([#256](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/256))
+
 ## [0.0.18](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.17...v0.0.18) - 2026-10-30
 
 ### Performance
