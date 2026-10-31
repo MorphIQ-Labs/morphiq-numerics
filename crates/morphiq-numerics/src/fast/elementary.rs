@@ -28,9 +28,9 @@ pub fn ln_slice(x: &[f64], out: &mut [f64]) {
     }
 }
 
-/// Exponential with relative error at most `2^-51` for `|x| < 704`.
+/// Exponential with relative error at most `2^-38` for `|x| < 704`.
 ///
-/// It uses the generated table high words and a bounded cubic polynomial,
+/// It uses the generated table high words and a bounded quadratic polynomial,
 /// with exact exponent-field scaling. Other inputs use [`crate::elementary::exp`],
 /// including gradual underflow, overflow, infinities and NaN payloads.
 #[must_use]

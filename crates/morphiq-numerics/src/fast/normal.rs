@@ -51,7 +51,7 @@ pub fn norm_cdf(x: f64) -> f64 {
 /// (`FastNormal.fast_normal_lower_ok`).
 #[inline]
 pub(super) fn lower(a: f64) -> f64 {
-    let exponential = crate::exp::bounded::in_domain((-0.5 * a) * a);
+    let exponential = crate::exp::bounded::in_domain_precise((-0.5 * a) * a);
     let scaled = a * crate::normal_distribution::INV_SQRT2_HIGH;
     (0.5 * exponential) * crate::erfcx::bounded::table(scaled)
 }

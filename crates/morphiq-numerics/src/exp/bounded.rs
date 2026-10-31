@@ -1,6 +1,6 @@
-//! Explicit bounded exponential: high-word table and constrained cubic.
+//! Public quadratic exponential and the tighter cubic used by the normal family.
 
-use super::bounded_tables::{C2, HIGH, INV, L1, L2D};
+use super::bounded_tables::{C1, C2, HIGH, INV, L1, L2D, STEP};
 use super::tables::{POLY_S, SHIFTER};
 
 #[inline]
@@ -12,11 +12,25 @@ pub(crate) fn exp(x: f64) -> f64 {
     in_domain(x)
 }
 
-/// Evaluate an argument whose caller has established `|x| < 704`.
-/// The public exp screen and CDF exponent proof (`fast_normal_exponent_ok`,
-/// range [-32, 0]) establish this precondition before calling the kernel.
+/// Public exp's short reduction and parallel quadratic, relative bound 2^-38.
 #[inline]
 pub(crate) fn in_domain(x: f64) -> f64 {
+    debug_assert!(x.abs() < 704.0);
+    let t = x * INV + SHIFTER;
+    let n = t - SHIFTER;
+    let bits = t.to_bits();
+    #[allow(clippy::cast_possible_truncation)] // masked index is at most 1023
+    let index = (bits & 1023) as usize;
+    let high = f64::from_bits(HIGH[index].wrapping_add(bits << 42));
+    let r = x - n * STEP;
+    // Independent terms shorten the chain; operation order is proof-bound.
+    high * ((1.0 + C1 * r) + (0.5 * r) * r)
+}
+
+/// Tighter internal exp, retaining the normal family's relative 2^-51 budget.
+/// The CDF argument proof establishes |x| <= 32 before entering this kernel.
+#[inline]
+pub(crate) fn in_domain_precise(x: f64) -> f64 {
     debug_assert!(x.abs() < 704.0);
     let t = x * INV + SHIFTER;
     let n = t - SHIFTER;
@@ -33,11 +47,25 @@ pub(crate) fn in_domain(x: f64) -> f64 {
     high * (1.0 + u)
 }
 
-/// Lane form of `in_domain`; validated CDF lanes and screened exp packets
-/// establish the same domain before entering this operation sequence.
+/// Lane form of the public quadratic; screened packets establish the domain.
 #[cfg(feature = "simd")]
 #[inline(always)]
 pub(crate) fn in_domain_lanes<K: morphiq_numerics_arch::Simd>(k: K, x: K::F) -> K::F {
+    debug_assert!(all_active(k, x));
+    let t = k.add(k.mul(x, k.splat(INV)), k.splat(SHIFTER));
+    let n = k.sub(t, k.splat(SHIFTER));
+    let bits = k.to_bits(t);
+    let high = k.to_float(k.add_u(k.to_bits(k.gather_wrapped(&HIGH, bits)), k.shl_u(bits, 42)));
+    let r = k.sub(x, k.mul(n, k.splat(STEP)));
+    let linear = k.add(k.splat(1.0), k.mul(k.splat(C1), r));
+    let quadratic = k.mul(k.mul(k.splat(0.5), r), r);
+    k.mul(high, k.add(linear, quadratic))
+}
+
+/// Lane form of the tighter internal cubic, preserving the normal-family bits.
+#[cfg(feature = "simd")]
+#[inline(always)]
+pub(crate) fn in_domain_precise_lanes<K: morphiq_numerics_arch::Simd>(k: K, x: K::F) -> K::F {
     debug_assert!(all_active(k, x));
     let t = k.add(k.mul(x, k.splat(INV)), k.splat(SHIFTER));
     let n = k.sub(t, k.splat(SHIFTER));
