@@ -319,7 +319,7 @@ vega where inversion is ill-conditioned. A premium/vega reporting screen must
 never silently remove supported consumer inputs from qualification.
 
 The versioned `scripts/bench_fast/x86/prepare-exp-latency.py` stages the focused
-native comparison using the shared paired runner. The acceptance criterion is
+native Linux comparison using the shared paired runner. The acceptance criterion is
 a one-sided 95% upper confidence ratio no greater than one against the prior
 public cubic for dependent latency on ordinary, discount and density input
 banks, independently. Ten fresh processes run two alternating paired samples
@@ -329,8 +329,8 @@ short slices/remainders, mixed fallback packets, wide inputs, unchanged CDF
 and strong exp controls are reviewed separately for regressions. Scalar
 CORE-MATH, SLEEF and glibc calls are diagnostic comparisons, with binary hashes
 and native environment retained. A latency win does not establish throughput
-parity, and this focused x86 investigation does not establish native ARM parity
-or an end-to-end Risk result. Full competitor qualification uses the native
+parity, and this focused investigation establishes results only on each measured
+architecture, independently. It does not establish an end-to-end Risk result. Full competitor qualification uses the native
 procedure in `scripts/bench_fast/README.md`.
 
 Independent exp fixtures include neighboring binary64 inputs around reduction

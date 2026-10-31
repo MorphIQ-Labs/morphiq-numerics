@@ -363,9 +363,10 @@ The same host, duration, pairing and retention rules apply. This scoped
 comparison does not establish the broader #192 workload/length/ARM matrix,
 mixed or fallback-heavy banks, or consumer qualification.
 
-## Focused exp latency comparison
+## Focused Linux exp latency comparison
 
-`x86/prepare-exp-latency.py` stages the existing paired runner around already
+`x86/prepare-exp-latency.py` runs on native x86-64 or AArch64 Linux. It
+stages the existing paired runner around already
 built C-ABI wrappers exporting `prod_exp`, `prod_exp_slice`, `prod_norm_cdf_slice`
 and `control_exp`. Build baseline and candidate with the same release profile
 (thin LTO, one codegen unit, `simd,std`, no ambient Rust flags), using the
@@ -394,5 +395,18 @@ latency cells must independently improve against the baseline under the shared
 ten-process confidence rule. Other cells are regression/comparator diagnostics;
 a successful required-cell result alone is not competitor or release acceptance.
 Review throughput and controls separately. Discount/density inputs are declared
-synthetic pricing-domain banks, not captured consumer frequencies. This adapter
-establishes neither native ARM speed nor an end-to-end pricing/IV budget.
+synthetic pricing-domain banks, not captured consumer frequencies. Report each measured architecture separately; one host cannot establish speed
+on another. This adapter does not establish an end-to-end pricing/IV budget.
+
+On AArch64 Linux, compile both Rust wrappers natively with the same manifest
+profile and `simd,std`; the slice entry selects NEON. Build pinned SLEEF 3.9
+with its scalar library enabled, GNUABI and tests disabled, and CORE-MATH
+with `-O3 -fPIC -shared -march=native -frounding-math -ffp-contract=off`.
+The shared timer is portable: compile `x86/native-matrix.c` with
+`-O3 -fPIC -shared -ffp-contract=off -I/path/to/sleef/include`, link that
+host’s `libsleef.so.3`, and give the loader its library directory. Compile
+`x86/native-cache.c` with `-O3 -fPIC -shared`. Pass those native binaries
+to the same adapter. Before timing, run the release reference suite and the
+fast scalar/slice tests on that host, including its determinism digest.
+Retain OS/glibc, CPU, compiler and binary hashes; Linux/ARM measurements do
+not establish macOS/Apple-libm performance.

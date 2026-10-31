@@ -2,11 +2,12 @@
 
 All binaries must already exist. Run the staged run-qualification.py after builds
 and oracle/proof work finish. No downloads, compilation, or retries during timing.
-This focused x86 investigation does not replace the full native parity matrix.
+This focused native Linux investigation does not replace the full parity matrix.
 """
 import argparse
 import hashlib
 import json
+import platform
 from pathlib import Path
 import shutil
 import struct
@@ -19,6 +20,8 @@ for name in ['product', 'baseline', 'native', 'native-cache', 'core-math', 'slee
     parser.add_argument('--'+name, type=Path, required=True)
 parser.add_argument('--cpu', type=int, required=True)
 a = parser.parse_args()
+if platform.system() != 'Linux' or platform.machine() not in ['x86_64', 'aarch64']:
+    parser.error('Use native x86-64 or AArch64 Linux with glibc')
 out = a.out.resolve()
 out.mkdir(parents=True, exist_ok=False)
 for name in ['qualify-cell.py', 'run-qualification.py']:
@@ -87,7 +90,7 @@ manifest = dict(cells=cells, builds=[dict(name='auto',sha256=pins['product.so'][
                     control_sha256=pins['baseline.so']['sha256'])],
                 protocol=dict(processes=10, blocks=2, paired_rounds_per_process=2,
                               target_ms=600, minimum_ms=250, upper95_t9=1.8331129326536335),
-                interpretation='Required: dependent latency improves against baseline in all three ordinary/pricing input banks (upper one-sided 95% ratio <= 1). Throughput, wide, mixed, unchanged CDF and strong control are separate regression diagnostics; glibc/CORE-MATH/SLEEF are diagnostic comparators. Review every cell. No ARM or consumer end-to-end qualification is implied.',
+                interpretation='Required: dependent latency improves against baseline in all three ordinary/pricing input banks (upper one-sided 95% ratio <= 1). Throughput, wide, mixed, unchanged CDF and strong control are separate regression diagnostics; glibc/CORE-MATH/SLEEF are diagnostic comparators. Review every cell. Results apply only to the measured host and architecture; no consumer end-to-end qualification is implied.',
                 source=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
                 diff_sha256=hashlib.sha256(subprocess.check_output(['git','diff','HEAD'])).hexdigest(),
                 binary_pins=pins)
