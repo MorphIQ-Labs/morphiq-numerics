@@ -10,6 +10,20 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.21](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.20...v0.0.21) - 2026-11-01
+
+### Added
+
+- *(fast)* keep the 2^-51 exp and add exp_coarse at 2^-38 ([#265](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/265))
+
+### Other
+
+- use MorphIQ Risk naming throughout ([#263](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/263))
+
+### Performance
+
+- *(exp)* shorten the fast exponential dependency chain ([#261](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/261))
+
 ## [0.0.20](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.19...v0.0.20) - 2026-10-31
 
 ### Performance
