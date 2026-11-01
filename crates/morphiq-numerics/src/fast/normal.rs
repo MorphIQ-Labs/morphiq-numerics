@@ -37,11 +37,7 @@ pub fn norm_cdf(x: f64) -> f64 {
     if !(MIN_MAGNITUDE..=8.0).contains(&a) {
         return norm_cdf_fallback(x);
     }
-    if a <= 1.0 {
-        return central(x);
-    }
-    let lower = lower(a);
-    if x < 0.0 { lower } else { 1.0 - lower }
+    super::cdf::in_domain(x)
 }
 
 /// The lower tail `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` for
@@ -109,22 +105,6 @@ pub fn log_norm_cdf(x: f64) -> f64 {
 #[inline(never)]
 fn log_norm_cdf_fallback(x: f64) -> f64 {
     crate::normal::log_norm_cdf(x)
-}
-
-/// Degree-25 integrated Gaussian Taylor polynomial on |x| <= 1.
-#[inline]
-pub(super) fn central(x: f64) -> f64 {
-    use crate::normal_distribution::{CENTER_HIGH as A, DENSITY_HIGH};
-    let z = x * x;
-    let zz = z * z;
-    let p0 = A[0] + z * A[1];
-    let p1 = A[2] + z * A[3];
-    let p2 = A[4] + z * A[5];
-    let p3 = A[6] + z * A[7];
-    let p4 = A[8] + z * A[9];
-    let p5 = A[10] + z * A[11];
-    let p = p0 + zz * (p1 + zz * (p2 + zz * (p3 + zz * (p4 + zz * (p5 + zz * A[12])))));
-    0.5 + (x * DENSITY_HIGH) * p
 }
 
 /// Apply [`erfcx`] to a slice, preserving its scalar result bits.

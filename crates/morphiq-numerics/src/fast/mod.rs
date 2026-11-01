@@ -6,6 +6,7 @@
 //! the strong API's bits or correctly rounded results in the accelerated domain.
 //! See `docs/fast.md` for the bounds and their derivation.
 
+mod cdf;
 pub mod elementary;
 #[cfg(feature = "simd")]
 mod lanes;
