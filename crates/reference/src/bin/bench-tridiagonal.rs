@@ -5,7 +5,7 @@ use morphiq_numerics::linalg::tridiagonal::{
 };
 use std::{hint::black_box, time::Instant};
 
-// Adapted from the same original MIT FerroRisk recurrence as the library.
+// Adapted from the same original MIT MorphIQ Risk recurrence as the library.
 // See crates/morphiq-numerics/THIRD_PARTY_NOTICES.md. Compact off-diagonals;
 // successful finite-domain benchmark only. The original absolute 1e-300
 // pivot threshold is deliberately retained: subnormal cases are not timed
