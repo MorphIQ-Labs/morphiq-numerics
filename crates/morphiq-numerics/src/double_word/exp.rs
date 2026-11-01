@@ -26,9 +26,15 @@ const LIMIT: f64 = 1455.0;
 /// Below this magnitude `exp(x) = 1 + x` within `x²`, under the bound.
 const TINY: f64 = 1.0 / 1_152_921_504_606_846_976.0; // 2^-60
 /// A low word below this magnitude is dropped from the reduced argument; its
-/// effect on `exp` is below `2^-1000`, and it keeps every product of a leading
+/// effect on `exp` is below `2^-990`, and it keeps every product of a leading
 /// and a trailing word within the double-word multiplication's proved domain.
 const LOW_FLOOR: f64 = 1.0e-300;
+/// A reduced argument below this magnitude is taken as zero (`exp` moves by
+/// less than `2^-900`), so every Horner product is zero or normal.
+const R_FLOOR: f64 = 1.0e-271;
+/// A Horner value's trailing word below this magnitude is dropped (relative
+/// effect below `2^-187`), for the same reason.
+const V_FLOOR: f64 = 1.0e-60;
 
 /// The source of an exact product `(RN(a·b), a·b - RN(a·b))`.
 pub(super) trait ExactProduct {
@@ -77,7 +83,9 @@ fn kernel<P: ExactProduct>(x: DoubleWord, p: &P) -> Option<(DoubleWord, i32)> {
         .add_f64(-(n * L2))
         .add_f64(-q_lo)
         .add_f64(-q_hi);
-    let r = if r.lo.abs() < LOW_FLOOR {
+    let r = if r.hi.abs() < R_FLOOR {
+        DoubleWord::from_f64(0.0)
+    } else if r.lo.abs() < LOW_FLOOR {
         DoubleWord::from_f64(r.hi)
     } else {
         r
@@ -92,6 +100,9 @@ fn kernel<P: ExactProduct>(x: DoubleWord, p: &P) -> Option<(DoubleWord, i32)> {
             v = v.add_f64(f64::from_bits(low));
         }
         v = v.add_f64(f64::from_bits(high));
+        if v.lo.abs() < V_FLOOR {
+            v = DoubleWord::from_f64(v.hi);
+        }
     }
     Some((word(TABLE[j]).mul_with(v, p), exponent))
 }
