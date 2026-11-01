@@ -32,27 +32,34 @@ fn within_bound(actual: f64, high: f64, low: f64, relative: bool, exponent: i64)
 #[test]
 fn accelerated_domains_meet_their_bound_including_reference_uncertainty() {
     let data: Value = serde_json::from_str(include_str!("../fixtures/fast.json")).unwrap();
-    let mut observed = [0; 3];
+    let mut observed = [0; 4];
     for row in data["cases"].as_array().unwrap() {
         let name = row["primitive"].as_str().unwrap();
         let x = word(&row["x"]);
-        let (index, actual, relative, exponent) = match name {
-            "exp" => (0, elementary::exp(x), true, -38),
-            "erfcx" => (1, normal::erfcx(x), true, -51),
-            "cdf" => (2, normal::norm_cdf(x), false, -49),
+        // Each exp witness checks both public exponentials against their own
+        // published bound: the cubic `exp` and the quadratic `exp_coarse`.
+        let checks: &[(usize, &str, f64, bool, i64)] = match name {
+            "exp" => &[
+                (0, "exp", elementary::exp(x), true, -51),
+                (1, "exp_coarse", elementary::exp_coarse(x), true, -38),
+            ],
+            "erfcx" => &[(2, "erfcx", normal::erfcx(x), true, -51)],
+            "cdf" => &[(3, "cdf", normal::norm_cdf(x), false, -49)],
             _ => unreachable!("unknown fixture primitive"),
         };
-        assert!(
-            within_bound(
-                actual,
-                word(&row["high"]),
-                word(&row["low"]),
-                relative,
-                exponent
-            ),
-            "{name}({x:?}): {actual:?} exceeds the public bound including oracle uncertainty"
-        );
-        observed[index] += 1;
+        for &(index, api, actual, relative, exponent) in checks {
+            assert!(
+                within_bound(
+                    actual,
+                    word(&row["high"]),
+                    word(&row["low"]),
+                    relative,
+                    exponent
+                ),
+                "{api}({x:?}): {actual:?} exceeds the public bound including oracle uncertainty"
+            );
+            observed[index] += 1;
+        }
     }
     assert!(observed.iter().all(|&n| n > 100), "empty oracle population");
 }

@@ -78,8 +78,8 @@ rounding is bounded by `u|t + g| + 2^-1075`. The constant's error is below
 
 **Positive inputs.** The lower tail is the bounded CDF's composition
 `q̂ = RN((0.5·exp_cubic(t))·table_erfcx(z))`, now with a relative bound.
-`exp_cubic` is the retained internal `2^-51` kernel; the public `2^-38`
-quadratic is not used in this composition:
+`exp_cubic` is the public fast `exp`'s `2^-51` kernel, entered under the CDF's
+argument proof; `exp_coarse`'s `2^-38` quadratic is not used in this composition:
 `fast_logcdf_lower_relative` composes the exponential's two perturbations
 (`2^-51` from the kernel and `exp(u q) - 1 <= 33u` from the rounded exponent),
 the table's two (`2^-51` and the argument sensitivity, proportional to `y` on

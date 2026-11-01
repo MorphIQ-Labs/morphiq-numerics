@@ -1,20 +1,72 @@
-//! Public quadratic exponential and the tighter cubic used by the normal family.
+//! Bounded exponentials: the table and constrained cubic (`fast::elementary::exp`,
+//! relative `2^-51`, also the normal family's kernel) and the one-word reduction
+//! with parallel quadratic (`fast::elementary::exp_coarse`, relative `2^-38`).
+//! One slice engine serves both through [`Kernel`]; each monomorphizes to its own
+//! code, so neither kernel's operation sequence depends on the other.
 
 use super::bounded_tables::{C1, C2, HIGH, INV, L1, L2D, STEP};
 use super::tables::{POLY_S, SHIFTER};
 
+/// One bounded kernel's scalar and lane forms over `|x| < 704`. The public
+/// entries screen that domain and give every other input to the strong owner.
+pub(crate) trait Kernel {
+    fn scalar(x: f64) -> f64;
+    #[cfg(feature = "simd")]
+    fn lanes<K: morphiq_numerics_arch::Simd>(k: K, x: K::F) -> K::F;
+}
+
+/// The table and constrained cubic, relative `2^-51`.
+pub(crate) struct Cubic;
+impl Kernel for Cubic {
+    #[inline(always)]
+    fn scalar(x: f64) -> f64 {
+        in_domain(x)
+    }
+    #[cfg(feature = "simd")]
+    #[inline(always)]
+    fn lanes<K: morphiq_numerics_arch::Simd>(k: K, x: K::F) -> K::F {
+        in_domain_lanes(k, x)
+    }
+}
+
+/// The one-word reduction and parallel quadratic, relative `2^-38`.
+pub(crate) struct Coarse;
+impl Kernel for Coarse {
+    #[inline(always)]
+    fn scalar(x: f64) -> f64 {
+        in_domain_coarse(x)
+    }
+    #[cfg(feature = "simd")]
+    #[inline(always)]
+    fn lanes<K: morphiq_numerics_arch::Simd>(k: K, x: K::F) -> K::F {
+        in_domain_coarse_lanes(k, x)
+    }
+}
+
+/// The public entry for kernel `E`: accelerated on `|x| < 704`, the strong
+/// owner elsewhere (NaNs fail the comparison and belong to it too).
 #[inline]
-pub(crate) fn exp(x: f64) -> f64 {
-    let active = x.abs() < 704.0; // NaNs belong to the strong owner too.
+pub(crate) fn entry<E: Kernel>(x: f64) -> f64 {
+    let active = x.abs() < 704.0;
     if !active {
         return super::exp(x);
     }
-    in_domain(x)
+    E::scalar(x)
 }
 
-/// Public exp's short reduction and parallel quadratic, relative bound 2^-38.
 #[inline]
-pub(crate) fn in_domain(x: f64) -> f64 {
+pub(crate) fn exp(x: f64) -> f64 {
+    entry::<Cubic>(x)
+}
+
+#[inline]
+pub(crate) fn exp_coarse(x: f64) -> f64 {
+    entry::<Coarse>(x)
+}
+
+/// The short reduction and parallel quadratic, relative bound 2^-38.
+#[inline]
+pub(crate) fn in_domain_coarse(x: f64) -> f64 {
     debug_assert!(x.abs() < 704.0);
     let t = x * INV + SHIFTER;
     let n = t - SHIFTER;
@@ -27,10 +79,11 @@ pub(crate) fn in_domain(x: f64) -> f64 {
     high * ((1.0 + C1 * r) + (0.5 * r) * r)
 }
 
-/// Tighter internal exp, retaining the normal family's relative 2^-51 budget.
-/// The CDF argument proof establishes |x| <= 32 before entering this kernel.
+/// The table and constrained cubic, relative bound 2^-51: the public `exp`
+/// and the normal family's kernel. Callers establish |x| < 704 (the CDF
+/// argument proof establishes |x| <= 32) before entering it.
 #[inline]
-pub(crate) fn in_domain_precise(x: f64) -> f64 {
+pub(crate) fn in_domain(x: f64) -> f64 {
     debug_assert!(x.abs() < 704.0);
     let t = x * INV + SHIFTER;
     let n = t - SHIFTER;
@@ -47,10 +100,10 @@ pub(crate) fn in_domain_precise(x: f64) -> f64 {
     high * (1.0 + u)
 }
 
-/// Lane form of the public quadratic; screened packets establish the domain.
+/// Lane form of the quadratic; screened packets establish the domain.
 #[cfg(feature = "simd")]
 #[inline(always)]
-pub(crate) fn in_domain_lanes<K: morphiq_numerics_arch::Simd>(k: K, x: K::F) -> K::F {
+pub(crate) fn in_domain_coarse_lanes<K: morphiq_numerics_arch::Simd>(k: K, x: K::F) -> K::F {
     debug_assert!(all_active(k, x));
     let t = k.add(k.mul(x, k.splat(INV)), k.splat(SHIFTER));
     let n = k.sub(t, k.splat(SHIFTER));
@@ -62,10 +115,10 @@ pub(crate) fn in_domain_lanes<K: morphiq_numerics_arch::Simd>(k: K, x: K::F) -> 
     k.mul(high, k.add(linear, quadratic))
 }
 
-/// Lane form of the tighter internal cubic, preserving the normal-family bits.
+/// Lane form of the cubic: the public slice's and the normal family's lanes.
 #[cfg(feature = "simd")]
 #[inline(always)]
-pub(crate) fn in_domain_precise_lanes<K: morphiq_numerics_arch::Simd>(k: K, x: K::F) -> K::F {
+pub(crate) fn in_domain_lanes<K: morphiq_numerics_arch::Simd>(k: K, x: K::F) -> K::F {
     debug_assert!(all_active(k, x));
     let t = k.add(k.mul(x, k.splat(INV)), k.splat(SHIFTER));
     let n = k.sub(t, k.splat(SHIFTER));
@@ -89,9 +142,9 @@ fn all_active<K: morphiq_numerics_arch::Simd>(k: K, input: K::F) -> bool {
 #[cfg(feature = "simd")]
 #[cold]
 #[inline(never)]
-fn scalar_packet(input: &[f64], output: &mut [f64]) {
+fn scalar_packet<E: Kernel>(input: &[f64], output: &mut [f64]) {
     for (&x, y) in input.iter().zip(output) {
-        *y = exp(x);
+        *y = entry::<E>(x);
     }
 }
 
@@ -99,20 +152,26 @@ fn scalar_packet(input: &[f64], output: &mut [f64]) {
 #[inline(always)]
 // Cold packets finish through scalar owners by reference; the hot path needs
 // neither a masked dependency on the screen nor a returned lane-array spill.
-fn evaluate<K: morphiq_numerics_arch::Simd>(k: K, x: K::F, input: &[f64], output: &mut [f64]) {
+fn evaluate<K: morphiq_numerics_arch::Simd, E: Kernel>(
+    k: K,
+    x: K::F,
+    input: &[f64],
+    output: &mut [f64],
+) {
     if !all_active(k, x) {
-        return scalar_packet(input, output);
+        return scalar_packet::<E>(input, output);
     }
-    k.store_partial(in_domain_lanes(k, x), output);
+    k.store_partial(E::lanes(k, x), output);
 }
 
 #[cfg(feature = "simd")]
-struct Slice<'a> {
+struct Slice<'a, E> {
     input: &'a [f64],
     output: &'a mut [f64],
+    kernel: core::marker::PhantomData<E>,
 }
 #[cfg(feature = "simd")]
-impl morphiq_numerics_arch::WithSimd for Slice<'_> {
+impl<E: Kernel> morphiq_numerics_arch::WithSimd for Slice<'_, E> {
     type Output = ();
     #[inline(always)]
     fn with<K: morphiq_numerics_arch::Simd>(self, k: K) {
@@ -132,7 +191,7 @@ impl morphiq_numerics_arch::WithSimd for Slice<'_> {
                 let output = &mut output[start..start + K::LANES];
                 let mut x = K::Array::default();
                 x.as_mut().copy_from_slice(input);
-                evaluate(k, k.load(x), input, output);
+                evaluate::<K, E>(k, k.load(x), input, output);
             }
         }
         let inputs = rest.chunks_exact(K::LANES);
@@ -141,28 +200,29 @@ impl morphiq_numerics_arch::WithSimd for Slice<'_> {
         for (input, output) in inputs.zip(outputs.by_ref()) {
             let mut x = K::Array::default();
             x.as_mut().copy_from_slice(input);
-            evaluate(k, k.load(x), input, output);
+            evaluate::<K, E>(k, k.load(x), input, output);
         }
         if !tail.is_empty() {
             let output = outputs.into_remainder();
             if K::LANES <= 4 || tail.len() <= 2 {
                 for (&x, y) in tail.iter().zip(output) {
-                    *y = exp(x);
+                    *y = entry::<E>(x);
                 }
             } else {
-                evaluate(k, k.load_partial(tail), tail, output);
+                evaluate::<K, E>(k, k.load_partial(tail), tail, output);
             }
         }
     }
 }
 
 #[cfg(feature = "simd")]
-struct Packet<'a, const N: usize> {
+struct Packet<'a, const N: usize, E> {
     input: &'a [f64; N],
     output: &'a mut [f64; N],
+    kernel: core::marker::PhantomData<E>,
 }
 #[cfg(feature = "simd")]
-impl<const N: usize> morphiq_numerics_arch::WithSimd for Packet<'_, N> {
+impl<const N: usize, E: Kernel> morphiq_numerics_arch::WithSimd for Packet<'_, N, E> {
     type Output = ();
     #[inline(always)]
     fn with<K: morphiq_numerics_arch::Simd>(self, k: K) {
@@ -181,7 +241,7 @@ impl<const N: usize> morphiq_numerics_arch::WithSimd for Packet<'_, N> {
             active = k.and_m(active, k.lt(k.abs(k.load(x)), k.splat(704.0)));
         }
         if k.mask_bits(active) != (1 << K::LANES) - 1 {
-            return scalar_packet(self.input, self.output);
+            return scalar_packet::<E>(self.input, self.output);
         }
         for block in (0..N).step_by(4 * K::LANES) {
             for offset in [0, K::LANES, 2 * K::LANES, 3 * K::LANES] {
@@ -191,7 +251,7 @@ impl<const N: usize> morphiq_numerics_arch::WithSimd for Packet<'_, N> {
                     let output = &mut self.output[start..start + K::LANES];
                     let mut x = K::Array::default();
                     x.as_mut().copy_from_slice(input);
-                    k.store_partial(in_domain_lanes(k, k.load(x)), output);
+                    k.store_partial(E::lanes(k, k.load(x)), output);
                 }
             }
         }
@@ -206,40 +266,42 @@ impl<const N: usize> morphiq_numerics_arch::WithSimd for Packet<'_, N> {
     not(any(target_feature = "avx2", target_feature = "avx512f")),
     inline(always)
 )]
-fn fixed<K: morphiq_numerics_arch::Simd, const N: usize>(
+fn fixed<K: morphiq_numerics_arch::Simd, const N: usize, E: Kernel>(
     k: K,
     input: &[f64; N],
     output: &mut [f64; N],
 ) {
     // Keep static-feature builds from inlining every packet kernel into the
     // dispatcher and imposing their register saves on short/remainder calls.
-    k.vectorize(Packet { input, output });
+    k.vectorize(Packet::<N, E> {
+        input,
+        output,
+        kernel: core::marker::PhantomData,
+    });
 }
 
 #[cfg(feature = "simd")]
 #[inline(never)]
-fn packet<K: morphiq_numerics_arch::Simd, const N: usize>(k: K, op: Slice<'_>) {
+fn packet<K: morphiq_numerics_arch::Simd, const N: usize, E: Kernel>(k: K, op: Slice<'_, E>) {
     let (input, tail) = op.input.split_at(N);
     let (output, rest) = op.output.split_at_mut(N);
-    let packet = Packet::<N> {
-        input: input.try_into().expect("fixed packet"),
-        output: output.try_into().expect("fixed packet"),
-    };
+    let input: &[f64; N] = input.try_into().expect("fixed packet");
+    let output: &mut [f64; N] = output.try_into().expect("fixed packet");
     for (&x, y) in tail.iter().zip(rest) {
-        *y = exp(x);
+        *y = entry::<E>(x);
     }
-    fixed(k, packet.input, packet.output);
+    fixed::<K, N, E>(k, input, output);
 }
 #[cfg(feature = "simd")]
 #[inline(always)]
-fn run<K: morphiq_numerics_arch::Simd>(k: K, op: Slice<'_>) {
+fn run<K: morphiq_numerics_arch::Simd, E: Kernel>(k: K, op: Slice<'_, E>) {
     if op.input.len() >= K::LANES
         && op.input.len() <= 8 * K::LANES
         && op.input.len().is_power_of_two()
     {
         macro_rules! fixed {
             ($n:literal) => {
-                fixed::<K, $n>(
+                fixed::<K, $n, E>(
                     k,
                     op.input.try_into().expect("fixed packet"),
                     op.output.try_into().expect("fixed packet"),
@@ -258,12 +320,12 @@ fn run<K: morphiq_numerics_arch::Simd>(k: K, op: Slice<'_>) {
     }
     if op.input.len() > K::LANES && op.input.len() <= 8 * K::LANES + 2 {
         match op.input.len() {
-            3 => return packet::<K, 2>(k, op),
-            5 | 6 => return packet::<K, 4>(k, op),
-            9 | 10 => return packet::<K, 8>(k, op),
-            17 | 18 => return packet::<K, 16>(k, op),
-            33 | 34 => return packet::<K, 32>(k, op),
-            65 | 66 => return packet::<K, 64>(k, op),
+            3 => return packet::<K, 2, E>(k, op),
+            5 | 6 => return packet::<K, 4, E>(k, op),
+            9 | 10 => return packet::<K, 8, E>(k, op),
+            17 | 18 => return packet::<K, 16, E>(k, op),
+            33 | 34 => return packet::<K, 32, E>(k, op),
+            65 | 66 => return packet::<K, 64, E>(k, op),
             _ => (),
         }
     }
@@ -272,14 +334,18 @@ fn run<K: morphiq_numerics_arch::Simd>(k: K, op: Slice<'_>) {
 
 #[cfg(feature = "simd")]
 #[inline]
-pub(crate) fn slice(input: &[f64], output: &mut [f64]) {
+pub(crate) fn slice<E: Kernel>(input: &[f64], output: &mut [f64]) {
     if input.len() <= 1 {
         if let Some(&x) = input.first() {
-            output[0] = exp(x);
+            output[0] = entry::<E>(x);
         }
         return;
     }
-    let op = Slice { input, output };
+    let op = Slice::<E> {
+        input,
+        output,
+        kernel: core::marker::PhantomData,
+    };
     #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
     {
         use morphiq_numerics_arch::{Avx2, Avx512};
@@ -293,7 +359,7 @@ pub(crate) fn slice(input: &[f64], output: &mut [f64]) {
         {
             return run(k, op);
         }
-        sse2(op);
+        sse2::<E>(op);
     }
     #[cfg(not(all(target_arch = "x86_64", target_feature = "sse2")))]
     morphiq_numerics_arch::dispatch(op);
@@ -301,7 +367,7 @@ pub(crate) fn slice(input: &[f64], output: &mut [f64]) {
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "sse2"))]
 #[inline(never)]
-fn sse2(op: Slice<'_>) {
+fn sse2<E: Kernel>(op: Slice<'_, E>) {
     run(morphiq_numerics_arch::Sse2::new(), op);
 }
 
@@ -310,21 +376,25 @@ fn sse2(op: Slice<'_>) {
 // arithmetic and domain/fallback ownership remain with exp and fixed.
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(always)]
-pub(crate) fn slice_static_avx512(input: &[f64], output: &mut [f64]) {
+pub(crate) fn slice_static_avx512<E: Kernel>(input: &[f64], output: &mut [f64]) {
     use morphiq_numerics_arch::{Avx2, Avx512, Sse2};
     macro_rules! full {
         ($k:expr, $n:literal) => {
-            fixed::<_, $n>($k, input.try_into().unwrap(), output.try_into().unwrap())
+            fixed::<_, $n, E>($k, input.try_into().unwrap(), output.try_into().unwrap())
         };
     }
     macro_rules! tail {
         ($k:expr, $n:literal, $len:literal) => {
-            static_packet::<_, $n, $len>($k, input.try_into().unwrap(), output.try_into().unwrap())
+            static_packet::<_, $n, $len, E>(
+                $k,
+                input.try_into().unwrap(),
+                output.try_into().unwrap(),
+            )
         };
     }
     match input.len() {
         0 => (),
-        1 => scalar_packet(input, output),
+        1 => scalar_packet::<E>(input, output),
         2 => full!(Sse2::new(), 2),
         3 => tail!(Sse2::new(), 2, 3),
         4..=6 => {
@@ -335,7 +405,7 @@ pub(crate) fn slice_static_avx512(input: &[f64], output: &mut [f64]) {
                     _ => tail!(k, 4, 6),
                 }
             } else {
-                static_avx512_other(input, output);
+                static_avx512_other::<E>(input, output);
             }
         }
         8..=10 => {
@@ -346,13 +416,13 @@ pub(crate) fn slice_static_avx512(input: &[f64], output: &mut [f64]) {
                 _ => tail!(k, 8, 10),
             }
         }
-        _ => static_avx512_other(input, output),
+        _ => static_avx512_other::<E>(input, output),
     }
 }
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(never)]
-fn static_packet<K: morphiq_numerics_arch::Simd, const N: usize, const LEN: usize>(
+fn static_packet<K: morphiq_numerics_arch::Simd, const N: usize, const LEN: usize, E: Kernel>(
     k: K,
     input: &[f64; LEN],
     output: &mut [f64; LEN],
@@ -360,9 +430,9 @@ fn static_packet<K: morphiq_numerics_arch::Simd, const N: usize, const LEN: usiz
     let (prefix, tail) = input.split_at(N);
     let (prefix_out, rest) = output.split_at_mut(N);
     for (&x, y) in tail.iter().zip(rest) {
-        *y = exp(x);
+        *y = entry::<E>(x);
     }
-    fixed::<K, N>(
+    fixed::<K, N, E>(
         k,
         prefix.try_into().unwrap(),
         prefix_out.try_into().unwrap(),
@@ -371,6 +441,6 @@ fn static_packet<K: morphiq_numerics_arch::Simd, const N: usize, const LEN: usiz
 
 #[cfg(all(feature = "simd", target_arch = "x86_64", target_feature = "avx512f"))]
 #[inline(never)]
-fn static_avx512_other(input: &[f64], output: &mut [f64]) {
-    slice(input, output);
+fn static_avx512_other<E: Kernel>(input: &[f64], output: &mut [f64]) {
+    slice::<E>(input, output);
 }

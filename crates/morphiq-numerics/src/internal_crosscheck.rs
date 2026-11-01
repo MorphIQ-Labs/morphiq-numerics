@@ -1619,6 +1619,14 @@ fn fast_corpus(out: &mut String) {
         .unwrap();
         writeln!(
             out,
+            "fast_exp_coarse {:016x} {:016x} : {:016x}",
+            x.to_bits(),
+            crate::elementary::exp(x).to_bits(),
+            crate::fast::elementary::exp_coarse(x).to_bits()
+        )
+        .unwrap();
+        writeln!(
+            out,
             "fast_erfcx {:016x} : {:016x}",
             x.to_bits(),
             crate::fast::normal::erfcx(x).to_bits()

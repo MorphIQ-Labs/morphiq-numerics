@@ -22,7 +22,7 @@ for f,name in [('exp','prod_exp'),('erfcx','prod_erfcx'),('cdf','prod_norm_cdf')
    else:
     a=mp.mpf(float(x));ref=mp.exp(a) if f=='exp' else mp.exp(a*a)*mp.erfc(a) if f=='erfcx' else mp.erfc(-a/mp.sqrt(2))/2
     if accelerated:
-     error=abs(mp.mpf(float(y))-ref)/(1 if f=='cdf' else abs(ref));allowed=mp.mpf(2)**(-49 if f=='cdf' else -38 if f=='exp' else -51);ok=error<=allowed;sampled+=1;worst=max(worst,error)
+     error=abs(mp.mpf(float(y))-ref)/(1 if f=='cdf' else abs(ref));allowed=mp.mpf(2)**(-49 if f=='cdf' else -51);ok=error<=allowed;sampled+=1;worst=max(worst,error)
     else:
      fallback+=1
      if math.isinf(float(ref)):error=mp.mpf(0) if math.isinf(y) else mp.inf;allowed=mp.mpf(0);ok=error==0

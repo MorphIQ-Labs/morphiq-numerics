@@ -102,6 +102,10 @@ let compute op args =
       (match args with
        | [x; fallback] -> show_bits (x_fast_exp (z_of_u64 (hex x)) (z_of_u64 (hex fallback)))
        | _ -> failwith "fast_exp takes input and strong fallback result")
+  | "fast_exp_coarse" ->
+      (match args with
+       | [x; fallback] -> show_bits (x_fast_exp_coarse (z_of_u64 (hex x)) (z_of_u64 (hex fallback)))
+       | _ -> failwith "fast_exp_coarse takes input and strong fallback result")
   | "fast_ln" ->
       (match args with
        | [x] -> show_bits (x_fast_ln (z_of_u64 (hex x)))
