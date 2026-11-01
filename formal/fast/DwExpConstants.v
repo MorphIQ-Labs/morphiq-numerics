@@ -6,6 +6,8 @@ From Binary64 Require Import IEEE64 Grid Encodings.
 From Interval Require Import Tactic.
 Require Import FastExpTables.
 Open Scope R_scope.
+Lemma dwx_bpow_m (k : nat) : bpow radix2 (- Z.of_nat k) = / 2 ^ k.
+Proof. rewrite bpow_opp, bpow_powerRZ, <- pow_powerRZ. reflexivity. Qed.
 Definition dwx_l2 : f64 := b64_of_bits 13629889474006614016.
 Lemma dwx_l2_val : B dwx_l2 = (- 6500601210863616) / 2 ^ 97.
 Proof. exact (bits_val 13629889474006614016 true 6500601210863616 97 eq_refl). Qed.
@@ -52,30 +54,30 @@ Proof. exact (bits_val 4607182418800017408 false 4503599627370496 52 eq_refl). Q
 Lemma dwx_c0_hi_finite : finite dwx_c0_hi.
 Proof. exact (bits_finite 4607182418800017408 _ _ _ eq_refl). Qed.
 Definition dwx_c0_lo : f64 := b64_of_bits 0.
-Lemma dwx_c0_lo_val : B dwx_c0_lo = 4503599627370496 / 2 ^ 1075.
-Proof. exact (bits_val 0 false 4503599627370496 1075 eq_refl). Qed.
+Lemma dwx_c0_lo_val : B dwx_c0_lo = 0.
+Proof. reflexivity. Qed.
 Lemma dwx_c0_lo_finite : finite dwx_c0_lo.
-Proof. exact (bits_finite 0 _ _ _ eq_refl). Qed.
+Proof. reflexivity. Qed.
 Definition dwx_c1_hi : f64 := b64_of_bits 4607182418800017408.
 Lemma dwx_c1_hi_val : B dwx_c1_hi = 4503599627370496 / 2 ^ 52.
 Proof. exact (bits_val 4607182418800017408 false 4503599627370496 52 eq_refl). Qed.
 Lemma dwx_c1_hi_finite : finite dwx_c1_hi.
 Proof. exact (bits_finite 4607182418800017408 _ _ _ eq_refl). Qed.
 Definition dwx_c1_lo : f64 := b64_of_bits 0.
-Lemma dwx_c1_lo_val : B dwx_c1_lo = 4503599627370496 / 2 ^ 1075.
-Proof. exact (bits_val 0 false 4503599627370496 1075 eq_refl). Qed.
+Lemma dwx_c1_lo_val : B dwx_c1_lo = 0.
+Proof. reflexivity. Qed.
 Lemma dwx_c1_lo_finite : finite dwx_c1_lo.
-Proof. exact (bits_finite 0 _ _ _ eq_refl). Qed.
+Proof. reflexivity. Qed.
 Definition dwx_c2_hi : f64 := b64_of_bits 4602678819172646912.
 Lemma dwx_c2_hi_val : B dwx_c2_hi = 4503599627370496 / 2 ^ 53.
 Proof. exact (bits_val 4602678819172646912 false 4503599627370496 53 eq_refl). Qed.
 Lemma dwx_c2_hi_finite : finite dwx_c2_hi.
 Proof. exact (bits_finite 4602678819172646912 _ _ _ eq_refl). Qed.
 Definition dwx_c2_lo : f64 := b64_of_bits 0.
-Lemma dwx_c2_lo_val : B dwx_c2_lo = 4503599627370496 / 2 ^ 1075.
-Proof. exact (bits_val 0 false 4503599627370496 1075 eq_refl). Qed.
+Lemma dwx_c2_lo_val : B dwx_c2_lo = 0.
+Proof. reflexivity. Qed.
 Lemma dwx_c2_lo_finite : finite dwx_c2_lo.
-Proof. exact (bits_finite 0 _ _ _ eq_refl). Qed.
+Proof. reflexivity. Qed.
 Definition dwx_c3_hi : f64 := b64_of_bits 4595172819793696085.
 Lemma dwx_c3_hi_val : B dwx_c3_hi = 6004799503160661 / 2 ^ 55.
 Proof. exact (bits_val 4595172819793696085 false 6004799503160661 55 eq_refl). Qed.
@@ -127,7 +129,7 @@ Proof. exact (bits_val 4281236182911787034 false 7320136537186330 125 eq_refl). 
 Lemma dwx_c7_lo_finite : finite dwx_c7_lo.
 Proof. exact (bits_finite 4281236182911787034 _ _ _ eq_refl). Qed.
 Lemma dwx_l2_eq : B dwx_l2 = IZR (-1549864104) * bpow radix2 (-75).
-Proof. rewrite dwx_l2_val. change (bpow radix2 (-75)) with (/ 2 ^ 75). field. Qed.
+Proof. rewrite dwx_l2_val. change (-75)%Z with (- Z.of_nat 75)%Z. rewrite dwx_bpow_m. field. Qed.
 Theorem dwx_split : Rabs (B fx_l1 + B dwx_l2 + B dwx_l3 - ln 2 / 1024) <= / 2 ^ 128.
 Proof. rewrite fx_l1_val, dwx_l2_val, dwx_l3_val. interval with (i_prec 300). Qed.
 Theorem dwx_c0_close : Rabs (B dwx_c0_hi + B dwx_c0_lo - / 1) <= / 1 * / 2 ^ 105.

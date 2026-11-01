@@ -130,17 +130,29 @@ From Binary64 Require Import IEEE64 Grid Encodings.
 From Interval Require Import Tactic.
 Require Import FastExpTables.
 Open Scope R_scope.
+Lemma dwx_bpow_m (k : nat) : bpow radix2 (- Z.of_nat k) = / 2 ^ k.
+Proof. rewrite bpow_opp, bpow_powerRZ, <- pow_powerRZ. reflexivity. Qed.
 '''
     for name, value in [('dwx_l2', dw_l2), ('dwx_l3', dw_l3)] + [(f'dwx_{n.lower()}', v) for n, v in dw_thresholds]:
         dwc += coq_constant(name, value)
+    def coq_word(name, value):
+        if value == 0.0:
+            return f'''Definition {name} : f64 := b64_of_bits 0.
+Lemma {name}_val : B {name} = 0.
+Proof. reflexivity. Qed.
+Lemma {name}_finite : finite {name}.
+Proof. reflexivity. Qed.
+'''
+        return coq_constant(name, value)
+
     for k, (high, low) in enumerate(taylor):
-        dwc += coq_constant(f'dwx_c{k}_hi', struct.unpack('<d', struct.pack('<Q', high))[0])
-        dwc += coq_constant(f'dwx_c{k}_lo', struct.unpack('<d', struct.pack('<Q', low))[0])
+        dwc += coq_word(f'dwx_c{k}_hi', struct.unpack('<d', struct.pack('<Q', high))[0])
+        dwc += coq_word(f'dwx_c{k}_lo', struct.unpack('<d', struct.pack('<Q', low))[0])
     m2 = int(mp.mpf(dw_l2) * mp.mpf(2)**int(-mp.floor(mp.log(abs(dw_l2), 2)) + 30))
     e2 = -int(-mp.floor(mp.log(abs(dw_l2), 2)) + 30)
     assert mp.mpf(m2) * mp.mpf(2)**e2 == mp.mpf(dw_l2) and abs(m2) < 2**31
     dwc += f'''Lemma dwx_l2_eq : B dwx_l2 = IZR ({m2}) * bpow radix2 ({e2}).
-Proof. rewrite dwx_l2_val. change (bpow radix2 ({e2})) with (/ 2 ^ {-e2}). field. Qed.
+Proof. rewrite dwx_l2_val. change ({e2})%Z with (- Z.of_nat {-e2})%Z. rewrite dwx_bpow_m. field. Qed.
 Theorem dwx_split : Rabs (B fx_l1 + B dwx_l2 + B dwx_l3 - ln 2 / 1024) <= / 2 ^ 128.
 Proof. rewrite fx_l1_val, dwx_l2_val, dwx_l3_val. interval with (i_prec 300). Qed.
 '''
