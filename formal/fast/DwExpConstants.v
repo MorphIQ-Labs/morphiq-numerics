@@ -38,11 +38,11 @@ Lemma dwx_low_floor_val : B dwx_low_floor = 6032057205060441 / 2 ^ 1049.
 Proof. exact (bits_val 118622047889322841 false 6032057205060441 1049 eq_refl). Qed.
 Lemma dwx_low_floor_finite : finite dwx_low_floor.
 Proof. exact (bits_finite 118622047889322841 _ _ _ eq_refl). Qed.
-Definition dwx_r_floor : f64 := b64_of_bits 552549081483236265.
-Lemma dwx_r_floor_val : B dwx_r_floor = 7613526571406249 / 2 ^ 953.
-Proof. exact (bits_val 552549081483236265 false 7613526571406249 953 eq_refl). Qed.
+Definition dwx_r_floor : f64 := b64_of_bits 911521286674494270.
+Lemma dwx_r_floor_val : B dwx_r_floor = 6297761573024574 / 2 ^ 873.
+Proof. exact (bits_val 911521286674494270 false 6297761573024574 873 eq_refl). Qed.
 Lemma dwx_r_floor_finite : finite dwx_r_floor.
-Proof. exact (bits_finite 552549081483236265 _ _ _ eq_refl). Qed.
+Proof. exact (bits_finite 911521286674494270 _ _ _ eq_refl). Qed.
 Definition dwx_v_floor : f64 := b64_of_bits 3709195899275879974.
 Lemma dwx_v_floor_val : B dwx_v_floor = 7237005577332262 / 2 ^ 252.
 Proof. exact (bits_val 3709195899275879974 false 7237005577332262 252 eq_refl). Qed.

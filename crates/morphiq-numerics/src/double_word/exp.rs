@@ -25,11 +25,11 @@ use super::exp_tables::{
 // - `LIMIT = 1455`: inputs at or above it return `None`; it keeps `|n| < 2^22`,
 //   so `n·L1` and `n·L2` are exact, and the binary exponent within `±2099`;
 // - `TINY = 2^-60`: below it `exp(x) = 1 + x` within `x²`, under the bound;
-// - `LOW_FLOOR = 1e-300`, `R_FLOOR = 1e-271`, `V_FLOOR = 1e-60`: a reduced
+// - `LOW_FLOOR = 1e-300`, `R_FLOOR = 1e-247`, `V_FLOOR = 1e-60`: a reduced
 //   argument's trailing word, a reduced argument, and a Horner value's trailing
 //   word below these are dropped, so every product of a leading and a trailing
 //   word is zero or normal as the double-word multiplication bound requires; the
-//   effects are below `2^-990`, `2^-900` and `2^-187` relative.
+//   effects are below `2^-990`, `2^-820` and `2^-187` relative.
 
 /// The source of an exact product `(RN(a·b), a·b - RN(a·b))`.
 pub(super) trait ExactProduct {
@@ -79,7 +79,7 @@ fn kernel<P: ExactProduct>(x: DoubleWord, p: &P) -> Option<(DoubleWord, i32)> {
         .add_f64(-q_lo)
         .add_f64(-q_hi);
     if r.hi.abs() < R_FLOOR {
-        // exp(r) = 1 within 2^-900: the table entry itself, the same words the
+        // exp(r) = 1 within 2^-820: the table entry itself, the same words the
         // Horner steps and final product would give for r = 0.
         return Some((word(TABLE[j]), exponent));
     }

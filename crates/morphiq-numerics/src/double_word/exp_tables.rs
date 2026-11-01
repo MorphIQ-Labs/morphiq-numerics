@@ -9,7 +9,7 @@ pub(super) const SHIFTER: f64 = f64::from_bits(0x4338000000000000);
 pub(super) const LIMIT: f64 = f64::from_bits(0x4096bc0000000000);
 pub(super) const TINY: f64 = f64::from_bits(0x3c30000000000000);
 pub(super) const LOW_FLOOR: f64 = f64::from_bits(0x01a56e1fc2f8f359);
-pub(super) const R_FLOOR: f64 = f64::from_bits(0x07ab0c764ac6d3a9);
+pub(super) const R_FLOOR: f64 = f64::from_bits(0x0ca65fc7e170b33e);
 pub(super) const V_FLOOR: f64 = f64::from_bits(0x3379b604aaaca626);
 /// `1/k!` for `k = 0..=7` as (high, low) words.
 pub(super) const TAYLOR: [[u64; 2]; 8] = [
