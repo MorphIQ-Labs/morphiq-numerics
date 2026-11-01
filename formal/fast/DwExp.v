@@ -1054,3 +1054,180 @@ Proof.
     assert (16 * dwx_u2 * (99 / 100) <= 16 * dwx_u2 * exp X) by (apply Rmult_le_compat_l; lra).
     lra.
 Qed.
+
+(** * The published bound *)
+
+Theorem dwexp_ok xh xl : finite xh -> finite xl -> B xh = rndF (B xh + B xl) -> Rabs (B xh) < 1455 ->
+  exists zh zl k, dwexp64 xh xl = Some (zh, zl, k) /\ finite zh /\ finite zl /\
+  B zh = rndF (B zh + B zl) /\ 9996 / 10000 <= B zh + B zl < 20008 / 10000 /\ (-2100 <= k <= 2099)%Z /\
+  Rabs ((B zh + B zl) * bpow radix2 k - exp (B xh + B xl)) <= 16 * dwx_u2 * exp (B xh + B xl).
+Proof.
+  intros Fh Fl E Hx.
+  pose proof dwx_u2_range as U2.
+  destruct dwx_floors as [F1 [F2 [F3 [[Vf0 Vf1] [[Rf0 Rf1] [Lf0 Lf1]]]]]].
+  assert (Absf : forall v, B (b64_abs v) = Rabs (B v)) by (intros v; unfold b64_abs; apply B2R_Babs).
+  assert (Lim : B dwx_limit = 1455) by (rewrite dwx_limit_val; apply Rle_antisym; interval with (i_prec 64)).
+  assert (Lt : dwx_lt (b64_abs xh) dwx_limit = true)
+    by (apply (dwx_lt_true _ _ (dwx_abs_finite _ Fh) dwx_limit_finite); rewrite Absf, Lim; exact Hx).
+  unfold dwexp64. rewrite Lt.
+  destruct (dwx_lt (b64_abs xh) dwx_tiny) eqn:Tn.
+  { apply (dwx_lt_true _ _ (dwx_abs_finite _ Fh) dwx_tiny_finite) in Tn. rewrite Absf in Tn.
+    pose proof (dwexp_tiny_ok xh xl Fh Fl E Tn) as T.
+    destruct (add_f64_64 xh xl dwx_c0_hi) as [zh zl]. destruct T as [Fzh [Fzl [Ez [Rz Bz]]]].
+    exists zh, zl, 0%Z. split; [reflexivity | ].
+    change (bpow radix2 0) with 1. rewrite Rmult_1_r. repeat split; try assumption; try lra; lia. }
+  pose proof (dwexp_index_ok xh Fh Hx) as I. destruct (dwexp_index xh) as [n ni]. destruct I as [Fn [Bn [Ni Q]]].
+  pose proof (dwexp_reduce_ok xh xl n ni Fh Fl E Hx Fn Bn Ni Q) as Rd.
+  destruct (dwexp_reduce xh xl n) as [rh rl]. destruct Rd as [Frh [Frl [Er [Rr HR]]]].
+  destruct (dwx_scale ni Ni) as [Hj [Hk Sc]].
+  set (j := Z.to_nat (Z.land ni 1023)) in *. set (k := Z.shiftr ni 10) in *.
+  destruct (dwx_tab j Hj) as [Fth [Ftl [Et [Lt0 [Th [Tl Td]]]]]].
+  destruct (dwx_E_range j Hj) as [E1 E2].
+  set (Ev := exp (INR j * ln 2 / 1024)) in *.
+  set (R := B xh + B xl - IZR ni * dwx_L) in *.
+  assert (Xe : exp (B xh + B xl) = bpow radix2 k * (Ev * exp R)).
+  { replace (B xh + B xl) with (IZR ni * dwx_L + R) by (unfold R; ring). rewrite exp_plus, Sc. ring. }
+  assert (Fin : forall Zv c, Rabs (Zv - Ev * exp R) <= c * (Ev * exp R) -> c <= 16 * dwx_u2 ->
+            Rabs (Zv * bpow radix2 k - exp (B xh + B xl)) <= 16 * dwx_u2 * exp (B xh + B xl)).
+  { intros Zv c H1 H2. rewrite Xe.
+    replace (Zv * bpow radix2 k - bpow radix2 k * (Ev * exp R)) with (bpow radix2 k * (Zv - Ev * exp R)) by ring.
+    rewrite Rabs_mult, (Rabs_pos_eq (bpow radix2 k)) by (apply bpow_ge_0).
+    assert (P0 : 0 < Ev * exp R) by (apply Rmult_lt_0_compat; [lra | apply exp_pos]).
+    pose proof (bpow_gt_0 radix2 k) as B0.
+    replace (16 * dwx_u2 * (bpow radix2 k * (Ev * exp R))) with (bpow radix2 k * (16 * dwx_u2 * (Ev * exp R))) by ring.
+    apply Rmult_le_compat_l; [lra | ]. eapply Rle_trans; [exact H1 | ]. apply Rmult_le_compat_r; lra. }
+  apply dwx_abs_le in HR. 
+  assert (GR : 99966 / 100000 <= exp R <= 100034 / 100000) by (split; interval with (i_prec 64)).
+  set (r := B rh + B rl) in *.
+  assert (Td' : Rabs (B (fx_t_hi j) + B (fx_t_lo j) - Ev) <= 4 * dwx_u2 * Ev).
+  { eapply Rle_trans; [exact Td | ]. replace (bpow radix2 (-104)) with (4 * dwx_u2) by (rewrite dwx_u2_val; change (-104)%Z with (- Z.of_nat 104)%Z; rewrite dwx_bpow_m; field).
+    assert (0 <= dwx_u2) by lra. nra. }
+  destruct (dwx_lt (b64_abs rh) dwx_r_floor) eqn:Rf.
+  - (* the table entry itself *)
+    apply (dwx_lt_true _ _ (dwx_abs_finite _ Frh) dwx_r_floor_finite) in Rf. rewrite Absf in Rf.
+    exists (fx_t_hi j), (fx_t_lo j), k. split; [reflexivity | ].
+    pose proof (dwx_abs_le _ _ Tl) as Tl'. assert (/ 2 ^ 53 <= / 1000) by (interval with (i_prec 64)).
+    split; [exact Fth | split; [exact Ftl | split; [exact Et | split; [split; lra | split; [exact Hk | ]]]]].
+    pose proof (dwx_word_sum rh rl Er) as S. fold r in S.
+    assert (Sr : Rabs r <= / 10 ^ 199).
+    { eapply Rle_trans; [exact S | ].
+      assert (/ 2 * bpow radix2 (-1074) <= / 10 ^ 300) by (interval with (i_prec 64)).
+      apply Rmult_le_reg_r with (1 - / 9007199254740992); [lra | ].
+      unfold Rdiv. rewrite Rmult_assoc, Rinv_l, Rmult_1_r by lra.
+      assert (/ 10 ^ 200 + / 10 ^ 300 <= / 10 ^ 199 * (1 - / 9007199254740992)) by (interval with (i_prec 64)). lra. }
+    assert (Rs : Rabs R <= 521 / 1000 * dwx_u2).
+    { replace R with (r + - (r - R)) by ring. pose proof (Rabs_triang r (- (r - R))) as T. rewrite Rabs_Ropp in T.
+      assert (/ 10 ^ 199 <= / 1000 * dwx_u2) by (rewrite dwx_u2_val; interval with (i_prec 64)). lra. }
+    pose proof (dwx_exp_small R (521 / 1000 * dwx_u2) Rs ltac:(lra)) as G1.
+    apply (Fin _ (0 * (1 + 4 * dwx_u2) * (1 + 54 / 100 * dwx_u2) + 4 * dwx_u2 * (1 + 54 / 100 * dwx_u2) + 54 / 100 * dwx_u2)).
+    + apply (dwx_compose _ (B (fx_t_hi j) + B (fx_t_lo j)) 1 Ev (exp R) 0 (4 * dwx_u2) (54 / 100 * dwx_u2));
+        try lra; try apply exp_pos.
+      * unfold Rminus. rewrite Rmult_1_r, Rplus_opp_r, Rabs_R0. lra.
+      * rewrite Rabs_minus_sym.
+        assert (521 / 1000 * dwx_u2 * (1 + 2 * (521 / 1000 * dwx_u2)) <= 54 / 100 * dwx_u2 * (99966 / 100000))
+          by (rewrite dwx_u2_val; interval with (i_prec 64)).
+        assert (54 / 100 * dwx_u2 * (99966 / 100000) <= 54 / 100 * dwx_u2 * exp R) by (apply Rmult_le_compat_l; lra).
+        lra.
+    + rewrite dwx_u2_val. interval with (i_prec 64).
+  - (* the Horner evaluation *)
+    apply (dwx_lt_false _ _ (dwx_abs_finite _ Frh) dwx_r_floor_finite) in Rf. rewrite Absf in Rf.
+    assert (Rb : Rabs r <= 338451 / 1000000000 + 52 / 100 * dwx_u2).
+    { replace r with (R + (r - R)) by ring. pose proof (Rabs_triang R (r - R)).
+      assert (Rabs R <= 338451 / 1000000000) by (apply Rabs_le; lra). lra. }
+    destruct (dwx_high_bounds rh rl Er) as [_ Hrh]. fold r in Hrh.
+    assert (Rh : Rabs (B rh) <= dwx_rho).
+    { unfold dwx_rho. eapply Rle_trans; [exact Hrh | ].
+      assert (Rabs r * (1 + / 9007199254740992) <= (338451 / 1000000000 + 52 / 100 * dwx_u2) * (1 + / 9007199254740992))
+        by (apply Rmult_le_compat_r; lra).
+      assert ((338451 / 1000000000 + 52 / 100 * dwx_u2) * (1 + / 9007199254740992) + / 2 * bpow radix2 (-1074)
+              <= 3384511 / 10000000000) by (rewrite dwx_u2_val; interval with (i_prec 128)).
+      lra. }
+    assert (Rho : dwx_rho <= / 1000) by (unfold dwx_rho; lra).
+    assert (Rr0 : Rabs r <= dwx_rho)
+      by (eapply Rle_trans; [exact Rb | ]; unfold dwx_rho; rewrite dwx_u2_val; interval with (i_prec 128)).
+    assert (RL : exists rl' : f64, (if dwx_lt (b64_abs rl) dwx_low_floor then dwx_zero else rl) = rl' /\
+                 dwx_rinv rh rl' dwx_rho /\ Rabs (B rh + B rl' - r) <= B dwx_low_floor).
+    { destruct (dwx_lt (b64_abs rl) dwx_low_floor) eqn:Lf.
+      - apply (dwx_lt_true _ _ (dwx_abs_finite _ Frl) dwx_low_floor_finite) in Lf. rewrite Absf in Lf.
+        exists dwx_zero. split; [reflexivity | split].
+        + unfold dwx_rinv. change (B dwx_zero) with 0. rewrite Rplus_0_r.
+          split; [exact Frh | ]. split; [reflexivity | ]. split; [symmetry; apply dwx_rndF_float | ].
+          split; [lra | ]. split; [left; reflexivity | ]. split; lra.
+        + change (B dwx_zero) with 0. unfold r. replace (B rh + 0 - (B rh + B rl)) with (- B rl) by ring.
+          rewrite Rabs_Ropp. lra.
+      - apply (dwx_lt_false _ _ (dwx_abs_finite _ Frl) dwx_low_floor_finite) in Lf. rewrite Absf in Lf.
+        exists rl. split; [reflexivity | split].
+        + unfold dwx_rinv. split; [exact Frh | ]. split; [exact Frl | ]. split; [exact Er | ].
+          split; [lra | ]. split; [right; exact Lf | ]. split; [exact Rr0 | exact Rho].
+        + replace (B rh + B rl - r) with 0 by (unfold r; ring). rewrite Rabs_R0. lra. }
+    destruct RL as [rl' [Hrl [Rinv Drl]]]. rewrite Hrl.
+    pose proof (dwexp_horner_ok rh rl' Rinv) as Hh.
+    destruct (dwexp_horner rh rl') as [vh vl]. destruct Hh as [Fvh [Fvl [Ev' [Bv [Lv [HP [Hd Hd0]]]]]]].
+    destruct Rinv as [_ [_ [_ [_ [_ [Rr' _]]]]]].
+    set (r' := B rh + B rl') in *.
+    pose proof (dwx_trunc r' Rr') as Tr.
+    (* the final product *)
+    set (th := B (fx_t_hi j)) in *. set (tl := B (fx_t_lo j)) in *.
+    pose proof (dwx_low_le _ _ Ev') as Bvl.
+    pose proof (dwx_abs_le _ _ Tl) as Tl'. assert (H53 : / 2 ^ 53 <= / 1000) by (interval with (i_prec 64)).
+    assert (NT : th + tl <> 0) by lra.
+    assert (NV : B vh + B vl <> 0) by (apply dwx_nonzero; [exact Ev' | intros Z0; rewrite Z0, Rabs_R0 in Bv; lra]).
+    assert (Dhh : in_two_prod_domain th (B vh)).
+    { right. rewrite Rabs_mult, (Rabs_pos_eq th) by lra.
+      assert (bpow radix2 (-969) <= / 10000) by (interval with (i_prec 64)).
+      assert (1 * / 10000 <= th * Rabs (B vh)) by (apply Rmult_le_compat; lra). lra. }
+    assert (Dhl : normal_or_zero (th * B vl)).
+    { destruct Lv as [Z0 | Lv]; [left; rewrite Z0; ring | right].
+      rewrite Rabs_mult, (Rabs_pos_eq th) by lra.
+      assert (bpow radix2 (-1022) <= B dwx_v_floor) by (rewrite dwx_v_floor_val; interval with (i_prec 64)).
+      assert (1 * B dwx_v_floor <= th * Rabs (B vl)) by (apply Rmult_le_compat; lra). lra. }
+    assert (Dlh : normal_or_zero (tl * B vh)).
+    { destruct Lt0 as [Z0 | Lt0]; [left; rewrite Z0; ring | right].
+      rewrite Rabs_mult. apply Rle_trans with (/ 10000 * B dwx_low_floor); [exact F2 | ].
+      rewrite Rmult_comm. apply Rmult_le_compat; lra. }
+    pose proof (dwx_mul_step (fx_t_hi j) (fx_t_lo j) vh vl Fth Ftl Et Fvh Fvl Ev'
+                  ltac:(change (Rabs th <= 4); rewrite (Rabs_pos_eq th) by lra; lra)
+                  ltac:(change (Rabs tl <= 4); lra) ltac:(lra) ltac:(lra)
+                  Dhh Dhl Dlh ltac:(apply Rmult_integral_contrapositive; split; assumption)) as SM.
+    fold th tl in SM.
+    destruct (mul64 (fx_t_hi j) (fx_t_lo j) vh vl) as [zh zl]. destruct SM as [Fzh [Fzl [Ez Rz]]].
+    exists zh, zl, k. split; [reflexivity | ].
+    (* the Horner value against exp(R) *)
+    assert (Dr : Rabs (r' - R) <= 53 / 100 * dwx_u2).
+    { replace (r' - R) with ((r' - r) + (r - R)) by ring. pose proof (Rabs_triang (r' - r) (r - R)).
+      assert (B dwx_low_floor <= / 100 * dwx_u2) by (rewrite dwx_low_floor_val, dwx_u2_val; interval with (i_prec 64)).
+      lra. }
+    pose proof (dwx_exp_small (r' - R) (53 / 100 * dwx_u2) Dr ltac:(lra)) as G1.
+    assert (G2 : Rabs (exp r' - exp R) <= 53 / 100 * dwx_u2 * (1 + 2 * (53 / 100 * dwx_u2)) * exp R).
+    { assert (Eq : exp r' = exp R * exp (r' - R)) by (rewrite <- exp_plus; f_equal; ring).
+      replace (exp r' - exp R) with (exp R * (exp (r' - R) - 1)) by (rewrite Eq; ring).
+      rewrite Rabs_mult, (Rabs_pos_eq (exp R)) by (apply Rlt_le, exp_pos).
+      rewrite Rmult_comm. apply Rmult_le_compat_r; [apply Rlt_le, exp_pos | exact G1]. }
+    assert (HV : Rabs (B vh + B vl - exp R) <= 2937 / 1000 * dwx_u2 * exp R).
+    { replace (B vh + B vl - exp R) with ((B vh + B vl - dwx_poly r') + (dwx_poly r' - exp r') + (exp r' - exp R)) by ring.
+      pose proof (Rabs_triang ((B vh + B vl - dwx_poly r') + (dwx_poly r' - exp r')) (exp r' - exp R)).
+      pose proof (Rabs_triang (B vh + B vl - dwx_poly r') (dwx_poly r' - exp r')).
+      assert (C1 : 20042 / 10000 * dwx_u2 + 4 / 10 * dwx_u2 <= 2406 / 1000 * dwx_u2 * (99966 / 100000)) by lra.
+      assert (C2 : 2406 / 1000 * dwx_u2 * (99966 / 100000) <= 2406 / 1000 * dwx_u2 * exp R) by (apply Rmult_le_compat_l; lra).
+      assert (C3 : 53 / 100 * dwx_u2 * (1 + 2 * (53 / 100 * dwx_u2)) <= 5301 / 10000 * dwx_u2)
+        by (rewrite dwx_u2_val; interval with (i_prec 64)).
+      assert (C4 : 53 / 100 * dwx_u2 * (1 + 2 * (53 / 100 * dwx_u2)) * exp R <= 5301 / 10000 * dwx_u2 * exp R)
+        by (apply Rmult_le_compat_r; [apply Rlt_le, exp_pos | exact C3]).
+      lra. }
+    set (c := 5 * dwx_u2 * (1 + 4 * dwx_u2) * (1 + 2937 / 1000 * dwx_u2) + 4 * dwx_u2 * (1 + 2937 / 1000 * dwx_u2)
+              + 2937 / 1000 * dwx_u2).
+    assert (Cb : c <= 12 * dwx_u2) by (unfold c; rewrite dwx_u2_val; interval with (i_prec 64)).
+    pose proof (dwx_compose (B zh + B zl) (th + tl) (B vh + B vl) Ev (exp R) (5 * dwx_u2) (4 * dwx_u2) (2937 / 1000 * dwx_u2)
+                  ltac:(lra) (exp_pos R) ltac:(lra) ltac:(lra) ltac:(lra) Rz Td' HV) as Cz.
+    fold c in Cz.
+    assert (EG : 99966 / 100000 <= Ev * exp R <= 19987 / 10000 * (100034 / 100000)).
+    { split; [assert (1 * (99966 / 100000) <= Ev * exp R) by (apply Rmult_le_compat; lra); lra | ].
+      apply Rmult_le_compat; lra. }
+    assert (Cz' : Rabs (B zh + B zl - Ev * exp R) <= 12 * dwx_u2 * (Ev * exp R)).
+    { eapply Rle_trans; [exact Cz | ]. apply Rmult_le_compat_r; lra. }
+    split; [exact Fzh | split; [exact Fzl | split; [exact Ez | split; [ | split; [exact Hk | ]]]]].
+    + assert (12 * dwx_u2 * (Ev * exp R) <= 12 * dwx_u2 * (19987 / 10000 * (100034 / 100000)))
+        by (apply Rmult_le_compat_l; lra).
+      apply dwx_abs_le in Cz'. split; lra.
+    + apply (Fin _ c Cz). lra.
+Qed.
