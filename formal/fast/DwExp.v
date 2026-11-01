@@ -1231,3 +1231,18 @@ Proof.
       apply dwx_abs_le in Cz'. split; lra.
     + apply (Fin _ c Cz). lra.
 Qed.
+
+(** Outside the domain, including NaNs and infinities, the result is [None]. *)
+Theorem dwexp_none xh xl : ~ (finite xh /\ Rabs (B xh) < 1455) -> dwexp64 xh xl = None.
+Proof.
+  intros H. unfold dwexp64.
+  destruct (dwx_lt (b64_abs xh) dwx_limit) eqn:L; [ | reflexivity].
+  exfalso. apply H.
+  assert (Fx : finite xh).
+  { destruct xh as [s | s | s pl Hpl | s m e He]; try reflexivity; vm_compute in L; discriminate. }
+  split; [exact Fx | ].
+  apply (dwx_lt_true _ _ (dwx_abs_finite _ Fx) dwx_limit_finite) in L.
+  unfold b64_abs in L. rewrite B2R_Babs in L.
+  assert (B dwx_limit = 1455) by (rewrite dwx_limit_val; apply Rle_antisym; interval with (i_prec 64)).
+  lra.
+Qed.
