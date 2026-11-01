@@ -1096,7 +1096,7 @@ Proof.
     pose proof (bpow_gt_0 radix2 k) as B0.
     replace (16 * dwx_u2 * (bpow radix2 k * (Ev * exp R))) with (bpow radix2 k * (16 * dwx_u2 * (Ev * exp R))) by ring.
     apply Rmult_le_compat_l; [lra | ]. eapply Rle_trans; [exact H1 | ]. apply Rmult_le_compat_r; lra. }
-  apply dwx_abs_le in HR. 
+  apply dwx_abs_le in HR.
   assert (GR : 99966 / 100000 <= exp R <= 100034 / 100000) by (split; interval with (i_prec 64)).
   set (r := B rh + B rl) in *.
   assert (Td' : Rabs (B (fx_t_hi j) + B (fx_t_lo j) - Ev) <= 4 * dwx_u2 * Ev).
