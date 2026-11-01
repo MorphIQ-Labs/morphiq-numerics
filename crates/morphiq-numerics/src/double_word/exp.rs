@@ -15,26 +15,21 @@
 //! term equals Dekker's on [`two_prod`](crate::eft::two_prod)'s proved domain.
 
 use super::DoubleWord;
-use super::exp_tables::{INV, L1, L2, L3, TABLE, TAYLOR};
+use super::exp_tables::{
+    INV, L1, L2, L3, LIMIT, LOW_FLOOR, R_FLOOR, SHIFTER, TABLE, TAYLOR, TINY, V_FLOOR,
+};
 
-/// `1.5 · 2^52`: adding and subtracting it rounds to the nearest integer for
-/// arguments below `2^51` in magnitude.
-const SHIFTER: f64 = 6_755_399_441_055_744.0;
-/// Inputs at or above this magnitude return `None`. It keeps `|n| < 2^22`, so
-/// `n·L1` and `n·L2` are exact, and the binary exponent within `±2099`.
-const LIMIT: f64 = 1455.0;
-/// Below this magnitude `exp(x) = 1 + x` within `x²`, under the bound.
-const TINY: f64 = 1.0 / 1_152_921_504_606_846_976.0; // 2^-60
-/// A low word below this magnitude is dropped from the reduced argument; its
-/// effect on `exp` is below `2^-990`, and it keeps every product of a leading
-/// and a trailing word within the double-word multiplication's proved domain.
-const LOW_FLOOR: f64 = 1.0e-300;
-/// A reduced argument below this magnitude is taken as zero (`exp` moves by
-/// less than `2^-900`), so every Horner product is zero or normal.
-const R_FLOOR: f64 = 1.0e-271;
-/// A Horner value's trailing word below this magnitude is dropped (relative
-/// effect below `2^-187`), for the same reason.
-const V_FLOOR: f64 = 1.0e-60;
+// Generated thresholds (`exp_tables.rs`), shared with the Coq transcription:
+// - `SHIFTER = 1.5 · 2^52`: adding and subtracting it rounds to the nearest
+//   integer for arguments below `2^51` in magnitude;
+// - `LIMIT = 1455`: inputs at or above it return `None`; it keeps `|n| < 2^22`,
+//   so `n·L1` and `n·L2` are exact, and the binary exponent within `±2099`;
+// - `TINY = 2^-60`: below it `exp(x) = 1 + x` within `x²`, under the bound;
+// - `LOW_FLOOR = 1e-300`, `R_FLOOR = 1e-271`, `V_FLOOR = 1e-60`: a reduced
+//   argument's trailing word, a reduced argument, and a Horner value's trailing
+//   word below these are dropped, so every product of a leading and a trailing
+//   word is zero or normal as the double-word multiplication bound requires; the
+//   effects are below `2^-990`, `2^-900` and `2^-187` relative.
 
 /// The source of an exact product `(RN(a·b), a·b - RN(a·b))`.
 pub(super) trait ExactProduct {
@@ -83,9 +78,12 @@ fn kernel<P: ExactProduct>(x: DoubleWord, p: &P) -> Option<(DoubleWord, i32)> {
         .add_f64(-(n * L2))
         .add_f64(-q_lo)
         .add_f64(-q_hi);
-    let r = if r.hi.abs() < R_FLOOR {
-        DoubleWord::from_f64(0.0)
-    } else if r.lo.abs() < LOW_FLOOR {
+    if r.hi.abs() < R_FLOOR {
+        // exp(r) = 1 within 2^-900: the table entry itself, the same words the
+        // Horner steps and final product would give for r = 0.
+        return Some((word(TABLE[j]), exponent));
+    }
+    let r = if r.lo.abs() < LOW_FLOOR {
         DoubleWord::from_f64(r.hi)
     } else {
         r
