@@ -23,7 +23,8 @@ use super::exp_tables::{
 // - `SHIFTER = 1.5 · 2^52`: adding and subtracting it rounds to the nearest
 //   integer for arguments below `2^51` in magnitude;
 // - `LIMIT = 1455`: inputs at or above it return `None`; it keeps `|n| < 2^22`,
-//   so `n·L1` and `n·L2` are exact, and the binary exponent within `±2099`;
+//   so `n·L1` and `n·L2` are exact, and the binary exponent within
+//   `[-2100, 2099]`;
 // - `TINY = 2^-60`: below it `exp(x) = 1 + x` within `x²`, under the bound;
 // - `LOW_FLOOR = 1e-300`, `R_FLOOR = 1e-247`, `V_FLOOR = 1e-60`: a reduced
 //   argument's trailing word, a reduced argument, and a Horner value's trailing
@@ -68,7 +69,7 @@ fn kernel<P: ExactProduct>(x: DoubleWord, p: &P) -> Option<(DoubleWord, i32)> {
     let index = n as i64;
     #[allow(clippy::cast_sign_loss)] // masked to 0..1024
     let j = (index & 1023) as usize;
-    #[allow(clippy::cast_possible_truncation)] // |index >> 10| <= 2099
+    #[allow(clippy::cast_possible_truncation)] // |index >> 10| <= 2100
     let exponent = (index >> 10) as i32;
     // n·L1 and n·L2 are exact; n·L3 is taken exactly and subtracted word by
     // word. Every step is DWPlusFP, whose output is proved a double word.
@@ -111,7 +112,7 @@ impl DoubleWord {
     ///
     /// `value` is a double-word number in `[0.9996, 2.0008)`, with relative
     /// error as stated in [`docs/double-word.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/double-word.md#exponential);
-    /// `n` is in `[-2099, 2099]`. The scale is left to the caller, so
+    /// `n` is in `[-2100, 2099]`. The scale is left to the caller, so
     /// `value · 2^n` may lie outside binary64's range: a caller multiplying it
     /// into a quantity of opposite scale keeps the product finite.
     ///
@@ -266,7 +267,14 @@ mod tests {
         assert_eq!(DoubleWord::from_f64(-1455.0).exp_split(), None);
         assert_eq!(DoubleWord::from_f64(f64::NAN).exp_split(), None);
         assert_eq!(DoubleWord::from_f64(f64::INFINITY).exp_split(), None);
-        assert!(DoubleWord::from_f64(1454.999).exp_split().is_some());
+        assert_eq!(
+            DoubleWord::from_f64(1454.999).exp_split().map(|(_, n)| n),
+            Some(2099)
+        );
+        assert_eq!(
+            DoubleWord::from_f64(-1454.999).exp_split().map(|(_, n)| n),
+            Some(-2100)
+        );
         let (one, zero) = DoubleWord::from_f64(0.0).exp_split().unwrap();
         assert_eq!((one.hi(), one.lo(), zero), (1.0, 0.0, 0));
         let (value, n) = DoubleWord::from_f64(-0.0).exp_split().unwrap();
@@ -278,7 +286,7 @@ mod tests {
         for x in inputs().take(100_000) {
             let (value, n) = x.exp_split().unwrap();
             assert!((0.9996..2.0008).contains(&value.hi()), "{x:?} -> {value:?}");
-            assert!((-2099..=2099).contains(&n), "{x:?} -> {n}");
+            assert!((-2100..=2099).contains(&n), "{x:?} -> {n}");
         }
     }
 }
