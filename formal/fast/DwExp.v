@@ -1001,3 +1001,56 @@ Proof.
     { unfold Rdiv. apply Rmult_le_compat_r; [lra | ]. apply Rmult_le_compat_r; lra. }
     apply dwx_exp_mono in H. eapply Rle_trans; [exact H | ]. interval with (i_prec 64).
 Qed.
+
+(** * The branches *)
+
+Lemma dwx_u2_range : / 10 ^ 32 <= dwx_u2 <= / 10 ^ 31.
+Proof. rewrite dwx_u2_val. split; interval with (i_prec 64). Qed.
+
+Lemma dwx_word_sum xh xl : B xh = rndF (B xh + B xl) ->
+  Rabs (B xh + B xl) <= (Rabs (B xh) + / 2 * bpow radix2 (-1074)) / (1 - / 9007199254740992).
+Proof.
+  intros E. pose proof (dwx_rnd_abs_err (B xh + B xl)) as R0. rewrite <- E in R0.
+  replace (B xh - (B xh + B xl)) with (- B xl) in R0 by ring. rewrite Rabs_Ropp in R0.
+  pose proof (Rabs_triang (B xh) (B xl)).
+  apply Rmult_le_reg_r with (1 - / 9007199254740992); [lra | ].
+  unfold Rdiv. rewrite Rmult_assoc, Rinv_l, Rmult_1_r by lra. lra.
+Qed.
+
+Theorem dwexp_tiny_ok xh xl : finite xh -> finite xl -> B xh = rndF (B xh + B xl) -> Rabs (B xh) < B dwx_tiny ->
+  let '(zh, zl) := add_f64_64 xh xl dwx_c0_hi in
+  finite zh /\ finite zl /\ B zh = rndF (B zh + B zl) /\ 9996 / 10000 <= B zh + B zl < 20008 / 10000 /\
+  Rabs (B zh + B zl - exp (B xh + B xl)) <= 16 * dwx_u2 * exp (B xh + B xl).
+Proof.
+  intros Fh Fl E Hx.
+  assert (Tv : B dwx_tiny <= 868 / 1000000000000000000000) by (rewrite dwx_tiny_val; interval with (i_prec 64)).
+  pose proof (dwx_word_sum xh xl E) as S.
+  set (X := B xh + B xl) in *.
+  assert (Xb : Rabs X <= 174 / 100000000000000000000).
+  { eapply Rle_trans; [exact S | ].
+    assert (/ 2 * bpow radix2 (-1074) <= / 10 ^ 300) by (interval with (i_prec 64)).
+    apply Rmult_le_reg_r with (1 - / 9007199254740992); [lra | ].
+    unfold Rdiv. rewrite Rmult_assoc, Rinv_l, Rmult_1_r by lra. lra. }
+  assert (W : forall v, Rabs v <= 4 -> Rabs v <= bpow radix2 1018).
+  { intros v Hv. apply Rle_trans with (bpow radix2 2); [change (bpow radix2 2) with 4; lra | apply bpow_le; lia]. }
+  pose proof (dwx_low_le _ _ E) as Bl.
+  assert (C0 : B dwx_c0_hi = 1) by (rewrite dwx_c0_hi_val; field).
+  pose proof (dwx_add_step xh xl dwx_c0_hi Fh Fl dwx_c0_hi_finite E ltac:(apply W; lra) ltac:(apply W; lra)
+                ltac:(apply W; rewrite C0, Rabs_R1; lra)) as SA.
+  destruct (add_f64_64 xh xl dwx_c0_hi) as [zh zl]. destruct SA as [Fzh [Fzl [Ez Rz]]].
+  rewrite C0 in Rz. fold X in Rz.
+  pose proof dwx_u2_range as U2.
+  apply dwx_abs_le in Xb.
+  assert (T2 : Rabs (exp X - (1 + X)) <= / 10 ^ 35) by (interval with (i_taylor X, i_prec 128)).
+  assert (Eg : 99 / 100 <= exp X <= 101 / 100) by (split; interval with (i_prec 64)).
+  assert (Xr : Rabs (X + 1) <= 102 / 100) by (apply Rabs_le; lra).
+  assert (Zr : Rabs (B zh + B zl - (X + 1)) <= 2 * dwx_u2 * (102 / 100)).
+  { eapply Rle_trans; [exact Rz | ]. apply Rmult_le_compat_l; lra. }
+  split; [exact Fzh | split; [exact Fzl | split; [exact Ez | split]]].
+  - apply dwx_abs_le in Zr. split; lra.
+  - replace (B zh + B zl - exp X) with ((B zh + B zl - (X + 1)) + - (exp X - (1 + X))) by ring.
+    pose proof (Rabs_triang (B zh + B zl - (X + 1)) (- (exp X - (1 + X)))) as T.
+    rewrite Rabs_Ropp in T.
+    assert (16 * dwx_u2 * (99 / 100) <= 16 * dwx_u2 * exp X) by (apply Rmult_le_compat_l; lra).
+    lra.
+Qed.
