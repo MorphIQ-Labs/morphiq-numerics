@@ -604,3 +604,161 @@ Proof.
   apply (Rmult_lt_compat_r (Rabs ((B xh + B xl) * (B yh + B yl)))) in Rl; [ | exact P].
   rewrite Rmult_assoc, Rinv_l, Rmult_1_r in Rl by lra. lra.
 Qed.
+
+(** * One Horner step *)
+
+Lemma dwx_low_le xh xl : B xh = rndF (B xh + B xl) -> Rabs (B xl) <= Rabs (B xh) + 2.
+Proof.
+  intros E. pose proof (dwx_rnd_abs_err (B xh + B xl)) as R0. rewrite <- E in R0.
+  replace (B xh - (B xh + B xl)) with (- B xl) in R0 by ring. rewrite Rabs_Ropp in R0.
+  assert (Tiny : / 2 * bpow radix2 (-1074) <= 1) by (interval with (i_prec 64)).
+  pose proof (Rabs_triang (B xh) (B xl)). pose proof (Rabs_pos (B xh)). lra.
+Qed.
+
+Lemma dwx_nonzero xh xl : B xh = rndF (B xh + B xl) -> B xh <> 0 -> B xh + B xl <> 0.
+Proof. intros E N Z0. rewrite Z0, round_0 in E by exact _. exact (N E). Qed.
+
+Lemma dwx_rndF_float x : rndF (B x) = B x.
+Proof. apply round_generic; [exact _ | apply B_fmt]. Qed.
+
+Lemma dwx_floors :
+  bpow radix2 (-969) <= / 10000 * B dwx_r_floor /\
+  bpow radix2 (-1022) <= / 10000 * B dwx_low_floor /\
+  bpow radix2 (-1022) <= B dwx_v_floor * B dwx_r_floor /\
+  0 < B dwx_v_floor <= / 10 ^ 59 /\ 0 < B dwx_r_floor <= / 10 ^ 200 /\ 0 < B dwx_low_floor <= / 10 ^ 299.
+Proof.
+  rewrite dwx_r_floor_val, dwx_low_floor_val, dwx_v_floor_val.
+  change (-969)%Z with (- Z.of_nat 969)%Z. change (-1022)%Z with (- Z.of_nat 1022)%Z.
+  rewrite !dwx_bpow_m. repeat split; interval with (i_prec 64).
+Qed.
+
+Definition dwexp_err (A d rho cl ch : R) : R :=
+  let m := (A + d) * rho * (1 + 5 * dwx_u2) in
+  let s := (m + cl) * (1 + 2 * dwx_u2) in
+  d * rho + 5 * dwx_u2 * (A + d) * rho + 2 * dwx_u2 * (m + cl) + 2 * dwx_u2 * (s + ch) + B dwx_v_floor.
+
+Lemma dwexp_step_ok k vh vl rh rl P A d rho :
+  finite vh -> finite vl -> B vh = rndF (B vh + B vl) ->
+  / 10000 <= Rabs (B vh) <= 2 -> (B vl = 0 \/ B dwx_v_floor <= Rabs (B vl)) ->
+  finite rh -> finite rl -> B rh = rndF (B rh + B rl) ->
+  B dwx_r_floor <= Rabs (B rh) <= / 1000 -> (B rl = 0 \/ B dwx_low_floor <= Rabs (B rl)) ->
+  Rabs (B rh + B rl) <= rho -> rho <= / 1000 ->
+  Rabs P <= A -> Rabs (B vh + B vl - P) <= d -> 0 <= d -> A + d <= 3 ->
+  finite (dwx_c_hi k) -> finite (dwx_c_lo k) ->
+  Rabs (B (dwx_c_hi k)) <= 1 -> Rabs (B (dwx_c_lo k)) <= / 1000 ->
+  ((k < 3)%nat -> B (dwx_c_lo k) = 0) ->
+  let '(wh, wl) := dwexp_step k rh rl (vh, vl) in
+  finite wh /\ finite wl /\ B wh = rndF (B wh + B wl) /\
+  (B wl = 0 \/ B dwx_v_floor <= Rabs (B wl)) /\
+  Rabs (B wh + B wl - (P * (B rh + B rl) + B (dwx_c_hi k) + B (dwx_c_lo k)))
+    <= dwexp_err A d rho (Rabs (B (dwx_c_lo k))) (Rabs (B (dwx_c_hi k))).
+Proof.
+  intros Fvh Fvl Ev Bv Lv Frh Frl Er Br Lr Hr Hrho HP Hd Hd0 HAd Fch Fcl Bch Bcl Kl.
+  destruct dwx_floors as [F1 [F2 [F3 [[Vf0 Vf1] [[Rf0 Rf1] [Lf0 Lf1]]]]]].
+  assert (U2 : 0 < dwx_u2 <= / 10 ^ 30) by (rewrite dwx_u2_val; split; interval with (i_prec 64)).
+  set (V := B vh + B vl) in *. set (r := B rh + B rl) in *.
+  pose proof (dwx_low_le _ _ Ev) as Bvl. pose proof (dwx_low_le _ _ Er) as Brl.
+  assert (NV : V <> 0) by (apply dwx_nonzero; [exact Ev | intros Z0; rewrite Z0, Rabs_R0 in Bv; lra]).
+  assert (Nr : r <> 0) by (apply dwx_nonzero; [exact Er | intros Z0; rewrite Z0, Rabs_R0 in Br; lra]).
+  assert (HV : Rabs V <= A + d).
+  { replace V with (P + (V - P)) by ring. pose proof (Rabs_triang P (V - P)). lra. }
+  (* the product's domain *)
+  assert (Dhh : in_two_prod_domain (B vh) (B rh)).
+  { right. rewrite Rabs_mult. apply Rle_trans with (/ 10000 * B dwx_r_floor); [exact F1 | ].
+    apply Rmult_le_compat; lra. }
+  assert (Dhl : normal_or_zero (B vh * B rl)).
+  { destruct Lr as [Z0 | Lr]; [left; rewrite Z0; ring | right].
+    rewrite Rabs_mult. apply Rle_trans with (/ 10000 * B dwx_low_floor); [exact F2 | ].
+    apply Rmult_le_compat; lra. }
+  assert (Dlh : normal_or_zero (B vl * B rh)).
+  { destruct Lv as [Z0 | Lv]; [left; rewrite Z0; ring | right].
+    rewrite Rabs_mult. apply Rle_trans with (B dwx_v_floor * B dwx_r_floor); [exact F3 | ].
+    apply Rmult_le_compat; lra. }
+  assert (NVr : V * r <> 0) by (apply Rmult_integral_contrapositive; split; assumption).
+  pose proof (dwx_mul_step vh vl rh rl Fvh Fvl Ev Frh Frl Er ltac:(lra) ltac:(lra) ltac:(lra) ltac:(lra)
+                Dhh Dhl Dlh NVr) as SM.
+  unfold dwexp_step. fold V r in SM.
+  destruct (mul64 vh vl rh rl) as [mh ml]. destruct SM as [Fmh [Fml [Em Rm]]].
+  set (cl := B (dwx_c_lo k)) in *. set (ch := B (dwx_c_hi k)) in *.
+  set (mb := (A + d) * rho * (1 + 5 * dwx_u2)).
+  assert (VR : Rabs (V * r) <= (A + d) * rho) by (rewrite Rabs_mult; apply Rmult_le_compat; try apply Rabs_pos; lra).
+  assert (HM : Rabs (B mh + B ml) <= mb).
+  { unfold mb. replace (B mh + B ml) with (V * r + (B mh + B ml - V * r)) by ring.
+    pose proof (Rabs_triang (V * r) (B mh + B ml - V * r)).
+    assert (5 * dwx_u2 * Rabs (V * r) <= 5 * dwx_u2 * ((A + d) * rho)) by (apply Rmult_le_compat_l; lra). nra. }
+  assert (R0 : 0 <= rho) by (pose proof (Rabs_pos r); lra).
+  assert (A0 : 0 <= A + d) by (pose proof (Rabs_pos P); lra).
+  assert (Mb : mb <= / 100).
+  { unfold mb. assert ((A + d) * rho <= 3 * / 1000) by (apply Rmult_le_compat; lra).
+    assert ((A + d) * rho * (1 + 5 * dwx_u2) <= 3 * / 1000 * (1 + 5 * dwx_u2))
+      by (apply Rmult_le_compat_r; lra). lra. }
+  assert (W : forall v, Rabs v <= 4 -> Rabs v <= bpow radix2 1018).
+  { intros v Hv. apply Rle_trans with (bpow radix2 2); [change (bpow radix2 2) with 4; lra | apply bpow_le; lia]. }
+  assert (Wd : forall zh zl M, B zh = rndF (B zh + B zl) -> Rabs (B zh + B zl) <= M -> M <= 1 ->
+            Rabs (B zh) <= bpow radix2 1018 /\ Rabs (B zl) <= bpow radix2 1018).
+  { intros zh zl M Ez Hz HM'. destruct (dwx_dw_words zh zl M Ez Hz) as [A1 A2].
+    assert (bpow radix2 (-1074) <= / 10) by (interval with (i_prec 64)).
+    split; apply W; lra. }
+  destruct (Wd mh ml mb Em HM ltac:(lra)) as [Wmh Wml].
+  (* the low coefficient word *)
+  assert (SL : exists sh sl,
+      (if (3 <=? k)%nat then add_f64_64 mh ml (dwx_c_lo k) else (mh, ml)) = (sh, sl) /\
+      finite sh /\ finite sl /\ B sh = rndF (B sh + B sl) /\
+      Rabs (B sh + B sl - (B mh + B ml + cl)) <= 2 * dwx_u2 * (mb + Rabs cl)).
+  { destruct (3 <=? k)%nat eqn:K.
+    - pose proof (dwx_add_step mh ml (dwx_c_lo k) Fmh Fml Fcl Em Wmh Wml ltac:(apply W; change (Rabs cl <= 4); lra)) as SA.
+      destruct (add_f64_64 mh ml (dwx_c_lo k)) as [sh sl]. destruct SA as [Fsh [Fsl [Es Rs]]]. fold cl in Rs.
+      exists sh, sl. split; [reflexivity | repeat split; try assumption].
+      eapply Rle_trans; [exact Rs | ]. apply Rmult_le_compat_l; [lra | ].
+      pose proof (Rabs_triang (B mh + B ml) cl). lra.
+    - apply Nat.leb_gt in K. exists mh, ml. split; [reflexivity | repeat split; try assumption].
+      fold cl in Kl. rewrite (Kl K), Rplus_0_r. unfold Rminus. rewrite Rplus_opp_r, Rabs_R0.
+      pose proof (Rabs_pos cl). assert (0 <= mb) by (unfold mb; apply Rmult_le_pos; [apply Rmult_le_pos | ]; lra). assert (0 <= 2 * dwx_u2) by lra. apply Rmult_le_pos; lra. }
+  destruct SL as [sh [sl [Hs [Fsh [Fsl [Es Rs]]]]]]. rewrite Hs.
+  set (sb := (mb + Rabs cl) * (1 + 2 * dwx_u2)).
+  assert (HS : Rabs (B sh + B sl) <= sb).
+  { unfold sb. replace (B sh + B sl) with ((B mh + B ml + cl) + (B sh + B sl - (B mh + B ml + cl))) by ring.
+    pose proof (Rabs_triang (B mh + B ml + cl) (B sh + B sl - (B mh + B ml + cl))).
+    pose proof (Rabs_triang (B mh + B ml) cl). nra. }
+  assert (Sb : sb <= / 10).
+  { unfold sb. assert ((mb + Rabs cl) * (1 + 2 * dwx_u2) <= (/ 100 + / 1000) * (1 + 2 * dwx_u2))
+      by (apply Rmult_le_compat_r; lra). lra. }
+  destruct (Wd sh sl sb Es HS ltac:(lra)) as [Wsh Wsl].
+  (* the high coefficient word *)
+  pose proof (dwx_add_step sh sl (dwx_c_hi k) Fsh Fsl Fch Es Wsh Wsl ltac:(apply W; change (Rabs ch <= 4); lra)) as SA.
+  destruct (add_f64_64 sh sl (dwx_c_hi k)) as [wh wl]. destruct SA as [Fwh [Fwl [Ew Rw]]].
+  fold ch in Rw.
+  assert (Rw' : Rabs (B wh + B wl - (B sh + B sl + ch)) <= 2 * dwx_u2 * (sb + Rabs ch)).
+  { eapply Rle_trans; [exact Rw | ]. apply Rmult_le_compat_l; [lra | ].
+    pose proof (Rabs_triang (B sh + B sl) ch). lra. }
+  (* the error before the floor *)
+  assert (Tot : Rabs (B wh + B wl - (P * r + ch + cl))
+                <= d * rho + 5 * dwx_u2 * (A + d) * rho + 2 * dwx_u2 * (mb + Rabs cl) + 2 * dwx_u2 * (sb + Rabs ch)).
+  { replace (B wh + B wl - (P * r + ch + cl))
+      with ((B wh + B wl - (B sh + B sl + ch)) + (B sh + B sl - (B mh + B ml + cl))
+            + (B mh + B ml - V * r) + (V - P) * r) by ring.
+    assert (E1 : Rabs ((V - P) * r) <= d * rho)
+      by (rewrite Rabs_mult; apply Rmult_le_compat; try apply Rabs_pos; lra).
+    assert (E2 : Rabs (B mh + B ml - V * r) <= 5 * dwx_u2 * (A + d) * rho).
+    { assert (G : 5 * dwx_u2 * Rabs (V * r) <= 5 * dwx_u2 * ((A + d) * rho)) by (apply Rmult_le_compat_l; lra).
+      eapply Rle_trans; [exact Rm | ]. replace (5 * dwx_u2 * (A + d) * rho) with (5 * dwx_u2 * ((A + d) * rho)) by ring.
+      exact G. }
+    pose proof (Rabs_triang (B wh + B wl - (B sh + B sl + ch) + (B sh + B sl - (B mh + B ml + cl))
+                              + (B mh + B ml - V * r)) ((V - P) * r)).
+    pose proof (Rabs_triang (B wh + B wl - (B sh + B sl + ch) + (B sh + B sl - (B mh + B ml + cl)))
+                              (B mh + B ml - V * r)).
+    pose proof (Rabs_triang (B wh + B wl - (B sh + B sl + ch)) (B sh + B sl - (B mh + B ml + cl))).
+    lra. }
+  unfold dwexp_err. fold mb. fold sb.
+  pose proof (dwx_abs_finite _ Fwl) as Fa.
+  assert (Ab : B (b64_abs wl) = Rabs (B wl)) by (unfold b64_abs; apply B2R_Babs).
+  destruct (dwx_lt (b64_abs wl) dwx_v_floor) eqn:Fl.
+  - apply (dwx_lt_true _ _ Fa dwx_v_floor_finite) in Fl. rewrite Ab in Fl.
+    split; [exact Fwh | split; [reflexivity | split; [ | split; [left; reflexivity | ]]]].
+    + change (B dwx_zero) with 0. rewrite Rplus_0_r. symmetry. apply dwx_rndF_float.
+    + change (B dwx_zero) with 0. rewrite Rplus_0_r.
+      replace (B wh - (P * r + ch + cl)) with ((B wh + B wl - (P * r + ch + cl)) + - B wl) by ring.
+      pose proof (Rabs_triang (B wh + B wl - (P * r + ch + cl)) (- B wl)) as T. rewrite Rabs_Ropp in T. lra.
+  - apply (dwx_lt_false _ _ Fa dwx_v_floor_finite) in Fl. rewrite Ab in Fl.
+    split; [exact Fwh | split; [exact Fwl | split; [exact Ew | split; [right; exact Fl | ]]]]. lra.
+Qed.
