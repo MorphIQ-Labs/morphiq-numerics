@@ -939,3 +939,65 @@ Proof.
     apply Rmult_le_reg_r with (1 - e); [lra | exact G]. }
   unfold Rabs. destruct (Rcase_abs (exp y - 1)); nra.
 Qed.
+
+(** * Composition *)
+
+(** [Z ≈ T·V], [T ≈ E], [V ≈ G] relatively by [M], [A] and [Bb]: [Z ≈ E·G]. *)
+Lemma dwx_compose Z T V E G M A Bb :
+  0 < E -> 0 < G -> 0 <= M -> 0 <= A -> 0 <= Bb ->
+  Rabs (Z - T * V) <= M * Rabs (T * V) -> Rabs (T - E) <= A * E -> Rabs (V - G) <= Bb * G ->
+  Rabs (Z - E * G) <= (M * (1 + A) * (1 + Bb) + A * (1 + Bb) + Bb) * (E * G).
+Proof.
+  intros E0 G0 M0 A0 B0 HZ HT HV.
+  assert (Tb : Rabs T <= E * (1 + A)).
+  { replace T with (E + (T - E)) by ring. pose proof (Rabs_triang E (T - E)). rewrite (Rabs_pos_eq E) in H by lra. lra. }
+  assert (Vb : Rabs V <= G * (1 + Bb)).
+  { replace V with (G + (V - G)) by ring. pose proof (Rabs_triang G (V - G)). rewrite (Rabs_pos_eq G) in H by lra. lra. }
+  assert (TV : Rabs (T * V) <= E * (1 + A) * (G * (1 + Bb)))
+    by (rewrite Rabs_mult; apply Rmult_le_compat; try apply Rabs_pos; assumption).
+  assert (E1 : Rabs (Z - T * V) <= M * (E * (1 + A) * (G * (1 + Bb)))).
+  { eapply Rle_trans; [exact HZ | ]. apply Rmult_le_compat_l; assumption. }
+  assert (E2 : Rabs ((T - E) * V) <= A * E * (G * (1 + Bb)))
+    by (rewrite Rabs_mult; apply Rmult_le_compat; try apply Rabs_pos; assumption).
+  assert (E3 : Rabs (E * (V - G)) <= E * (Bb * G))
+    by (rewrite Rabs_mult, (Rabs_pos_eq E) by lra; apply Rmult_le_compat_l; lra).
+  replace (Z - E * G) with ((Z - T * V) + (T - E) * V + E * (V - G)) by ring.
+  pose proof (Rabs_triang ((Z - T * V) + (T - E) * V) (E * (V - G))).
+  pose proof (Rabs_triang (Z - T * V) ((T - E) * V)).
+  replace ((M * (1 + A) * (1 + Bb) + A * (1 + Bb) + Bb) * (E * G))
+    with (M * (E * (1 + A) * (G * (1 + Bb))) + A * E * (G * (1 + Bb)) + E * (Bb * G)) by ring.
+  lra.
+Qed.
+
+(** The index's table entry and binary exponent. *)
+Lemma dwx_scale ni : (Z.abs ni <= 2149501)%Z ->
+  (Z.to_nat (Z.land ni 1023) < 1024)%nat /\ (-2100 <= Z.shiftr ni 10 <= 2099)%Z /\
+  exp (IZR ni * dwx_L) = bpow radix2 (Z.shiftr ni 10) * exp (INR (Z.to_nat (Z.land ni 1023)) * ln 2 / 1024).
+Proof.
+  intros Hn.
+  assert (Lm : Z.land ni 1023 = (ni mod 1024)%Z) by (change 1023%Z with (Z.ones 10); rewrite Z.land_ones by lia; reflexivity).
+  assert (Sh : Z.shiftr ni 10 = (ni / 1024)%Z) by (rewrite Z.shiftr_div_pow2 by lia; reflexivity).
+  rewrite Lm, Sh.
+  pose proof (Z.mod_pos_bound ni 1024 ltac:(lia)) as Mb.
+  pose proof (Z_div_mod_eq_full ni 1024) as D.
+  split; [apply Nat2Z.inj_lt; rewrite Z2Nat.id by lia; simpl; lia | ].
+  split; [Z.div_mod_to_equations; lia | ].
+  rewrite INR_IZR_INZ, Z2Nat.id by lia.
+  rewrite bpow_exp, <- exp_plus. f_equal.
+  replace (IZR ni) with (IZR (1024 * (ni / 1024) + ni mod 1024)%Z) by (f_equal; lia).
+  rewrite plus_IZR, mult_IZR. unfold dwx_L. change (IZR radix2) with 2. field.
+Qed.
+
+Lemma dwx_E_range j : (j < 1024)%nat ->
+  1 <= exp (INR j * ln 2 / 1024) <= 19987 / 10000.
+Proof.
+  intros Hj. assert (Jr : 0 <= INR j <= 1023).
+  { split; [apply pos_INR | ]. replace 1023 with (INR 1023) by (simpl; lra). apply le_INR; lia. }
+  assert (L0 : 0 < ln 2) by (rewrite <- ln_1; apply ln_increasing; lra).
+  split.
+  - assert (0 <= INR j * ln 2 / 1024) by (unfold Rdiv; apply Rmult_le_pos; [apply Rmult_le_pos | ]; lra).
+    rewrite <- exp_0. apply dwx_exp_mono. lra.
+  - assert (H : INR j * ln 2 / 1024 <= 1023 * ln 2 / 1024).
+    { unfold Rdiv. apply Rmult_le_compat_r; [lra | ]. apply Rmult_le_compat_r; lra. }
+    apply dwx_exp_mono in H. eapply Rle_trans; [exact H | ]. interval with (i_prec 64).
+Qed.
