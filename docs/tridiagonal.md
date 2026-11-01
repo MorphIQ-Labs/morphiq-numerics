@@ -254,7 +254,7 @@ Dense LU from faer is a different complexity/cost comparison, and is not added
 as a runtime dependency. Parallel cyclic reduction changes operation order;
 reciprocal pivots change rounding. Neither is part of this API.
 
-The recurrence is adapted from the original MIT FerroRisk kernel at
+The recurrence is adapted from the original MIT MorphIQ Risk kernel at
 `100880f67b9da1c66e9a9d03ba9e1a5ad876eb5c`, with factor/solve separation,
 compact off-diagonals, explicit domain/range checks and a separate certificate.
 The crate's `THIRD_PARTY_NOTICES.md` records the exact source, hash and license.

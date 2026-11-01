@@ -46,7 +46,7 @@ RHOS = sorted({
 RHOS = sorted({s * r for r in RHOS for s in (1.0, -1.0)})
 # Thresholds the quadrature meets in turn: the origin, both signs and both
 # orderings, the near and far tails, equal and opposite arguments, a saturated
-# corner, and the -3/-3, -6/-6 and -20/1 cancellation corners of ferro-risk's
+# corner, and the -3/-3, -6/-6 and -20/1 cancellation corners of MorphIQ Risk's
 # bivariate-normal audit (#380).
 PAIRS = [(0.0, 0.0), (0.25, -0.25), (1.0, 1.0), (-1.0, -1.0), (1.0, -2.0), (2.0, 3.5),
          (-2.0, -3.5), (3.5, -3.5), (-3.0, -3.0), (-3.0, 3.0), (-6.0, -6.0), (-6.0, -9.0),
@@ -54,7 +54,7 @@ PAIRS = [(0.0, 0.0), (0.25, -0.25), (1.0, 1.0), (-1.0, -1.0), (1.0, -2.0), (2.0,
          (0.0, 9.0), (-20.0, 1.0), (37.5, 38.5)]
 
 
-# The deep-tail negative-correlation corner of ferro-risk's issue #380: both
+# The deep-tail negative-correlation corner of MorphIQ Risk's issue #380: both
 # arguments well below zero, correlation negative, where the direct Genz sum
 # cancels to the rounding floor (about 1e16) and the reflection identity to
 # 2e18. They are required cases, not samples.
@@ -87,7 +87,7 @@ DEEP = [(h, k, rho)
                      (-20.0, -20.0), (-25.0, -25.0), (-30.0, -30.0), (-36.0, -36.0),
                      (-10.0, -30.0), (-20.0, -9.0), (-37.0, -37.83783783783783),
                      (-37.0, -37.83783783783784))]
-FERRO = ROOT / 'generators/bivariate_normal_ferro_inputs.json'
+MORPHIQ_RISK = ROOT / 'generators/bivariate_normal_morphiq_risk_inputs.json'
 
 
 def phi(x):
@@ -230,9 +230,9 @@ def cases():
         k = (next(rng) / 2.0 ** 64 * 2 - 1) * 12
         rho = (next(rng) / 2.0 ** 64 * 2 - 1)
         out.append((h, k, rho, 'random', None))
-    for row in json.loads(FERRO.read_text())['rows']:
+    for row in json.loads(MORPHIQ_RISK.read_text())['rows']:
         h, k, rho = (from_bits(int(row[name], 16)) for name in ('h', 'k', 'rho'))
-        out.append((h, k, rho, 'ferro', (row['family'], row['status'], row['value'])))
+        out.append((h, k, rho, 'morphiq_risk', (row['family'], row['status'], row['value'])))
     for h, k, rho in TAIL:
         out.append((h, k, rho, 'tail', None))
     for h, k, rho in DEEP:
@@ -267,12 +267,12 @@ def second_route(index, h, k, rho, kind):
 
 def evaluate(case):
     """One case at both precisions, plus the second route on a subset."""
-    index, (h, k, rho, kind, ferro) = case
+    index, (h, k, rho, kind, morphiq_risk) = case
     if beyond_binary64(h, k, rho):
         row = {'kind': kind, 'h': f'{to_bits(h):016x}', 'k': f'{to_bits(k):016x}',
                'rho': f'{to_bits(rho):016x}', 'value': '0'}
-        if ferro is not None:
-            row['ferro'] = {'family': ferro[0], 'status': ferro[1], 'value': ferro[2]}
+        if morphiq_risk is not None:
+            row['morphiq_risk'] = {'family': morphiq_risk[0], 'status': morphiq_risk[1], 'value': morphiq_risk[2]}
         return row, False, None
     lo, hi = (at(p, bvn, h, k, rho) for p in PRECISIONS)
     tolerance = max(abs(hi) * mp.mpf(10) ** -36, mp.mpf(10) ** -46)
@@ -301,9 +301,9 @@ def evaluate(case):
         'value': text(hi),
     }
     disagreement = None
-    if ferro is not None:
-        family, status, value = ferro
-        row['ferro'] = {'family': family, 'status': status, 'value': value}
+    if morphiq_risk is not None:
+        family, status, value = morphiq_risk
+        row['morphiq_risk'] = {'family': family, 'status': status, 'value': value}
         # The earlier fixture prints 15 significant digits: where it called a
         # row resolved ours must agree to the rounding of those digits.
         if status == 'resolved' and abs(mp.mpf(value) - hi) > mp.mpf('6e-15') * abs(hi):
@@ -340,7 +340,7 @@ def generate(shard=None):
         assert cross >= 300, cross
     return {'generator': 'generators/bivariate_normal_reference.py', 'mpmath': mp.__version__,
             'precision_bits': list(PRECISIONS), 'digits': DIGITS, 'cross_checked': cross,
-            'ferro_disagreements': disagreements, 'cases': rows}
+            'morphiq_risk_disagreements': disagreements, 'cases': rows}
 
 
 def check_shard(index, count):
@@ -357,7 +357,7 @@ def check_shard(index, count):
         sys.exit(f'{OUT} holds {len(committed["cases"])} cases, the generator defines {len(every)}')
     total = sum(1 for i, (h, k, rho, kind, _) in every if second_route(i, h, k, rho, kind))
     fresh = generate((index, count))
-    if committed['cross_checked'] != total or committed['ferro_disagreements']:
+    if committed['cross_checked'] != total or committed['morphiq_risk_disagreements']:
         sys.exit(f'{OUT} header differs: cross_checked {committed["cross_checked"]} vs {total}')
     for name in ('generator', 'mpmath', 'precision_bits', 'digits'):
         if committed[name] != fresh[name]:
@@ -384,7 +384,7 @@ def main():
     else:
         OUT.write_text(out)
     print(f'bivariate_normal: {len(result["cases"])} cases, {result["cross_checked"]} cross-checked, '
-          f'{len(result["ferro_disagreements"])} disagreements with the ferro-risk rows')
+          f'{len(result["morphiq_risk_disagreements"])} disagreements with the MorphIQ Risk rows')
 
 
 if __name__ == '__main__':

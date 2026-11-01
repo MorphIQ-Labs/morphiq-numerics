@@ -1,5 +1,5 @@
 {
-"source": "ferro-risk crates/ferro-risk/testing/data/bivariate_normal_reference.json at commit 72db248c (generator sha256 76c15159df0d34e327d40390cac06b340f6c4726c22e6eb1776ac910688b0e47)",
+"source": "MorphIQ Risk bivariate_normal_reference.json reference corpus at commit 72db248c (generator sha256 76c15159df0d34e327d40390cac06b340f6c4726c22e6eb1776ac910688b0e47)",
 "selection": "every row except the BS2002-correlation families (bs_rho, bs_reachable_tail); every 10th row of the body and bounded_tail families",
 "rows": [
 {

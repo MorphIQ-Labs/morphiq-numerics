@@ -1,9 +1,10 @@
 # Third-party notices
 
-## FerroRisk Thomas recurrence
+## MorphIQ Risk Thomas recurrence
 
-- Project: MorphIQ Labs FerroRisk, commit `100880f67b9da1c66e9a9d03ba9e1a5ad876eb5c`.
-- Original source: <https://github.com/MorphIQ-Labs/ferro-risk/blob/100880f67b9da1c66e9a9d03ba9e1a5ad876eb5c/src/numerics/tridiag.rs>.
+- Project: MorphIQ Risk (MorphIQ Labs), commit `100880f67b9da1c66e9a9d03ba9e1a5ad876eb5c`.
+- Original source: <https://api.github.com/repositories/1321813529/contents/src/numerics/tridiag.rs?ref=100880f67b9da1c66e9a9d03ba9e1a5ad876eb5c>.
+  The source link uses GitHub's repository ID so it does not depend on the project name.
 - SHA-256 of the complete original `src/numerics/tridiag.rs`:
   `ddd8e947454ecc0bf867d49442f81d518368ca152997cb487894083c1ac177e8`.
 - License at that commit: MIT; reproduced below without changes.
