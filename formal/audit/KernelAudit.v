@@ -953,6 +953,10 @@ Print Assumptions FastLogCdf.fast_logcdf_positive_ok.
 Print Assumptions FastLogCdf.fast_logcdf_entry_ok.
 Print Assumptions FastLogCdf.fast_logcdf_fallback.
 Print Assumptions FastLogCdf.fast_logcdf_nonfinite.
+Require FastExpQuadratic.
+Print Assumptions FastExpQuadratic.fast_exp_quadratic_ok.
+Print Assumptions FastExpQuadratic.fast_short_reduction_ok.
+Print Assumptions FastExpQuadratic.fast_quadratic_approx.
 Print Assumptions FastExp.fast_exp_entry_ok.
 Print Assumptions FastExp.fast_exp_nonpositive_range.
 Print Assumptions FastErfcx.fast_erfcx_table_ok.

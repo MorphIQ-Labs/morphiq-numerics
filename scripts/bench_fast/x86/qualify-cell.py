@@ -2,6 +2,7 @@
 import argparse
 import csv
 import ctypes as C
+import ctypes.util
 import hashlib
 import json
 import math
@@ -111,6 +112,14 @@ def main():
             method = 'measure_packet'
     elif args.reference == 'core_math_exp':
         ref, method = pointer(E/'libcoreexp.so', 'cr_exp'), 'measure1'
+    elif args.reference == 'glibc_exp':
+        if platform.system() != 'Linux' or platform.libc_ver()[0] != 'glibc':
+            raise RuntimeError('glibc_exp requires native Linux with glibc')
+        # Black-box ABI comparison only; no platform implementation source.
+        library = ctypes.util.find_library('m')
+        if library is None:
+            raise RuntimeError('Cannot locate the system libm')
+        ref, method = pointer(library, 'exp'), 'measure1'
     elif args.reference == 'core_math_ln':
         ref, method = pointer(E/('libcorelog.dylib' if platform.system() == 'Darwin' else 'libcorelog.so'), 'cr_log'), 'measure1'
     elif args.reference == 'libcerf_erfcx':
@@ -195,6 +204,7 @@ def main():
     after = host()
     input_bytes = b''.join(struct.pack('>d', value) for value in values)
     metadata = dict(arguments=vars(args), counts=counts, before=before, after=after,
+                    platform=platform.platform(), libc=platform.libc_ver(),
                     input_sha256=hashlib.sha256(input_bytes).hexdigest(),
                     product_sha256=hashlib.sha256(Path(args.product).read_bytes()).hexdigest(),
                     input_address=input_address, output_address=output_address,
