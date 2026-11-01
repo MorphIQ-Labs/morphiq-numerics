@@ -7,6 +7,7 @@
 //! See `docs/fast.md` for the bounds and their derivation.
 
 mod cdf;
+mod cdf_tables;
 pub mod elementary;
 #[cfg(feature = "simd")]
 mod lanes;
