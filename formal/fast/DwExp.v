@@ -304,3 +304,223 @@ Proof.
     + change (IZR (2 ^ 53)) with (bpow radix2 53). rewrite <- bpow_plus. apply bpow_lt. lia.
   - split; [exact F | rewrite E, Bn; reflexivity].
 Qed.
+
+(** * The reduction *)
+
+Definition dwx_u2 : R := bpow radix2 (-106).
+
+Lemma dwx_u2_eq : 2 * bpow radix2 (- prec) ^ 2 = 2 * dwx_u2.
+Proof.
+  unfold dwx_u2, prec. change (- (53))%Z with (-53)%Z.
+  replace (bpow radix2 (-53) ^ 2) with (bpow radix2 (-53) * bpow radix2 (-53)) by ring.
+  rewrite <- bpow_plus. reflexivity.
+Qed.
+
+(** The words of a normalized double word are bounded by twice its value plus
+    the smallest subnormal. *)
+Lemma dwx_dw_words zh zl M : B zh = rndF (B zh + B zl) -> Rabs (B zh + B zl) <= M ->
+  Rabs (B zh) <= 2 * M + bpow radix2 (-1074) /\ Rabs (B zl) <= 3 * M + bpow radix2 (-1074).
+Proof.
+  intros E Hm. pose proof (dwx_rnd_abs_err (B zh + B zl)) as R0. rewrite <- E in R0.
+  assert (T : / 2 * bpow radix2 (-1074) <= bpow radix2 (-1074)) by (pose proof (bpow_gt_0 radix2 (-1074)); lra).
+  assert (H1 : Rabs (B zh) <= Rabs (B zh + B zl) + Rabs (B zh - (B zh + B zl))).
+  { replace (B zh) with ((B zh + B zl) + (B zh - (B zh + B zl))) at 1 by ring. apply Rabs_triang. }
+  assert (H2 : Rabs (B zl) <= Rabs (B zh + B zl) + Rabs (B zh)).
+  { replace (B zl) with ((B zh + B zl) - B zh) at 1 by ring. eapply Rle_trans; [apply Rabs_triang | ].
+    rewrite Rabs_Ropp. lra. }
+  pose proof (Rabs_pos (B zh + B zl)). split; nra.
+Qed.
+
+(** One DWPlusFP step in binary64: finite, normalized, within [2u²] of the
+    exact sum, for words at most [2^1018]. *)
+Lemma dwx_add_step xh xl y : finite xh -> finite xl -> finite y -> B xh = rndF (B xh + B xl) ->
+  Rabs (B xh) <= bpow radix2 1018 -> Rabs (B xl) <= bpow radix2 1018 -> Rabs (B y) <= bpow radix2 1018 ->
+  let '(zh, zl) := add_f64_64 xh xl y in
+  finite zh /\ finite zl /\ B zh = rndF (B zh + B zl) /\
+  Rabs (B zh + B zl - (B xh + B xl + B y)) <= 2 * dwx_u2 * Rabs (B xh + B xl + B y).
+Proof.
+  intros Fh Fl Fy E Bh Bl By.
+  assert (U : forall v, Rabs v <= bpow radix2 1018 -> bnd 1 1018 v) by (intros v Hv; unfold bnd; lra).
+  destruct (add_f64_64_ok 1 1018 xh xl y Fh Fl Fy (U _ Bh) (U _ Bl) (U _ By)
+              ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia)) as [Fzh [Fzl Ez]].
+  pose proof (add_f64_dw (B xh) (B xl) (B y) (B_fmt xh) (B_fmt xl) (B_fmt y) E) as D.
+  pose proof (add_f64_abs (B xh) (B xl) (B y) (B_fmt xh) (B_fmt xl) (B_fmt y) E) as A.
+  rewrite <- Ez in D, A. rewrite <- dwx_u2_eq.
+  destruct (add_f64_64 xh xl y) as [zh zl]. cbn [fst snd] in *.
+  repeat split; assumption.
+Qed.
+
+(** The double word's trailing word is below [2^-53] of its value plus the
+    smallest subnormal. *)
+Lemma dwx_low_small xh xl : B xh = rndF (B xh + B xl) -> Rabs (B xh) < 1455 -> Rabs (B xl) <= / 5000000000000.
+Proof.
+  intros E Hx. pose proof (dwx_rnd_abs_err (B xh + B xl)) as R0. rewrite <- E in R0.
+  replace (B xh - (B xh + B xl)) with (- B xl) in R0 by ring. rewrite Rabs_Ropp in R0.
+  assert (Tiny : / 2 * bpow radix2 (-1074) <= / 1000000000000000000) by (interval with (i_prec 64)).
+  assert (Tr : Rabs (B xh + B xl) <= Rabs (B xh) + Rabs (B xl)) by apply Rabs_triang.
+  clear E. nra.
+Qed.
+
+Lemma dwx_l1_gap : Rabs (dwx_L - B fx_l1) <= / 23000000000000.
+Proof. unfold dwx_L. rewrite fx_l1_val. interval with (i_prec 100). Qed.
+
+Lemma dwx_l12_gap : Rabs (dwx_L - B fx_l1 - B dwx_l2) <= / 70000000000000000000000.
+Proof. unfold dwx_L. rewrite fx_l1_val, dwx_l2_val. interval with (i_prec 200). Qed.
+
+Lemma dwx_l3_small : Rabs (B dwx_l3) <= bpow radix2 (-76).
+Proof. rewrite dwx_l3_val. change (-76)%Z with (- Z.of_nat 76)%Z. rewrite dwx_bpow_m. interval with (i_prec 200). Qed.
+
+Lemma dwx_l3_big : bpow radix2 (-969) <= Rabs (B dwx_l3).
+Proof. rewrite dwx_l3_val. change (-969)%Z with (- Z.of_nat 969)%Z. rewrite dwx_bpow_m. interval with (i_prec 200). Qed.
+
+Lemma dwx_split' : Rabs (B fx_l1 + B dwx_l2 + B dwx_l3 - dwx_L) <= / 2 ^ 128.
+Proof. exact dwx_split. Qed.
+
+Lemma dwx_u2_val : dwx_u2 = / 2 ^ 106.
+Proof. unfold dwx_u2. change (-106)%Z with (- Z.of_nat 106)%Z. apply dwx_bpow_m. Qed.
+
+Theorem dwexp_reduce_ok xh xl n ni :
+  finite xh -> finite xl -> B xh = rndF (B xh + B xl) -> Rabs (B xh) < 1455 ->
+  finite n -> B n = IZR ni -> (Z.abs ni <= 2149501)%Z ->
+  Rabs (B xh / dwx_L - IZR ni) <= / 2 + / 1000000000 ->
+  let '(rh, rl) := dwexp_reduce xh xl n in
+  finite rh /\ finite rl /\ B rh = rndF (B rh + B rl) /\
+  Rabs (B rh + B rl - (B xh + B xl - IZR ni * dwx_L)) <= 52 / 100 * dwx_u2 /\
+  Rabs (B xh + B xl - IZR ni * dwx_L) <= 0.000338451.
+Proof.
+  intros Fh Fl E Hx Fn Bn Ni Q.
+  pose proof dwx_L_range as Lr.
+  assert (Nr : Rabs (IZR ni) <= 2149501) by (rewrite <- abs_IZR; apply IZR_le; lia).
+  pose proof (dwx_low_small xh xl E Hx) as Xl.
+  set (R := B xh + B xl - IZR ni * dwx_L).
+  assert (HR : Rabs R <= 0.000338451).
+  { assert (H1 : B xh - IZR ni * dwx_L = dwx_L * (B xh / dwx_L - IZR ni)) by (field; lra).
+    assert (H2 : Rabs (B xh - IZR ni * dwx_L) <= 0.0006769016 * (/ 2 + / 1000000000)).
+    { rewrite H1, Rabs_mult, (Rabs_pos_eq dwx_L) by lra. apply Rmult_le_compat; try lra. apply Rabs_pos. }
+    unfold R. replace (B xh + B xl - IZR ni * dwx_L) with ((B xh - IZR ni * dwx_L) + B xl) by ring.
+    eapply Rle_trans; [apply Rabs_triang | ]. lra. }
+  (* the exact products *)
+  destruct (dwexp_product_exact n ni fx_l1 1488522236 (-41) Fn Bn Ni fx_l1_finite dwx_l1_eq
+              ltac:(lia) ltac:(lia)) as [Fe1 Be1].
+  destruct (dwexp_product_exact n ni dwx_l2 (-1549864104) (-75) Fn Bn Ni dwx_l2_finite dwx_l2_eq
+              ltac:(lia) ltac:(lia)) as [Fe2 Be2].
+  assert (Nb : Rabs (B n) <= bpow radix2 22).
+  { rewrite Bn. change (bpow radix2 22) with 4194304. lra. }
+  assert (Dom : in_two_prod_domain (B n) (B dwx_l3)).
+  { destruct (Z.eq_dec ni 0) as [Z0 | N0].
+    - left. rewrite Bn, Z0. ring.
+    - right. rewrite Rabs_mult. pose proof dwx_l3_big as L3b.
+      assert (1 <= Rabs (B n)) by (rewrite Bn, <- abs_IZR; apply IZR_le; lia).
+      pose proof (Rabs_pos (B dwx_l3)). nra. }
+  pose proof (two_prod_ieee 22 (-76) n dwx_l3 Fn dwx_l3_finite Nb dwx_l3_small
+                ltac:(lia) ltac:(lia) ltac:(lia) Dom) as TP.
+  unfold dwexp_reduce.
+  destruct (two_prod64 n dwx_l3) as [qh ql]. destruct TP as [Fqh [Fql [Pq Eq]]].
+  rewrite Bn in Pq, Eq.
+  pose proof dwx_l1_gap as G1. pose proof dwx_l12_gap as G12. pose proof dwx_split' as Sp.
+  pose proof dwx_l3_small as L3s.
+  assert (U2 : 0 < dwx_u2 <= / 81129638414606681695789005144064) by (rewrite dwx_u2_val; split; [apply Rinv_0_lt_compat; apply pow_lt; lra | simpl; lra]).
+  assert (W : forall v, Rabs v <= 2000 -> Rabs v <= bpow radix2 1018).
+  { intros v Hv. apply Rle_trans with (bpow radix2 11); [change (bpow radix2 11) with 2048; lra | apply bpow_le; lia]. }
+  assert (Wd : forall zh zl M, B zh = rndF (B zh + B zl) -> Rabs (B zh + B zl) <= M -> M <= / 10 ->
+            Rabs (B zh) <= bpow radix2 1018 /\ Rabs (B zl) <= bpow radix2 1018).
+  { intros zh zl M Ez Hz HM. destruct (dwx_dw_words zh zl M Ez Hz) as [A1 A2].
+    assert (bpow radix2 (-1074) <= / 10) by (interval with (i_prec 64)).
+    split; apply W; lra. }
+  assert (Wx : Rabs (B xh) <= bpow radix2 1018 /\ Rabs (B xl) <= bpow radix2 1018).
+  { split; apply W; lra. }
+  assert (Ebd : forall e s M, Rabs e <= 2 * dwx_u2 * Rabs s -> Rabs s <= M -> Rabs e <= 2 * dwx_u2 * M).
+  { intros e s M He Hs. apply Rle_trans with (2 * dwx_u2 * Rabs s); [exact He | apply Rmult_le_compat_l; lra]. }
+  (* step a: x - n L1 *)
+  assert (Y1 : Rabs (B (fneg (fmul n fx_l1))) <= bpow radix2 1018).
+  { rewrite dwx_fneg, Rabs_Ropp, Be1. apply W.
+    assert (C : 0 <= B fx_l1 <= 0.000677) by (rewrite fx_l1_val; split; interval with (i_prec 64)).
+    rewrite Rabs_mult, (Rabs_pos_eq (B fx_l1)) by lra.
+    assert (Rabs (IZR ni) * B fx_l1 <= 2149501 * 0.000677) by (apply Rmult_le_compat; try apply Rabs_pos; lra). lra. }
+  destruct Wx as [Wxh Wxl].
+  pose proof (dwx_add_step xh xl (fneg (fmul n fx_l1)) Fh Fl (dwx_fneg_finite _ Fe1) E Wxh Wxl Y1) as SA.
+  destruct (add_f64_64 xh xl (fneg (fmul n fx_l1))) as [ah al]. destruct SA as [Fah [Fal [Ea Ra]]].
+  rewrite dwx_fneg, Be1 in Ra.
+  set (s1 := B xh + B xl + - (IZR ni * B fx_l1)) in Ra.
+  assert (S1 : s1 = R + IZR ni * (dwx_L - B fx_l1)) by (unfold s1, R; ring).
+  assert (S1b : Rabs s1 <= 0.00034).
+  { rewrite S1. eapply Rle_trans; [apply Rabs_triang | ]. rewrite Rabs_mult.
+    assert (Rabs (IZR ni) * Rabs (dwx_L - B fx_l1) <= 2149501 * / 23000000000000)
+      by (apply Rmult_le_compat; try apply Rabs_pos; assumption). lra. }
+  set (e1 := B ah + B al - s1) in Ra.
+  assert (E1 : Rabs e1 <= 2 * dwx_u2 * 0.00034) by exact (Ebd e1 s1 _ Ra S1b).
+  assert (Av : Rabs (B ah + B al) <= 0.00035) by (replace (B ah + B al) with (s1 + e1) by (unfold e1; ring);
+    eapply Rle_trans; [apply Rabs_triang | ]; lra).
+  destruct (Wd ah al 0.00035 Ea Av ltac:(lra)) as [Wah Wal].
+  (* step b: a - n L2 *)
+  assert (Y2 : Rabs (B (fneg (fmul n dwx_l2))) <= bpow radix2 1018).
+  { rewrite dwx_fneg, Rabs_Ropp, Be2. apply W.
+    assert (C : Rabs (B dwx_l2) <= / 1000000000000) by (rewrite dwx_l2_val; interval with (i_prec 64)).
+    rewrite Rabs_mult.
+    assert (Rabs (IZR ni) * Rabs (B dwx_l2) <= 2149501 * / 1000000000000)
+      by (apply Rmult_le_compat; try apply Rabs_pos; assumption). lra. }
+  pose proof (dwx_add_step ah al (fneg (fmul n dwx_l2)) Fah Fal (dwx_fneg_finite _ Fe2) Ea Wah Wal Y2) as SB.
+  destruct (add_f64_64 ah al (fneg (fmul n dwx_l2))) as [bh bl]. destruct SB as [Fbh [Fbl [Eb Rb]]].
+  rewrite dwx_fneg, Be2 in Rb.
+  set (s2 := B ah + B al + - (IZR ni * B dwx_l2)) in Rb.
+  assert (S2 : s2 = R + IZR ni * (dwx_L - B fx_l1 - B dwx_l2) + e1) by (unfold s2, e1, s1, R; ring).
+  assert (S2b : Rabs s2 <= 0.00034).
+  { rewrite S2. eapply Rle_trans; [apply Rabs_triang | ]. eapply Rle_trans; [apply Rplus_le_compat_r, Rabs_triang | ].
+    rewrite Rabs_mult.
+    assert (Rabs (IZR ni) * Rabs (dwx_L - B fx_l1 - B dwx_l2) <= 2149501 * / 70000000000000000000000)
+      by (apply Rmult_le_compat; try apply Rabs_pos; assumption). lra. }
+  set (e2 := B bh + B bl - s2) in Rb.
+  assert (E2 : Rabs e2 <= 2 * dwx_u2 * 0.00034) by exact (Ebd e2 s2 _ Rb S2b).
+  assert (Bv : Rabs (B bh + B bl) <= 0.00035) by (replace (B bh + B bl) with (s2 + e2) by (unfold e2; ring);
+    eapply Rle_trans; [apply Rabs_triang | ]; lra).
+  destruct (Wd bh bl 0.00035 Eb Bv ltac:(lra)) as [Wbh Wbl].
+  (* the exact product's words are small *)
+  assert (L3v : Rabs (B dwx_l3) <= / 10000000000000000000000) by (rewrite dwx_l3_val; interval with (i_prec 64)).
+  assert (Qs : Rabs (B qh + B ql) <= / 1000000000000000).
+  { rewrite Eq, Rabs_mult.
+    assert (Rabs (IZR ni) * Rabs (B dwx_l3) <= 2149501 * / 10000000000000000000000)
+      by (apply Rmult_le_compat; try apply Rabs_pos; assumption). lra. }
+  assert (Qe : B qh = rndF (B qh + B ql)) by (rewrite Eq; exact Pq).
+  destruct (dwx_dw_words qh ql (/ 1000000000000000) Qe Qs) as [Wqh0 Wql0].
+  assert (Tb : bpow radix2 (-1074) <= / 1000000000000000) by (interval with (i_prec 64)).
+  assert (Wqh : Rabs (B (fneg qh)) <= bpow radix2 1018) by (rewrite dwx_fneg, Rabs_Ropp; apply W; lra).
+  assert (Wql : Rabs (B (fneg ql)) <= bpow radix2 1018) by (rewrite dwx_fneg, Rabs_Ropp; apply W; lra).
+  (* step c: b - q_lo *)
+  pose proof (dwx_add_step bh bl (fneg ql) Fbh Fbl (dwx_fneg_finite _ Fql) Eb Wbh Wbl Wql) as SC.
+  destruct (add_f64_64 bh bl (fneg ql)) as [ch cl]. destruct SC as [Fch [Fcl [Ec Rc]]].
+  rewrite dwx_fneg in Rc.
+  set (s3 := B bh + B bl + - B ql) in Rc.
+  assert (S3b : Rabs s3 <= 0.00034001).
+  { unfold s3. replace (B bh + B bl + - B ql) with (s2 + e2 - B ql) by (unfold e2; ring).
+    eapply Rle_trans; [apply Rabs_triang | ]. rewrite Rabs_Ropp.
+    eapply Rle_trans; [apply Rplus_le_compat_r, Rabs_triang | ]. lra. }
+  set (e3 := B ch + B cl - s3) in Rc.
+  assert (E3 : Rabs e3 <= 2 * dwx_u2 * 0.00034001) by exact (Ebd e3 s3 _ Rc S3b).
+  assert (Cv : Rabs (B ch + B cl) <= 0.00035) by (replace (B ch + B cl) with (s3 + e3) by (unfold e3; ring);
+    eapply Rle_trans; [apply Rabs_triang | ]; lra).
+  destruct (Wd ch cl 0.00035 Ec Cv ltac:(lra)) as [Wch Wcl].
+  (* step d: c - q_hi *)
+  pose proof (dwx_add_step ch cl (fneg qh) Fch Fcl (dwx_fneg_finite _ Fqh) Ec Wch Wcl Wqh) as SD.
+  destruct (add_f64_64 ch cl (fneg qh)) as [rh rl]. destruct SD as [Frh [Frl [Er Rr]]].
+  rewrite dwx_fneg in Rr.
+  set (s4 := B ch + B cl + - B qh) in Rr.
+  assert (S4 : s4 = R - IZR ni * (B fx_l1 + B dwx_l2 + B dwx_l3 - dwx_L) + e1 + e2 + e3).
+  { assert (Qh : B qh = IZR ni * B dwx_l3 - B ql) by lra.
+    unfold s4, e3, s3, e2, s2, e1, s1, R. rewrite Qh. ring. }
+  assert (Sig : Rabs (IZR ni * (B fx_l1 + B dwx_l2 + B dwx_l3 - dwx_L)) <= 2149501 * / 2 ^ 128).
+  { rewrite Rabs_mult. apply Rmult_le_compat; try apply Rabs_pos; assumption. }
+  set (D := IZR ni * (B fx_l1 + B dwx_l2 + B dwx_l3 - dwx_L)) in S4, Sig.
+  assert (T4 : forall a b c d e, Rabs (a + b + c + d + e) <= Rabs a + Rabs b + Rabs c + Rabs d + Rabs e).
+  { intros a b c d e.
+    pose proof (Rabs_triang (a + b + c + d) e). pose proof (Rabs_triang (a + b + c) d).
+    pose proof (Rabs_triang (a + b) c). pose proof (Rabs_triang a b). lra. }
+  assert (Sg : 2149501 * / 2 ^ 128 <= 513 / 1000 * dwx_u2) by (rewrite dwx_u2_val; interval with (i_prec 64)).
+  assert (S4b : Rabs s4 <= 0.00034).
+  { replace s4 with (R + - D + e1 + e2 + e3) by (rewrite S4; ring).
+    eapply Rle_trans; [apply T4 | ]. rewrite Rabs_Ropp. lra. }
+  set (e4 := B rh + B rl - s4) in Rr.
+  assert (E4 : Rabs e4 <= 2 * dwx_u2 * 0.00034) by exact (Ebd e4 s4 _ Rr S4b).
+  split; [exact Frh | split; [exact Frl | split; [exact Er | split; [ | exact HR]]]].
+  replace (B rh + B rl - R) with (- D + e1 + e2 + e3 + e4) by (unfold e4; rewrite S4; ring).
+  eapply Rle_trans; [apply T4 | ]. rewrite Rabs_Ropp. lra.
+Qed.
