@@ -1,6 +1,6 @@
-//! Writes the cross-check corpus: each public double-word operation and
-//! error-free transform, and `sqrt`, on reproducible inputs, with the library's
-//! results.
+//! Writes the cross-check corpus: each public double-word operation (including
+//! `exp_split`) and error-free transform, and `sqrt`, on reproducible inputs,
+//! with the library's results.
 //!
 //! `scripts/check_formal.sh` runs the proved IEEE 754 definitions, extracted
 //! from Coq, on the same inputs and requires identical bits
@@ -77,6 +77,30 @@ fn pair(z: DoubleWord) -> (f64, f64) {
     (z.hi(), z.lo())
 }
 
+/// `exp_split`: a presence flag, the value's words and the exponent offset by
+/// 4096 (so it is a small positive word, never a NaN's bits), or four zeros
+/// for `None`.
+fn exp_split_line(out: &mut impl Write, x: DoubleWord) {
+    let outs = match x.exp_split() {
+        Some((value, n)) => [
+            1,
+            value.hi().to_bits(),
+            value.lo().to_bits(),
+            u64::try_from(i64::from(n) + 4096).expect("|n| < 4096"),
+        ],
+        None => [0; 4],
+    };
+    let outs: Vec<String> = outs.iter().map(|w| format!("{w:016x}")).collect();
+    writeln!(
+        out,
+        "exp_split {} {} : {}",
+        hex(x.hi()),
+        hex(x.lo()),
+        outs.join(" ")
+    )
+    .expect("write");
+}
+
 fn main() {
     let mut words = Words::new(0x0c0c_c705_5c4e_c401);
     let mut out = BufWriter::new(std::io::stdout().lock());
@@ -98,12 +122,27 @@ fn main() {
         line(&mut out, "mul", &[xh, xl, yh, yl], pair(x.mul(y)));
         line(&mut out, "div_f64", &[xh, xl, f], pair(x.div_f64(f)));
         line(&mut out, "div", &[xh, xl, yh, yl], pair(x.div(y)));
+        // Mostly inside exp_split's domain |hi| < 1455, its reduction seams and
+        // its tiny-argument switch, sometimes beyond it.
+        exp_split_line(&mut out, double_word(&mut words, -70, 10));
+        exp_split_line(&mut out, x);
 
         // Every encoding: both signs, the subnormals, infinities and NaNs.
         let any = f64::from_bits(words.next_word());
         line1(&mut out, "sqrt", any, sqrt(any));
         let positive = word(&mut words, low, high).abs();
         line1(&mut out, "sqrt", positive, sqrt(positive));
+    }
+    for special in [
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        1455.0,
+        -1455.0,
+        1454.999,
+        -1454.999,
+    ] {
+        exp_split_line(&mut out, DoubleWord::from_f64(special));
     }
     out.flush().expect("flush");
 }

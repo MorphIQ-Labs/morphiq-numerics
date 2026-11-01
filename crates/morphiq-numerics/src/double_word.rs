@@ -40,6 +40,8 @@
 use crate::eft::{fast_two_sum, two_prod, two_sum};
 
 mod checked;
+mod exp;
+mod exp_tables;
 pub use checked::{CheckError, Hypothesis};
 
 /// An unevaluated sum `hi + lo` of two binary64 numbers with
@@ -63,6 +65,13 @@ impl DoubleWord {
     #[inline]
     pub(crate) const fn fast_sum(a: f64, b: f64) -> Self {
         let (hi, lo) = fast_two_sum(a, b);
+        Self { hi, lo }
+    }
+
+    /// `hi + lo` from words the caller guarantees satisfy `hi = RN(hi + lo)`:
+    /// generated table entries and exact products.
+    #[inline(always)]
+    const fn from_words(hi: f64, lo: f64) -> Self {
         Self { hi, lo }
     }
 
@@ -192,8 +201,23 @@ impl DoubleWord {
     #[inline]
     pub const fn mul(self, other: Self) -> Self {
         let (c_hi, c_lo1) = two_prod(self.hi, other.hi);
-        let t_lo1 = self.hi * other.lo;
-        let t_lo2 = self.lo * other.hi;
+        Self::mul_finish(self, other, c_hi, c_lo1)
+    }
+
+    /// [`mul`](Self::mul) with the leading words' exact product from `p`:
+    /// the same words, for a crate kernel whose products stay in
+    /// [`two_prod`]'s domain.
+    #[inline(always)]
+    fn mul_with<P: exp::ExactProduct>(self, other: Self, p: &P) -> Self {
+        let (c_hi, c_lo1) = p.two_prod(self.hi, other.hi);
+        Self::mul_finish(self, other, c_hi, c_lo1)
+    }
+
+    /// The operations after the exact product shared by `mul` and `mul_with`.
+    #[inline(always)]
+    const fn mul_finish(a: Self, b: Self, c_hi: f64, c_lo1: f64) -> Self {
+        let t_lo1 = a.hi * b.lo;
+        let t_lo2 = a.lo * b.hi;
         let c_lo2 = t_lo1 + t_lo2;
         let c_lo3 = c_lo1 + c_lo2;
         let (hi, lo) = fast_two_sum(c_hi, c_lo3);

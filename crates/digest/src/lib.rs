@@ -1130,6 +1130,7 @@ pub fn corpus_digest() -> [u8; 32] {
     tridiagonal_unpivoted_section(&mut r);
     bivariate_normal_section(&mut r);
     fast_section(&mut r);
+    double_word_exp_section(&mut r);
 
     r.0.finalize().into()
 }
@@ -1980,5 +1981,73 @@ fn fast_section(r: &mut Recorder) {
                 }
             }
         }
+    }
+}
+
+/// `DoubleWord::exp_split` on its own corpus and seed, appended last so every
+/// earlier section keeps its inputs: domain edges and their neighbours, the
+/// tiny-argument switch, reduction seams, and random double words.
+fn double_word_exp_section(r: &mut Recorder) {
+    let mut words = Words::new(0x0d0e_0266_2026_1101);
+    r.label("double_word_exp");
+    for hi in [
+        0.0,
+        -0.0,
+        1455.0,
+        -1455.0,
+        1454.999,
+        -1454.999,
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::MIN_POSITIVE,
+        1.0e-300,
+    ] {
+        double_word_exp_case(r, &mut words, hi);
+    }
+    for edge in [1455.0_f64, -1455.0, 1.0 / 1_152_921_504_606_846_976.0] {
+        for hi in [
+            edge.next_down(),
+            edge.next_up(),
+            -edge.next_down(),
+            -edge.next_up(),
+        ] {
+            double_word_exp_case(r, &mut words, hi);
+        }
+    }
+    for k in -40_i32..=40 {
+        let seam = (f64::from(k) + 0.5) * core::f64::consts::LN_2 / 1024.0;
+        for hi in [seam.next_down(), seam, seam.next_up()] {
+            double_word_exp_case(r, &mut words, hi);
+        }
+    }
+    for _ in 0..4_000 {
+        let e = i64::try_from(words.next_word() % 72).unwrap() - 62;
+        let hi = words.with_exponent(e.min(9));
+        double_word_exp_case(r, &mut words, hi);
+    }
+}
+
+/// One `exp_split` case: `hi` with a random trailing word below half an ulp.
+fn double_word_exp_case(r: &mut Recorder, words: &mut Words, hi: f64) {
+    let lo = if hi.is_finite() && hi.abs() >= 1.0e-280 {
+        let ulp = f64::from_bits(hi.abs().to_bits() + 1) - hi.abs();
+        #[allow(clippy::cast_precision_loss)]
+        let fraction = (words.next_word() >> 11) as f64 / (1_u64 << 53) as f64 - 0.5;
+        let lo = fraction * ulp * 0.999;
+        if hi + lo == hi { lo } else { 0.0 }
+    } else {
+        0.0
+    };
+    let Some(x) = DoubleWord::from_parts(hi, lo) else {
+        r.u64(u64::MAX);
+        return;
+    };
+    match x.exp_split() {
+        Some((value, n)) => {
+            r.double_word(value);
+            r.i64(i64::from(n));
+        }
+        None => r.u64(u64::MAX - 1),
     }
 }
