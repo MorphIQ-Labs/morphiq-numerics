@@ -524,3 +524,83 @@ Proof.
   replace (B rh + B rl - R) with (- D + e1 + e2 + e3 + e4) by (unfold e4; rewrite S4; ring).
   eapply Rle_trans; [apply T4 | ]. rewrite Rabs_Ropp. lra.
 Qed.
+
+(** * The table as double words *)
+
+Definition dwx_eqb (x y : f64) : bool :=
+  match Bcompare 53 1024 x y with Some Eq => true | _ => false end.
+
+Lemma dwx_eqb_true x y : finite x -> finite y -> dwx_eqb x y = true -> B x = B y.
+Proof.
+  intros Fx Fy; unfold dwx_eqb; rewrite Bcompare_correct by assumption.
+  destruct (Rcompare_spec (B x) (B y)); intros; try discriminate; lra.
+Qed.
+
+(** Every entry is a normalized double word whose trailing word is zero or at
+    least [LOW_FLOOR], so its products with a value near 1 are zero or normal. *)
+Definition dwx_tab_entry (j : nat) : bool :=
+  dwx_eqb (fadd (fx_t_hi j) (fx_t_lo j)) (fx_t_hi j) &&
+  (negb (dwx_lt dwx_zero (b64_abs (fx_t_lo j))) || negb (dwx_lt (b64_abs (fx_t_lo j)) dwx_low_floor)).
+
+Lemma dwx_tab_check : forallb dwx_tab_entry (seq 0 1024) = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma dwx_tab j : (j < 1024)%nat ->
+  finite (fx_t_hi j) /\ finite (fx_t_lo j) /\ B (fx_t_hi j) = rndF (B (fx_t_hi j) + B (fx_t_lo j)) /\
+  (B (fx_t_lo j) = 0 \/ B dwx_low_floor <= Rabs (B (fx_t_lo j))) /\
+  1 <= B (fx_t_hi j) < 2 /\ Rabs (B (fx_t_lo j)) <= / 2 ^ 53 /\
+  Rabs (B (fx_t_hi j) + B (fx_t_lo j) - exp (INR j * ln 2 / 1024)) <= bpow radix2 (-104).
+Proof.
+  intros Hj. destruct (fx_t_ok j Hj) as [Fh [Fl [_ [_ [_ [Th [Tl D]]]]]]].
+  unfold fx_t_hi, fx_t_lo.
+  pose proof dwx_tab_check as C. rewrite forallb_forall in C.
+  specialize (C j ltac:(apply in_seq; lia)). unfold dwx_tab_entry, fx_t_hi, fx_t_lo in C.
+  apply andb_prop in C. destruct C as [C1 C2].
+  set (th := b64_of_bits (fst (nth j fx_t_bits (0%Z, 0%Z)))) in *.
+  set (tl := b64_of_bits (snd (nth j fx_t_bits (0%Z, 0%Z)))) in *.
+  assert (Bd : bnd 1 2 (B th + B tl)).
+  { unfold bnd. change (bpow radix2 2) with 4.
+    assert (/ 2 ^ 53 <= 1) by (interval with (i_prec 64)).
+    pose proof (Rabs_triang (B th) (B tl)) as T. rewrite (Rabs_pos_eq (B th)) in T by lra. lra. }
+  destruct (fadd_ok 1 2 _ _ Fh Fl ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia) Bd) as [Fs Es].
+  pose proof (dwx_eqb_true _ _ Fs Fh C1) as E1. rewrite Es in E1.
+  pose proof (dwx_abs_finite _ Fl) as Fa.
+  assert (Fz : finite dwx_zero) by reflexivity.
+  assert (Ab : B (b64_abs tl) = Rabs (B tl)) by (unfold b64_abs; apply B2R_Babs).
+  split; [exact Fh | split; [exact Fl | split; [symmetry; exact E1 | split; [ | ]]]].
+  2: { repeat split; try assumption; lra. }
+  apply Bool.orb_true_iff in C2. destruct C2 as [C2 | C2]; apply Bool.negb_true_iff in C2.
+  - left. apply (dwx_lt_false _ _ Fz Fa) in C2. rewrite Ab in C2.
+    change (B dwx_zero) with 0 in C2. pose proof (Rabs_pos (B tl)).
+    destruct (Req_dec (B tl) 0) as [Z0 | Z0]; [exact Z0 | pose proof (Rabs_pos_lt _ Z0); lra].
+  - right. apply (dwx_lt_false _ _ Fa dwx_low_floor_finite) in C2. rewrite Ab in C2. exact C2.
+Qed.
+
+(** * Products *)
+
+Lemma dwx_mul_step xh xl yh yl :
+  finite xh -> finite xl -> B xh = rndF (B xh + B xl) ->
+  finite yh -> finite yl -> B yh = rndF (B yh + B yl) ->
+  Rabs (B xh) <= 4 -> Rabs (B xl) <= 4 -> Rabs (B yh) <= 4 -> Rabs (B yl) <= 4 ->
+  in_two_prod_domain (B xh) (B yh) -> normal_or_zero (B xh * B yl) -> normal_or_zero (B xl * B yh) ->
+  (B xh + B xl) * (B yh + B yl) <> 0 ->
+  let '(zh, zl) := mul64 xh xl yh yl in
+  finite zh /\ finite zl /\ B zh = rndF (B zh + B zl) /\
+  Rabs (B zh + B zl - (B xh + B xl) * (B yh + B yl)) <= 5 * dwx_u2 * Rabs ((B xh + B xl) * (B yh + B yl)).
+Proof.
+  intros Fxh Fxl Ex Fyh Fyl Ey Bxh Bxl Byh Byl Dhh Dhl Dlh NZ.
+  assert (W : forall v, Rabs v <= 4 -> Rabs v <= bpow radix2 508).
+  { intros v Hv. apply Rle_trans with (bpow radix2 2); [change (bpow radix2 2) with 4; lra | apply bpow_le; lia]. }
+  pose proof (mul_ieee xh xl yh yl Fxh Fxl Ex Fyh Fyl Ey (W _ Bxh) (W _ Bxl) (W _ Byh) (W _ Byl) Dhh Dhl Dlh) as M.
+  assert (U : forall v, Rabs v <= 4 -> bnd 1 2 v) by (intros v Hv; unfold bnd; (change (bpow radix2 2) with 4); lra).
+  destruct (mul64_ok 2 xh xl yh yl Fxh Fxl Fyh Fyl (U _ Bxh) (U _ Bxl) (U _ Byh) (U _ Byl) ltac:(lia)) as [_ [_ Ez]].
+  pose proof (mul_dw (B xh) (B xl) (B yh) (B yl) (B_fmt xh) (B_fmt xl) Ex (B_fmt yh) (B_fmt yl) Ey Dhh Dhl Dlh) as D.
+  rewrite <- Ez in D.
+  destruct (mul64 xh xl yh yl) as [zh zl]. cbn [fst snd] in *. destruct M as [Fzh [Fzl Rl]].
+  split; [exact Fzh | split; [exact Fzl | split; [exact D | ]]].
+  assert (Uq : bpow radix2 (- prec) * bpow radix2 (- prec) = dwx_u2) by (rewrite <- bpow_plus; reflexivity).
+  rewrite Uq in Rl. unfold Rdiv in Rl. rewrite Rabs_mult, Rabs_Rinv in Rl by exact NZ.
+  pose proof (Rabs_pos_lt _ NZ) as P.
+  apply (Rmult_lt_compat_r (Rabs ((B xh + B xl) * (B yh + B yl)))) in Rl; [ | exact P].
+  rewrite Rmult_assoc, Rinv_l, Rmult_1_r in Rl by lra. lra.
+Qed.
