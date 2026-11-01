@@ -904,3 +904,38 @@ Proof.
   destruct (dwexp_step 0 rh rl (v1h, v1l)) as [v0h v0l].
   exact I0.
 Qed.
+
+(** * Truncation and the exponential near zero *)
+
+Lemma dwx_abs_le r a : Rabs r <= a -> - a <= r <= a.
+Proof. unfold Rabs. destruct (Rcase_abs r); intros; lra. Qed.
+
+Theorem dwx_trunc r : Rabs r <= dwx_rho -> Rabs (dwx_poly r - exp r) <= 4 / 10 * dwx_u2.
+Proof.
+  intros Hr. apply dwx_abs_le in Hr. unfold dwx_rho in Hr.
+  unfold dwx_poly, dwx_hstep. cbn [dwx_c_hi dwx_c_lo].
+  rewrite dwx_c0_hi_val, dwx_c0_lo_val, dwx_c1_hi_val, dwx_c1_lo_val, dwx_c2_hi_val, dwx_c2_lo_val,
+    dwx_c3_hi_val, dwx_c3_lo_val, dwx_c4_hi_val, dwx_c4_lo_val, dwx_c5_hi_val, dwx_c5_lo_val,
+    dwx_c6_hi_val, dwx_c6_lo_val, dwx_c7_hi_val, dwx_c7_lo_val, dwx_u2_val.
+  interval with (i_taylor r, i_degree 10, i_prec 250).
+Qed.
+
+Lemma dwx_exp_mono a b : a <= b -> exp a <= exp b.
+Proof. intros H. destruct (Req_dec a b) as [-> | N]; [lra | apply Rlt_le, exp_increasing; lra]. Qed.
+
+(** [exp y] within [e(1 + 2e)] of 1 for [|y| <= e <= 1/1000]: [1 + x <= exp x]
+    at [±e] and the exponential's monotonicity. *)
+Lemma dwx_exp_small y e : Rabs y <= e -> e <= / 1000 -> Rabs (exp y - 1) <= e * (1 + 2 * e).
+Proof.
+  intros Hy He. apply dwx_abs_le in Hy.
+  pose proof (dwx_exp_mono _ _ (proj1 Hy)) as L. pose proof (dwx_exp_mono _ _ (proj2 Hy)) as U.
+  assert (E0 : 0 <= e) by lra.
+  pose proof (exp_ineq1_le (- e)) as Lo.
+  assert (P : exp e * exp (- e) = 1) by (rewrite <- exp_plus; replace (e + - e) with 0 by ring; apply exp_0).
+  assert (Up : exp e <= 1 + e + 2 * e * e).
+  { assert (G : exp e * (1 - e) <= (1 + e + 2 * e * e) * (1 - e)).
+    { assert (exp e * (1 - e) <= exp e * exp (- e)) by (apply Rmult_le_compat_l; [apply Rlt_le, exp_pos | lra]).
+      assert (1 <= (1 + e + 2 * e * e) * (1 - e)) by nra. lra. }
+    apply Rmult_le_reg_r with (1 - e); [lra | exact G]. }
+  unfold Rabs. destruct (Rcase_abs (exp y - 1)); nra.
+Qed.
