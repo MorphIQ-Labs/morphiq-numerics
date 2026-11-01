@@ -31,7 +31,7 @@ Proof.
   rewrite B251 in Q.
   set (g := gaussian_erfcx (91/16)) in *.
   assert (R : Rabs (cdf_tail_num (91/16) / cdf_tail_den (91/16) - IZR 90531799999620242451793997536359660534584837076082833918651080267460591429987 / 2 ^ 259) <= / 2 ^ 60).
-  { unfold cdf_tail_num, cdf_tail_den. cdf_values. interval with (i_prec 400). }
+  { unfold cdf_tail_num, cdf_tail_den, cdf_num_words, cdf_den_words. cbn [cdf_horner]. cdf_values. interval with (i_prec 400). }
   assert (V : 9 / 100 <= IZR 90531799999620242451793997536359660534584837076082833918651080267460591429987 / 2 ^ 259 <= 1 / 10) by (split; interval with (i_prec 300)).
   assert (T : / 2 ^ 251 <= / 10 ^ 70) by interval.
   assert (U : / 2 ^ 60 + / 10 ^ 70 <= / 2 ^ 56 * (9 / 100 - / 10 ^ 70)) by interval.
