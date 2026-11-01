@@ -4,7 +4,8 @@
 //! [`docs/double-word.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/double-word.md#exponential).
 //! In outline: `n = round(x · 1024/ln 2)`; a three-part Cody–Waite reduction
 //! gives `r = x - n·ln(2)/1024` with `|r| <= ln(2)/2048` (plus rounding); a
-//! degree-7 double-word Horner evaluation gives `exp(r)`; and the generated
+//! degree-7 double-word Horner evaluation gives `exp(r)`, each step one
+//! DWTimesDW1 product and DWPlusFP additions of the coefficient's words; and the generated
 //! double-word table entry `exp(j·ln(2)/1024)`, `j = n mod 1024`, scales it,
 //! leaving the binary exponent `floor(n/1024)` to the caller.
 //!
@@ -58,7 +59,7 @@ fn kernel<P: ExactProduct>(x: DoubleWord, p: &P) -> Option<(DoubleWord, i32)> {
         return None;
     }
     if hi.abs() < TINY {
-        return Some((DoubleWord::from_f64(1.0).add(x), 0));
+        return Some((x.add_f64(1.0), 0));
     }
     let t = hi * INV + SHIFTER;
     let n = t - SHIFTER;
@@ -68,20 +69,29 @@ fn kernel<P: ExactProduct>(x: DoubleWord, p: &P) -> Option<(DoubleWord, i32)> {
     let j = (index & 1023) as usize;
     #[allow(clippy::cast_possible_truncation)] // |index >> 10| <= 2099
     let exponent = (index >> 10) as i32;
-    // n·L1 and n·L2 are exact; n·L3 is taken exactly.
+    // n·L1 and n·L2 are exact; n·L3 is taken exactly and subtracted word by
+    // word. Every step is DWPlusFP, whose output is proved a double word.
     let (q_hi, q_lo) = p.two_prod(n, L3);
     let r = x
         .add_f64(-(n * L1))
         .add_f64(-(n * L2))
-        .sub(DoubleWord::from_words(q_hi, q_lo));
+        .add_f64(-q_lo)
+        .add_f64(-q_hi);
     let r = if r.lo.abs() < LOW_FLOOR {
         DoubleWord::from_f64(r.hi)
     } else {
         r
     };
+    // Horner steps add each coefficient's low then high word by DWPlusFP; the
+    // low words of 1/0!, 1/1! and 1/2! are zero.
     let mut v = word(TAYLOR[7]);
     for k in (0..7).rev() {
-        v = v.mul_with(r, p).add(word(TAYLOR[k]));
+        let [high, low] = TAYLOR[k];
+        v = v.mul_with(r, p);
+        if k >= 3 {
+            v = v.add_f64(f64::from_bits(low));
+        }
+        v = v.add_f64(f64::from_bits(high));
     }
     Some((word(TABLE[j]).mul_with(v, p), exponent))
 }
