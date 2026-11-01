@@ -637,7 +637,7 @@ Definition dwexp_err (A d rho cl ch : R) : R :=
   let s := (m + cl) * (1 + 2 * dwx_u2) in
   d * rho + 5 * dwx_u2 * (A + d) * rho + 2 * dwx_u2 * (m + cl) + 2 * dwx_u2 * (s + ch) + B dwx_v_floor.
 
-Lemma dwexp_step_ok k vh vl rh rl P A d rho :
+Lemma dwexp_step_ok k (vh vl rh rl : f64) P A d rho :
   finite vh -> finite vl -> B vh = rndF (B vh + B vl) ->
   / 10000 <= Rabs (B vh) <= 2 -> (B vl = 0 \/ B dwx_v_floor <= Rabs (B vl)) ->
   finite rh -> finite rl -> B rh = rndF (B rh + B rl) ->
@@ -761,4 +761,146 @@ Proof.
       pose proof (Rabs_triang (B wh + B wl - (P * r + ch + cl)) (- B wl)) as T. rewrite Rabs_Ropp in T. lra.
   - apply (dwx_lt_false _ _ Fa dwx_v_floor_finite) in Fl. rewrite Ab in Fl.
     split; [exact Fwh | split; [exact Fwl | split; [exact Ew | split; [right; exact Fl | ]]]]. lra.
+Qed.
+
+(** * The Horner chain *)
+
+Definition dwx_inv (vh vl : f64) (P A d : R) : Prop :=
+  finite vh /\ finite vl /\ B vh = rndF (B vh + B vl) /\ / 10000 <= Rabs (B vh) <= 2 /\
+  (B vl = 0 \/ B dwx_v_floor <= Rabs (B vl)) /\ Rabs P <= A /\ Rabs (B vh + B vl - P) <= d /\ 0 <= d.
+
+Definition dwx_rinv (rh rl : f64) (rho : R) : Prop :=
+  finite rh /\ finite rl /\ B rh = rndF (B rh + B rl) /\ B dwx_r_floor <= Rabs (B rh) <= / 1000 /\
+  (B rl = 0 \/ B dwx_low_floor <= Rabs (B rl)) /\ Rabs (B rh + B rl) <= rho /\ rho <= / 1000.
+
+Lemma dwx_high_bounds xh xl : B xh = rndF (B xh + B xl) ->
+  Rabs (B xh + B xl) * (1 - / 9007199254740992) - / 2 * bpow radix2 (-1074) <= Rabs (B xh) /\
+  Rabs (B xh) <= Rabs (B xh + B xl) * (1 + / 9007199254740992) + / 2 * bpow radix2 (-1074).
+Proof.
+  intros E. pose proof (dwx_rnd_abs_err (B xh + B xl)) as R0. rewrite <- E in R0.
+  pose proof (Rabs_triang_inv (B xh) (B xh + B xl)) as T1.
+  pose proof (Rabs_triang_inv (B xh + B xl) (B xh)) as T2.
+  rewrite Rabs_minus_sym in T2. split; lra.
+Qed.
+
+Lemma dwx_coef k :
+  finite (dwx_c_hi k) /\ finite (dwx_c_lo k) /\ Rabs (B (dwx_c_hi k)) <= 1 /\
+  Rabs (B (dwx_c_lo k)) <= / 1000 /\ ((k < 3)%nat -> B (dwx_c_lo k) = 0).
+Proof.
+  destruct k as [|[|[|[|[|[|[|k]]]]]]]; cbn [dwx_c_hi dwx_c_lo];
+    repeat split; try apply dwx_c0_hi_finite; try apply dwx_c0_lo_finite;
+    try apply dwx_c1_hi_finite; try apply dwx_c1_lo_finite; try apply dwx_c2_hi_finite; try apply dwx_c2_lo_finite;
+    try apply dwx_c3_hi_finite; try apply dwx_c3_lo_finite; try apply dwx_c4_hi_finite; try apply dwx_c4_lo_finite;
+    try apply dwx_c5_hi_finite; try apply dwx_c5_lo_finite; try apply dwx_c6_hi_finite; try apply dwx_c6_lo_finite;
+    try apply dwx_c7_hi_finite; try apply dwx_c7_lo_finite;
+    rewrite ?dwx_c0_hi_val, ?dwx_c0_lo_val, ?dwx_c1_hi_val, ?dwx_c1_lo_val, ?dwx_c2_hi_val, ?dwx_c2_lo_val,
+      ?dwx_c3_hi_val, ?dwx_c3_lo_val, ?dwx_c4_hi_val, ?dwx_c4_lo_val, ?dwx_c5_hi_val, ?dwx_c5_lo_val,
+      ?dwx_c6_hi_val, ?dwx_c6_lo_val, ?dwx_c7_hi_val, ?dwx_c7_lo_val;
+    try (intros; reflexivity); try (intros; lia); interval with (i_prec 64).
+Qed.
+
+Lemma dwx_chain k (vh vl rh rl : f64) P A d rho A' d' :
+  dwx_inv vh vl P A d -> dwx_rinv rh rl rho -> A + d <= 3 ->
+  dwexp_err A d rho (Rabs (B (dwx_c_lo k))) (Rabs (B (dwx_c_hi k))) <= d' ->
+  A * rho + Rabs (B (dwx_c_hi k)) + Rabs (B (dwx_c_lo k)) <= A' ->
+  / 5000 <= Rabs (B (dwx_c_hi k) + B (dwx_c_lo k)) - A * rho - d' ->
+  A' + d' <= 3 / 2 ->
+  let '(wh, wl) := dwexp_step k rh rl (vh, vl) in
+  dwx_inv wh wl (P * (B rh + B rl) + B (dwx_c_hi k) + B (dwx_c_lo k)) A' d'.
+Proof.
+  intros [Fvh [Fvl [Ev [Bv [Lv [HP [Hd Hd0]]]]]]] [Frh [Frl [Er [Br [Lr [Hr Hrho]]]]]] HAd Hd' HA' Hlow Hup.
+  destruct (dwx_coef k) as [Fch [Fcl [Bch [Bcl Kl]]]].
+  pose proof (dwexp_step_ok k vh vl rh rl P A d rho Fvh Fvl Ev Bv Lv Frh Frl Er Br Lr Hr Hrho HP Hd Hd0 HAd
+                Fch Fcl Bch Bcl Kl) as S.
+  revert S. destruct (dwexp_step k rh rl (vh, vl)) as [wh wl]. intros S. destruct S as [Fwh [Fwl [Ew [Lw Rw]]]].
+  set (r := B rh + B rl) in *. set (ch := B (dwx_c_hi k)) in *. set (cl := B (dwx_c_lo k)) in *.
+  set (P' := P * r + ch + cl).
+  assert (Pr : Rabs (P * r) <= A * rho) by (rewrite Rabs_mult; apply Rmult_le_compat; try apply Rabs_pos; lra).
+  assert (W' : Rabs (B wh + B wl - P') <= d') by (unfold P'; lra).
+  assert (HP' : Rabs P' <= A').
+  { unfold P'. pose proof (Rabs_triang (P * r + ch) cl). pose proof (Rabs_triang (P * r) ch). lra. }
+  assert (LP' : Rabs (ch + cl) - A * rho <= Rabs P').
+  { unfold P'. replace (P * r + ch + cl) with ((ch + cl) + P * r) by ring.
+    pose proof (Rabs_triang_inv (ch + cl + P * r) (- (P * r))) as T.
+    replace (ch + cl + P * r - - (P * r)) with (ch + cl + 2 * (P * r)) in T by ring.
+    pose proof (Rabs_triang (ch + cl + P * r) (- (P * r))) as T2.
+    replace (ch + cl + P * r + - (P * r)) with (ch + cl) in T2 by ring. rewrite Rabs_Ropp in T2. lra. }
+  assert (HW : Rabs P' - d' <= Rabs (B wh + B wl) <= Rabs P' + d').
+  { pose proof (Rabs_triang_inv P' (P' - (B wh + B wl))) as T1.
+    replace (P' - (P' - (B wh + B wl))) with (B wh + B wl) in T1 by ring.
+    rewrite Rabs_minus_sym in T1.
+    pose proof (Rabs_triang P' (B wh + B wl - P')) as T2.
+    replace (P' + (B wh + B wl - P')) with (B wh + B wl) in T2 by ring. split; lra. }
+  destruct (dwx_high_bounds wh wl Ew) as [H1 H2].
+  assert (Tiny : / 2 * bpow radix2 (-1074) <= / 10 ^ 300) by (interval with (i_prec 64)).
+  assert (Wl : / 5000 <= Rabs (B wh + B wl)) by lra.
+  unfold dwx_inv. repeat split; try assumption.
+  - assert (/ 5000 * (1 - / 9007199254740992) <= Rabs (B wh + B wl) * (1 - / 9007199254740992))
+      by (apply Rmult_le_compat_r; lra).
+    assert (/ 10 ^ 300 <= / 10 ^ 10) by (interval with (i_prec 64)). lra.
+  - assert (Rabs (B wh + B wl) * (1 + / 9007199254740992) <= 3 / 2 * (1 + / 9007199254740992))
+      by (apply Rmult_le_compat_r; lra).
+    assert (/ 10 ^ 300 <= / 10 ^ 10) by (interval with (i_prec 64)). lra.
+  - pose proof (Rabs_pos (B wh + B wl - P')). lra.
+Qed.
+
+(** The polynomial the chain evaluates, with the coefficients' words. *)
+Definition dwx_hstep (k : nat) (P r : R) : R := P * r + B (dwx_c_hi k) + B (dwx_c_lo k).
+Definition dwx_poly (r : R) : R :=
+  dwx_hstep 0 (dwx_hstep 1 (dwx_hstep 2 (dwx_hstep 3 (dwx_hstep 4 (dwx_hstep 5 (dwx_hstep 6
+    (B dwx_c7_hi + B dwx_c7_lo) r) r) r) r) r) r) r.
+
+Definition dwx_rho : R := 3384511 / 10000000000.
+
+Ltac dwx_numeric :=
+  cbn [dwx_c_hi dwx_c_lo]; unfold dwexp_err, dwx_rho;
+  rewrite ?dwx_c0_hi_val, ?dwx_c0_lo_val, ?dwx_c1_hi_val, ?dwx_c1_lo_val, ?dwx_c2_hi_val, ?dwx_c2_lo_val,
+    ?dwx_c3_hi_val, ?dwx_c3_lo_val, ?dwx_c4_hi_val, ?dwx_c4_lo_val, ?dwx_c5_hi_val, ?dwx_c5_lo_val,
+    ?dwx_c6_hi_val, ?dwx_c6_lo_val, ?dwx_c7_hi_val, ?dwx_c7_lo_val, ?dwx_u2_val, ?dwx_v_floor_val;
+  repeat split; interval with (i_prec 200).
+
+Lemma dwx_c7_norm : B dwx_c7_hi = rndF (B dwx_c7_hi + B dwx_c7_lo).
+Proof.
+  assert (Bd : bnd 1 2 (B dwx_c7_hi + B dwx_c7_lo)).
+  { unfold bnd. change (bpow radix2 2) with 4. rewrite dwx_c7_hi_val, dwx_c7_lo_val. interval with (i_prec 64). }
+  destruct (fadd_ok 1 2 _ _ dwx_c7_hi_finite dwx_c7_lo_finite ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia) Bd) as [Fs Es].
+  rewrite <- Es. symmetry. apply dwx_eqb_true; [exact Fs | exact dwx_c7_hi_finite | vm_compute; reflexivity].
+Qed.
+
+Theorem dwexp_horner_ok rh rl : dwx_rinv rh rl dwx_rho ->
+  let '(vh, vl) := dwexp_horner rh rl in
+  dwx_inv vh vl (dwx_poly (B rh + B rl)) (10004 / 10000) (20042 / 10000 * dwx_u2).
+Proof.
+  intros Rinv.
+  assert (I7 : dwx_inv dwx_c7_hi dwx_c7_lo (B dwx_c7_hi + B dwx_c7_lo) (1985 / 10000000) 0).
+  { unfold dwx_inv. repeat split; try apply dwx_c7_hi_finite; try apply dwx_c7_lo_finite; try apply dwx_c7_norm.
+    - rewrite dwx_c7_hi_val. interval with (i_prec 64).
+    - rewrite dwx_c7_hi_val. interval with (i_prec 64).
+    - right. rewrite dwx_c7_lo_val, dwx_v_floor_val. interval with (i_prec 64).
+    - rewrite dwx_c7_hi_val, dwx_c7_lo_val. interval with (i_prec 64).
+    - unfold Rminus. rewrite Rplus_opp_r, Rabs_R0. lra.
+    - lra. }
+  unfold dwexp_horner, dwx_poly. set (r := B rh + B rl).
+  pose proof (dwx_chain 6 _ _ rh rl _ _ _ dwx_rho (1389 / 1000000) (28 / 10000 * dwx_u2) I7 Rinv
+    ltac:(lra) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric)) as I6.
+  destruct (dwexp_step 6 rh rl (dwx_c7_hi, dwx_c7_lo)) as [v6h v6l].
+  pose proof (dwx_chain 5 _ _ rh rl _ _ _ dwx_rho (8334 / 1000000) (167 / 10000 * dwx_u2) I6 Rinv
+    ltac:(rewrite dwx_u2_val; interval with (i_prec 64)) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric)) as I5.
+  destruct (dwexp_step 5 rh rl (v6h, v6l)) as [v5h v5l].
+  pose proof (dwx_chain 4 _ _ rh rl _ _ _ dwx_rho (41670 / 1000000) (835 / 10000 * dwx_u2) I5 Rinv
+    ltac:(rewrite dwx_u2_val; interval with (i_prec 64)) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric)) as I4.
+  destruct (dwexp_step 4 rh rl (v5h, v5l)) as [v4h v4l].
+  pose proof (dwx_chain 3 _ _ rh rl _ _ _ dwx_rho (166690 / 1000000) (3336 / 10000 * dwx_u2) I4 Rinv
+    ltac:(rewrite dwx_u2_val; interval with (i_prec 64)) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric)) as I3.
+  destruct (dwexp_step 3 rh rl (v4h, v4l)) as [v3h v3l].
+  pose proof (dwx_chain 2 _ _ rh rl _ _ _ dwx_rho (500060 / 1000000) (10008 / 10000 * dwx_u2) I3 Rinv
+    ltac:(rewrite dwx_u2_val; interval with (i_prec 64)) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric)) as I2.
+  destruct (dwexp_step 2 rh rl (v3h, v3l)) as [v2h v2l].
+  pose proof (dwx_chain 1 _ _ rh rl _ _ _ dwx_rho (10002 / 10000) (20021 / 10000 * dwx_u2) I2 Rinv
+    ltac:(rewrite dwx_u2_val; interval with (i_prec 64)) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric)) as I1.
+  destruct (dwexp_step 1 rh rl (v2h, v2l)) as [v1h v1l].
+  pose proof (dwx_chain 0 _ _ rh rl _ _ _ dwx_rho (10004 / 10000) (20042 / 10000 * dwx_u2) I1 Rinv
+    ltac:(rewrite dwx_u2_val; interval with (i_prec 64)) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric) ltac:(dwx_numeric)) as I0.
+  destruct (dwexp_step 0 rh rl (v1h, v1l)) as [v0h v0l].
+  exact I0.
 Qed.
