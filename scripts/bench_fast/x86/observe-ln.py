@@ -89,7 +89,7 @@ for build in manifest['builds']:
             for x in xs:
                 exact,uncertainty,_=reference[bits(x)]
                 delta=(abs(exact)+uncertainty)*mp.mpf(2)**-53+mp.mpf(2)**-65
-                cap=mp.expm1(delta)*(1+mp.mpf(2)**-38)+mp.mpf(2)**-38
+                cap=mp.expm1(delta)*(1+mp.mpf(2)**-51)+mp.mpf(2)**-51
                 fraction=(abs(mp.mpf(composed(x))/mp.mpf(x)-1)+mp.mpf(2)**-104)/cap
                 assert fraction<=1,(bits(x),str(fraction))
                 errors.append(fraction)

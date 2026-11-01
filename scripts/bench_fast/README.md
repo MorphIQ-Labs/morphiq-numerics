@@ -286,7 +286,7 @@ these observations supplement the existing proofs and independent fixtures.
 
 The synthetic `exp(ln(x))` composition uses positive normal inputs with binary
 exponents from -900 to 900. If `d = 2^-53*|ln(x)| + 2^-65`, its relative error
-bound is `expm1(d)*(1+2^-38) + 2^-38`, using the fast exp bound on this range.
+bound is `expm1(d)*(1+2^-51) + 2^-51`, using the fast exp bound on this range.
 It has separate scalar throughput/latency cells and strong composition controls.
 It does not qualify a consumer's distinct composed error or workload budget.
 
@@ -371,7 +371,11 @@ built C-ABI wrappers exporting `prod_exp`, `prod_exp_slice`, `prod_norm_cdf_slic
 and `control_exp`. Build baseline and candidate with the same release profile
 (thin LTO, one codegen unit, `simd,std`, no ambient Rust flags), using the
 `x86/matrix-wrapper/src/lib.rs` adapter and `prepare.py` build procedure.
-Keep the baseline binary before rebuilding the candidate. Supply the existing
+Keep the baseline binary before rebuilding the candidate. To time
+`fast::elementary::exp_coarse` against `exp` from one source tree, build the
+candidate from a copy of the adapter whose `prod_exp` and `prod_exp_slice` call
+`exp_coarse` and `exp_coarse_slice`, and the baseline from the unmodified
+adapter. Supply the existing
 `native-matrix.c` and `native-cache.c` shared timers and pinned CORE-MATH/SLEEF
 binaries. `glibc_exp` resolves the system libm through its public ABI; no glibc
 source is needed. Record the distribution's glibc version and libm binary hash

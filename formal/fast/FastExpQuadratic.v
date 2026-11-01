@@ -1,5 +1,5 @@
-(** Public low-latency exp: one-word reduction and parallel quadratic.
-    The internal normal-family cubic keeps its separate tighter contract. *)
+(** Coarse public exp (`fast::elementary::exp_coarse`): one-word reduction and parallel quadratic.
+    The cubic (`fast::elementary::exp`, FastExp) keeps its tighter contract. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz Classical.
 From Flocq Require Import Core Relative IEEE754.Binary IEEE754.Bits.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Mul
@@ -215,3 +215,25 @@ Proof.
  apply(Rmult_le_reg_r(/exp(B x)));[apply Rinv_0_lt_compat,exp_pos|].
  rewrite Rmult_assoc,Rinv_r,Rmult_1_r by(pose proof(exp_pos(B x));lra);exact Error.
 Qed.
+
+(** Public coarse dispatch: the same exp stage screen as `FastExp.fast_exp_public64`,
+    equivalent to the Rust absolute-value comparison. The strong owner's result
+    is an explicit parameter: this theorem does not re-prove the strong fallback. *)
+Require ExpStageB.
+Definition fast_exp_coarse_public64 x strong_result :=
+ if ExpStageB.screen x then fast_exp_quadratic64 x else strong_result.
+
+Theorem fast_exp_coarse_public_accelerated x strong_result :
+ ExpStageB.screen x=true ->
+ finite (fast_exp_coarse_public64 x strong_result) /\
+ Rabs (B (fast_exp_coarse_public64 x strong_result)-exp (B x))<=
+   bpow radix2 (-38)*exp (B x).
+Proof.
+ intros Screen. unfold fast_exp_coarse_public64;rewrite Screen.
+ destruct (ExpStageB.screen_ok x Screen) as [Fx X].
+ apply fast_exp_quadratic_ok;assumption.
+Qed.
+
+Theorem fast_exp_coarse_public_fallback x strong_result :
+ ExpStageB.screen x=false -> fast_exp_coarse_public64 x strong_result=strong_result.
+Proof. intros Screen;unfold fast_exp_coarse_public64;rewrite Screen;reflexivity. Qed.

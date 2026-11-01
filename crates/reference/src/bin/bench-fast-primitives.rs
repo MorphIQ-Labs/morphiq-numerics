@@ -13,6 +13,10 @@ fn main() {
             let x = f64::from_bits(u64::from_str_radix(word, 16).unwrap());
             let (scalar, slice): (Scalar, Slice) = match name {
                 "exp" => (fast::elementary::exp, fast::elementary::exp_slice),
+                "exp_coarse" => (
+                    fast::elementary::exp_coarse,
+                    fast::elementary::exp_coarse_slice,
+                ),
                 "ln" => (fast::elementary::ln, fast::elementary::ln_slice),
                 "erfcx" => (fast::normal::erfcx, fast::normal::erfcx_slice),
                 "cdf" => (fast::normal::norm_cdf, fast::normal::norm_cdf_slice),
@@ -38,7 +42,7 @@ fn main() {
         "MORPHIQ_FAST_BENCH_ITERATIONS must be positive"
     );
     eprintln!("timed_iterations={iterations}; values_per_call=52; warmup_calls=100");
-    let functions: [(&str, Scalar, Slice, Scalar, Slice, f64, f64); 5] = [
+    let functions: [(&str, Scalar, Slice, Scalar, Slice, f64, f64); 6] = [
         (
             "log_cdf",
             normal::log_norm_cdf,
@@ -63,6 +67,15 @@ fn main() {
             elementary::exp_slice,
             fast::elementary::exp,
             fast::elementary::exp_slice,
+            -0.2,
+            0.2,
+        ),
+        (
+            "exp_coarse",
+            elementary::exp,
+            elementary::exp_slice,
+            fast::elementary::exp_coarse,
+            fast::elementary::exp_coarse_slice,
             -0.2,
             0.2,
         ),

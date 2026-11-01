@@ -1946,6 +1946,14 @@ fn fast_section(r: &mut Recorder) {
             -40.0,
             40.0,
         ),
+        // Appended last, so every earlier entry keeps its inputs.
+        (
+            "fast::exp_coarse",
+            elementary_fast::exp_coarse,
+            elementary_fast::exp_coarse_slice,
+            -746.0,
+            710.0,
+        ),
     ] {
         r.label(name);
         for &bits in &edges {

@@ -85,19 +85,19 @@ Qed.
 (** Public dispatch reuses the existing exp stage screen, equivalent to the
     Rust absolute-value comparison. The strong owner's result is an explicit
     parameter: this theorem does not re-prove the existing strong fallback. *)
-Require ExpStageB FastExpQuadratic.
+Require ExpStageB.
 Definition fast_exp_public64 x strong_result :=
- if ExpStageB.screen x then FastExpQuadratic.fast_exp_quadratic64 x else strong_result.
+ if ExpStageB.screen x then fast_exp_entry64 x else strong_result.
 
 Theorem fast_exp_public_accelerated x strong_result :
  ExpStageB.screen x=true ->
  finite (fast_exp_public64 x strong_result) /\
  Rabs (B (fast_exp_public64 x strong_result)-exp (B x))<=
-   bpow radix2 (-38)*exp (B x).
+   bpow radix2 (-51)*exp (B x).
 Proof.
  intros Screen. unfold fast_exp_public64;rewrite Screen.
  destruct (ExpStageB.screen_ok x Screen) as [Fx X].
- apply FastExpQuadratic.fast_exp_quadratic_ok;assumption.
+ apply fast_exp_entry_ok;assumption.
 Qed.
 
 Theorem fast_exp_public_fallback x strong_result :

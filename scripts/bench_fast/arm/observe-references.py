@@ -16,7 +16,7 @@ for name,entry in E.entries.items():
    oracle=mp.mpf(r['oracle_256bit']);error=abs(mp.mpf(float(y))-oracle)/(1 if f=='cdf' else abs(oracle)) if math.isfinite(float(y)) else mp.mpf(0) if math.isinf(float(oracle)) else mp.inf
    within=None
    if active:
-    finite+=1;within=error<=mp.mpf(2)**(-49 if f=='cdf' else -38 if f=='exp' else -51)
+    finite+=1;within=error<=mp.mpf(2)**(-49 if f=='cdf' else -51)
     if not within:budget_exceeded.append(r['input_bits'])
     if error>worst:worst=error;witness=r['input_bits']
    w.writerow([r['input_bits'],M.bits(y),r['oracle_256bit'],active,mp.nstr(error,30),within])

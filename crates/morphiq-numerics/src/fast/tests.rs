@@ -55,6 +55,7 @@ fn mixed_slices_preserve_fast_scalar_bits_and_remainders() {
             elementary::exp as fn(f64) -> f64,
             elementary::exp_slice as Slice,
         ),
+        (elementary::exp_coarse, elementary::exp_coarse_slice),
         (elementary::ln, elementary::ln_slice),
         (normal::erfcx, normal::erfcx_slice),
         (normal::norm_cdf, normal::norm_cdf_slice),
@@ -107,6 +108,10 @@ fn unaccelerated_inputs_retain_strong_results() {
     ] {
         assert_eq!(
             elementary::exp(x).to_bits(),
+            crate::elementary::exp(x).to_bits()
+        );
+        assert_eq!(
+            elementary::exp_coarse(x).to_bits(),
             crate::elementary::exp(x).to_bits()
         );
     }
@@ -181,4 +186,22 @@ fn log_cdf_accelerated_domain_tracks_the_strong_owner() {
     // The strong owner is itself within 2^-53 relative; this is a sampled
     // sanity check against the published budget, not the proof of it.
     assert!(worst < 1.0);
+}
+
+#[test]
+#[should_panic(expected = "exp_coarse_slice: slices of different lengths")]
+fn exp_coarse_slice_rejects_length_mismatch() {
+    elementary::exp_coarse_slice(&[1.0], &mut []);
+}
+
+#[test]
+fn the_two_exp_kernels_are_distinct_and_exact_at_zero() {
+    // Zero is exact in both; elsewhere the kernels are different approximations,
+    // so a coincidence everywhere would mean one entry routes to the other.
+    assert_eq!(elementary::exp(0.0).to_bits(), 1.0_f64.to_bits());
+    assert_eq!(elementary::exp_coarse(0.0).to_bits(), 1.0_f64.to_bits());
+    let differs = (1..=64)
+        .map(|i| f64::from(i) * 0.03125 - 1.0)
+        .any(|x| elementary::exp(x).to_bits() != elementary::exp_coarse(x).to_bits());
+    assert!(differs);
 }

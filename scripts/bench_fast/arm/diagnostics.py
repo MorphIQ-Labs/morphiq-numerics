@@ -36,7 +36,7 @@ for cell in M.CELLS:
    x=float(base[i%len(base)]+v*0.03125);v=fn(x,1) if r['kind']=='scalar_capsule' else fn(x);inputs.append(M.bits(x))
    z=mp.mpf(x);ref=mp.exp(z) if f=='exp' else mp.exp(z*z)*mp.erfc(z) if f=='erfcx' else mp.erfc(-z/mp.sqrt(2))/2
    err=abs(mp.mpf(v)-ref)/(1 if f=='cdf' else abs(ref));worst=max(worst,err)
-   if name.startswith('prod_') and err>mp.mpf(2)**(-49 if f=='cdf' else -38 if f=='exp' else -51):fails.append(M.bits(x))
+   if name.startswith('prod_') and err>mp.mpf(2)**(-49 if f=='cdf' else -51):fails.append(M.bits(x))
   latency.append(dict(cell=cell['id'],name=name,observations=len(inputs),input_bits=inputs,max_error=str(worst),production_failures=fails))
 result=dict(allocations=allocation,fallback_identity=fallback,composition=composition,latency_oracle=latency,limitations='Allocation instrumentation is separate from uninstrumented timing; observed Rust heap allocation calls only. Scratch buffers and Python/C input construction are outside primitive timing except explicitly measured composition/cache work. Feedback timing includes multiplication/addition and indirect call overhead; native assembly confirms the loop-carried dependency.')
 (P/'diagnostics.json').write_text(json.dumps(result,indent=2)+'\n')

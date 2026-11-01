@@ -30,7 +30,7 @@ for primitive,symbol in [('exp','exp'),('erfcx','erfcx'),('cdf','norm_cdf')]:
    for w,actual in zip(bank,y):
     checks+=1
     if word(actual)!=reference[w]:mismatches.append(dict(kind='slice',backend=backend,prefix=prefix,bank=path,input=w,actual=word(actual),expected=reference[w]))
- budget=mp.mpf(2)**(-49 if primitive=='cdf' else -38 if primitive=='exp' else -51);worst=mp.mpf(0);witness=None;failures=[];fallback_mismatches=[];observations=0
+ budget=mp.mpf(2)**(-49 if primitive=='cdf' else -51);worst=mp.mpf(0);witness=None;failures=[];fallback_mismatches=[];observations=0
  active=lambda x:abs(x)<704 if primitive=='exp' else -.5<=x<16 and abs(x)>=2**-33 if primitive=='erfcx' else 2**-33<=abs(x)<=8
  def oracle(x):
   a=mp.mpf(x)
