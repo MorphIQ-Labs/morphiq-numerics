@@ -64,7 +64,23 @@ def generate():
     cases = []
     for primitive, filename in [('exp', 'exp.json'), ('erfcx', 'erfcx.json'), ('cdf', 'normal.json')]:
         fixture = json.loads((OUTPUT.parent/filename).read_text())
-        for row in fixture['cases']:
+        rows = fixture['cases'][:]
+        if primitive == 'exp':
+            # Quadratic residual extrema (+/-A/2) and reduction seams (+/-A),
+            # throughout the public domain. The input bits come from the
+            # mathematical grid at high precision, independently of runtime.
+            with mp.workprec(600):
+                indices = sorted(set(range(-1040034, 1040035, 8191)) |
+                                 {-1040034, -1, 0, 1, 1040034})
+                for n in indices:
+                    for offset in [mp.mpf('-.5'), mp.mpf('-.25'), mp.mpf('.25'), mp.mpf('.5')]:
+                        center = rounded((n + offset) * mp.log(2) / 1024)
+                        for x in [math.nextafter(center, -math.inf), center,
+                                  math.nextafter(center, math.inf)]:
+                            rows.append(dict(x=word(x)))
+            # Retained worst observation of the short-reduction candidate.
+            rows.append(dict(x='c085ba89313e97b8'))
+        for row in rows:
             x = number(row['x'])
             active = (abs(x) < 704 if primitive == 'exp' else
                       -.5 <= x < 16 and abs(x) >= 2**-33 if primitive == 'erfcx' else

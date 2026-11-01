@@ -26,10 +26,22 @@ Lemma fx_c2_val : B fx_c2 = 4503599662984798 / 2 ^ 53.
 Proof. exact (bits_val 4602678819208261214 false 4503599662984798 53 eq_refl). Qed.
 Lemma fx_c2_finite : finite fx_c2.
 Proof. exact (bits_finite 4602678819208261214 _ _ _ eq_refl). Qed.
+Definition fx_step : f64 := b64_of_bits 4559382538039736815.
+Lemma fx_step_val : B fx_step = 6243314768165359 / 2 ^ 63.
+Proof. exact (bits_val 4559382538039736815 false 6243314768165359 63 eq_refl). Qed.
+Lemma fx_step_finite : finite fx_step.
+Proof. exact (bits_finite 4559382538039736815 _ _ _ eq_refl). Qed.
+Definition fx_c1 : f64 := b64_of_bits 4607182418864502807.
+Lemma fx_c1_val : B fx_c1 = 4503599691855895 / 2 ^ 52.
+Proof. exact (bits_val 4607182418864502807 false 4503599691855895 52 eq_refl). Qed.
+Lemma fx_c1_finite : finite fx_c1.
+Proof. exact (bits_finite 4607182418864502807 _ _ _ eq_refl). Qed.
 Theorem fx_inv_close : Rabs(B fx_inv-1024/ln 2)<=/2^41.
 Proof. rewrite fx_inv_val. interval with(i_prec 100). Qed.
 Theorem fx_l_split_d : Rabs(B fx_l1+B fx_l2d-ln 2/1024)<=/2^99.
 Proof. rewrite fx_l1_val,fx_l2d_val. interval with(i_prec 160). Qed.
+Theorem fx_step_close : Rabs(B fx_step-ln 2/1024)<=/2^64.
+Proof. rewrite fx_step_val. interval with(i_prec 160). Qed.
 Definition fx_t_bits : list (Z * Z) := [
   (4607182418800017408%Z, 0%Z);
   (4607185468325554383%Z, 13586652638593792815%Z);
