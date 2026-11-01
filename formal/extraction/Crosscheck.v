@@ -7,6 +7,7 @@
 From Coq Require Import ZArith Extraction ExtrOcamlBasic.
 From Flocq Require Import IEEE754.Binary IEEE754.Bits.
 From Binary64 Require Import IEEE64 IEEE64Add IEEE64Mul IEEE64Div IEEE64Sqrt SqrtAlgorithm.
+Require DwExp.
 
 Definition of_bits (z : Z) : f64 := b64_of_bits z.
 Definition pair_bits (p : f64 * f64) : Z * Z := (bits_of_b64 (fst p), bits_of_b64 (snd p)).
@@ -23,6 +24,13 @@ Definition x_div_f64 xh xl y := pair_bits (div_f64_64 (of_bits xh) (of_bits xl) 
 Definition x_div xh xl yh yl := pair_bits (div64 (of_bits xh) (of_bits xl) (of_bits yh) (of_bits yl)).
 (** sqrt.rs's transcription, proved equal to [fsqrt] (SqrtAlgorithm.v). *)
 Definition x_sqrt x := bits_of_b64 (sqrt_rs (of_bits x)).
+(** exp_split's transcription (formal/fast/DwExp.v): a presence flag, the
+    value's words and the exponent offset by 4096, or four zeros for [None]. *)
+Definition x_exp_split xh xl : Z * Z * Z * Z :=
+  match DwExp.dwexp64 (of_bits xh) (of_bits xl) with
+  | Some (zh, zl, k) => (1%Z, bits_of_b64 zh, bits_of_b64 zl, (k + 4096)%Z)
+  | None => (0%Z, 0%Z, 0%Z, 0%Z)
+  end.
 
 Extraction "crosscheck.ml" x_two_sum x_fast_two_sum x_two_prod x_add_f64 x_add x_sub
-  x_mul_f64 x_mul x_div_f64 x_div x_sqrt.
+  x_mul_f64 x_mul x_div_f64 x_div x_sqrt x_exp_split.

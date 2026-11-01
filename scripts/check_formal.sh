@@ -290,7 +290,7 @@ while [ "$i" -lt "$kernel_chunks" ]; do
   i=$((i + 1))
 done
 (cd "$build/extraction" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" Crosscheck.v \
+  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../gappa "" Crosscheck.v \
   && compile_extraction -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
   && echo "extraction: running crosscheck" \
   && ./crosscheck "$corpus") > "$work/crosscheck.log" 2> "$work/crosscheck.err" &

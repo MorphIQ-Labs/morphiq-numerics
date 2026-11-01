@@ -5,7 +5,8 @@
 //! - [`eft`]: error-free transforms, the rounded sum or product of two
 //!   numbers with its exact rounding error;
 //! - [`double_word`]: double-word (`f64 + f64`) arithmetic with proved
-//!   relative error bounds;
+//!   relative error bounds, and `DoubleWord::exp_split`, a double-word
+//!   exponential with its binary exponent kept apart;
 //! - [`elementary`]: correctly rounded `exp`, `expm1`, `exp2`, `ln`, `ln_1p`,
 //!   `log2`, `log10`, `sin`, `cos`, `sincos`, `tan` and `sqrt`, each with its
 //!   stated domain of correct rounding, and `exp_slice`, `exp2_slice`, `expm1_slice`, `ln_slice` and

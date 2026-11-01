@@ -217,6 +217,76 @@ one Apple M1 Pro core, best of seven runs over 2·10^6 operands, it took
 `add` from 1.7 to 4.7 ns, `mul` from 2.0 to 9.2 ns and `div` from 3.4 to 11.4 ns.
 The checks allocate nothing and are `no_std`.
 
+## Exponential
+
+`DoubleWord::exp_split(x)` returns `(value, n)` with `exp(x) ≈ value · 2^n`
+for a double-word `x = hi + lo` with `|hi| < 1455`. Otherwise, NaNs and
+infinities included, it returns `None`. `value` is a double-word number in
+`[0.9996, 2.0008)` and `n` an integer in `[-2100, 2099]`. The scale stays with
+the caller, so `value · 2^n` may lie outside binary64's range.
+
+**Bound.** `|value · 2^n - exp(x)| <= 16u² · exp(x)` on the whole domain, that
+is relative `2^-102`. `DwExp.dwexp_ok` (`formal/fast/DwExp.v`) proves it for the
+kernel's IEEE 754 transcription, and `DwExp.dwexp_none` proves the `None`
+cases. The proof composes the error to under `12u²`. The worst error observed
+over the 22,030 independent 600-bit references
+(`generators/double_word_exp_reference.py`) is `4u²`.
+
+**Derivation.** With `ℓ = ln(2)/1024`:
+
+1. **Index.** `n = RN(RN(hi · INV) + S) - S`, with `INV = RN(1024/ln 2)` and
+   `S = 1.5 · 2^52`. That is an integer within `1/2 + 10^-9` of `hi/ℓ`, with
+   `|n| <= 2149501`. The table index is `j = n mod 1024` and the binary
+   exponent `floor(n / 1024)`.
+2. **Reduction.** A three-part Cody–Waite split `ℓ ≈ L1 + L2 + L3`, generated
+   by `generators/fast_exp_constants.py`. `L1` and `L2` have 31 significant
+   bits, so `n·L1` and `n·L2` are exact, and `|L1 + L2 + L3 - ℓ| <= 2^-128`.
+   With `(q_hi, q_lo) = two_prod(n, L3)`, four `add_f64` steps give
+   `r = (((x ⊕ -n·L1) ⊕ -n·L2) ⊕ -q_lo) ⊕ -q_hi`. Each step's output is a
+   proved double word. `|r - (x - n·ℓ)| <= 0.52u²`, almost all of it the
+   split's `|n| · 2^-128`, and `|x - n·ℓ| <= 0.000338451`.
+3. **Polynomial.** `exp(r)` by double-word Horner evaluation of the degree-7
+   Taylor polynomial, starting from `1/7!`. Each step is one `mul` by `r`,
+   then `add_f64` of the coefficient's low word (zero for `1/0!`, `1/1!` and
+   `1/2!`, so skipped) and of its high word. The coefficients are double-word
+   roundings of `1/k!`, within `2^-105` relative. The evaluation is within
+   `2.0042u²` of the polynomial, and the polynomial within `0.4u²` of
+   `exp(r)`.
+4. **Reconstruction.** `value = T_j ⊗ v`, where `T_j` is the double-word table
+   entry `exp(j·ℓ)` shared with the bounded `exp`. The reflective certificate in
+   `FastExpTables` checks its 1024 entries against `exp` within `2^-104`. A
+   second check, `DwExp.dwx_tab_check`, shows each entry is a normalized double
+   word whose low word is zero or at least `10^-300`.
+
+**Guards.** They keep every operation inside its proved domain, and each one
+is part of the proof:
+- below `|hi| < 2^-60` the result is `1 ⊕ x` with `n = 0`, within `2u² + x²`;
+- a reduced argument below `10^-247` returns `T_j` itself, since `exp(r) = 1`
+  within `2^-820`;
+- a trailing word of `r` below `10^-300`, or of a Horner value below
+  `10^-60`, is dropped, which moves the result by less than `2^-990` and
+  `2^-187` relative.
+
+With them every product of a leading and a trailing word is zero or normal, as
+the multiplication bound requires. The error budget, relative to `exp(x)`:
+
+| Source | Bound |
+|---|---|
+| Table entry | `4u²` (certified) |
+| Final product | `5u²` |
+| Horner evaluation, truncation and reduction | `2.94u²` |
+| Total, with cross terms (proved) | under `12u²` |
+| Published | `16u²` |
+
+**Products.** Every multiplication is DWTimesDW1 and every exact product is
+`two_prod`'s, operation for operation. Only the source of the exact product
+varies with the target (ADR 0002). It is a hardware fused multiply-add in
+builds that target one, and one runtime dispatch per call into an FMA-enabled
+body on x86-64 with `simd` and `std`. Elsewhere it is Dekker's algorithm. On
+`two_prod`'s proved domain they return the same words. The unit tests compare
+all three on 100,000 inputs, and `scripts/check_fma.sh` requires the FMA
+build's cross-check corpus to be identical.
+
 ## Machine-checked proofs
 
 `scripts/check_formal.sh` (the `formal (coq)` CI job) checks these, on Coq 8.15.2
@@ -279,9 +349,15 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest
 - **The axiom audit.** The gate requires the global axioms of every relied-on
   theorem (`formal/audit/Audit.v`) to be exactly `formal/axioms.expected`: Coq's
   four classical-reals axioms.
+- **The exponential.** `formal/fast/DwExp.v` transcribes `exp_split` in IEEE
+  754 arithmetic and proves `dwexp_ok`, the `16u²` bound with the value's and
+  the exponent's ranges, and `dwexp_none`, from the bounds above and
+  `FastExpTables`. The kernel audit (`formal/audit/KernelAudit.v`) checks their
+  axioms.
 - **The binding.** `formal/binding.sha256` binds the proofs to `eft.rs`,
-  `double_word.rs` and the checked operations' hypotheses
-  (`double_word/checked.rs`) by hash. Editing any of them, or a proof, fails the
+  `double_word.rs`, the checked operations' hypotheses
+  (`double_word/checked.rs`) and the exponential (`double_word/exp.rs` and its
+  generated `exp_tables.rs`) by hash. Editing any of them, or a proof, fails the
   lane until the proofs are rerun and the manifest is updated with them.
 
 **What is assumed:** Rust's `f64` arithmetic is IEEE 754 binary64 with
@@ -298,7 +374,9 @@ extracted to OCaml (`formal/extraction`), and the gate runs them on a corpus the
 Rust library writes (`crosscheck-corpus` in `crates/reference`), requiring
 identical bits for every result; any NaN matches any NaN, since IEEE 754 leaves
 NaN payloads to the implementation. The corpus has 4,000 cases per function,
-covering the proved domains, subnormals, signed zeros and overflow.
+covering the proved domains, subnormals, signed zeros and overflow. For
+`exp_split` it has 8,000, mostly inside its domain, plus NaN, the infinities
+and the domain's edges.
 - **It can fail:** a reassociated sum in `mul`, `add`, `div_f64` or `div`
   changes between 56 and 410 of the corpus's results. Reordering `two_prod`'s
   middle partial products changes none, correctly: on its domain every partial
@@ -317,6 +395,7 @@ covering the proved domains, subnormals, signed zeros and overflow.
 | `two_prod` | `Dekker` (Flocq), via `TwoProdBinary64.v`; `two_prod64` (`IEEE64Mul.v`) | `two_prod_exact`; in IEEE 754, `two_prod_ieee` |
 | `two_sum` | `TwoSum` (`DWPlus.v`); `two_sum64` (`IEEE64Add.v`) | `TwoSum_correct`; in IEEE 754, `two_sum_ieee` |
 | `fast_two_sum` | `Fast2Sum` (`F2SumFLX.v`); `fast_two_sum64` (`IEEE64Add.v`) | `F2Sum_correct_abs`, `F2Sum_correct_cexp`; in IEEE 754, `fast_two_sum_ieee` |
+| `exp_split` | `dwexp64` (`DwExp.v`) | `dwexp_ok`, `16u²`; `dwexp_none` |
 
 ## Checked by
 

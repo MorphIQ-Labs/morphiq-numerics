@@ -3,7 +3,8 @@
 
    Each corpus line is "op in... : out...", every value a binary64 as 16 hex
    digits: two outputs for the double-word operations and transforms, one for
-   sqrt. Results must match exactly, except that any NaN matches any NaN:
+   sqrt, four for exp_split (a presence flag, the value's words and the exponent
+   offset by 4096). Results must match exactly, except that any NaN matches any NaN:
    IEEE 754 leaves a NaN's payload to the implementation. Exits 1 on a
    mismatch or a malformed line. *)
 
@@ -48,6 +49,9 @@ let compute op ins =
   | "div_f64", [a; b; c] -> pair (x_div_f64 a b c)
   | "div", [a; b; c; d] -> pair (x_div a b c d)
   | "sqrt", [a] -> [u64_of_z (x_sqrt a)]
+  | "exp_split", [a; b] ->
+      let (((f, h), l), k) = x_exp_split a b in
+      List.map u64_of_z [f; h; l; k]
   | _ -> failwith ("unknown operation " ^ op)
 
 let hex s = Int64.of_string ("0x" ^ s)
