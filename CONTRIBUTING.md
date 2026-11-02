@@ -54,7 +54,7 @@ python3 scripts/check_numerical_mutations.py target/numerical-mutations
 The [numerical mutation gate](scripts/mutations/README.md) runs on macOS and
 Linux. Use a fresh output directory for each run so earlier receipts survive.
 
-The [MPFR fuzzing guide](fuzz/README.md) describes the elementary contracts,
+The [MPFR fuzzing guide](fuzz/README.md) describes the strong and fast elementary contracts,
 seed corpus, scalar/SIMD campaigns and failure replay. MPFR remains in the
 independent unpublished `fuzz/` workspace.
 
