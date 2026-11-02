@@ -1,5 +1,8 @@
-//! Elementary functions, correctly rounded: each returns the binary64 number
-//! nearest to the exact result, ties to even, on every target.
+//! Target-independent elementary functions with per-function accuracy contracts.
+//!
+//! Correct rounding means the nearest binary64 result, ties to even, and is
+//! claimed only on established domains. The derivations state the proved error
+//! bounds elsewhere.
 //!
 //! Each function's derivation, with its certificates, is in `docs/`:
 //! [`exp`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/exp.md),
@@ -8,9 +11,13 @@
 //! [`ln` and `ln_1p`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/ln.md),
 //! [`log2` and `log10`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/log2.md),
 //! [`sin`, `cos`, `sincos` and `tan`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/sin_cos.md),
-//! [`sqrt`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/sqrt.md).
+//! [`sqrt`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/sqrt.md),
+//! [`asin`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/asin.md),
+//! [`asinh`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/asinh.md),
+//! [`atan2`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/atan2.md).
 //!
-//! [`exp_slice`], [`exp2_slice`], [`expm1_slice`], [`ln_slice`] and [`ln_1p_slice`] apply a function to every
+//! [`exp_slice`], [`exp2_slice`], [`expm1_slice`], [`ln_slice`], [`ln_1p_slice`],
+//! [`asin_slice`], [`asinh_slice`] and [`atan2_slice`] apply a function to every
 //! element of a slice and return its bits exactly. With the `simd` feature they
 //! evaluate several elements at once in SIMD lanes
 //! ([`lanes`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/lanes.md)),

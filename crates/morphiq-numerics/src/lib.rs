@@ -1,4 +1,8 @@
-//! Correctly rounded, target-independent binary64 numerics.
+//! Target-independent binary64 numerics with explicit numerical contracts.
+//!
+//! Correct rounding is claimed on established domains; other APIs carry their
+//! stated error bounds. The [`fast`] namespace selects bounded approximations
+//! explicitly, without changing the existing APIs' guarantees.
 //!
 //! It provides:
 //!
@@ -7,11 +11,11 @@
 //! - [`double_word`]: double-word (`f64 + f64`) arithmetic with proved
 //!   relative error bounds, and `DoubleWord::exp_split`, a double-word
 //!   exponential with its binary exponent kept apart;
-//! - [`elementary`]: correctly rounded `exp`, `expm1`, `exp2`, `ln`, `ln_1p`,
-//!   `log2`, `log10`, `sin`, `cos`, `sincos`, `tan` and `sqrt`, each with its
-//!   stated domain of correct rounding, and `exp_slice`, `exp2_slice`, `expm1_slice`, `ln_slice` and
-//!   `ln_1p_slice`, which return the same bits for a whole slice, in SIMD
-//!   lanes with the `simd` feature;
+//! - [`elementary`]: `exp`, `expm1`, `exp2`, `ln`, `ln_1p`, `log2`, `log10`,
+//!   `sin`, `cos`, `sincos`, `tan`, `sqrt`, `asin`, `asinh` and `atan2`, each
+//!   with its stated correct-rounding domain or error bound; slice functions
+//!   for `exp`, `exp2`, `expm1`, `ln`, `ln_1p`, `asin`, `asinh` and `atan2`
+//!   preserve scalar bits, using SIMD lanes with the `simd` feature;
 //! - [`log_space`]: `log_sum_exp` and `log_diff_exp`, logarithms of sums and
 //!   differences of exponentials, within proved error bounds, with `−∞` as
 //!   exact zero mass; `log_sum_exp_pairs`, which returns `log_sum_exp`'s
@@ -25,10 +29,10 @@
 //!   density, correctly rounded wherever its rounding test decides; and
 //!   `erfcx`, the scaled complementary error function, with `erfcx_slice`
 //!   for scalar-equivalent SIMD evaluation (see its assurance limits);
-//! - [`fast`]: draft explicit bounded-approximation `exp` and `exp_coarse`
-//!   (relative `2^-51` and `2^-38`), `ln`, `erfcx`, `norm_cdf` and
-//!   `log_norm_cdf` entries with matching slices; see their qualification
-//!   limits;
+//! - [`fast`]: explicit bounded-approximation `exp` and `exp_coarse`
+//!   (relative `2^-51` and `2^-38` for `|x| < 704`), `ln`, `erfcx`, `norm_cdf`
+//!   and `log_norm_cdf` entries with matching slices; each states its accelerated
+//!   domain and delegates other inputs to the corresponding strong API;
 //! - [`bivariate_normal`]: the bivariate normal distribution function with an
 //!   absolute error bound, and a per-correlation evaluator that reuses its
 //!   quadrature table;
@@ -42,8 +46,10 @@
 //!   dominant, sign and general unpivoted matrices, with explicit certificates;
 //! - [`ulp`]: units in the last place, and distances measured in them.
 //!
-//! The crate is `no_std`, forbids `unsafe` and never calls a platform math
-//! library, so its results are the same on every target. Its one dependency,
+//! The crate is `no_std`, forbids `unsafe`, allocates no heap memory and never
+//! calls a platform math library. Specified operation sequences preserve its
+//! results across targets under the documented floating-point environment.
+//! Its one dependency,
 //! optional behind the `simd` feature, is the first-party
 //! `morphiq-numerics-arch`, which holds the lane intrinsics.
 
