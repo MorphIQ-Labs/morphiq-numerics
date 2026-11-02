@@ -42,7 +42,14 @@ cargo install --locked cargo-audit --version "$(cat .cargo/audit-version)"
 ./scripts/check_advisories.sh
 cargo install --locked cargo-deny --version "$(cat .cargo/deny-version)"
 cargo deny --locked check licenses
+./scripts/check_fuzz_licenses.sh
+./scripts/install_fuzz.sh
+./scripts/check_fuzz.sh 60
 ```
+
+The [MPFR fuzzing guide](fuzz/README.md) describes the elementary contracts,
+seed corpus, scalar/SIMD campaigns and failure replay. MPFR remains in the
+independent unpublished `fuzz/` workspace.
 
 ## Pull requests
 

@@ -1,4 +1,4 @@
-2a72829f1d6c476d17aed8044f350e6b577ec44ba474f40fecd3ce889cbd4f21  crates/morphiq-numerics/src/atan2/mod.rs
+4391eeba85b0e2b3579eba590a64c2c8a2e43a843cb7f1a8b8f2e1ec8bd77b69  crates/morphiq-numerics/src/atan2/mod.rs
 9ae513b01a7c6ec6ab99920b682b748311b2d4deaad4947bc30852cfafc42102  crates/morphiq-numerics/src/atan2/tables.rs
 0564b9670c6273ee9190e66950fa286ded97ec64a830167cf437b1b26bf9254d  docs/atan2.md
 7bf90d94dcb0e80b22b905a832b2c1d411f53fa5865aed0b7d750c2fdcfba3c0  formal/atan2/Atan2Kernel.v

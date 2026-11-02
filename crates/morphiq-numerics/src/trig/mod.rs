@@ -36,7 +36,7 @@ const SHIFTER: f64 = f64::from_bits(0x4338_0000_0000_0000);
 
 /// `sin x`: correctly rounded wherever Lefèvre and Muller's worst cases cover it
 /// (`|x| ≤ 1.4422·2^−26` and `2^−24 ≤ |x| ≤ 2 + 4675/8192`) and whenever the
-/// rounding test decides; otherwise within `(1/2 + 2^−140)` ulp (§6).
+/// rounding test decides; otherwise within `(1/2 + 2^−144)` ulp (§6).
 ///
 /// `sin(±0) = ±0`; `sin(±∞)` and `sin(NaN)` are NaN.
 #[must_use]
@@ -53,7 +53,7 @@ pub fn sin(x: f64) -> f64 {
 
 /// `cos x`: correctly rounded wherever Lefèvre and Muller's worst cases cover it
 /// (`|x| ≤ 12867/8192`) and whenever the rounding test decides; otherwise
-/// within `(1/2 + 2^−140)` ulp (§6).
+/// within `(1/2 + 2^−144)` ulp (§6).
 ///
 /// `cos(±∞)` and `cos(NaN)` are NaN.
 #[must_use]
