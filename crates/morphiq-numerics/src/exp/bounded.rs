@@ -215,13 +215,14 @@ impl<E: Kernel> morphiq_numerics_arch::WithSimd for Slice<'_, E> {
     }
 }
 
-#[cfg(feature = "simd")]
+// Fixed packets are selected only by the x86 dispatchers below.
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
 struct Packet<'a, const N: usize, E> {
     input: &'a [f64; N],
     output: &'a mut [f64; N],
     kernel: core::marker::PhantomData<E>,
 }
-#[cfg(feature = "simd")]
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
 impl<const N: usize, E: Kernel> morphiq_numerics_arch::WithSimd for Packet<'_, N, E> {
     type Output = ();
     #[inline(always)]
@@ -257,7 +258,7 @@ impl<const N: usize, E: Kernel> morphiq_numerics_arch::WithSimd for Packet<'_, N
         }
     }
 }
-#[cfg(feature = "simd")]
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
 #[cfg_attr(
     any(target_feature = "avx2", target_feature = "avx512f"),
     inline(never)
@@ -280,7 +281,7 @@ fn fixed<K: morphiq_numerics_arch::Simd, const N: usize, E: Kernel>(
     });
 }
 
-#[cfg(feature = "simd")]
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
 #[inline(never)]
 fn packet<K: morphiq_numerics_arch::Simd, const N: usize, E: Kernel>(k: K, op: Slice<'_, E>) {
     let (input, tail) = op.input.split_at(N);
@@ -292,7 +293,7 @@ fn packet<K: morphiq_numerics_arch::Simd, const N: usize, E: Kernel>(k: K, op: S
     }
     fixed::<K, N, E>(k, input, output);
 }
-#[cfg(feature = "simd")]
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
 #[inline(always)]
 fn run<K: morphiq_numerics_arch::Simd, E: Kernel>(k: K, op: Slice<'_, E>) {
     if op.input.len() >= K::LANES
