@@ -1,5 +1,18 @@
 use super::{elementary, normal};
 
+/// The largest `a` whose `RN(a * INV_SQRT2_HIGH)` takes the CDF body.
+fn cdf_body_edge() -> f64 {
+    let inv = crate::normal_distribution::INV_SQRT2_HIGH;
+    let mut a = super::cdf::BODY_LIMIT / inv;
+    while a * inv <= super::cdf::BODY_LIMIT {
+        a = a.next_up();
+    }
+    while a * inv > super::cdf::BODY_LIMIT {
+        a = a.next_down();
+    }
+    a
+}
+
 #[test]
 fn mixed_slices_preserve_fast_scalar_bits_and_remainders() {
     let mut xs = [0.0; 257];
@@ -34,9 +47,11 @@ fn mixed_slices_preserve_fast_scalar_bits_and_remainders() {
         -normal::NEG_LIMIT,
         -8.0,
         -1.0,
+        -cdf_body_edge(),
         -0.5,
         -normal::MIN_MAGNITUDE,
         normal::MIN_MAGNITUDE,
+        cdf_body_edge(),
         1.0,
         8.0,
         16.0,

@@ -968,12 +968,19 @@ Print Assumptions FastErfcx.fast_erfcx_table_ok.
 Print Assumptions FastErfcx.fast_erfcx_entry_ok.
 Print Assumptions FastErfcx.fast_erfcx_fallback_contract.
 Print Assumptions FastNormal.fast_normal_lower_ok.
-Print Assumptions FastNormal.fast_normal_entry_ok.
-Print Assumptions FastNormal.fast_normal_fallback_contract.
+Require FastCdfOde FastCdfApprox FastCdfBody FastCdf.
+Print Assumptions FastCdfOde.cdf_ode_relative.
+Print Assumptions FastCdfApprox.cdf_tail_approx.
+Print Assumptions FastCdfBody.cdf_body_approx.
+Print Assumptions FastCdf.fast_cdf_body_ok.
+Print Assumptions FastCdf.fast_cdf_lower_ok.
+Print Assumptions FastCdf.fast_cdf_entry_ok.
+Print Assumptions FastCdf.fast_cdf_fallback_contract.
+Print Assumptions FastCdf.fast_cdf_nonfinite.
 Print Assumptions FastExp.fast_exp_public_accelerated.
 Print Assumptions FastExp.fast_exp_public_fallback.
 
-Require FastExpScale FastExpPolynomial FastExpReconstruction FastErfcxEvaluation FastErfcxCertificates FastNormalCentralAnalytic FastNormalCentral.
+Require FastExpScale FastExpPolynomial FastExpReconstruction FastErfcxEvaluation FastErfcxCertificates.
 Print Assumptions FastExpScale.fast_scaled_high_ok.
 Print Assumptions FastExpScale.fast_raw_scale.
 Print Assumptions FastExpScale.fast_raw_index.
@@ -981,8 +988,6 @@ Print Assumptions FastExpPolynomial.fast_cubic_approx.
 Print Assumptions FastExpReconstruction.fast_reconstruction_ok.
 Print Assumptions FastErfcxEvaluation.fast_table_ieee.
 Print Assumptions FastErfcxCertificates.fast_table_certificate.
-Print Assumptions FastNormalCentralAnalytic.gaussian_integral_weighted_remainder.
-Print Assumptions FastNormalCentral.fast_normal_center_ok.
 
 Print Assumptions LnNormalized.normalized_cell_index.
 Require LnUnit.
