@@ -1,0 +1,11 @@
+--- a/crates/morphiq-numerics/src/eft.rs
++++ b/crates/morphiq-numerics/src/eft.rs
+@@ -6,7 +6,7 @@
+
+ /// Veltkamp's splitting constant `2^27 + 1`, for binary64's 53-bit significand
+ /// split into 26 and 27 bits (Dekker 1971, (5.7) and (6.2)).
+-const SPLITTER: f64 = 134_217_729.0;
++const SPLITTER: f64 = 134_217_728.0;
+
+ /// `(s, t)` with `s = RN(a + b)` and `s + t = a + b` exactly, for any `a` and
+ /// `b` at most `2^1020` in magnitude, which excludes overflow

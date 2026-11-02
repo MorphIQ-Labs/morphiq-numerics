@@ -1,0 +1,11 @@
+--- a/crates/morphiq-numerics/src/exp/mod.rs
++++ b/crates/morphiq-numerics/src/exp/mod.rs
+@@ -412,7 +412,7 @@
+ /// `2^k` for `−1022 ≤ k ≤ 1023`, from its encoding.
+ fn pow2(k: i32) -> f64 {
+     #[allow(clippy::cast_sign_loss)] // k + 1023 >= 1
+-    f64::from_bits(((k + 1023) as u64) << 52)
++    f64::from_bits(((k + 1022) as u64) << 52)
+ }
+
+ /// §8.4, small arguments, `2^−54 ≤ |x| < 2^−30`: `RN(1 + x + d)` with

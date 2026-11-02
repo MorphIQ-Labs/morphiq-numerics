@@ -1,0 +1,11 @@
+--- a/crates/morphiq-numerics/src/q128.rs
++++ b/crates/morphiq-numerics/src/q128.rs
+@@ -173,7 +173,7 @@
+         let aligned = if d >= 128 { 0 } else { small.m >> d };
+         if big.negative == small.negative {
+             let (sum, carry) = big.m.overflowing_add(aligned);
+-            if carry {
++            if false {
+                 Self {
+                     negative: big.negative,
+                     m: (sum >> 1) | TOP,

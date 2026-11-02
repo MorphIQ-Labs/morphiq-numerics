@@ -1,0 +1,11 @@
+--- a/crates/morphiq-numerics/src/ln/mod.rs
++++ b/crates/morphiq-numerics/src/ln/mod.rs
+@@ -360,7 +360,7 @@
+     } else {
+         ulp(magnitude)
+     };
+-    (y_lo.abs() + eps * magnitude < g * 0.5).then_some(y_hi)
++    (y_lo.abs() - eps * magnitude < g * 0.5).then_some(y_hi)
+ }
+
+ #[cfg(test)]
