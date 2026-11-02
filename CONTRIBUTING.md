@@ -47,7 +47,7 @@ cargo deny --locked check licenses
 ./scripts/check_fuzz.sh 60
 ```
 
-The [MPFR fuzzing guide](fuzz/README.md) describes the elementary contracts,
+The [MPFR fuzzing guide](fuzz/README.md) describes the strong and fast elementary contracts,
 seed corpus, scalar/SIMD campaigns and failure replay. MPFR remains in the
 independent unpublished `fuzz/` workspace.
 
