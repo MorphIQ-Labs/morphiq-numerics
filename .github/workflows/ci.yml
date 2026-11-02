@@ -164,7 +164,10 @@ jobs:
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: rustc --version
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
-      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Install ARM lint targets
+        run: rustup target add aarch64-unknown-linux-gnu thumbv7em-none-eabihf
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - run: ./scripts/check_clippy.sh
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo doc --locked --workspace --all-features --no-deps
         env:
