@@ -149,7 +149,8 @@ Every invariant names its enforcement, chosen from this ladder: (1) unrepresenta
 
 ```sh
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+rustup target add aarch64-unknown-linux-gnu thumbv7em-none-eabihf
+./scripts/check_clippy.sh         # native, ARM NEON and no_std scalar fallback
 cargo test --workspace --all-features --locked
 cargo doc --workspace --all-features --no-deps --locked      # RUSTDOCFLAGS="-D warnings"
 cargo build -p morphiq-numerics --locked --target thumbv7em-none-eabihf   # no_std

@@ -293,14 +293,29 @@ impl<const SPECIALIZE_NORMAL: bool> morphiq_numerics_arch::WithSimd
 }
 
 // Fixed packets avoid the bulk loop's stack frame and partial-array copies
-// on short calls. This is the same dispatch structure used by bounded exp.
-#[cfg(feature = "simd")]
+// on short calls. Only x86/NEON dispatchers and forced-backend tests use them;
+// other targets vectorize Slice directly.
+#[cfg(all(
+    feature = "simd",
+    any(
+        test,
+        target_arch = "x86_64",
+        all(target_arch = "aarch64", target_feature = "neon")
+    )
+))]
 struct Packet<'a, const N: usize> {
     input: &'a [f64; N],
     output: &'a mut [f64; N],
 }
 
-#[cfg(feature = "simd")]
+#[cfg(all(
+    feature = "simd",
+    any(
+        test,
+        target_arch = "x86_64",
+        all(target_arch = "aarch64", target_feature = "neon")
+    )
+))]
 impl<const N: usize> morphiq_numerics_arch::WithSimd for Packet<'_, N> {
     type Output = ();
     #[inline(always)]
@@ -328,7 +343,14 @@ impl<const N: usize> morphiq_numerics_arch::WithSimd for Packet<'_, N> {
     }
 }
 
-#[cfg(feature = "simd")]
+#[cfg(all(
+    feature = "simd",
+    any(
+        test,
+        target_arch = "x86_64",
+        all(target_arch = "aarch64", target_feature = "neon")
+    )
+))]
 #[cfg_attr(
     any(target_feature = "avx2", target_feature = "avx512f"),
     inline(never)
@@ -345,7 +367,14 @@ fn fixed<K: morphiq_numerics_arch::Simd, const N: usize>(
     k.vectorize(Packet { input, output });
 }
 
-#[cfg(feature = "simd")]
+#[cfg(all(
+    feature = "simd",
+    any(
+        test,
+        target_arch = "x86_64",
+        all(target_arch = "aarch64", target_feature = "neon")
+    )
+))]
 #[inline(never)]
 fn packet<K: morphiq_numerics_arch::Simd, const N: usize>(k: K, work: Slice<'_>) {
     let (input, tail) = work.input.split_at(N);
@@ -360,7 +389,14 @@ fn packet<K: morphiq_numerics_arch::Simd, const N: usize>(k: K, work: Slice<'_>)
     );
 }
 
-#[cfg(feature = "simd")]
+#[cfg(all(
+    feature = "simd",
+    any(
+        test,
+        target_arch = "x86_64",
+        all(target_arch = "aarch64", target_feature = "neon")
+    )
+))]
 #[inline(always)]
 fn run<K: morphiq_numerics_arch::Simd>(k: K, work: Slice<'_>) {
     let n = work.input.len();
@@ -428,7 +464,6 @@ pub(crate) fn slice(input: &[f64], output: &mut [f64]) {
 #[cfg(feature = "simd")]
 #[inline(never)]
 fn slice_general(input: &[f64], output: &mut [f64]) {
-    use morphiq_numerics_arch::Simd;
     if input.len() < 2 {
         for (&x, y) in input.iter().zip(output) {
             *y = ln(x);
@@ -438,7 +473,7 @@ fn slice_general(input: &[f64], output: &mut [f64]) {
     let work = Slice::<true> { input, output };
     #[cfg(target_arch = "x86_64")]
     {
-        use morphiq_numerics_arch::{Avx2, Avx512, Sse2};
+        use morphiq_numerics_arch::{Avx2, Avx512, Simd, Sse2};
         if input.len() >= Avx512::LANES
             && let Some(k) = Avx512::try_new()
         {
@@ -459,7 +494,10 @@ fn slice_general(input: &[f64], output: &mut [f64]) {
         target_arch = "x86_64",
         all(target_arch = "aarch64", target_feature = "neon")
     )))]
-    morphiq_numerics_arch::Scalar::new().vectorize(work);
+    {
+        use morphiq_numerics_arch::Simd;
+        morphiq_numerics_arch::Scalar::new().vectorize(work);
+    }
 }
 
 #[cfg(all(test, feature = "simd"))]

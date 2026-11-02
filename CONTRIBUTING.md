@@ -32,7 +32,8 @@ it may be given, and what the pull request discloses.
 
 ```sh
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+rustup target add aarch64-unknown-linux-gnu thumbv7em-none-eabihf
+./scripts/check_clippy.sh
 cargo test --workspace --all-features --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps --locked
 rustup target add thumbv7em-none-eabihf
