@@ -332,6 +332,9 @@ jobs:
       - name: Install pinned MPFR fuzz tools
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
         run: ./scripts/install_fuzz.sh
+      - name: Fuzz runner shell compatibility and failure propagation
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
+        run: python3 -m unittest scripts.test_fuzz_runner
       - name: MPFR elementary oracle, regression replay and short campaigns
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
         run: ./scripts/check_fuzz.sh 60
