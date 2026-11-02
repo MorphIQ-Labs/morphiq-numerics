@@ -80,6 +80,20 @@ def generate():
                             rows.append(dict(x=word(x)))
             # Retained worst observation of the short-reduction candidate.
             rows.append(dict(x='c085ba89313e97b8'))
+        if primitive == 'cdf':
+            # The body/tail dispatch edge: the largest a whose RN(a/sqrt 2),
+            # formed with the nearest binary64 of 1/sqrt 2, is at most 15/32,
+            # with neighbours of both signs; and a negative-tail sweep for the
+            # relative bound on x < 0.
+            inv = float(mp.mpf(1) / mp.sqrt(2))
+            edge = 0.46875 / inv
+            while edge * inv <= 0.46875:
+                edge = math.nextafter(edge, math.inf)
+            while edge * inv > 0.46875:
+                edge = math.nextafter(edge, -math.inf)
+            for x in [math.nextafter(edge, -math.inf), edge, math.nextafter(edge, math.inf)]:
+                rows += [dict(x=word(x)), dict(x=word(-x))]
+            rows += [dict(x=word(-8 + i / 64)) for i in range(0, 470)]
         for row in rows:
             x = number(row['x'])
             active = (abs(x) < 704 if primitive == 'exp' else

@@ -379,6 +379,8 @@ fn neon_mul_add_gives_the_exact_product_error() {
 #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
 #[test]
 fn x86_mul_add_gives_the_exact_product_error() {
+    #[cfg(target_feature = "fma")]
+    check_fma(crate::Sse2::new());
     if let Some(s) = crate::Avx2::try_new() {
         check_fma(s);
     }
@@ -391,7 +393,12 @@ fn x86_mul_add_gives_the_exact_product_error() {
 fn backends_without_fma_return_none() {
     const { assert!(!Scalar::FMA) };
     assert!(Scalar::new().mul_add(1.0, 2.0, 3.0).is_none());
-    #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
+    // SSE2 has the fused multiply-add only in builds that target FMA.
+    #[cfg(all(
+        target_arch = "x86_64",
+        target_feature = "sse2",
+        not(target_feature = "fma")
+    ))]
     {
         let s = crate::Sse2::new();
         const { assert!(!crate::Sse2::FMA) };

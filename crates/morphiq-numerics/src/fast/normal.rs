@@ -24,12 +24,13 @@ pub fn erfcx(x: f64) -> f64 {
 
 /// Standard-normal cumulative distribution, `P(Z <= x)`.
 ///
-/// Absolute error is at most `2^-49` on
-/// `2^-33 <= |x| <= 8`. For `|x| <= 1` it evaluates the generated
-/// integrated Gaussian polynomial. For larger arguments it uses the identity
-/// `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` for `a = |x|`,
-/// with the generated high word of `1/sqrt(2)` and the table polynomial.
-/// Other inputs use [`crate::normal::norm_cdf`], retaining its special values.
+/// Absolute error is at most `2^-49` on `2^-33 <= |x| <= 8`, and for
+/// `x < 0` there also relative error at most `2^-48`. With
+/// `y = RN(|x|/sqrt(2))`, `y <= 15/32` evaluates a generated erf polynomial;
+/// larger `y` evaluates `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` with
+/// the exponent split exactly and one generated erfcx rational
+/// (`FastCdf.fast_cdf_entry_ok`). Other inputs use [`crate::normal::norm_cdf`],
+/// retaining its special values.
 #[must_use]
 #[inline]
 pub fn norm_cdf(x: f64) -> f64 {
@@ -37,11 +38,7 @@ pub fn norm_cdf(x: f64) -> f64 {
     if !(MIN_MAGNITUDE..=8.0).contains(&a) {
         return norm_cdf_fallback(x);
     }
-    if a <= 1.0 {
-        return central(x);
-    }
-    let lower = lower(a);
-    if x < 0.0 { lower } else { 1.0 - lower }
+    super::cdf::in_domain(x)
 }
 
 /// The lower tail `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` for
@@ -109,22 +106,6 @@ pub fn log_norm_cdf(x: f64) -> f64 {
 #[inline(never)]
 fn log_norm_cdf_fallback(x: f64) -> f64 {
     crate::normal::log_norm_cdf(x)
-}
-
-/// Degree-25 integrated Gaussian Taylor polynomial on |x| <= 1.
-#[inline]
-pub(super) fn central(x: f64) -> f64 {
-    use crate::normal_distribution::{CENTER_HIGH as A, DENSITY_HIGH};
-    let z = x * x;
-    let zz = z * z;
-    let p0 = A[0] + z * A[1];
-    let p1 = A[2] + z * A[3];
-    let p2 = A[4] + z * A[5];
-    let p3 = A[6] + z * A[7];
-    let p4 = A[8] + z * A[9];
-    let p5 = A[10] + z * A[11];
-    let p = p0 + zz * (p1 + zz * (p2 + zz * (p3 + zz * (p4 + zz * (p5 + zz * A[12])))));
-    0.5 + (x * DENSITY_HIGH) * p
 }
 
 /// Apply [`erfcx`] to a slice, preserving its scalar result bits.

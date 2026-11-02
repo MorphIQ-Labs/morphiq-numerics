@@ -80,9 +80,10 @@ split and Veltkamp's product. On its domain `D` — `a·b = 0` or
 excluded by `two_prod_ieee`, `formal/binary64/IEEE64Eft.v`).
 
 On a backend with a hardware fused multiply-add (NEON, AVX2 with FMA,
-AVX-512F) the lane `two_prod` computes `e' = RN(a·b − p)`, one fused
-operation (`mul_add(a, b, −p)`). On SSE2 and the scalar backend, which have
-none, it performs Dekker's operations as `eft.rs` writes them. **On `D`,
+AVX-512F, and SSE2 in a build that targets `fma`) the lane `two_prod` computes
+`e' = RN(a·b − p)`, one fused operation (`mul_add(a, b, −p)`). On the scalar
+backend and SSE2 without `fma`, which have none, it performs Dekker's
+operations as `eft.rs` writes them. **On `D`,
 `e' = e` bit for bit:**
 
 1. **A nonzero error.** `e` is a binary64 number equal to `a·b − p`, so
