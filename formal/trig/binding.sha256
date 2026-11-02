@@ -1,5 +1,5 @@
 63f119290b1de910bad964975a3a759dba617c6730269b74a2613f3054e69f19  crates/morphiq-numerics/src/q256.rs
-d8b2e7f8661c5c290e777524c99d93adc04ac850504cc0eb1569c2dd686e83a1  crates/morphiq-numerics/src/trig/mod.rs
+03ddcee2f497d760a6df0e818f30aff3194759afda1285b989675398d40dac47  crates/morphiq-numerics/src/trig/mod.rs
 04832e10879b522834a3ac8216047ae560a4291d79769e7a7fb95c6ac4ec5991  crates/morphiq-numerics/src/trig/reduction.rs
 386eea8124abe13bcf3c86b75c4b724b4bbec0e2eae12a5d6a22ea28f3b4a3ed  crates/morphiq-numerics/src/trig/tables.rs
 2138c81de7403a69734a37cf30f01b433d2e415e930a185b1e11b9e67f4f2ddf  docs/sin_cos.md

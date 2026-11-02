@@ -46,10 +46,17 @@ cargo deny --locked check licenses
 cargo install --locked cargo-mutants --version "$(cat .cargo/mutants-version)"
 python3 -m unittest scripts.test_numerical_mutations
 python3 scripts/check_numerical_mutations.py target/numerical-mutations
+./scripts/check_fuzz_licenses.sh
+./scripts/install_fuzz.sh
+./scripts/check_fuzz.sh 60
 ```
 
 The [numerical mutation gate](scripts/mutations/README.md) runs on macOS and
 Linux. Use a fresh output directory for each run so earlier receipts survive.
+
+The [MPFR fuzzing guide](fuzz/README.md) describes the elementary contracts,
+seed corpus, scalar/SIMD campaigns and failure replay. MPFR remains in the
+independent unpublished `fuzz/` workspace.
 
 ## Pull requests
 

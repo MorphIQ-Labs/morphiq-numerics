@@ -1,0 +1,48 @@
+name: scheduled fuzz
+
+on:
+  schedule:
+    - cron: '23 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scheduled-elementary-fuzz-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  elementary:
+    name: elementary (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: fuzz-${{ matrix.os }}
+          workspaces: fuzz
+      - run: ./scripts/install_fuzz.sh
+      - name: Audit the oracle dependencies
+        run: |
+          cargo install --locked --no-default-features cargo-audit --version "$(cat .cargo/audit-version)"
+          cargo install --locked cargo-deny --version "$(cat .cargo/deny-version)"
+          ./scripts/check_advisories.sh
+          ./scripts/check_fuzz_licenses.sh
+      - name: Thirty minutes each of scalar and SIMD mutation
+        run: ./scripts/check_fuzz.sh 1800
+      - name: Retain failures, logs and evolved corpora
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: elementary-fuzz-${{ matrix.os }}
+          path: |
+            target/fuzz/logs/
+            target/fuzz/artifacts/
+            target/fuzz/corpus-*/
+          retention-days: 14
