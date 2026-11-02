@@ -135,6 +135,21 @@ rounds, one-sided 95% upper time ratio at most one in every required cell, CPU
 isolated, both builds `-C target-cpu=x86-64-v3` (performance is qualified on
 FMA builds). Fifty required cells cover pricing, body, lower, upper and wide
 banks; dependent latency, scalar throughput and slices of 1, 2, 4, 8, 13, 52,
-53 and 4096. The results for the merged source are in the owning pull request.
-Native ARM qualification is not yet run; the corresponding claims are
-unestablished.
+53 and 4096.
+
+On an Intel Core i9-10920X (Cascade Lake, AVX-512), Linux, rustc 1.97.1, both
+wrappers built with `--features simd,std` and `-C target-cpu=x86-64-v3`
+against the previous `fast::norm_cdf`, all 50 required cells pass:
+
+| Cell group | Time ratio (candidate / previous) | Worst one-sided 95% upper |
+| --- | --- | --- |
+| Dependent latency, five banks | 0.79–0.89 | 0.89 |
+| Scalar throughput, five banks | 0.70–0.94 | 0.95 |
+| Slices of 1–4 | 0.67–0.87 | 0.92 |
+| Slices of 8–4096 | 0.29–0.87 | 0.88 |
+
+Diagnostics: a mixed bank with fallbacks 0.58; SLEEF's AVX-512 erfc-based CDF
+on 4096 pricing values 0.27; the unchanged strong `norm_cdf` control
+1.002–1.006, the noise floor of the paired protocol. These are native
+measurements on that host only. Native ARM qualification is not yet run; the
+corresponding claims are unestablished.
