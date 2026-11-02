@@ -1,5 +1,5 @@
-//! x86-64: two SSE2 lanes (no fused multiply-add), four AVX2 lanes with FMA,
-//! and eight AVX-512F lanes.
+//! x86-64: two SSE2 lanes (with FMA's fused multiply-add only in builds that
+//! target FMA), four AVX2 lanes with FMA, and eight AVX-512F lanes.
 //!
 //! This module is compiled only when the target enables SSE2, which every
 //! hosted x86-64 target does, so the SSE2 backend needs no detection and its
@@ -16,10 +16,12 @@ use crate::{Simd, WithSimd, sealed::Sealed};
 use helpers::{avx2, avx512, sse2};
 
 // ---------------------------------------------------------------------------
-// SSE2: two lanes, no fused multiply-add.
+// SSE2: two lanes; a fused multiply-add only where the build targets FMA.
 
 /// Two SSE2 lanes. Every hosted x86-64 target enables SSE2, so the token is
-/// always available where the type exists. SSE2 has no fused multiply-add.
+/// always available where the type exists. SSE2 has no fused multiply-add;
+/// a build that targets FMA (`x86-64-v3` or later) has the 128-bit VFMADD on
+/// every CPU it runs on, and the backend uses it.
 #[derive(Clone, Copy, Debug)]
 pub struct Sse2(());
 
@@ -53,7 +55,7 @@ impl Sealed for Sse2 {}
 impl Simd for Sse2 {
     const LANES: usize = 2;
     const NAME: &'static str = "sse2";
-    const FMA: bool = false;
+    const FMA: bool = cfg!(target_feature = "fma");
     type F = __m128d;
     type U = __m128i;
     type M = Sse2Mask;
@@ -68,9 +70,19 @@ impl Simd for Sse2 {
     }
 
     #[inline(always)]
-    fn mul_add(self, _: __m128d, _: __m128d, _: __m128d) -> Option<__m128d> {
-        // SSE2 has no fused multiply-add.
-        None
+    fn mul_add(self, a: __m128d, b: __m128d, c: __m128d) -> Option<__m128d> {
+        #[cfg(target_feature = "fma")]
+        {
+            // SAFETY: the helper requires SSE2 and FMA; the target enables
+            // both for the whole build, so every CPU running it has them.
+            Some(unsafe { sse2::mul_add(a, b, c) })
+        }
+        #[cfg(not(target_feature = "fma"))]
+        {
+            // SSE2 alone has no fused multiply-add.
+            let _ = (a, b, c);
+            None
+        }
     }
 
     forward! { sse2;
@@ -390,6 +402,13 @@ mod helpers {
         #[inline]
         pub(in super::super) fn mul(a: __m128d, b: __m128d) -> __m128d {
             _mm_mul_pd(a, b)
+        }
+        #[cfg(target_feature = "fma")]
+        #[target_feature(enable = "sse2,fma")]
+        #[inline]
+        pub(in super::super) fn mul_add(a: __m128d, b: __m128d, c: __m128d) -> __m128d {
+            // VFMADD: a·b + c, rounded once.
+            core::arch::x86_64::_mm_fmadd_pd(a, b, c)
         }
         #[target_feature(enable = "sse2")]
         #[inline]

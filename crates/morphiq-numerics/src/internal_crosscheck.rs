@@ -1657,6 +1657,9 @@ fn fast_corpus(out: &mut String) {
         -0.5,
         -1.0,
         1.0,
+        // The CDF's body/tail edge: RN(a/sqrt 2) <= 15/32 exactly up to here.
+        -f64::from_bits(0x3fe5_3694_8017_480f),
+        f64::from_bits(0x3fe5_3694_8017_480f),
         16.0,
         -8.0,
         8.0,

@@ -32,7 +32,7 @@ fn within_bound(actual: f64, high: f64, low: f64, relative: bool, exponent: i64)
 #[test]
 fn accelerated_domains_meet_their_bound_including_reference_uncertainty() {
     let data: Value = serde_json::from_str(include_str!("../fixtures/fast.json")).unwrap();
-    let mut observed = [0; 4];
+    let mut observed = [0; 5];
     for row in data["cases"].as_array().unwrap() {
         let name = row["primitive"].as_str().unwrap();
         let x = word(&row["x"]);
@@ -44,6 +44,11 @@ fn accelerated_domains_meet_their_bound_including_reference_uncertainty() {
                 (1, "exp_coarse", elementary::exp_coarse(x), true, -38),
             ],
             "erfcx" => &[(2, "erfcx", normal::erfcx(x), true, -51)],
+            // The lower half also carries a relative bound.
+            "cdf" if x < 0.0 => &[
+                (3, "cdf", normal::norm_cdf(x), false, -49),
+                (4, "cdf (relative, x < 0)", normal::norm_cdf(x), true, -48),
+            ],
             "cdf" => &[(3, "cdf", normal::norm_cdf(x), false, -49)],
             _ => unreachable!("unknown fixture primitive"),
         };
