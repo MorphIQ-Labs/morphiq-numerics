@@ -1,4 +1,5 @@
-//! `atan2`: the angle of `(x, y)` rounded to nearest, ties to even.
+//! `atan2`: the angle of `(x, y)`, correctly rounded on established paths
+//! and within a proved bound elsewhere.
 //!
 //! The derivation and every bound are in
 //! [`docs/atan2.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/atan2.md);
