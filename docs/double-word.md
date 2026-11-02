@@ -230,7 +230,11 @@ is relative `2^-102`. `DwExp.dwexp_ok` (`formal/fast/DwExp.v`) proves it for the
 kernel's IEEE 754 transcription, and `DwExp.dwexp_none` proves the `None`
 cases. The proof composes the error to under `12u²`. The worst error observed
 over the 22,030 independent 600-bit references
-(`generators/double_word_exp_reference.py`) is `4u²`.
+(`generators/double_word_exp_reference.py`) is `4u²`. Its seeded log-spaced
+inputs use the shared interval oracle to round `10^e` once to binary64, with
+agreement at two consecutive enclosure precisions. Platform `pow` does not
+select the input bits; the 600-bit output references are then computed for
+those exact inputs.
 
 **Derivation.** With `ℓ = ln(2)/1024`:
 

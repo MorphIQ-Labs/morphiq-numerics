@@ -99,8 +99,9 @@ def log2_cases():
 
 
 def log10_cases():
-    # 10^k is exact in binary64 for 0 <= k <= 22.
-    return specials([10.0 ** k for k in range(1, 23)]) + random_cases(0x6C6F6731305F7266)
+    # 10^k is exact in binary64 for 0 <= k <= 22. Compute as integers,
+    # then convert exactly; float ** would invoke platform pow().
+    return specials([float(10 ** k) for k in range(1, 23)]) + random_cases(0x6C6F6731305F7266)
 
 
 def precise_cases(base, seed):
