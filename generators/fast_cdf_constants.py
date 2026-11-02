@@ -137,8 +137,11 @@ def coq_constant(name, value):
             f'Proof. exact (bits_val {bits} {sign} {full} {full_shift} eq_refl). Qed.\n'
             f'Lemma {name}_finite : finite {name}.\n'
             f'Proof. exact (bits_finite {bits} _ _ _ eq_refl). Qed.\n'
-            f'Lemma {name}_g : B {name} = float2R (Float2 ({signed}) ({-shift})).\n'
-            f'Proof. apply word_value_ok; vm_compute; reflexivity. Qed.\n')
+            # Gappa spells an integer constant Float1 m, a dyadic Float2 m e.
+            + (f'Lemma {name}_g : B {name} = Float1 ({signed * 2 ** (-shift)}).\n'
+               f'Proof. apply word_integer_ok; vm_compute; reflexivity. Qed.\n' if shift <= 0 else
+               f'Lemma {name}_g : B {name} = float2R (Float2 ({signed}) ({-shift})).\n'
+               f'Proof. apply word_value_ok; vm_compute; reflexivity. Qed.\n'))
 
 
 def real_poly(names, var):
@@ -226,7 +229,7 @@ def certificate_tail(num, den):
               'dc = rnd(db0 + rnd(y4*db1));', 'DC = DB0 + Y4*DB1;',
               'dh = rnd(dc + rnd(y8*da4));', 'DE = DC + Y8*dA4;',
               'r = rnd(nh/dh);', 'R = NE/DE;',
-              '{ yy in [0x1.ep-2, %s] -> r -/ R in [-0x1.6p-49, 0x1.6p-49] }' % YMAX.hex()]
+              '{ yy in [0x1.ep-2, %s] -> r -/ R in [-0x1.1p-49, 0x1.1p-49] /\\ dh in [1, 0x1p30] }' % YMAX.hex()]
     return '\n'.join(lines) + '\n'
 
 

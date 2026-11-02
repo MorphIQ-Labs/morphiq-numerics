@@ -24,12 +24,13 @@ pub fn erfcx(x: f64) -> f64 {
 
 /// Standard-normal cumulative distribution, `P(Z <= x)`.
 ///
-/// Absolute error is at most `2^-49` on
-/// `2^-33 <= |x| <= 8`. For `|x| <= 1` it evaluates the generated
-/// integrated Gaussian polynomial. For larger arguments it uses the identity
-/// `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` for `a = |x|`,
-/// with the generated high word of `1/sqrt(2)` and the table polynomial.
-/// Other inputs use [`crate::normal::norm_cdf`], retaining its special values.
+/// Absolute error is at most `2^-49` on `2^-33 <= |x| <= 8`, and for
+/// `x < 0` there also relative error at most `2^-48`. With
+/// `y = RN(|x|/sqrt(2))`, `y <= 15/32` evaluates a generated erf polynomial;
+/// larger `y` evaluates `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` with
+/// the exponent split exactly and one generated erfcx rational
+/// (`FastCdf.fast_cdf_entry_ok`). Other inputs use [`crate::normal::norm_cdf`],
+/// retaining its special values.
 #[must_use]
 #[inline]
 pub fn norm_cdf(x: f64) -> f64 {

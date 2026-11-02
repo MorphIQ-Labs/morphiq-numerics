@@ -157,8 +157,8 @@ Lemma cdf_den_0_val : B cdf_den_0 = 4503599627370496 / 2 ^ 52.
 Proof. exact (bits_val 4607182418800017408 false 4503599627370496 52 eq_refl). Qed.
 Lemma cdf_den_0_finite : finite cdf_den_0.
 Proof. exact (bits_finite 4607182418800017408 _ _ _ eq_refl). Qed.
-Lemma cdf_den_0_g : B cdf_den_0 = float2R (Float2 (1) (0)).
-Proof. apply word_value_ok; vm_compute; reflexivity. Qed.
+Lemma cdf_den_0_g : B cdf_den_0 = Float1 (1).
+Proof. apply word_integer_ok; vm_compute; reflexivity. Qed.
 
 Definition cdf_den_1 : f64 := b64_of_bits 4614059872385912828.
 Lemma cdf_den_1_val : B cdf_den_1 = 6877453585895420 / 2 ^ 51.

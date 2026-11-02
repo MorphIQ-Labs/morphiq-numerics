@@ -62,4 +62,4 @@ dh = rnd(dc + rnd(y8*da4));
 DE = DC + Y8*dA4;
 r = rnd(nh/dh);
 R = NE/DE;
-{ yy in [0x1.ep-2, 0x1.6a09e667f3bcdp+2] -> r -/ R in [-0x1.6p-49, 0x1.6p-49] }
+{ yy in [0x1.ep-2, 0x1.6a09e667f3bcdp+2] -> r -/ R in [-0x1.1p-49, 0x1.1p-49] /\ dh in [1, 0x1p30] }

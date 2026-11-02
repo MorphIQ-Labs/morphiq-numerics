@@ -1,10 +1,12 @@
-(** Integrated Taylor remainder for the bounded CDF's |x|<=1 domain. *)
-From Coq Require Import Reals Lia Lra Psatz.
+(** The bounded normal CDF's body: [Phi(x) - 1/2 = erf(x/sqrt 2)/2], and the
+    generated polynomial [P(y^2)] approximates [erf(y)/y] for [|y| <= 15/32]. *)
+From Coq Require Import Reals Lia Lra Psatz List.
 From Coquelicot Require Import Coquelicot.
 From Interval Require Import Tactic.
 From Flocq Require Import Core.
-Require Import StageGappa Expm1Series ErfcxExpRemainder ErfcxTaylorODE
- ErfcxGaussianSeries ErfcxFactorial NormalCentered.
+Require Import StageGappa Expm1Series ErfcxConstants ErfcxExpRemainder ErfcxTaylorODE
+  ErfcxGaussianSeries ErfcxGaussianTarget ErfcxFactorial NormalCentered FastCdfConstants.
+Import ListNotations.
 Open Scope R_scope.
 
 Lemma gaussian_pointwise_weighted n x u :
@@ -58,18 +60,44 @@ Proof.
  - exact Integral.
 Qed.
 
-Theorem fast_normal_center_truncation x : Rabs x<=1 ->
- Rabs (normal_center x-normal_center_polynomial 12 x)<=3/2^53.
+(** [Phi(x) - 1/2 = int_0^(x/sqrt 2) exp(-t^2) dt / sqrt pi]. *)
+Theorem cdf_center_integral x : normal_center x=inv_sqrt_pi*RInt gaussian 0 (x/sqrt 2).
 Proof.
- intros X. unfold normal_center,normal_center_polynomial,normal_shape.
- replace (normal_density_constant*x*RInt(gaussian_scaled(x/sqrt 2))0 1-
-   normal_density_constant*x*gaussian_sum 12 (x/sqrt 2)) with
-   (normal_density_constant*x*(RInt(gaussian_scaled(x/sqrt 2))0 1-gaussian_sum 12 (x/sqrt 2))) by ring.
- rewrite !Rabs_mult,(Rabs_pos_eq normal_density_constant).
- 2: unfold normal_density_constant;left;interval with(i_prec 80).
- eapply Rle_trans.
- - apply Rmult_le_compat_l;[apply Rmult_le_pos;[unfold normal_density_constant;left;interval with(i_prec 80)|apply Rabs_pos]|apply gaussian_integral_weighted_remainder].
- - apply Rabs_le_inv in X. unfold normal_density_constant. binary_factorials.
-   repeat rewrite INR_IZR_INZ;small_numerals.
-   interval with(i_prec 100).
+  rewrite gaussian_integral_scaled. unfold normal_center,normal_shape.
+  assert (Constant : normal_density_constant=inv_sqrt_pi/sqrt 2).
+  { unfold inv_sqrt_pi,normal_density_constant.
+    rewrite sqrt_mult by (pose proof PI_RGT_0;lra).
+    field;split;interval with(i_prec 80). }
+  rewrite Constant. field. interval with(i_prec 80).
+Qed.
+
+(** The generated body polynomial against the degree-12 Taylor sum of
+    [int_0^1 exp(-(y u)^2) du]. *)
+Lemma cdf_body_taylor y : Rabs y<=15/32 ->
+  Rabs(/2*cdf_body_poly(y*y)-inv_sqrt_pi*gaussian_sum 12 y)<=/2^56.
+Proof.
+  intros Y. apply Rabs_le_inv in Y.
+  unfold cdf_body_poly,cdf_body_words,gaussian_sum,inv_sqrt_pi. cbn [cdf_horner sum_f_R0].
+  binary_factorials. repeat rewrite INR_IZR_INZ. small_numerals. cdf_values.
+  interval with (i_bisect y, i_taylor y, i_degree 26, i_prec 200).
+Qed.
+
+Theorem cdf_body_approx y : Rabs y<=15/32 ->
+  Rabs(/2*(y*cdf_body_poly(y*y))-inv_sqrt_pi*RInt gaussian 0 y)<=/2^55*Rabs y.
+Proof.
+  intros Y. pose proof (cdf_body_taylor y Y) as T.
+  pose proof (gaussian_integral_weighted_remainder 12 y) as R.
+  assert (Small : (y*y)^S 12/(INR(fact(S 12))*INR(S(2*S 12)))<=/2^60).
+  { apply Rabs_le_inv in Y. binary_factorials. repeat rewrite INR_IZR_INZ. small_numerals.
+    interval with (i_bisect y, i_prec 100). }
+  assert (I : 0<inv_sqrt_pi<=1) by (unfold inv_sqrt_pi;split;interval with (i_prec 80)).
+  rewrite gaussian_integral_scaled.
+  replace (/2*(y*cdf_body_poly(y*y))-inv_sqrt_pi*(y*RInt(gaussian_scaled y)0 1)) with
+    (y*((/2*cdf_body_poly(y*y)-inv_sqrt_pi*gaussian_sum 12 y)-
+        inv_sqrt_pi*(RInt(gaussian_scaled y)0 1-gaussian_sum 12 y))) by ring.
+  rewrite Rabs_mult,Rmult_comm. apply Rmult_le_compat_r;[apply Rabs_pos|].
+  eapply Rle_trans;[apply Rabs_triang|]. rewrite Rabs_Ropp,Rabs_mult,(Rabs_pos_eq inv_sqrt_pi) by lra.
+  assert (inv_sqrt_pi*Rabs(RInt(gaussian_scaled y)0 1-gaussian_sum 12 y)<=/2^60).
+  { eapply Rle_trans;[apply Rmult_le_compat_l;[lra|exact R]|]. nra. }
+  lra.
 Qed.
