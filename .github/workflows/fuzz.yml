@@ -34,6 +34,8 @@ jobs:
           cargo install --locked cargo-deny --version "$(cat .cargo/deny-version)"
           ./scripts/check_advisories.sh
           ./scripts/check_fuzz_licenses.sh
+      - name: Fuzz runner shell compatibility and failure propagation
+        run: python3 -m unittest scripts.test_fuzz_runner
       - name: Thirty minutes each of scalar and SIMD mutation
         run: ./scripts/check_fuzz.sh 1800
       - name: Retain failures, logs and evolved corpora

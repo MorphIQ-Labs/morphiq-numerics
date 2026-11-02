@@ -21,10 +21,12 @@ cargo fmt --manifest-path fuzz/Cargo.toml -- --check
 cargo clippy --manifest-path fuzz/Cargo.toml --all-targets --all-features --locked -- -D warnings
 cp fuzz/Cargo.lock target/fuzz/Cargo.lock.before
 for mode in scalar simd; do
-  features=()
+  # Bash 3.2 treats an empty array as unset under set -u. Keep explicit
+  # scalar flags, and prevent defaults from silently enabling SIMD.
+  features=(--no-default-features)
   fuzz_features=fuzzing
   if [[ "$mode" == simd ]]; then
-    features=(--features simd)
+    features=(--no-default-features --features simd)
     fuzz_features=fuzzing,simd
   fi
   cargo test --manifest-path fuzz/Cargo.toml --locked "${features[@]}" --lib
