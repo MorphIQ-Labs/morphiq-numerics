@@ -18,7 +18,7 @@ A **backend** is a zero-sized token type implementing the sealed trait `Simd`.
 |---|---|---|---|---|
 | `Scalar` | every target | 1 | no | always |
 | `Neon` | aarch64 | 2 | yes (`FMLA`) | the target enables `neon` (every aarch64 target with an FPU) |
-| `Sse2` | x86-64 | 2 | no | the target enables `sse2` (every hosted x86-64 target) |
+| `Sse2` | x86-64 | 2 | only where the build targets `fma` (`VFMADD`; `x86-64-v3` and later) | the target enables `sse2` (every hosted x86-64 target) |
 | `Avx2` | x86-64 | 4 | yes (`VFMADD`, the FMA extension) | AVX2 and FMA are detected |
 | `Avx512` | x86-64 | 8 | yes (`VFMADD`) | AVX-512F is detected |
 
@@ -141,7 +141,7 @@ changes. A lane operation is then the scalar operation, bit for bit.
   bit operations;
 - `mul_add(a, b, −RN(a·b))` against the exact product in integer arithmetic,
   on 20,000 operand pairs, wherever the backend has FMA;
-- `mul_add` is `None` on `Scalar` and `Sse2`.
+- `mul_add` is `None` on `Scalar`, and on `Sse2` in builds without `fma`.
 
 The `test` CI job runs them on x86-64 (SSE2, AVX2) and aarch64 (NEON) hosts,
 and the `simd (avx512, sde)` job on AVX-512F under Intel's Software
