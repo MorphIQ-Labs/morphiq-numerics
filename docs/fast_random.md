@@ -86,10 +86,10 @@ stepwise reference. The octant uses only the shared exact swaps and sign
 changes. `bm_zero_angle` additionally checks the zero-angle sine bits.
 
 The independent Sollya checks are in
-`generators/trig_normal_pair_poly.sollya`; the Gappa certificates are
-`formal/trig/normal_pair_sin.g` and `normal_pair_cos.g`. The generated
+`generators/normal_random_poly.sollya`; the Gappa certificates are
+`formal/normal/normal_pair_sin.g` and `normal_pair_cos.g`. The generated
 constants, source, derivation and proofs are bound by `formal/binding.sha256`
-and `formal/trig/binding.sha256`. The kernel audit records the assumptions
+(normal compositions use the end-to-end manifest). The kernel audit records the assumptions
 of these theorems. The extracted kernel is compared bit for bit against
 2,048 reduced input pairs in the internal cross-check corpus.
 

@@ -4,7 +4,7 @@ From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add Encodings RoundingConstant RoundingGaps.
 From Interval Require Import Tactic.
 Require Import StageGappa FastRandomConstants.
-Require trig_normal_pair_sin trig_normal_pair_cos.
+Require normal_normal_pair_sin normal_normal_pair_cos.
 Open Scope R_scope.
 Definition bm_limit : R := 884279719003555 / 1125899906842624.
 
@@ -73,7 +73,7 @@ Proof.
  unfold bm_sin_value,bm_sin_ideal;cbv zeta.
  rewrite bm_sin0_g,bm_sin1_g,bm_sin2_g,bm_sin3_g,bm_sin4_g,bm_sin5_g.
  unfold bm_limit in X.
- rewrite <-Rx;apply Rabs_le;split;gappa_goal (trig_normal_pair_sin.l1 x).
+ rewrite <-Rx;apply Rabs_le;split;gappa_goal (normal_normal_pair_sin.l1 x).
 Qed.
 Theorem bm_sin_approx x : 0<=x<=bm_limit ->
  Rabs (bm_sin_ideal x-sin x)<=127/2^51.
@@ -134,7 +134,7 @@ Proof.
  unfold bm_cos_value,bm_cos_ideal;cbv zeta.
  rewrite bm_cos0_g,bm_cos1_g,bm_cos2_g,bm_cos3_g,bm_cos4_g,bm_cos5_g.
  unfold bm_limit in X.
- rewrite <-Rx;apply Rabs_le;split;gappa_goal (trig_normal_pair_cos.l1 x).
+ rewrite <-Rx;apply Rabs_le;split;gappa_goal (normal_normal_pair_cos.l1 x).
 Qed.
 Theorem bm_cos_approx x : 0<=x<=bm_limit ->
  Rabs (bm_cos_ideal x-cos x)<=127/2^51.
