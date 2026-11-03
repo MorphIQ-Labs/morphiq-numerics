@@ -20,17 +20,22 @@ import mpmath
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import trig_constants  # noqa: E402
+import trig_reduction  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DIR = ROOT / 'formal/trig'
 T_LIT = '0.0078126'
-T_MIN = '1b-320'  # t is 0 or at least 2^-317 in magnitude (section 4)
+R_MIN_EXP = -62  # required reduced-argument floor, enforced before generation
+# Q256's 256-bit significand gives a grid of 2^(R_MIN_EXP - 255);
+# widen its nonzero floor down by three bits for the certificates (section 4).
+T_MIN = f'1b{R_MIN_EXP - 255 - 3}'
 T_SPLIT = '1b-60'  # above it nothing underflows; below it t = r_lo (section 4)
 DW_ADD = '776b-114'  # add and sub: 3u^2/(1 - 4u), widened (docs/double-word.md)
 DW_MUL = '5b-106'    # mul: 5u^2 (docs/double-word.md)
 TAIL = '1b-50'
 SIN_T = '1b-65'
 COS_T = '1b-65'
+REDUCTION_ERROR_EXP = -199  # stated Q256 reduction error (docs/sin_cos.md, section 3)
 REDUCTION_FAST = '1b-104'  # r's double-word against Q256's r, as an effect on the value
 FAST = '1b-62'
 LEVEL_U = Fraction(1, 2**255)
@@ -277,7 +282,27 @@ H - X -> -(s * ({c.numerator} / {c.denominator})) * (En + Hn * ((1 + kk) * (1 + 
     return files, e_prev
 
 
+def check_reduction_premise():
+    """Enforce the generated closest approach behind T_MIN, not a Coq proof.
+
+    Allow for the reduction's stated 2^-199 relative error when transferring
+    the exact remainder's floor to Q256's r (docs/sin_cos.md, sections 3-4).
+    Keep the required floor fixed: a weaker reduction must fail for review,
+    rather than silently widening the certificate's domain.
+    """
+    with mpmath.workprec(trig_reduction.PREC):
+        reduction = trig_reduction.derive()
+        r_min = (reduction['d_min'] * (mpmath.pi / 2)
+                 * (1 - mpmath.mpf(2) ** REDUCTION_ERROR_EXP))
+        if not mpmath.isfinite(r_min) or r_min < mpmath.mpf(2) ** R_MIN_EXP:
+            raise ValueError(
+                'trig certificate premise failed: generated closest approach '
+                f'gives |r| >= {mpmath.nstr(r_min, 12)}, but T_MIN requires '
+                f'|r| >= 2^{R_MIN_EXP}; review the reduction and tiny-t bounds')
+
+
 def generate():
+    check_reduction_premise()
     d = trig_constants.derive()
     values = d['values']
     files = {}
@@ -389,7 +414,7 @@ def accurate(d, e_sin, e_cos):
         ('cos', e_cos, Fraction(7, 10), Fraction(8726, 10000)),
     ):
         h = up(e_levels + shift + trunc)
-        dr = up(Fraction(1, 2**199) * ratio)
+        dr = up(Fraction(2) ** REDUCTION_ERROR_EXP * ratio)
         product = '(1 + m1) * ' if name == 'sin' else ''
         product_hyp = ' /\\ m1 in [-1b-255, 0]' if name == 'sin' else ''
         files[f'accurate_{name}.g'] = f'''# {name}'s accurate result (docs/sin_cos.md, section 5) relative to {name} of the
