@@ -92,7 +92,7 @@ hashes. Each operation verifies the frozen inputs. Keep the run directory
 and every pilot / sample through review; timing refuses to overwrite a run.
 
 The predeclared screen uses three banks of 4,096 pairs: seeded ordinary words,
-radial endpoints, and octant edges. All six implementations have the same
+radial endpoints, and octant edges. All eight implementations have the same
 pair-return ABI and function-pointer calls. Outputs are stored. Seven
 repetitions alternate the complete function order, with warmups and a pilot
 targeting 30 ms per sample. Report medians and the complete range; retain
@@ -137,8 +137,13 @@ and radial-edge banks; ordinary slices of lengths 1, 2, 7, 8, 9, 17 and
 4,096; radial-edge and octant-edge slices of length 4,096; Xoshiro256++ plus
 normal-pair generation; and a synthetic cached/antithetic composition using
 both normals in two updates. The public slice writes Rust tuple storage,
-with allocation outside timing. The reference loop writes the same tuple
-storage, without an assumed C/Rust tuple layout. The stream uses the same
+with allocation outside timing. Each process reuses identical input/output
+buffers for the product and reference and records their addresses. The reference loop writes the same tuple
+storage, without an assumed C/Rust tuple layout. The reference slice helpers
+inline their Rust Box–Muller statements and call the platform primitives as
+black boxes; there is no per-pair function-pointer or adapter call. Observation
+requires their scalar results to equal the C controls bit for bit. Both
+product and reference pay one function-pointer call per slice. The stream uses the same
 Xoshiro256++ implementation and seed 282 for every comparison.
 
 The dependent scalar timer feeds `previous-previous` into an input-word XOR.
@@ -179,3 +184,28 @@ objdump -d --disassemble=candidate7 \
   target/issue-282/screen-01/target/release/libnormal_pair_screen.so \
   > target/issue-282/screen-01/candidate7.asm
 ```
+
+Profile the same fixed-bank calling context separately from uninstrumented
+qualification. The profile count is a workload size, not a timing acceptance
+parameter; retain its command, host state and profiler output:
+
+```sh
+perf record -F 999 -e cycles:u --call-graph dwarf \
+  -o target/issue-282/product-profile.data -- \
+  python3 scripts/bench_fast/normal_pair/qualify.py \
+  target/issue-282/public-01 --out target/issue-282/profile-unused \
+  --cpu 2 --profile product
+perf record -F 99 -e cycles:u --call-graph dwarf \
+  -o target/issue-282/strong-profile.data -- \
+  python3 scripts/bench_fast/normal_pair/qualify.py \
+  target/issue-282/public-01 --out target/issue-282/profile-unused \
+  --cpu 2 --profile strong
+perf report --stdio --no-children -i target/issue-282/product-profile.data
+```
+
+Inspect the public `product`, `measure_slice` and C `measure_chain` symbols
+in addition to the candidate symbols. Confirm hardware square root, the
+specified FMA residual inside the logarithm, independent multiply/add in
+the angular polynomial, retained latency feedback, and the per-slice calling
+interface. Do not inspect external libm implementation source; it is a
+black-box comparator.

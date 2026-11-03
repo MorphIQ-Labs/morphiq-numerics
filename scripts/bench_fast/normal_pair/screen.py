@@ -23,7 +23,8 @@ ROOT = HERE.parents[2]
 MASK = (1 << 64) - 1
 N = 4096
 BOUND = 2.0 ** -38
-FUNCTIONS = ["candidate6", "candidate7", "product", "strong", "libm_folded", "libm_direct"]
+FUNCTIONS = ["candidate6", "candidate7", "product", "strong", "libm_folded", "libm_direct",
+             "rust_libm_folded", "rust_libm_direct"]
 
 
 def run(argv, cwd=None, env=None, log_path=None):
@@ -150,7 +151,7 @@ def load(out):
     native = ct.CDLL(str(out / "native.so"))
     functions = {}
     for name in FUNCTIONS:
-        f = getattr(product if name in ["candidate6", "candidate7", "product", "strong"] else native, name)
+        f = getattr(native if name in ["libm_folded", "libm_direct"] else product, name)
         f.argtypes = [ct.c_uint64, ct.c_uint64]
         f.restype = Pair
         functions[name] = f
@@ -181,6 +182,9 @@ def observe(out):
                 for a, b in zip(actual, expected):
                     if b == 0.0:
                         assert struct.pack(">d", a) == struct.pack(">d", b), (name, row, actual)
+            if name.startswith('rust_libm_'):
+                c = functions[name.removeprefix('rust_')](*words)
+                assert struct.pack('dd', got.x, got.y) == struct.pack('dd', c.x, c.y), (name, row)
         results[name] = dict(cases=len(cases), observed_max_absolute_error=worst[0],
                              witness=worst[1], reference="independent interval-oracle fixture",
                              candidate_target=BOUND, whole_domain_bound="unestablished")

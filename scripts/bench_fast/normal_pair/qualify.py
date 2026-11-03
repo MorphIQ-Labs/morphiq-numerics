@@ -65,8 +65,14 @@ def timers(prepared, cell):
     native.measure.restype = ct.c_uint64
     native.measure_chain.argtypes = native.measure.argtypes
     native.measure_chain.restype = ct.c_uint64
-    library.measure_slice.argtypes = [ct.POINTER(ct.c_uint64), ct.POINTER(ct.c_uint64),
-                                     ct.c_size_t, ct.c_uint64, ct.c_void_p]
+    library.output_new.argtypes = [ct.c_size_t]
+    library.output_new.restype = ct.c_void_p
+    library.output_address.argtypes = [ct.c_void_p]
+    library.output_address.restype = ct.c_size_t
+    library.output_free.argtypes = [ct.c_void_p]
+    library.output_free.restype = None
+    library.measure_slice.argtypes = [ct.POINTER(ct.c_uint64), ct.POINTER(ct.c_uint64), ct.c_void_p,
+                                     ct.c_size_t, ct.c_uint64, ct.c_uint8]
     library.measure_slice.restype = ct.c_uint64
     library.measure_stream.argtypes = [ct.c_void_p, ct.c_uint64, ct.c_bool]
     library.measure_stream.restype = ct.c_uint64
@@ -78,14 +84,33 @@ def timers(prepared, cell):
     second = (ct.c_uint64 * n)(*(int(pair[1], 16) for pair in bank))
     out = (screen.Pair * n)()
 
+    class Storage:
+        def __init__(self):
+            self.handle = library.output_new(n)
+
+        def __del__(self):
+            library.output_free(self.handle)
+
+    storage = Storage() if cell['kind'] == 'slice' else None
+
     def elapsed(name, count):
         f = functions[name]
         if cell["kind"] in ["scalar", "latency"]:
             timer = native.measure if cell["kind"] == "scalar" else native.measure_chain
             return timer(f, words, out, n, count)
         if cell["kind"] == "slice":
-            return library.measure_slice(first, second, n, count, None if name == "product" else f)
+            selector = {"product": 0, "libm_direct": 1, "libm_folded": 2}[name]
+            return library.measure_slice(first, second, storage.handle, n, count, selector)
         return library.measure_stream(f, n*count, cell["kind"] == "antithetic")
+    if storage:
+        elapsed.layout = dict(first=ct.addressof(first), second=ct.addressof(second),
+                              output=library.output_address(storage.handle), pairs=n,
+                              reuse="identical buffers for product and reference")
+    elif cell['kind'] in ['scalar', 'latency']:
+        elapsed.layout = dict(words=ct.addressof(words), output=ct.addressof(out), pairs=n,
+                              reuse="identical buffers for product and reference")
+    else:
+        elapsed.layout = dict(seed=282, words_per_pair=2, generator="Xoshiro256++")
     return elapsed
 
 
@@ -95,7 +120,8 @@ def worker(args):
     cell = next(c for c in manifest["cells"] if c["id"] == args.cell)
     measure = timers(args.prepared, cell)
     counts = manifest["counts"][args.cell]
-    result = dict(cell=cell, process=args.worker, before=host(args.cpu), warmups=[], samples=[])
+    result = dict(cell=cell, process=args.worker, before=host(args.cpu), layout=measure.layout,
+                  warmups=[], samples=[])
     for name in ["product", cell["reference"]]:
         count = max(1, counts[name] // 10)
         result["warmups"].append(dict(function=name, count=count, ns=measure(name, count)))
@@ -114,14 +140,18 @@ def worker(args):
         f.write("\n")
 
 
-def qualify(args):
-    if not (args.prepared / "observations.json").exists():
+def verify_prepared(prepared):
+    if not (prepared / "observations.json").exists():
         raise RuntimeError("Run the independent observations before qualification")
-    screen.load(args.prepared)
-    if screen.digest(Path(__file__)) != screen.digest(args.prepared / "templates/qualify.py"):
+    screen.load(prepared)
+    if screen.digest(Path(__file__)) != screen.digest(prepared / "templates/qualify.py"):
         raise RuntimeError("Qualification runner differs from the frozen preparation")
-    if screen.digest(HERE.parent / "protocol.py") != screen.digest(args.prepared / "templates/protocol.py"):
+    if screen.digest(HERE.parent / "protocol.py") != screen.digest(prepared / "templates/protocol.py"):
         raise RuntimeError("Benchmark protocol differs from the frozen preparation")
+
+
+def qualify(args):
+    verify_prepared(args.prepared)
     args.out.mkdir(parents=True, exist_ok=False)
     os.sched_setaffinity(0, {args.cpu})
     manifest = dict(cells=cells(), counts={}, before=host(args.cpu),
@@ -185,9 +215,21 @@ def main():
     parser.add_argument("--cpu", type=int, required=True)
     parser.add_argument("--cell")
     parser.add_argument("--worker", type=int)
+    parser.add_argument("--profile", choices=["product", "strong"])
+    parser.add_argument("--profile-count", type=int, default=20_000)
     args = parser.parse_args()
     args.prepared, args.out = args.prepared.resolve(), args.out.resolve()
-    if args.worker is None:
+    if args.profile:
+        if args.profile_count <= 0:
+            parser.error("--profile-count must be positive")
+        verify_prepared(args.prepared)
+        os.sched_setaffinity(0, {args.cpu})
+        cell = dict(kind="scalar", population="ordinary", n=4096, reference="libm_direct")
+        measure = timers(args.prepared, cell)
+        elapsed = measure(args.profile, args.profile_count)
+        print(json.dumps(dict(purpose="instrumented profile only", function=args.profile,
+                              ns=elapsed, pairs=4096*args.profile_count, host=host(args.cpu))))
+    elif args.worker is None:
         qualify(args)
     else:
         worker(args)

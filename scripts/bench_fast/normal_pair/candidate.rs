@@ -60,32 +60,110 @@ pub extern "C" fn product(w1: u64, w2: u64) -> Pair {
     Pair { x, y }
 }
 
+// Reason: black-box system-libm controls in the unpublished benchmark only.
+// Exit condition: none while comparing the platform math calling interface.
+#[allow(clippy::disallowed_methods)]
+#[inline(always)]
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_libm_direct(w1: u64, w2: u64) -> Pair {
+    let radius = (-2.0 * unit_open(w1).ln()).sqrt();
+    let theta = f64::from_bits(0x4019_21fb_5444_2d18)
+        * ((w2 >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000));
+    let (s, c) = theta.sin_cos();
+    Pair {
+        x: radius * c,
+        y: radius * s,
+    }
+}
+
+// Reason and exit condition: the same black-box benchmark control as above.
+#[allow(clippy::disallowed_methods)]
+#[inline(always)]
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_libm_folded(w1: u64, w2: u64) -> Pair {
+    let radius = (-2.0 * unit_open(w1).ln()).sqrt();
+    let k = w2 >> 11;
+    let octant = k >> 50;
+    let j = k & ((1 << 50) - 1);
+    let m = if octant & 1 == 0 { j } else { (1 << 50) - j };
+    let phi =
+        f64::from_bits(0x4019_21fb_5444_2d18) * (m as f64 * f64::from_bits(0x3ca0_0000_0000_0000));
+    let (s, c) = phi.sin_cos();
+    let (c, s) = if (octant + 1) & 2 != 0 {
+        (s, c)
+    } else {
+        (c, s)
+    };
+    let c = if (2..=5).contains(&octant) { -c } else { c };
+    let s = if octant >= 4 { -s } else { s };
+    Pair {
+        x: radius * c,
+        y: radius * s,
+    }
+}
+
+fn direct_slice(first: &[u64], second: &[u64], out: &mut [(f64, f64)]) {
+    for ((&a, &b), pair) in first.iter().zip(second).zip(out) {
+        let p = rust_libm_direct(a, b);
+        *pair = (p.x, p.y);
+    }
+}
+
+fn folded_slice(first: &[u64], second: &[u64], out: &mut [(f64, f64)]) {
+    for ((&a, &b), pair) in first.iter().zip(second).zip(out) {
+        let p = rust_libm_folded(a, b);
+        *pair = (p.x, p.y);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn output_new(n: usize) -> *mut std::ffi::c_void {
+    Box::into_raw(Box::new(vec![(0.0_f64, 0.0_f64); n])).cast()
+}
+
+/// # Safety
+/// `handle` must be a live allocation returned by `output_new`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn output_address(handle: *mut std::ffi::c_void) -> usize {
+    let out = unsafe { &*handle.cast::<Vec<(f64, f64)>>() };
+    out.as_ptr() as usize
+}
+
+/// # Safety
+/// `handle` must be returned by `output_new`, unused by other calls, and freed once.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn output_free(handle: *mut std::ffi::c_void) {
+    drop(unsafe { Box::from_raw(handle.cast::<Vec<(f64, f64)>>()) });
+}
+
 /// Time the public slice or the equivalent reference loop using Rust tuple
 /// storage, so the public API is measured without assuming tuple/C layout.
 ///
 /// # Safety
-/// Both pointers must address `n` initialized words for this call.
+/// Both word pointers must address `n` initialized words for this call.
+/// `handle` must be a live `output_new(n)` allocation used exclusively here.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn measure_slice(
     first: *const u64,
     second: *const u64,
+    handle: *mut std::ffi::c_void,
     n: usize,
     rounds: u64,
-    reference: Option<extern "C" fn(u64, u64) -> Pair>,
+    reference: u8,
 ) -> u64 {
     let first = unsafe { std::slice::from_raw_parts(first, n) };
     let second = unsafe { std::slice::from_raw_parts(second, n) };
-    let mut out = vec![(0.0, 0.0); n];
+    let out = unsafe { &mut *handle.cast::<Vec<(f64, f64)>>() };
+    assert_eq!(out.len(), n);
+    let f = match reference {
+        0 => morphiq_numerics::fast::random::normal_pair_slice,
+        1 => direct_slice,
+        2 => folded_slice,
+        _ => panic!("unknown slice comparator"),
+    };
     let start = std::time::Instant::now();
     for _ in 0..rounds {
-        if let Some(f) = reference {
-            for ((&a, &b), pair) in first.iter().zip(second).zip(&mut out) {
-                let p = f(a, b);
-                *pair = (p.x, p.y);
-            }
-        } else {
-            morphiq_numerics::fast::random::normal_pair_slice(first, second, &mut out);
-        }
+        f(first, second, out);
         std::hint::black_box(&out);
     }
     start.elapsed().as_nanos() as u64
