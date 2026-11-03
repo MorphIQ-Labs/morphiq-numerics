@@ -156,7 +156,9 @@ distinct from the engine's 54-contract pricing workload.
 The shared protocol calibrates on this host, retains all pilots, targets
 600 ms per sample and requires every timed duration to be at least 250 ms.
 Every cell has ten independent processes and two paired rounds per process,
-with alternating comparison order and warmups. Each process records affinity,
+with alternating comparison order and warmups. After calibrating both
+implementations, their common count is the larger calibrated count. This
+preserves the exact same seeded word prefix in stream comparisons. Each process records affinity,
 governor, frequency, load, CPU counters, SMT siblings and thermal readings
 where available. Report those conditions with the result; no CI timing is
 native performance evidence. Do not run unrelated builds/proofs while timing.

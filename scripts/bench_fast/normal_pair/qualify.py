@@ -172,6 +172,10 @@ def qualify(args):
                     log.write(json.dumps(dict(cell=cell["id"], function=name, kind=kind,
                                               count=count, ns=ns)) + "\n")
                 counts[name] = protocol.calibrate(lambda count: measure(name, count), record)
+            # The same count also gives stream cells identical word prefixes,
+            # rather than comparing different lengths of the seeded stream.
+            common = max(counts.values())
+            counts = {name: common for name in counts}
             manifest["counts"][cell["id"]] = counts
             print("Calibrated", cell["id"], flush=True)
     (args.out / "qualification-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
