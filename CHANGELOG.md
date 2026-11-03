@@ -10,6 +10,16 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.23](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.22...v0.0.23) - 2026-11-03
+
+### Fixed
+
+- *(simd)* scope helper compilation to supported backends ([#275](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/275))
+
+### Other
+
+- refresh project overview and numerical contract guidance ([#274](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/274))
+
 ## [0.0.22](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.21...v0.0.22) - 2026-11-02
 
 ### Added
