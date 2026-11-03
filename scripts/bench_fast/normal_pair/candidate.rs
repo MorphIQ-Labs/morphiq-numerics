@@ -64,8 +64,7 @@ pub extern "C" fn product(w1: u64, w2: u64) -> Pair {
 // Exit condition: none while comparing the platform math calling interface.
 #[allow(clippy::disallowed_methods)]
 #[inline(always)]
-#[unsafe(no_mangle)]
-pub extern "C" fn rust_libm_direct(w1: u64, w2: u64) -> Pair {
+fn libm_direct_pair(w1: u64, w2: u64) -> Pair {
     let radius = (-2.0 * unit_open(w1).ln()).sqrt();
     let theta = f64::from_bits(0x4019_21fb_5444_2d18)
         * ((w2 >> 11) as f64 * f64::from_bits(0x3ca0_0000_0000_0000));
@@ -79,8 +78,7 @@ pub extern "C" fn rust_libm_direct(w1: u64, w2: u64) -> Pair {
 // Reason and exit condition: the same black-box benchmark control as above.
 #[allow(clippy::disallowed_methods)]
 #[inline(always)]
-#[unsafe(no_mangle)]
-pub extern "C" fn rust_libm_folded(w1: u64, w2: u64) -> Pair {
+fn libm_folded_pair(w1: u64, w2: u64) -> Pair {
     let radius = (-2.0 * unit_open(w1).ln()).sqrt();
     let k = w2 >> 11;
     let octant = k >> 50;
@@ -102,16 +100,26 @@ pub extern "C" fn rust_libm_folded(w1: u64, w2: u64) -> Pair {
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_libm_direct(w1: u64, w2: u64) -> Pair {
+    libm_direct_pair(w1, w2)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_libm_folded(w1: u64, w2: u64) -> Pair {
+    libm_folded_pair(w1, w2)
+}
+
 fn direct_slice(first: &[u64], second: &[u64], out: &mut [(f64, f64)]) {
     for ((&a, &b), pair) in first.iter().zip(second).zip(out) {
-        let p = rust_libm_direct(a, b);
+        let p = libm_direct_pair(a, b);
         *pair = (p.x, p.y);
     }
 }
 
 fn folded_slice(first: &[u64], second: &[u64], out: &mut [(f64, f64)]) {
     for ((&a, &b), pair) in first.iter().zip(second).zip(out) {
-        let p = rust_libm_folded(a, b);
+        let p = libm_folded_pair(a, b);
         *pair = (p.x, p.y);
     }
 }
