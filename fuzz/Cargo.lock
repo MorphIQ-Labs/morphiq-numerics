@@ -93,14 +93,14 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "morphiq-numerics"
-version = "0.0.22"
+version = "0.0.23"
 dependencies = [
  "morphiq-numerics-arch",
 ]
 
 [[package]]
 name = "morphiq-numerics-arch"
-version = "0.0.22"
+version = "0.0.23"
 
 [[package]]
 name = "morphiq-numerics-fuzz"
