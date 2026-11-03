@@ -121,6 +121,22 @@ fn two_prod_reproduces_the_exact_square_of_a_split_tie() {
 }
 
 #[test]
+fn two_prod_is_exact_when_a_split_midpoint_squares_into_the_next_binade() {
+    // 3/2 + 2^-26 has 27 significant bits, but its square lies in [2, 4)
+    // and needs 54. Its low 2^-52 term must survive the rounded head product.
+    // Include adjacent binary64 inputs, signs and exponent scaling. Exact's
+    // integer multiplication supplies the oracle independently of the split.
+    for exponent in [-484_i64, 0, 509] {
+        let midpoint = (u64::try_from(exponent + 1023).unwrap() << 52) | (1 << 51) | (1 << 26);
+        for bits in [midpoint - 1, midpoint, midpoint + 1] {
+            let x = f64::from_bits(bits);
+            assert_exact_product(x, x);
+            assert_exact_product(x, -x);
+        }
+    }
+}
+
+#[test]
 fn every_check_sees_an_inexact_sum_or_product() {
     // Guards the oracle: each check above must be able to fail.
     let (a, b) = (1.0, f64::from_bits((1023 - 60) << 52));

@@ -1,0 +1,11 @@
+--- a/crates/morphiq-numerics/src/q128.rs
++++ b/crates/morphiq-numerics/src/q128.rs
+@@ -217,7 +217,7 @@
+             } else {
+                 self.m & ((1u128 << shift) - 1)
+             };
+-            rem > half || (rem == half && kept & 1 == 1)
++            rem < half || (rem == half && kept & 1 == 1)
+         };
+         if round_up {
+             kept += 1;
