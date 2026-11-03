@@ -732,6 +732,34 @@ pub fn corpus_digest() -> [u8; 32] {
         r.f64(z1);
     }
 
+    r.label("fast_normal_pair");
+    let mut pair_words = Words::new(282);
+    for w1 in [0, u64::MAX, 1 << 63] {
+        for w2 in [0, u64::MAX].into_iter().chain((1..8).map(|o| o << 61)) {
+            r.pair(morphiq_numerics::fast::random::normal_pair(w1, w2));
+        }
+    }
+    for _ in 0..10_000 {
+        r.pair(morphiq_numerics::fast::random::normal_pair(
+            pair_words.next_word(),
+            pair_words.next_word(),
+        ));
+    }
+    r.label("fast_normal_pair_slice");
+    let first = core::array::from_fn::<_, 17, _>(|_| pair_words.next_word());
+    let second = core::array::from_fn::<_, 17, _>(|_| pair_words.next_word());
+    let mut pairs = [(0.0, 0.0); 17];
+    for n in 0..=17 {
+        morphiq_numerics::fast::random::normal_pair_slice(
+            &first[..n],
+            &second[..n],
+            &mut pairs[..n],
+        );
+        for &pair in &pairs[..n] {
+            r.pair(pair);
+        }
+    }
+
     r.label("random");
     for seed in [0, 1, u64::MAX, 0x9e37_79b9_7f4a_7c15] {
         let mut splitmix = SplitMix64::new(seed);

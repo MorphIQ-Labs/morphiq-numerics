@@ -20,6 +20,7 @@ generators="generators/interval_reference.py generators/random_streams_reference
 generators="$generators generators/tridiagonal_reference.py generators/tridiagonal_sign_reference.py generators/tridiagonal_unpivoted_reference.py"
 generators="$generators generators/bivariate_normal_nodes.py generators/bivariate_normal_budget.py generators/bivariate_normal_reference.py"
 generators="$generators generators/fast_certificates.py generators/fast_exp_constants.py generators/fast_reference.py generators/fast_ln_reference.py generators/fast_log_cdf_reference.py generators/double_word_exp_reference.py generators/fast_cdf_constants.py"
+generators="$generators generators/fast_random_constants.py"
 for generator in $generators; do
   # The bivariate fixture's replay costs hours of CPU; CI replays it in shards
   # (scripts/check_bivariate_shard.sh), which together cover every row.

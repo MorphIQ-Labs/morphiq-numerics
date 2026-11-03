@@ -1002,3 +1002,14 @@ Require LnExactFma.
 Print Assumptions LnExactFma.reciprocal_dyadic_certificate.
 Print Assumptions LnExactFma.normalized_fma_identical.
 Print Assumptions LnExactFma.reduced_fma_identical.
+
+Require FastRandomAngular FastRandomBound FastRandomWords FastRandom.
+Print Assumptions FastRandomAngular.bm_sin_ok.
+Print Assumptions FastRandomAngular.bm_cos_ok.
+Print Assumptions FastRandomAngular.bm_zero_angle.
+Print Assumptions FastRandomBound.bm_output_bound.
+Print Assumptions FastRandomWords.bm_word_uniform_range.
+Print Assumptions FastRandomWords.bm_word_m_range.
+Print Assumptions FastRandomWords.bm_word_angle_range.
+Print Assumptions FastRandom.bm_radius_ok.
+Print Assumptions FastRandom.bm_pair_ok.

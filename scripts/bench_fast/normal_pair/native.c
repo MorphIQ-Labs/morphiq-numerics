@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
+#include <string.h>
 
 typedef struct { double x, y; } pair;
 typedef pair (*pair_fn)(uint64_t, uint64_t);
@@ -46,6 +47,26 @@ uint64_t measure(pair_fn f, const uint64_t *words, pair *out, size_t n, uint64_t
     uint64_t start = now_ns();
     for (uint64_t r = 0; r < rounds; r++) {
         for (size_t i = 0; i < n; i++) out[i] = f(words[2*i], words[2*i+1]);
+        __asm__ volatile("" : : "r"(out) : "memory");
+    }
+    return now_ns() - start;
+}
+
+// Finite previous outputs cancel to +0, retaining a dependency into the next
+// call without changing input bits. Strict FP compilation must retain the
+// subtraction because the opaque callee could return NaN. Observation and
+// the numerical contracts establish finite outputs for these inputs.
+uint64_t measure_chain(pair_fn f, const uint64_t *words, pair *out, size_t n, uint64_t rounds) {
+    double previous = 0;
+    uint64_t start = now_ns();
+    for (uint64_t r = 0; r < rounds; r++) {
+        for (size_t i = 0; i < n; i++) {
+            double cancelled = previous - previous;
+            uint64_t zero;
+            memcpy(&zero, &cancelled, sizeof zero);
+            out[i] = f(words[2*i] ^ zero, words[2*i+1]);
+            previous = out[i].x;
+        }
         __asm__ volatile("" : : "r"(out) : "memory");
     }
     return now_ns() - start;

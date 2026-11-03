@@ -23,7 +23,7 @@ ROOT = HERE.parents[2]
 MASK = (1 << 64) - 1
 N = 4096
 BOUND = 2.0 ** -38
-FUNCTIONS = ["candidate6", "candidate7", "strong", "libm_folded", "libm_direct"]
+FUNCTIONS = ["candidate6", "candidate7", "product", "strong", "libm_folded", "libm_direct"]
 
 
 def run(argv, cwd=None, env=None, log_path=None):
@@ -67,8 +67,9 @@ def prepare(out):
     out.mkdir(parents=True, exist_ok=False)
     templates = out / "templates"
     templates.mkdir()
-    for name in ["screen.py", "candidate.rs", "native.c", "README.md"]:
+    for name in ["screen.py", "candidate.rs", "native.c", "README.md", "qualify.py"]:
         shutil.copy2(HERE / name, templates / name)
+    shutil.copy2(HERE.parent / "protocol.py", templates / "protocol.py")
     source = out / "src"
     source.mkdir()
     mp.mp.prec = 200
@@ -149,7 +150,7 @@ def load(out):
     native = ct.CDLL(str(out / "native.so"))
     functions = {}
     for name in FUNCTIONS:
-        f = getattr(product if name in FUNCTIONS[:3] else native, name)
+        f = getattr(product if name in ["candidate6", "candidate7", "product", "strong"] else native, name)
         f.argtypes = [ct.c_uint64, ct.c_uint64]
         f.restype = Pair
         functions[name] = f
@@ -157,7 +158,7 @@ def load(out):
 
 
 def observe(out):
-    _, functions = load(out)
+    native, functions = load(out)
     fixture = json.loads((ROOT / "crates/reference/fixtures/box_muller.json").read_text())
     cases = fixture["edges"] + [row for family in ["splitmix64", "xoshiro256pp"]
                                 for stream in fixture[family].values() for row in stream]
@@ -175,7 +176,7 @@ def observe(out):
             error = max(abs(a - b) for a, b in zip(actual, expected))
             if error > worst[0]:
                 worst = error, row
-            if name.startswith("candidate"):
+            if name.startswith("candidate") or name == "product":
                 assert error <= BOUND, (name, words, actual, expected)
                 for a, b in zip(actual, expected):
                     if b == 0.0:
@@ -183,8 +184,24 @@ def observe(out):
         results[name] = dict(cases=len(cases), observed_max_absolute_error=worst[0],
                              witness=worst[1], reference="independent interval-oracle fixture",
                              candidate_target=BOUND, whole_domain_bound="unestablished")
+    native.measure_chain.argtypes = [ct.c_void_p, ct.POINTER(ct.c_uint64), ct.POINTER(Pair),
+                                    ct.c_size_t, ct.c_uint64]
+    native.measure_chain.restype = ct.c_uint64
+    checked = 0
+    for bank in banks().values():
+        n = len(bank)
+        words = (ct.c_uint64 * (2*n))(*(w for pair in bank for w in pair))
+        output = (Pair * n)()
+        for name, f in functions.items():
+            native.measure_chain(f, words, output, n, 1)
+            for (a, b), actual in zip(bank, output):
+                expected = f(a, b)
+                assert struct.pack('dd', actual.x, actual.y) == struct.pack('dd', expected.x, expected.y), name
+                checked += 1
+    results['chain_identity'] = dict(pairs=checked, all_output_bits_identical=True)
     (out / "observations.json").write_text(json.dumps(results, indent=2) + "\n")
-    print(json.dumps({name: row["observed_max_absolute_error"] for name, row in results.items()}, indent=2))
+    print(json.dumps({name: row["observed_max_absolute_error"] for name, row in results.items()
+                      if "observed_max_absolute_error" in row}, indent=2))
 
 
 def measure(out, cpu, seconds, repetitions):

@@ -106,6 +106,11 @@ let compute op args =
       (match args with
        | [x; fallback] -> show_bits (x_fast_exp_coarse (z_of_u64 (hex x)) (z_of_u64 (hex fallback)))
        | _ -> failwith "fast_exp_coarse takes input and strong fallback result")
+  | "fast_random" ->
+      (match args with
+       | [u; phi] -> String.concat " " (List.map show_bits
+           (x_fast_random (z_of_u64 (hex u)) (z_of_u64 (hex phi))))
+       | _ -> failwith "fast_random takes a unit uniform and folded angle")
   | "fast_ln" ->
       (match args with
        | [x] -> show_bits (x_fast_ln (z_of_u64 (hex x)))

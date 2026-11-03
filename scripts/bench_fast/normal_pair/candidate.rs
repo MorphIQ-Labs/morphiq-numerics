@@ -55,6 +55,69 @@ pub extern "C" fn candidate7(w1: u64, w2: u64) -> Pair {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn product(w1: u64, w2: u64) -> Pair {
+    let (x, y) = morphiq_numerics::fast::random::normal_pair(w1, w2);
+    Pair { x, y }
+}
+
+/// Time the public slice or the equivalent reference loop using Rust tuple
+/// storage, so the public API is measured without assuming tuple/C layout.
+///
+/// # Safety
+/// Both pointers must address `n` initialized words for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn measure_slice(
+    first: *const u64,
+    second: *const u64,
+    n: usize,
+    rounds: u64,
+    reference: Option<extern "C" fn(u64, u64) -> Pair>,
+) -> u64 {
+    let first = unsafe { std::slice::from_raw_parts(first, n) };
+    let second = unsafe { std::slice::from_raw_parts(second, n) };
+    let mut out = vec![(0.0, 0.0); n];
+    let start = std::time::Instant::now();
+    for _ in 0..rounds {
+        if let Some(f) = reference {
+            for ((&a, &b), pair) in first.iter().zip(second).zip(&mut out) {
+                let p = f(a, b);
+                *pair = (p.x, p.y);
+            }
+        } else {
+            morphiq_numerics::fast::random::normal_pair_slice(first, second, &mut out);
+        }
+        std::hint::black_box(&out);
+    }
+    start.elapsed().as_nanos() as u64
+}
+
+/// Xoshiro256++ plus a normal pair; optionally consume the cached normals
+/// in two antithetic updates. The same generator and seed serve each control.
+#[unsafe(no_mangle)]
+pub extern "C" fn measure_stream(
+    f: extern "C" fn(u64, u64) -> Pair,
+    count: u64,
+    antithetic: bool,
+) -> u64 {
+    let mut rng = morphiq_numerics::random::Xoshiro256PlusPlus::new(282);
+    let (mut plus, mut minus) = (0.0, 0.0);
+    let start = std::time::Instant::now();
+    for _ in 0..count {
+        let pair = f(rng.next_u64(), rng.next_u64());
+        if antithetic {
+            for z in [pair.x, pair.y] {
+                plus += z;
+                minus -= z;
+            }
+        } else {
+            std::hint::black_box((pair.x, pair.y));
+        }
+    }
+    std::hint::black_box((plus, minus));
+    start.elapsed().as_nanos() as u64
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn strong(w1: u64, w2: u64) -> Pair {
     let (x, y) = morphiq_numerics::random::normal_pair(w1, w2);
     Pair { x, y }

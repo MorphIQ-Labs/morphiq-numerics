@@ -12,6 +12,19 @@ SPEC.loader.exec_module(screen)
 
 
 class ScreenTests(unittest.TestCase):
+    def test_qualification_covers_the_declared_interfaces_and_short_slices(self):
+        spec = importlib.util.spec_from_file_location("normal_pair_qualify", Path(__file__).with_name("qualify.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        cells = module.cells()
+        self.assertEqual(len(cells), 32)
+        self.assertEqual(len({cell['id'] for cell in cells}), 32)
+        for reference in ['libm_direct', 'libm_folded']:
+            selected = [cell for cell in cells if cell['reference'] == reference]
+            self.assertEqual({c['kind'] for c in selected}, {'scalar', 'latency', 'slice', 'stream', 'antithetic'})
+            self.assertEqual({c['n'] for c in selected if c['kind'] == 'slice' and c['population'] == 'ordinary'},
+                             {1, 2, 7, 8, 9, 17, 4096})
+
     def test_word_stream_replays_known_splitmix_outputs(self):
         stream = screen.splitmix(0)
         self.assertEqual([next(stream) for _ in range(3)], [

@@ -191,11 +191,25 @@ const TAU: f64 = f64::from_bits(0x4019_21fb_5444_2d18);
 /// `m = 2^50 − j` in an odd one, measured back from the octant's end. The
 /// octant then swaps and negates `cos φ` and `sin φ`, exactly.
 fn turn(k: u64) -> (f64, f64) {
+    let (octant, phi) = folded_angle(k);
+    let (s, c) = crate::trig::sincos(phi);
+    orient(octant, s, c)
+}
+
+/// Exact integer octant fold, shared by the strong and bounded pairs.
+#[inline]
+pub(crate) fn folded_angle(k: u64) -> (u64, f64) {
     let octant = k >> 50;
     let j = k & ((1 << 50) - 1);
     let m = if octant & 1 == 0 { j } else { (1 << 50) - j };
     #[allow(clippy::cast_precision_loss)] // m <= 2^50
-    let (s, c) = crate::trig::sincos(TAU * (m as f64 * f64::from_bits((1023 - 53) << 52)));
+    let phi = TAU * (m as f64 * f64::from_bits((1023 - 53) << 52));
+    (octant, phi)
+}
+
+/// Exact swaps and sign changes for one octant, returning cosine then sine.
+#[inline]
+pub(crate) fn orient(octant: u64, s: f64, c: f64) -> (f64, f64) {
     // Octants 1, 2, 5 and 6 swap; 2 to 5 negate the cosine; 4 to 7 the sine.
     let (cos, sin) = if (octant + 1) & 2 != 0 {
         (s, c)
