@@ -120,7 +120,15 @@ by `k mod 4`, with `sin`'s sign from `x`.
      `[0, 3]` times its value, and the bounds still hold (*certified*:
      `sin_t_tiny.g`, `cos_t_tiny.g`).
    - `t` is 0 or at least `2^−317` in magnitude, since it's a difference on
-     `Q256`'s grid.
+     `Q256`'s grid. Before emitting or checking certificates,
+     `generators/trig_certificates.py` consumes `trig_reduction.derive()` and
+     requires `d_min·(π/2)·(1 − 2^−199) ≥ 2^−62`, allowing for §3's stated
+     reduction error. That floor gives the 256-bit grid spacing
+     `2^(−62−255) = 2^−317`; the certificate's `T_MIN` is derived from it,
+     widened down by three bits to `2^−320`. A smaller closest approach fails
+     generation even if the reduction generator adapts its window. This is a
+     high-precision generator consistency check, not a Coq proof of the
+     closest approach or the reduction bound.
 4. `sin(a + t) = S + (S·(cos t − 1) + C·sin t)` and
    `cos(a + t) = C + (C·(cos t − 1) − S·sin t)`:
    - `S` and `C` are the table's double-words (*generated*, within `2^−107.1`).

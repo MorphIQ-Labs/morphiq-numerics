@@ -10,6 +10,9 @@ binary64. Inputs: uniform and log-spaced arguments over the domain
 sample of multiples of ln(2)/1024; the domain limits; the tiny-argument switch
 at 2^-60; and random trailing words below half an ulp of the leading word.
 
+Log-spaced input magnitudes use the shared interval oracle to round 10^e
+once to binary64; no platform pow() enters the input stream.
+
 mpmath 1.4.1 (generators/requirements.txt), seeded, deterministic.
 Usage: double_word_exp_reference.py [--check]
 """
@@ -20,6 +23,8 @@ import struct
 import sys
 
 import mpmath as mp
+
+from oracle import correctly_rounded
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'crates/reference/fixtures/double_word_exp.json'
@@ -53,13 +58,22 @@ def words(v):
     return out
 
 
+def log_spaced_magnitude(exponent):
+    """RN(10^exponent), using the exact binary64 exponent and interval oracle.
+
+    Python's float ** calls platform pow(), so it must not choose fixture bits.
+    The oracle requires agreement at two consecutive enclosure precisions.
+    """
+    return correctly_rounded(lambda e: mp.iv.mpf(10) ** e, exponent)
+
+
 def cases():
     rng = random.Random(266)
     xs = []
     for _ in range(6000):
         xs.append(rng.uniform(-1454.999, 1454.999))
     for _ in range(4000):
-        mag = 10 ** rng.uniform(-18, 3.16)
+        mag = log_spaced_magnitude(rng.uniform(-18, 3.16))
         xs.append(mag if rng.random() < 0.5 else -mag)
     with mp.workprec(PREC):
         step = mp.log(2) / 1024
