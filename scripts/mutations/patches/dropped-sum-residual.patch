@@ -1,0 +1,11 @@
+--- a/crates/morphiq-numerics/src/eft.rs
++++ b/crates/morphiq-numerics/src/eft.rs
+@@ -22,7 +22,7 @@
+     let b_prime = s - a_prime;
+     let delta_a = a - a_prime;
+     let delta_b = b - b_prime;
+-    (s, delta_a + delta_b)
++    (s, 0.0)
+ }
+
+ /// `(s, t)` with `s = RN(a + b)` and `s + t = a + b` exactly, provided

@@ -43,7 +43,13 @@ cargo install --locked cargo-audit --version "$(cat .cargo/audit-version)"
 ./scripts/check_advisories.sh
 cargo install --locked cargo-deny --version "$(cat .cargo/deny-version)"
 cargo deny --locked check licenses
+cargo install --locked cargo-mutants --version "$(cat .cargo/mutants-version)"
+python3 -m unittest scripts.test_numerical_mutations
+python3 scripts/check_numerical_mutations.py target/numerical-mutations
 ```
+
+The [numerical mutation gate](scripts/mutations/README.md) runs on macOS and
+Linux. Use a fresh output directory for each run so earlier receipts survive.
 
 ## Pull requests
 

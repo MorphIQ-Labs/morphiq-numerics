@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "mutations": [
+    {
+      "id": "dropped-sum-residual",
+      "category": "dropped-error-term",
+      "source": "crates/morphiq-numerics/src/eft.rs",
+      "patch": "patches/dropped-sum-residual.patch",
+      "derivation": "docs/double-word.md",
+      "reason": "Discard the exact 2Sum residual; s+t must still equal the exact dyadic a+b.",
+      "package": "morphiq-numerics-reference",
+      "target": "eft",
+      "test": "two_sum_is_exact_for_operands_of_any_relative_size",
+      "failure_contains": "assertion `left == right` failed:"
+    },
+    {
+      "id": "reversed-rounding-direction",
+      "category": "wrong-rounding-direction",
+      "source": "crates/morphiq-numerics/src/q128.rs",
+      "patch": "patches/reversed-rounding-direction.patch",
+      "derivation": "docs/exp.md",
+      "reason": "Reverse the remainder comparison in Q128 nearest-even conversion, retaining its tie rule.",
+      "package": "morphiq-numerics",
+      "target": "lib",
+      "test": "q128::tests::to_f64_rounds_to_nearest_even",
+      "failure_contains": "a neighbour is nearer"
+    },
+    {
+      "id": "exponent-bias-minus-one",
+      "category": "off-by-one-exponent",
+      "source": "crates/morphiq-numerics/src/exp/mod.rs",
+      "patch": "patches/exponent-bias-minus-one.patch",
+      "derivation": "docs/exp.md",
+      "reason": "Subtract one from the exponent bias in fallback reconstruction; scaling must retain MPFR fixture bits.",
+      "package": "morphiq-numerics-reference",
+      "target": "exp",
+      "test": "exp_is_correctly_rounded_on_every_reference_case",
+      "failure_contains": "cases wrong:"
+    },
+    {
+      "id": "discarded-addition-carry",
+      "category": "missed-carry",
+      "source": "crates/morphiq-numerics/src/q128.rs",
+      "patch": "patches/discarded-addition-carry.patch",
+      "derivation": "docs/exp.md",
+      "reason": "Drop the 129th significand bit during addition; the Q128 oracle requires normalization and the exact-integer addition bound.",
+      "package": "morphiq-numerics",
+      "target": "lib",
+      "test": "q128::tests::add_is_within_its_bound",
+      "failure_contains": "is not normalized"
+    },
+    {
+      "id": "splitter-minus-one",
+      "category": "equivalent-control",
+      "source": "crates/morphiq-numerics/src/eft.rs",
+      "patch": "patches/splitter-minus-one.patch",
+      "derivation": "scripts/mutations/README.md#splitter-control",
+      "reason": "Retained candidate, not a numerical fault: the power-of-two splitter also gives the 26-bit head; see the equivalence argument.",
+      "package": "morphiq-numerics-reference",
+      "target": "eft",
+      "test": "two_prod_is_exact_across_its_domain",
+      "expectation": "equivalent-control"
+    },
+    {
+      "id": "split-precision-minus-one",
+      "category": "perturbed-constant",
+      "source": "crates/morphiq-numerics/src/eft.rs",
+      "patch": "patches/split-precision-minus-one.patch",
+      "derivation": "docs/double-word.md",
+      "reason": "Use 2^26+1 instead of 2^27+1: a 27-bit head can have a 54-bit product, violating exact product reconstruction.",
+      "package": "morphiq-numerics-reference",
+      "target": "eft",
+      "test": "two_prod_is_exact_when_a_split_midpoint_squares_into_the_next_binade",
+      "failure_contains": "assertion `left == right` failed:"
+    },
+    {
+      "id": "subtracted-rounding-uncertainty",
+      "category": "unsound-rounding-decision",
+      "source": "crates/morphiq-numerics/src/ln/mod.rs",
+      "patch": "patches/subtracted-rounding-uncertainty.patch",
+      "derivation": "docs/ln.md",
+      "reason": "Subtract the certified uncertainty instead of adding it; the Ziv test must reject intervals crossing a midpoint.",
+      "package": "morphiq-numerics",
+      "target": "lib",
+      "test": "ln::tests::the_rounding_test_decides_at_its_boundary",
+      "failure_contains": "assertion `left == right` failed:"
+    }
+  ]
+}
