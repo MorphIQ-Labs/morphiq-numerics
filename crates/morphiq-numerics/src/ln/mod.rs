@@ -1,4 +1,5 @@
-//! `ln` and `ln_1p`: natural logarithms rounded to nearest, ties to even.
+//! Natural logarithms: `ln` is correctly rounded; `ln_1p` is correctly rounded
+//! wherever its rounding tests decide, and within a proved bound otherwise.
 //!
 //! The derivation, every bound and the certificates are in
 //! [`docs/ln.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/ln.md);

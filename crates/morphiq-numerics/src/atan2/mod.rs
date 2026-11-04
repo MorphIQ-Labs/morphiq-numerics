@@ -1,4 +1,5 @@
-//! `atan2`: the angle of `(x, y)` rounded to nearest, ties to even.
+//! `atan2`: the angle of `(x, y)`, correctly rounded on established paths
+//! and within a proved bound elsewhere.
 //!
 //! The derivation and every bound are in
 //! [`docs/atan2.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/atan2.md);
@@ -45,7 +46,9 @@ pub(crate) enum Form {
 }
 
 /// `atan2(y, x)`, the angle of the point `(x, y)` in `[−π, π]` to the positive
-/// `x` axis: the binary64 number nearest to it, ties to even (§1, §6).
+/// `x` axis: correctly rounded on the tiny path, wherever the rounding test
+/// decides, and on the published worst-case list. Otherwise the result is
+/// within `(1/2 + 2^−137)` ulp of the exact angle (§1, §6).
 ///
 /// `atan2(±0, +0) = ±0`, `atan2(±0, −0) = ±π`; a NaN in either argument gives
 /// NaN.

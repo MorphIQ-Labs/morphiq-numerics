@@ -147,6 +147,8 @@ jobs:
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo fmt --all -- --check
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - run: cargo fmt --manifest-path fuzz/Cargo.toml -- --check
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: Prose-only change
         if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
         run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
@@ -214,6 +216,8 @@ jobs:
       - run: cargo install --locked cargo-deny --version "$(cat .cargo/deny-version)"
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - run: cargo deny --locked check licenses
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
+      - run: ./scripts/check_fuzz_licenses.sh
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: Prose-only change
         if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
@@ -322,6 +326,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: test-${{ matrix.os }}
+          workspaces: |
+            .
+            fuzz
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (runner.arch != 'ARM64') }}
         run: cargo test --locked --workspace --all-features
@@ -341,6 +348,25 @@ jobs:
           path: |
             target/numerical-mutations/*.json
             target/numerical-mutations/logs/
+      - name: Install pinned MPFR fuzz tools
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
+        run: ./scripts/install_fuzz.sh
+      - name: Fuzz runner shell compatibility and failure propagation
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
+        run: python3 -m unittest scripts.test_fuzz_runner
+      - name: MPFR elementary oracle, regression replay and short campaigns
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
+        run: ./scripts/check_fuzz.sh 60
+      - name: Retain fuzz failures, logs and evolved corpora
+        if: ${{ always() && needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: elementary-fuzz-${{ matrix.os }}
+          path: |
+            target/fuzz/logs/
+            target/fuzz/artifacts/
+            target/fuzz/corpus-*/
+          retention-days: 14
       - name: Unpivoted admission and pivot-policy mutation controls
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (runner.os == 'Linux') }}
         run: python3 scripts/check_tridiagonal_unpivoted_mutations.py target/unpivoted-mutations
@@ -619,10 +645,13 @@ jobs:
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
         id: proofs
         run: |
+          formal_args=()
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            formal_args=(--changed target/changed-files.txt --base-audit target/KernelAudit.base.v)
+          fi
           docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
             ./scripts/check_formal.sh --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
-            $(if [ "${{ github.event_name }}" = pull_request ]; then echo "--changed target/changed-files.txt --base-audit target/KernelAudit.base.v"; fi) \
-            target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
+            "${formal_args[@]}" target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
       - name: Prose-only change
         if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
         run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
