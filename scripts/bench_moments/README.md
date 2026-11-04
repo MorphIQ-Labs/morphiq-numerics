@@ -16,8 +16,10 @@ binary/source hashes with every attempt. Timing output belongs under ignored
   radius can differ. This is an alternative algorithm, not an oracle.
 - `ordinary_welford`: binary64 Welford without a certificate; diagnostic only.
 - `corrected_two_pass`: `sum2`, a retained centered buffer, `sum_squares2`, and
-  the residual correction; no returned certificate. Allocation and two passes
-  are included. This represents the storage tradeoff, not equivalent guarantees.
+  the residual correction; no returned certificate. Timing includes allocation
+  and four physical traversals: the original mean sum, centering into a buffer,
+  the residual sum, and the squared-deviation sum. This represents the storage
+  tradeoff, not equivalent guarantees.
 
 Exact inputs use a fixed integer xorshift seed, with lengths 3, 65, and 4096:
 ordinary nonnegative observations, large means/small spreads, a first-observation
