@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.24](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.23...v0.0.24) - 2026-11-04
+
+### Other
+
+- *(fuzz)* check elementary contracts against MPFR ([#278](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/278))
+
 ## [0.0.23](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.22...v0.0.23) - 2026-11-03
 
 ### Fixed
