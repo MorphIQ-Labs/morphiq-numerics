@@ -1,7 +1,7 @@
 //! Sums, dot products and sums of squares over slices, in a specified order,
 //! with compensated variants.
 //!
-//! Every function evaluates its terms left to right in one fixed order, so
+//! The slice functions evaluate their terms left to right in one fixed order, so
 //! the result is the same on every target. The compensated variants are
 //! Ogita, Rump and Oishi's Sum2 and Dot2 ("Accurate sum and dot product",
 //! *SIAM J. Sci. Comput.* 26(6), 2005), operation for operation; their results
@@ -11,8 +11,15 @@
 //!
 //! Here `u = 2^-53`, `γ_k = k·u / (1 − k·u)`, `s` is the exact sum or dot
 //! product, and `S` is the sum of the magnitudes of its terms.
+//!
+//! [`Moments2`] additionally provides checked, mergeable mean and variance
+//! statistics with an explicit absolute error bound per readout. Its batch
+//! partition and merge order are part of its separate numerical contract.
 
 use crate::eft::{two_prod, two_sum};
+
+mod moments;
+pub use moments::{MomentEstimate, Moments2, MomentsError};
 
 /// `x[0] + x[1] + … + x[n-1]`, rounded at each step, left to right:
 /// `π_n` of Ogita, Rump and Oishi's Algorithm 4.1. Zero for an empty slice.

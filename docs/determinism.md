@@ -54,6 +54,8 @@ functions unnoticed.
 
 | `fast::exp`, `fast::erfcx`, `fast::norm_cdf`, `fast::ln`, `fast::log_norm_cdf`, `fast::exp_coarse` and matching slices | signed special values, subnormals, screen boundaries and neighbors; 512 mixed scalar inputs per function; eight slices of each length 0–17, 31–33, 51–53 and 63–65 | every scalar and batched output; separate seed preserves all earlier corpus sections |
 
+| `reduce::Moments2` | lengths 0–65, four partitions, mixed signs/exponents, high means with small spreads, signed zeros, nonfinite/arithmetic/count refusals | exact count, update/merge status, mean/variance/standard-error values and absolute error bounds |
+
 ## Where it is checked
 
 The test `every_output_matches_the_committed_digest` runs:
