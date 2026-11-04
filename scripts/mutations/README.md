@@ -14,7 +14,10 @@ nonignored untracked files into a temporary source tree, applies one patch at a
 time there, and removes that tree on exit. The checkout is never mutated.
 
 The required Ubuntu x86-64 and macOS ARM test jobs run the same command, in
-both scalar and `simd,std` configurations. This checks numerical behavior,
+both scalar and `simd,std` configurations, using an output directory in
+`runner.temp` named for the workflow run and attempt. Receipts and builds stay
+outside the restored Cargo cache, and artifact uploads select that attempt's
+receipts and logs. This checks numerical behavior,
 not native performance. A successful receipt has twelve numerical rejections
 (six faults in two configurations) and two equivalent-control passes, each
 preceded by a passing baseline. It does not claim a whole-crate mutation score.

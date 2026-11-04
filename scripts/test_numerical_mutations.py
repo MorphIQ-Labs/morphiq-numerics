@@ -1,7 +1,9 @@
 """Negative controls for mutation receipts and inventory floors."""
 import unittest
+from pathlib import Path
+import tempfile
 
-from scripts.check_numerical_mutations import REQUIRED_FAULTS, catalog_entries, check_inventory, qualifies
+from scripts.check_numerical_mutations import REQUIRED_FAULTS, catalog_entries, check_inventory, qualifies, run
 
 
 class CatalogTests(unittest.TestCase):
@@ -29,6 +31,17 @@ class CatalogTests(unittest.TestCase):
 
 
 class ReceiptTests(unittest.TestCase):
+    def test_existing_receipts_and_cached_builds_are_preserved(self):
+        for name in ("receipt.json", "build/cached-output"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory)
+                previous = output / name
+                previous.parent.mkdir(parents=True, exist_ok=True)
+                previous.write_bytes(b"previous attempt")
+                with self.assertRaisesRegex(ValueError, "choose a fresh output directory"):
+                    run(output)
+                self.assertEqual(previous.read_bytes(), b"previous attempt")
+
     entry = {"test": "kernel::rounding_is_correct", "failure_contains": "a neighbour is nearer"}
     failure = """running 1 test
 test kernel::rounding_is_correct ... FAILED
