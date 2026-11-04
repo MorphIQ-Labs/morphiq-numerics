@@ -160,6 +160,8 @@ fn public_normal_slices_match_independent_witnesses() {
 }
 
 #[test]
+// catch_unwind cannot observe rejection on targets whose panic strategy aborts.
+#[cfg(panic = "unwind")]
 fn public_normal_slices_reject_mismatched_lengths() {
     use crate::normal::*;
     type SliceFunction = fn(&[f64], &mut [f64]);

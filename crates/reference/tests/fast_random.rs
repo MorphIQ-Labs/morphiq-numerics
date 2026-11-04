@@ -56,6 +56,8 @@ fn slice_lengths_and_remainders_preserve_every_scalar_bit() {
 }
 
 #[test]
+// Inspecting output after a panic requires unwinding; aborting targets trap.
+#[cfg(panic = "unwind")]
 fn mismatched_lengths_preserve_all_output_before_panicking() {
     for (first, second, count) in [(1, 2, 1), (2, 1, 2), (2, 2, 1), (0, 0, 1)] {
         let mut out = vec![(12.5, -3.25); count];
