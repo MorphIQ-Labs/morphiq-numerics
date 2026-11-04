@@ -89,4 +89,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
         run: |
           release-plz release-pr --config release-plz.toml --forge github --git-token "$GITHUB_TOKEN" \
-            --repo-url "https://github.com/${GITHUB_REPOSITORY}"
+            --repo-url "https://github.com/${GITHUB_REPOSITORY}" -o json > "$RUNNER_TEMP/release-pr.json"
+
+      # The fuzz harness is a separate workspace, so release-plz does not
+      # refresh its lockfile when it bumps the path dependencies' versions.
+      - name: Synchronize the release pull request's fuzz lockfile
+        run: ./scripts/sync_release_fuzz_lock.sh "$RUNNER_TEMP/release-pr.json"
