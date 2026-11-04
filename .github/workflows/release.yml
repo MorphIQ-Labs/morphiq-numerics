@@ -89,4 +89,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
         run: |
           release-plz release-pr --config release-plz.toml --forge github --git-token "$GITHUB_TOKEN" \
-            --repo-url "https://github.com/${GITHUB_REPOSITORY}"
+            --repo-url "https://github.com/${GITHUB_REPOSITORY}" -o json > "$RUNNER_TEMP/release-pr.json"
+          python3 scripts/refresh_release_fuzz_lock.py "$RUNNER_TEMP/release-pr.json"

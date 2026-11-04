@@ -86,9 +86,11 @@ version or edit a released changelog section by hand. A tag always equals
 the workspace version at its commit; `scripts/check_release_version.sh`
 enforces it.
 
-The independent `fuzz/` workspace has its own lockfile. The release-plz workflow
-updates the root workspace only, so refresh the fuzz lockfile on the release
-branch after each version bump:
+The independent `fuzz/` workspace has its own lockfile. After release-plz updates
+the root workspace, the release workflow refreshes the fuzz lockfile on the
+returned release branch and commits it if needed. It accepts only the two local
+library version changes and uses a normal push, so concurrent branch updates
+are rejected rather than overwritten. To reproduce the refresh manually:
 
 ```sh
 cargo update --manifest-path fuzz/Cargo.toml --workspace
