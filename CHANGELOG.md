@@ -10,6 +10,13 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.25](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.24...v0.0.25) - 2026-11-04
+
+### Added
+
+- *(fast)* add bounded normal pairs for Monte Carlo ([#283](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/283))
+- *(reduce)* add checked mergeable moment estimates ([#286](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/286))
+
 ## [0.0.24](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.23...v0.0.24) - 2026-11-04
 
 ### Other
