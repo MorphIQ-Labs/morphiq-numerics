@@ -40,6 +40,7 @@
 //!   unit uniforms and Box–Muller normal pairs;
 //! - [`reduce`]: sums, dot products and sums of squares in a specified order,
 //!   with compensated variants as accurate as twice the working precision;
+//!   checked mergeable moments with absolute arithmetic error certificates;
 //! - [`interval`]: finite conservative outward enclosures with typed domain and
 //!   range failures; these are not tight directed-rounding operations;
 //! - [`linalg::tridiagonal`]: reusable allocation-free Thomas factors for

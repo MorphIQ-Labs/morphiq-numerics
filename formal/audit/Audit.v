@@ -79,6 +79,24 @@ Print Assumptions FiniteInterval.exp_enclosure.
 Print Assumptions FiniteInterval.sqrt_enclosure.
 Print Assumptions FiniteInterval.ln_enclosure.
 
+From Binary64 Require Moments.
+Print Assumptions Moments.relative_error_from_result.
+Print Assumptions Moments.add_radius.
+Print Assumptions Moments.mul_radius.
+Print Assumptions Moments.div_radius.
+Print Assumptions Moments.local_error_composition.
+Print Assumptions Moments.project_nonnegative.
+Print Assumptions Moments.translated_centered_sum.
+Print Assumptions Moments.chan_combination.
+Print Assumptions Moments.centered_sum_append.
+Print Assumptions Moments.centered_squares_append.
+Print Assumptions Moments.centered_sum_shift.
+Print Assumptions Moments.centered_squares_shift.
+Print Assumptions Moments.anchored_mean.
+Print Assumptions Moments.centered_second_moment.
+Print Assumptions Moments.centered_squares_nonnegative.
+Print Assumptions Moments.second_moment_nonnegative.
+
 From Binary64 Require Tridiagonal.
 Print Assumptions Tridiagonal.margin_step.
 Print Assumptions Tridiagonal.dominant_row.

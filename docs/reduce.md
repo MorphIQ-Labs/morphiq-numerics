@@ -12,6 +12,11 @@
 | `sum_squares2(x)` | `Σ x_i²`, compensated | `dot2(x, x)` |
 | `max_abs(x)` | `max \|x_i\|` | left to right; exact |
 
+The module also provides [`Moments2`](moments.md), an allocation-free, mergeable
+accumulator with checked mean, unbiased variance, and standard-error readouts.
+Each readout carries an absolute arithmetic error bound. Its batching and
+merge-order contract is separate from the slice reductions below.
+
 **The order is part of the contract.** Every function evaluates its terms in one
 fixed order, so its result is the same on every target. A vectorized or parallel
 evaluation is allowed only where it reproduces these bits; none exists yet.

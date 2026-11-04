@@ -33,7 +33,10 @@ use morphiq_numerics::normal::{
 use morphiq_numerics::random::{
     SplitMix64, Xoshiro256PlusPlus, normal_pair, unit_closed_open, unit_open,
 };
-use morphiq_numerics::reduce::{dot, dot2, max_abs, sum, sum_squares, sum_squares2, sum2};
+use morphiq_numerics::reduce::{
+    MomentEstimate, Moments2, MomentsError, dot, dot2, max_abs, sum, sum_squares, sum_squares2,
+    sum2,
+};
 use morphiq_numerics::ulp::{ordered_bits, ulp, ulps_between};
 use sha2::{Digest, Sha256};
 
@@ -1131,6 +1134,7 @@ pub fn corpus_digest() -> [u8; 32] {
     bivariate_normal_section(&mut r);
     fast_section(&mut r);
     double_word_exp_section(&mut r);
+    moments_section(&mut r);
 
     r.0.finalize().into()
 }
@@ -2050,4 +2054,94 @@ fn double_word_exp_case(r: &mut Recorder, words: &mut Words, hi: f64) {
         }
         None => r.u64(u64::MAX - 1),
     }
+}
+
+// A separate seed leaves every pre-existing corpus section unchanged.
+fn moments_section(r: &mut Recorder) {
+    r.label("reduce::Moments2");
+    let mut words = Words::new(0x285_0000_0000_0001);
+    let mut samples = [0.0; 65];
+    for case in 0..48 {
+        for x in &mut samples {
+            *x = match case % 4 {
+                0 => normal_in(&mut words, -100, 100),
+                1 => 1e16 + 2.0 * (words.next_word() % 17) as f64,
+                2 => -0.0,
+                _ => (words.next_word() % 7) as f64 - 3.0,
+            };
+        }
+        for len in [0, 1, 2, 3, 7, 31, 32, 33, 64, 65] {
+            for chunk in [1, 7, 32, 65] {
+                let mut total = Moments2::new();
+                for xs in samples[..len].chunks(chunk) {
+                    let mut batch = Moments2::new();
+                    for &x in xs {
+                        moments_status(r, batch.push(x));
+                    }
+                    moments_status(r, total.merge(&batch));
+                }
+                moments_readouts(r, &total);
+            }
+        }
+    }
+    let mut limits = Moments2::new();
+    moments_status(r, limits.push(7.0));
+    for _ in 0..53 {
+        let copy = limits;
+        moments_status(r, limits.merge(&copy));
+    }
+    moments_readouts(r, &limits);
+    moments_status(r, limits.push(7.0));
+    let copy = limits;
+    moments_status(r, limits.merge(&copy));
+    moments_readouts(r, &limits);
+    for x in [
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::MAX,
+        f64::from_bits(1),
+    ] {
+        let mut total = Moments2::new();
+        moments_status(r, total.push(0.0));
+        moments_status(r, total.push(x));
+        moments_readouts(r, &total);
+        let mut other = Moments2::new();
+        moments_status(r, other.push(x));
+        moments_status(r, total.merge(&other));
+        moments_readouts(r, &total);
+    }
+}
+
+fn moments_status(r: &mut Recorder, result: Result<(), MomentsError>) {
+    match result {
+        Ok(()) => r.u64(0),
+        Err(MomentsError::NonFiniteSample) => r.u64(1),
+        Err(MomentsError::CountOverflow) => r.u64(2),
+        Err(MomentsError::Empty) => r.u64(3),
+        Err(MomentsError::InsufficientSamples) => r.u64(4),
+        Err(MomentsError::Range) => r.u64(5),
+        Err(MomentsError::Arithmetic(error)) => {
+            r.u64(6);
+            r.checked(Err(error));
+        }
+    }
+}
+
+fn moments_estimate(r: &mut Recorder, result: Result<MomentEstimate, MomentsError>) {
+    match result {
+        Ok(estimate) => {
+            moments_status(r, Ok(()));
+            r.f64(estimate.value());
+            r.f64(estimate.absolute_error());
+        }
+        Err(error) => moments_status(r, Err(error)),
+    }
+}
+
+fn moments_readouts(r: &mut Recorder, moments: &Moments2) {
+    r.u64(moments.count());
+    moments_estimate(r, moments.mean());
+    moments_estimate(r, moments.variance());
+    moments_estimate(r, moments.standard_error());
 }
