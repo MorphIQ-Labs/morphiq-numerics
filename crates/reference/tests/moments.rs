@@ -179,6 +179,10 @@ fn empty_merges_are_identities_and_zero_readouts_are_canonical() {
     }
 }
 
+// WASI preview 1 has no OS threads. The portable completion-order test below
+// exercises the same batch-order contract there; this test uses real workers
+// on native hosts. Remove this target restriction if the WASI runner gains threads.
+#[cfg(not(target_family = "wasm"))]
 #[test]
 fn fixed_batches_and_merge_order_ignore_worker_count() {
     let xs: Vec<_> = (0..1027).map(|i| 1e8 + (i % 37) as f64 * 0.25).collect();
@@ -211,16 +215,7 @@ fn fixed_batches_and_merge_order_ignore_worker_count() {
         for batch in results {
             total.merge(&batch).unwrap();
         }
-        assert_eq!(total, expected);
-        for (a, b) in [
-            (total.mean(), expected.mean()),
-            (total.variance(), expected.variance()),
-            (total.standard_error(), expected.standard_error()),
-        ] {
-            let (a, b) = (a.unwrap(), b.unwrap());
-            assert_eq!(a.value().to_bits(), b.value().to_bits());
-            assert_eq!(a.absolute_error().to_bits(), b.absolute_error().to_bits());
-        }
+        assert_same_moments(total, expected);
     }
 }
 
@@ -292,4 +287,39 @@ fn extreme_exponents_enclose_or_refuse_without_losing_state() {
         }
     }
     assert!(admitted > 100 && refused > 100);
+}
+
+fn assert_same_moments(actual: Moments2, expected: Moments2) {
+    assert_eq!(actual, expected);
+    for (a, b) in [
+        (actual.mean(), expected.mean()),
+        (actual.variance(), expected.variance()),
+        (actual.standard_error(), expected.standard_error()),
+    ] {
+        let (a, b) = (a.unwrap(), b.unwrap());
+        assert_eq!(a.value().to_bits(), b.value().to_bits());
+        assert_eq!(a.absolute_error().to_bits(), b.absolute_error().to_bits());
+    }
+}
+
+#[test]
+fn fixed_batches_preserve_bits_after_out_of_order_completion() {
+    let xs: Vec<_> = (0..1027).map(|i| 1e8 + (i % 37) as f64 * 0.25).collect();
+    let batches: Vec<_> = xs.chunks(64).collect();
+    let merge = |results: Vec<Moments2>| {
+        results.iter().fold(Moments2::new(), |mut total, batch| {
+            total.merge(batch).unwrap();
+            total
+        })
+    };
+    let expected = merge(batches.iter().map(|xs| accumulate(xs)).collect());
+    for workers in [1, 2, 4, 7] {
+        let mut results = vec![Moments2::new(); batches.len()];
+        for worker in (0..workers).rev() {
+            for index in (worker..batches.len()).step_by(workers).rev() {
+                results[index] = accumulate(batches[index]);
+            }
+        }
+        assert_same_moments(merge(results), expected);
+    }
 }

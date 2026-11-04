@@ -152,7 +152,8 @@ in exact integer arithmetic, clearing denominators before testing the returned
 mean and variance bounds. It squares standard-error interval endpoints before
 comparison, so no approximate square-root oracle is used there. Tests cover
 large means with small spreads, signs, constant data, multiple partitions,
-ordered merging across worker counts, invalid inputs, count limits, zero signs,
+ordered merging across native worker counts and portable completion orders,
+invalid inputs, count limits, zero signs,
 and transactional refusals. Different partitions are checked against the exact
 statistic, not required to match each other's bits.
 
