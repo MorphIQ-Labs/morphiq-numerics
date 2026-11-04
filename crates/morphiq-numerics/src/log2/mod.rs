@@ -1,5 +1,5 @@
-//! `log2` and `log10`: base-2 and base-10 logarithms rounded to nearest, ties
-//! to even.
+//! Base-2 and base-10 logarithms: `log2` is correctly rounded; `log10` is
+//! correctly rounded wherever its rounding test decides, and bounded otherwise.
 //!
 //! The derivation is in
 //! [`docs/log2.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/log2.md);

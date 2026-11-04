@@ -1,0 +1,48 @@
+[package]
+name = "morphiq-numerics-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+# Independent, unpublished oracle graph; never a library dependency.
+[workspace]
+members = ["."]
+
+[workspace.dependencies]
+libfuzzer-sys = "=0.4.12"
+rug = { version = "=1.30.0", default-features = false, features = ["float", "std"] }
+
+[dependencies]
+libfuzzer-sys = { workspace = true, optional = true }
+rug.workspace = true
+morphiq-numerics = { path = "../crates/morphiq-numerics" }
+
+[features]
+fuzzing = ["dep:libfuzzer-sys"]
+simd = ["morphiq-numerics/simd", "morphiq-numerics/std"]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+disallowed_methods = "deny"
+
+[[bin]]
+name = "elementary"
+path = "fuzz_targets/elementary.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]
+
+[[bin]]
+name = "fast_elementary"
+path = "fuzz_targets/fast_elementary.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]

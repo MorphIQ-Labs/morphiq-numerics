@@ -12,4 +12,5 @@ if [ "$installed" != "$required" ]; then
   exit 127
 fi
 cargo audit --deny warnings --deny unsound --deny yanked --deny unmaintained
+cargo audit --file fuzz/Cargo.lock --deny warnings --deny unsound --deny yanked --deny unmaintained
 echo "advisory gate: OK"

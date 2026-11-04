@@ -1,8 +1,9 @@
 # `atan2`
 
 `atan2(y, x)`, the angle of the point `(x, y)` to the positive `x` axis in
-`[−π, π]`, rounded to nearest, ties to even: a certified fast path in
-double-word arithmetic, the shared rounding test, and a `Q256` accurate path.
+`[−π, π]`, correctly rounded on established paths and within
+`(1/2 + 2^-137)` ulp elsewhere (§6): a certified fast path in double-word
+arithmetic, the shared rounding test, and a `Q256` accurate path.
 The code is `crates/morphiq-numerics/src/atan2/`; the constants are generated
 and every bound is a Gappa certificate in `formal/atan2`.
 
