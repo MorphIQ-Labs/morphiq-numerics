@@ -18,7 +18,14 @@ feature changes an existing API's numerical identity.
 | `fast::normal::norm_cdf` | `2^-33 <= abs(x) <= 8` | Absolute `2^-49`; relative `2^-48` for `x < 0` |
 | `fast::normal::log_norm_cdf` | `-22.5 <= x <= -2^-33` or `2^-33 <= x <= 8` | Absolute `2^-51 * abs(ln Φ(x)) + 2^-48`, natural-log units |
 
-Each function has a matching `_slice(x, out)` API. Results in the accelerated
+The word-to-pair API `fast::random::normal_pair` and its matching
+`normal_pair_slice(w1, w2, out)` have a separate
+[Box–Muller contract](fast_random.md): each output differs from the strong
+pair on the same words by at most `2^-38` in absolute value over all word
+pairs. The angular zeros retain their signs. This total word domain needs
+no strong fallback; its slice implementation calls the scalar function.
+
+Each elementary/normal function has a matching `_slice(x, out)` API. Results in the accelerated
 domains are finite and normal, except the logarithm's exact zero at one.
 The logarithm's derivation and log-unit budget are in [fast_ln.md](fast_ln.md);
 the log-CDF's are in [fast_log_cdf.md](fast_log_cdf.md); the CDF's are in

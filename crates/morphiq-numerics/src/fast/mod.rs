@@ -12,6 +12,8 @@ pub mod elementary;
 #[cfg(feature = "simd")]
 mod lanes;
 pub mod normal;
+pub mod random;
+mod random_tables;
 
 #[cfg(test)]
 mod tests;
