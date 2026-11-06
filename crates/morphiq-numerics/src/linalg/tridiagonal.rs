@@ -458,6 +458,33 @@ impl UnpivotedThomasFactors<'_, '_> {
         self.factors.solve_into(rhs, out)
     }
 
+    /// The Brennan–Schwartz sweep for `x >= obstacle` (`docs/tridiagonal.md`,
+    /// Obstacle solves): [`Self::solve_into`]'s forward recurrence, then its
+    /// back substitution from the last row with each value raised to its
+    /// obstacle before the next row consumes it. A value below its obstacle
+    /// takes the obstacle; any other value, including a signed-zero tie, is
+    /// kept. With an obstacle below every unconstrained value the bits are
+    /// [`Self::solve_into`]'s.
+    ///
+    /// For an M-matrix whose complementarity solution has its contact set
+    /// ending at the last row, the result solves
+    /// `min(A x - rhs, x - obstacle) = 0`. Nothing here checks that
+    /// structure; a caller verifies complementarity before relying on it.
+    /// Reverse the system's rows for a contact set beginning at the first.
+    ///
+    /// # Errors
+    /// [`Error::Shape`] or [`Error::NonFinite`] (in `rhs` or `obstacle`)
+    /// leaves output unchanged; [`Error::Range`] invalidates the partially
+    /// written output.
+    pub fn solve_obstacle_into(
+        &self,
+        rhs: &[f64],
+        obstacle: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), Error> {
+        self.factors.solve_obstacle_into(rhs, obstacle, out)
+    }
+
     /// Shared scalar/SIMD row-interleaved solve, bit-identical per RHS.
     /// Layout and complexity follow [`ThomasFactors::solve_many_into`].
     ///
@@ -533,6 +560,52 @@ impl Factors<'_, '_> {
                 return Err(Error::Range);
             }
             previous = *value;
+        }
+        Ok(())
+    }
+
+    pub fn solve_obstacle_into(
+        &self,
+        rhs: &[f64],
+        obstacle: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), Error> {
+        let n = self.matrix.len();
+        if rhs.len() != n || obstacle.len() != n || out.len() != n {
+            return Err(Error::Shape);
+        }
+        if !all_finite(rhs) || !all_finite(obstacle) {
+            return Err(Error::NonFinite);
+        }
+        self.forward(rhs.iter(), out.iter_mut())?;
+        self.backward_obstacle(out.iter_mut(), obstacle)
+    }
+
+    // The back substitution of `backward`, each value raised to its obstacle
+    // before the next row consumes it. A value below its obstacle takes the
+    // obstacle; every other value, including a signed zero tie, is kept.
+    fn backward_obstacle<'o>(
+        &self,
+        out: impl DoubleEndedIterator<Item = &'o mut f64>,
+        obstacle: &[f64],
+    ) -> Result<(), Error> {
+        let mut values = out.rev().zip(obstacle.iter().rev());
+        let Some((last, &floor)) = values.next() else {
+            return Ok(());
+        };
+        if *last < floor {
+            *last = floor;
+        }
+        let mut next = *last;
+        for ((value, &floor), &upper) in values.zip(self.normalized_upper.iter().rev()) {
+            *value -= upper * next;
+            if !value.is_finite() {
+                return Err(Error::Range);
+            }
+            if *value < floor {
+                *value = floor;
+            }
+            next = *value;
         }
         Ok(())
     }
@@ -658,6 +731,33 @@ impl ThomasFactors<'_, '_> {
         self.factors.solve_into(rhs, out)
     }
 
+    /// The Brennan–Schwartz sweep for `x >= obstacle` (`docs/tridiagonal.md`,
+    /// Obstacle solves): [`Self::solve_into`]'s forward recurrence, then its
+    /// back substitution from the last row with each value raised to its
+    /// obstacle before the next row consumes it. A value below its obstacle
+    /// takes the obstacle; any other value, including a signed-zero tie, is
+    /// kept. With an obstacle below every unconstrained value the bits are
+    /// [`Self::solve_into`]'s.
+    ///
+    /// For an M-matrix whose complementarity solution has its contact set
+    /// ending at the last row, the result solves
+    /// `min(A x - rhs, x - obstacle) = 0`. Nothing here checks that
+    /// structure; a caller verifies complementarity before relying on it.
+    /// Reverse the system's rows for a contact set beginning at the first.
+    ///
+    /// # Errors
+    /// [`Error::Shape`] or [`Error::NonFinite`] (in `rhs` or `obstacle`)
+    /// leaves output unchanged; [`Error::Range`] invalidates the partially
+    /// written output.
+    pub fn solve_obstacle_into(
+        &self,
+        rhs: &[f64],
+        obstacle: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), Error> {
+        self.factors.solve_obstacle_into(rhs, obstacle, out)
+    }
+
     /// Solve `rhs_count` right-hand sides sharing these factors.
     ///
     /// Both slices have exactly `matrix.len() * rhs_count` entries, interleaved
@@ -771,6 +871,33 @@ impl SignThomasFactors<'_, '_> {
     /// [`Error::Range`] invalidates the entire partially written output.
     pub fn solve_into(&self, rhs: &[f64], out: &mut [f64]) -> Result<(), Error> {
         self.factors.solve_into(rhs, out)
+    }
+
+    /// The Brennan–Schwartz sweep for `x >= obstacle` (`docs/tridiagonal.md`,
+    /// Obstacle solves): [`Self::solve_into`]'s forward recurrence, then its
+    /// back substitution from the last row with each value raised to its
+    /// obstacle before the next row consumes it. A value below its obstacle
+    /// takes the obstacle; any other value, including a signed-zero tie, is
+    /// kept. With an obstacle below every unconstrained value the bits are
+    /// [`Self::solve_into`]'s.
+    ///
+    /// For an M-matrix whose complementarity solution has its contact set
+    /// ending at the last row, the result solves
+    /// `min(A x - rhs, x - obstacle) = 0`. Nothing here checks that
+    /// structure; a caller verifies complementarity before relying on it.
+    /// Reverse the system's rows for a contact set beginning at the first.
+    ///
+    /// # Errors
+    /// [`Error::Shape`] or [`Error::NonFinite`] (in `rhs` or `obstacle`)
+    /// leaves output unchanged; [`Error::Range`] invalidates the partially
+    /// written output.
+    pub fn solve_obstacle_into(
+        &self,
+        rhs: &[f64],
+        obstacle: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), Error> {
+        self.factors.solve_obstacle_into(rhs, obstacle, out)
     }
 
     /// Solve row-interleaved RHS columns using the shared scalar/SIMD kernel.

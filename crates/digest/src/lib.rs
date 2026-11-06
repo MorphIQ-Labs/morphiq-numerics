@@ -1159,6 +1159,7 @@ pub fn corpus_digest() -> [u8; 32] {
     tridiagonal_batch_section(&mut r);
     tridiagonal_sign_section(&mut r);
     tridiagonal_unpivoted_section(&mut r);
+    tridiagonal_obstacle_section(&mut r);
     bivariate_normal_section(&mut r);
     fast_section(&mut r);
     double_word_exp_section(&mut r);
@@ -1246,6 +1247,67 @@ fn tridiagonal_system<const N: usize>(r: &mut Recorder, scale: f64) {
             }
             Err(e) => tridiagonal_error(r, e),
         }
+    }
+}
+
+/// The Brennan–Schwartz sweep on M-matrix systems of order `N`: obstacles met
+/// at the last rows, nowhere, and below zero, each solution's bits or error.
+fn tridiagonal_obstacle_system<const N: usize>(r: &mut Recorder, scale: f64) {
+    let mut lower = [0.0; N];
+    let mut diagonal = [0.0; N];
+    let mut upper = [0.0; N];
+    for i in 0..N {
+        lower[i] = -scale;
+        diagonal[i] = 3.0 * scale;
+        upper[i] = -0.5 * scale;
+    }
+    let off = N.saturating_sub(1);
+    let a = match DominantTridiagonal::new(&lower[..off], &diagonal, &upper[..off]) {
+        Ok(a) => a,
+        Err(e) => {
+            tridiagonal_error(r, e);
+            return;
+        }
+    };
+    let mut pivots = [0.0; N];
+    let mut normalized = [0.0; N];
+    let f = match a.factor_into(&mut pivots, &mut normalized[..off]) {
+        Ok(f) => f,
+        Err(e) => {
+            tridiagonal_error(r, e);
+            return;
+        }
+    };
+    let mut rhs = [0.0; N];
+    for (i, x) in rhs.iter_mut().enumerate() {
+        *x = f64::from(u32::try_from(i % 5).unwrap()) * scale - scale;
+    }
+    for rise in [1.0, 0.0, -1.0] {
+        let mut obstacle = [0.0; N];
+        for (i, g) in obstacle.iter_mut().enumerate() {
+            *g = rise * f64::from(u32::try_from(i).unwrap()) / 4.0 - 0.5;
+        }
+        let mut out = [0.0; N];
+        match f.solve_obstacle_into(&rhs, &obstacle, &mut out) {
+            Ok(()) => {
+                r.u64(0);
+                for x in out {
+                    r.f64(x);
+                }
+            }
+            Err(e) => tridiagonal_error(r, e),
+        }
+    }
+}
+
+fn tridiagonal_obstacle_section(r: &mut Recorder) {
+    r.label("linalg::tridiagonal::solve_obstacle_into");
+    for scale in [f64::MIN_POSITIVE, 0.125, 1.0, 1e200] {
+        tridiagonal_obstacle_system::<0>(r, scale);
+        tridiagonal_obstacle_system::<1>(r, scale);
+        tridiagonal_obstacle_system::<2>(r, scale);
+        tridiagonal_obstacle_system::<3>(r, scale);
+        tridiagonal_obstacle_system::<17>(r, scale);
     }
 }
 

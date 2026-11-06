@@ -130,6 +130,34 @@ solve arithmetic failures can leave partially written buffers; discard those
 contents. No factors escape a failed factorization. No operation changes matrix
 or RHS entries. Empty operations succeed without indexing a buffer.
 
+## Obstacle solves
+
+`solve_obstacle_into(rhs, obstacle, out)`, on every factor type, is the
+Brennan–Schwartz sweep for the linear complementarity problem
+`min(A x − rhs, x − obstacle) = 0`. It runs the forward recurrence above
+unchanged, then the back substitution from row n−1 with each value raised to
+its obstacle before the next row consumes it:
+
+    x[n−1] = max(y[n−1], g[n−1])
+    x[i]   = max(y[i] − c[i] * x[i+1], g[i])   (i = n−2 down to 0)
+
+`max(v, g)` is `g` when `v < g` and `v` otherwise, so a tie, including signed
+zeros, keeps `v`. The added work is n comparisons; storage, errors and
+finiteness checks follow `solve_into`, with `obstacle` checked like `rhs`.
+With every obstacle below its unconstrained value the bits are `solve_into`'s.
+
+The sweep is the complementarity solution when A is an M-matrix (positive
+diagonal, nonpositive off-diagonals, here strictly row dominant) and the
+solution's contact set `{i : x[i] = g[i]}` is a final interval of rows
+(Brennan and Schwartz 1977; Jaillet, Lamberton and Lapeyre 1990 for the American
+put's discretization). A contact set that begins at row 0 is the reversed
+system's: reverse the diagonal, swap and reverse the off-diagonals, solve with
+reversed `rhs` and `obstacle`, and reverse the output. Nothing here checks the
+contact structure; a consumer that cannot guarantee it verifies complementarity
+on the result and falls back to a general LCP solver. Tests compare the sweep
+against enumeration of every contact set, solved densely, on random M-matrix
+systems of orders 1–9 with contact at either end.
+
 ## SIMD across right-hand sides
 
 Both factor types expose `solve_many_into(rhs_count, rhs, out)` to solve multiple RHSs
