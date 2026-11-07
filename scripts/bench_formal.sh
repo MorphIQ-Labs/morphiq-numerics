@@ -17,11 +17,12 @@ public=$(realpath "$2")
 internal=$(realpath "$3")
 proofs=$(realpath "$4")
 out=$(realpath -m "$5")
-if [[ -e $out ]]; then
+mkdir -p "$(dirname "$out")"
+if ! mkdir "$out"; then
   echo "cold measurement requires a new output directory: $out" >&2
   exit 2
 fi
-mkdir -p "$out/build"
+mkdir "$out/build"
 cd "$(dirname "$0")/.."
 {
   git -c safe.directory="$PWD" rev-parse HEAD
