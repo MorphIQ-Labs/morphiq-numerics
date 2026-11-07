@@ -145,6 +145,21 @@ fn correction(z: f64) -> (f64, f64) {
     (z2, q)
 }
 
+/// Degree-four reconstruction for the normal-pair composition.
+/// The caller excludes reciprocal-one cells before selecting this path.
+#[inline(always)]
+pub(crate) fn normal_pair_log(reduced: &super::Reduced) -> f64 {
+    let i = reduced.stage_index;
+    let z = residual(reduced.y(), f64::from_bits(R[i]));
+    let e = f64::from(reduced.e);
+    let (th, tl) = T[i];
+    let ln1 = e * L1 + th;
+    let ln0 = e * L0 + tl;
+    let z2 = z * z;
+    let q = z2 * ((z * H[0] - 0.5) + z2 * H[1]);
+    (ln1 + z) + (ln0 + q)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -500,6 +500,20 @@ fn slice_general(input: &[f64], output: &mut [f64]) {
     }
 }
 
+/// Pair-specific logarithm on the exact open-uniform grid.
+/// The reciprocal-one cells retain the public fast logarithm's arithmetic.
+/// Elsewhere the private bound is `2^-48 * |ln(x)| + 2^-45`, sufficient for
+/// the radius composition in docs/fast_random.md. This is not a public ln API.
+#[inline(always)]
+pub(crate) fn normal_pair_log(x: f64) -> f64 {
+    debug_assert!(x >= f64::from_bits((1023 - 53) << 52) && x < 1.0);
+    if super::stage::unit_cell(x.to_bits()) {
+        let (s, lo, _, _) = super::stage::unit_parts(x);
+        return s + lo;
+    }
+    super::stage::normal_pair_log(&super::Reduced::normal_bits(x.to_bits(), 0))
+}
+
 #[cfg(all(test, feature = "simd"))]
 mod tests {
     use super::*;

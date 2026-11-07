@@ -31,10 +31,10 @@ pub(crate) fn angular(phi: f64) -> (f64, f64) {
 /// Uses the same exact uniforms and octant fold as the strong pair. Every
 /// input pair produces finite outputs; angular zeros retain their sign bits.
 /// This function consumes no additional random words and performs no
-/// rejection sampling or precision refinement. It uses the fast logarithm
+/// rejection sampling or precision refinement. It uses a radius-specific logarithm
 /// and bounded angular polynomials; correctly rounded results are not promised.
 #[must_use]
-#[inline]
+#[inline(always)]
 pub fn normal_pair(w1: u64, w2: u64) -> (f64, f64) {
     let (octant, phi) = crate::random::folded_angle(w2 >> 11);
     let (c, s) = components(crate::random::unit_open(w1), phi);
@@ -42,9 +42,12 @@ pub fn normal_pair(w1: u64, w2: u64) -> (f64, f64) {
 }
 
 /// The continuous-input sequence transcribed by `FastRandom.bm_pair64`.
+/// Callers establish `2^-53 <= u <= 1 - 2^-53` with the exact open-uniform map.
 #[inline(always)]
 pub(crate) fn components(u: f64, phi: f64) -> (f64, f64) {
-    let radius = crate::exact::sqrt(-2.0 * super::elementary::ln(u));
+    // The exact uniform range permits the radius-specific logarithm bound.
+    // The near-one cells retain the complete compensated sequence.
+    let radius = crate::exact::sqrt(-2.0 * crate::ln::bounded::normal_pair_log(u));
     let (s, c) = angular(phi);
     (radius * c, radius * s)
 }
@@ -64,7 +67,49 @@ pub fn normal_pair_slice(w1: &[u64], w2: &[u64], out: &mut [(f64, f64)]) {
         out.len(),
         "normal_pair_slice: output length differs"
     );
+    match w1.len() {
+        0 => (),
+        1 => out[0] = normal_pair(w1[0], w2[0]),
+        _ => bulk_pairs(w1, w2, out),
+    }
+}
+
+// Keep the bulk loop's hoisted constants and register saves off a tiny call.
+#[inline(never)]
+fn bulk_pairs(w1: &[u64], w2: &[u64], out: &mut [(f64, f64)]) {
     for ((&a, &b), pair) in w1.iter().zip(w2).zip(out) {
         *pair = normal_pair(a, b);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test_exact::{Exact, entries, field, word};
+    use core::cmp::Ordering;
+
+    #[test]
+    fn private_radius_meets_the_independent_oracle_at_reduction_boundaries() {
+        let fixture = include_str!("../../../reference/fixtures/fast_pair_radius.json");
+        for row in entries(fixture, &["rows"]) {
+            let input = u64::from_str_radix(field(row, "word"), 16).unwrap();
+            let u = crate::random::unit_open(input);
+            let logarithm = crate::ln::bounded::normal_pair_log(u);
+            let radius = crate::exact::sqrt(-2.0 * logarithm);
+            let near_one = u >= 511.0 / 512.0;
+            if near_one {
+                assert_eq!(
+                    logarithm.to_bits(),
+                    super::super::elementary::ln(u).to_bits()
+                );
+            }
+            // Outside the cancellation region the radius has a separate
+            // 2^-40 budget. Near one retains the existing composition bound.
+            let bound = Exact::of_hex("1", if near_one { -38 } else { -40 });
+            let error = Exact::of_f64(radius)
+                .sub(&Exact::of_f64(word(row, "radius")))
+                .abs();
+            assert!(radius.is_finite() && radius > 0.0);
+            assert_ne!(error.cmp(&bound), Ordering::Greater, "word {input:016x}");
+        }
     }
 }

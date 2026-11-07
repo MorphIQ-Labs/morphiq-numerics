@@ -2,15 +2,14 @@
 """Paired native qualification of the public normal-pair API on one host.
 
 Uses the shared benchmark protocol, a prepared/observed screen directory,
-and separate processes for each cell. This does not replace ARM measurements
-or consumer end-to-end qualification. No compilation occurs during timing.
+and separate processes for each cell on x86 Linux or native Apple Silicon.
+This does not replace consumer qualification. No compilation occurs during timing.
 """
 import argparse
 import ctypes as ct
 import importlib.util
 import json
 import math
-import os
 from pathlib import Path
 import statistics
 import subprocess
@@ -19,6 +18,7 @@ import sys
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import screen
+import host as native_host
 
 spec = importlib.util.spec_from_file_location("bench_protocol", HERE.parent / "protocol.py")
 protocol = importlib.util.module_from_spec(spec)
@@ -44,22 +44,12 @@ def cells():
 
 
 def host(cpu):
-    def read(path):
-        try:
-            return Path(path).read_text().strip()
-        except OSError:
-            return None
-    return dict(cpu=cpu, affinity=sorted(os.sched_getaffinity(0)), load=os.getloadavg(),
-                governor=read(f"/sys/devices/system/cpu/cpu{cpu}/cpufreq/scaling_governor"),
-                frequency_khz=read(f"/sys/devices/system/cpu/cpu{cpu}/cpufreq/scaling_cur_freq"),
-                siblings=read(f"/sys/devices/system/cpu/cpu{cpu}/topology/thread_siblings_list"),
-                cpu_stat=read("/proc/stat"),
-                thermal={str(p): read(p) for p in Path("/sys/class/thermal").glob("thermal_zone*/temp")})
+    return native_host.snapshot(cpu)
 
 
 def timers(prepared, cell):
     native, functions = screen.load(prepared)
-    library = ct.CDLL(str(prepared / "target/release/libnormal_pair_screen.so"))
+    library = ct.CDLL(str(native_host.product_path(prepared)))
     native.measure.argtypes = [ct.c_void_p, ct.POINTER(ct.c_uint64), ct.POINTER(screen.Pair),
                               ct.c_size_t, ct.c_uint64]
     native.measure.restype = ct.c_uint64
@@ -115,7 +105,7 @@ def timers(prepared, cell):
 
 
 def worker(args):
-    os.sched_setaffinity(0, {args.cpu})
+    native_host.configure(args.cpu, ct.CDLL(str(native_host.native_path(args.prepared))))
     manifest = json.loads((args.out / "qualification-manifest.json").read_text())
     cell = next(c for c in manifest["cells"] if c["id"] == args.cell)
     measure = timers(args.prepared, cell)
@@ -146,6 +136,10 @@ def verify_prepared(prepared):
     screen.load(prepared)
     if screen.digest(Path(__file__)) != screen.digest(prepared / "templates/qualify.py"):
         raise RuntimeError("Qualification runner differs from the frozen preparation")
+    if screen.digest(HERE / "host.py") != screen.digest(prepared / "templates/host.py"):
+        raise RuntimeError("Host adapter differs from the frozen preparation")
+    if screen.digest(HERE / "screen.py") != screen.digest(prepared / "templates/screen.py"):
+        raise RuntimeError("Preparation loader differs from the frozen preparation")
     if screen.digest(HERE.parent / "protocol.py") != screen.digest(prepared / "templates/protocol.py"):
         raise RuntimeError("Benchmark protocol differs from the frozen preparation")
 
@@ -153,7 +147,7 @@ def verify_prepared(prepared):
 def qualify(args):
     verify_prepared(args.prepared)
     args.out.mkdir(parents=True, exist_ok=False)
-    os.sched_setaffinity(0, {args.cpu})
+    native_host.configure(args.cpu, ct.CDLL(str(native_host.native_path(args.prepared))))
     manifest = dict(cells=cells(), counts={}, before=host(args.cpu),
                     prepared=str(args.prepared), prepared_manifest_sha256=screen.digest(args.prepared / "manifest.json"),
                     runner_sha256=screen.digest(Path(__file__)),
@@ -162,7 +156,7 @@ def qualify(args):
                     target_ns=protocol.TARGET_NS, minimum_ns=protocol.MINIMUM_NS,
                     upper95_t9=protocol.T9_ONE_SIDED_95,
                     decision="Every cell must have upper one-sided 95% ratio <= 1 and every timed sample >= minimum_ns; no retries or outlier removal",
-                    interpretation="One native x86-64-v3 Linux host; controlled CPU affinity, observed governor/frequency/thermal/contention. ARM and consumer qualification separate.")
+                    interpretation=native_host.configuration()["interpretation"] + " Consumer qualification remains separate.")
     with (args.out / "calibration.jsonl").open("x", buffering=1) as log:
         for cell in manifest["cells"]:
             measure = timers(args.prepared, cell)
@@ -185,8 +179,9 @@ def qualify(args):
         valid = True
         for process in range(protocol.PROCESSES):
             subprocess.run([sys.executable, str(Path(__file__)), str(args.prepared),
-                            "--out", str(args.out), "--cpu", str(args.cpu),
-                            "--cell", cell["id"], "--worker", str(process)], check=True)
+                            "--out", str(args.out),
+                            "--cell", cell["id"], "--worker", str(process)]
+                           + (["--cpu", str(args.cpu)] if args.cpu is not None else []), check=True)
             sample = json.loads((args.out / f'{cell["id"]}-process-{process}.json').read_text())
             paired = []
             for round_index in range(protocol.ROUNDS):
@@ -216,18 +211,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("prepared", type=Path)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--cpu", type=int, required=True)
+    parser.add_argument("--cpu", type=int, help="Required Linux CPU; omit on macOS")
     parser.add_argument("--cell")
     parser.add_argument("--worker", type=int)
     parser.add_argument("--profile", choices=["product", "strong"])
     parser.add_argument("--profile-count", type=int, default=20_000)
     args = parser.parse_args()
+    native_host.validate_cpu(args.cpu)
     args.prepared, args.out = args.prepared.resolve(), args.out.resolve()
     if args.profile:
         if args.profile_count <= 0:
             parser.error("--profile-count must be positive")
         verify_prepared(args.prepared)
-        os.sched_setaffinity(0, {args.cpu})
+        native_host.configure(args.cpu, ct.CDLL(str(native_host.native_path(args.prepared))))
         cell = dict(kind="scalar", population="ordinary", n=4096, reference="libm_direct")
         measure = timers(args.prepared, cell)
         elapsed = measure(args.profile, args.profile_count)
