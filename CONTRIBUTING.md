@@ -137,3 +137,15 @@ outcomes and the exact set of completion receipts, including their source and
 corpus identities. Missing, duplicate, stale, failed or skipped selected work
 cannot pass. Prose-only handling retains the repository's narrow allowlist.
 Build/audit/extraction timings and failure logs are retained as CI artifacts.
+
+For a reproducible cold/warm comparison, run `scripts/bench_formal.sh` in the
+same pinned Coq image. Its five arguments are the dependency archive, public
+corpus, internal corpus, generated Gappa proof directory and a new output
+directory under `target/`. Add `--family NAME` to measure one family; omitting
+it measures the full gate. It records the host, source/input hashes, separate
+build and audit wall times, exit statuses and raw logs. The cold pass requires
+an unused directory; the warm pass reuses its compiled proofs and repeats all
+audits and extractions. Keep failed and interrupted attempts through review.
+For a parallel CI matrix, report elapsed time from planning through aggregation
+separately from the sum of runner times; summing parallel stage times does not
+give the feedback latency.
