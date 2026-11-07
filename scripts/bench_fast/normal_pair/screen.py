@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prepare, observe, or time the focused normal-pair candidates for #282.
 
-This is a native Linux feasibility screen, not the native parity qualification.
+This is a native feasibility screen, not the native parity qualification.
 Preparation needs the repository's generators-venv (pinned mpmath); observation
 and timing use the Python standard library. Builds never run during timing.
 """
@@ -17,8 +17,12 @@ import shutil
 import statistics
 import struct
 import subprocess
+import sys
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import host
+
 ROOT = HERE.parents[2]
 MASK = (1 << 64) - 1
 N = 4096
@@ -65,10 +69,11 @@ def prepare(out):
     import mpmath as mp
     if mp.__version__ != "1.4.1":
         raise RuntimeError("Use target/generators-venv/bin/python (mpmath 1.4.1)")
+    config = host.configuration()
     out.mkdir(parents=True, exist_ok=False)
     templates = out / "templates"
     templates.mkdir()
-    for name in ["screen.py", "candidate.rs", "native.c", "README.md", "qualify.py"]:
+    for name in ["screen.py", "candidate.rs", "native.c", "README.md", "qualify.py", "host.py"]:
         shutil.copy2(HERE / name, templates / name)
     shutil.copy2(HERE.parent / "protocol.py", templates / "protocol.py")
     source = out / "src"
@@ -97,25 +102,25 @@ def prepare(out):
     (out / "Cargo.toml").write_text(manifest)
     # Avoid inheriting feature flags which could change the declared sequence.
     env = os.environ.copy()
-    env["RUSTFLAGS"] = "-C target-cpu=x86-64-v3"
+    env.pop("CARGO_ENCODED_RUSTFLAGS", None)
+    env["RUSTFLAGS"] = config["rustflags"]
     env["CARGO_TARGET_DIR"] = str(out / "target")
     rust = ["cargo", "build", "--offline", "--release", "--manifest-path", str(out / "Cargo.toml")]
     run(rust, env=env, log_path=out / "rust-build.log")
-    native = out / "native.so"
-    cc = ["cc", "-O3", "-march=x86-64-v3", "-ffp-contract=off", "-fno-math-errno",
+    native = host.native_path(out)
+    cc = ["cc", "-O3", *config["cflags"], "-ffp-contract=off", "-fno-math-errno",
           "-fno-builtin-log", "-fno-builtin-sincos",
-          "-shared", "-fPIC", str(HERE / "native.c"), "-lm", "-o", str(native)]
+          str(templates / "native.c"), "-lm", "-o", str(native)]
     run(cc, log_path=out / "c-build.log")
-    product = out / "target/release/libnormal_pair_screen.so"
+    product = host.product_path(out)
     files = [*templates.iterdir(), source / "coefficients.rs", source / "lib.rs",
              out / "Cargo.toml", out / "Cargo.lock", native, product,
-             ROOT / "crates/reference/fixtures/box_muller.json"]
-    linked = run(["ldd", str(native)])
-    for line in linked.splitlines():
-        if "=>" in line:
-            path = Path(line.split("=>", 1)[1].strip().split()[0])
-            if path.is_file():
-                files.append(path.resolve())
+             ROOT / "crates/reference/fixtures/box_muller.json",
+             ROOT / "Cargo.toml", ROOT / "Cargo.lock", ROOT / "rust-toolchain.toml",
+             ROOT / "crates/morphiq-numerics/Cargo.toml",
+             ROOT / "crates/morphiq-numerics-arch/Cargo.toml"]
+    linked, dependencies, system_math = host.linkage(native)
+    files.extend(dependencies)
     inputs = {name: [[f"{a:016x}", f"{b:016x}"] for a, b in bank]
               for name, bank in banks().items()}
     (out / "inputs.json").write_text(json.dumps(inputs) + "\n")
@@ -127,8 +132,8 @@ def prepare(out):
                     files={str(p): digest(p) for p in files}, coefficients=coefficients,
                     rustc=run(["rustc", "-Vv"]), cc=run(["cc", "--version"]),
                     native_linkage=linked,
-                    libc=platform.libc_ver(), platform=platform.platform(),
-                    cpu=Path("/proc/cpuinfo").read_text(),
+                    system_math=system_math, platform=platform.platform(),
+                    native_platform=config, host=host.snapshot(None),
                     rust_command=rust, rustflags=env["RUSTFLAGS"], cc_command=cc,
                     mpmath=mp.__version__, precision_bits=mp.mp.prec,
                     interpretation="Feasibility screen only. No proved bound or parity claim.")
@@ -147,8 +152,10 @@ def load(out):
     for path, expected in metadata["source_files"].items():
         if digest(ROOT / path) != expected:
             raise RuntimeError(f"Library source changed since build: {path}")
-    product = ct.CDLL(str(out / "target/release/libnormal_pair_screen.so"))
-    native = ct.CDLL(str(out / "native.so"))
+    if metadata["native_platform"] != host.configuration():
+        raise RuntimeError("Prepared binaries target a different native platform")
+    product = ct.CDLL(str(host.product_path(out)))
+    native = ct.CDLL(str(host.native_path(out)))
     functions = {}
     for name in FUNCTIONS:
         f = getattr(native if name in ["libm_folded", "libm_direct"] else product, name)
@@ -212,7 +219,7 @@ def measure(out, cpu, seconds, repetitions):
     if not (out / "observations.json").exists():
         raise RuntimeError("Run observe before timing")
     native, functions = load(out)
-    os.sched_setaffinity(0, {cpu})
+    host.configure(cpu, native)
     native.measure.argtypes = [ct.c_void_p, ct.POINTER(ct.c_uint64), ct.POINTER(Pair),
                               ct.c_size_t, ct.c_uint64]
     native.measure.restype = ct.c_uint64
@@ -223,7 +230,7 @@ def measure(out, cpu, seconds, repetitions):
             log.write(json.dumps(row) + "\n")
         record(dict(kind="host", cpu=cpu, load=os.getloadavg(),
                     seconds=seconds, repetitions=repetitions,
-                    affinity=sorted(os.sched_getaffinity(0)),
+                    scheduling=host.snapshot(cpu),
                     clock="CLOCK_MONOTONIC", power_thermal_contention="uncontrolled",
                     order="alternating complete function order per repetition",
                     interpretation="screen; fixed-bank throughput, no stream/latency/SIMD qualification"))
@@ -263,10 +270,11 @@ def main():
     parser.add_argument("--seconds", type=float, default=0.03)
     parser.add_argument("--repetitions", type=int, default=7)
     args = parser.parse_args()
-    if platform.system() != "Linux" or platform.machine() != "x86_64":
-        parser.error("This screen currently requires native x86-64 Linux with AVX2/FMA")
-    if args.action == "measure" and (args.cpu is None or args.seconds <= 0 or args.repetitions < 2):
-        parser.error("Timing needs --cpu, positive --seconds and at least two repetitions")
+    host.configuration()
+    if args.action == "measure":
+        host.validate_cpu(args.cpu)
+        if args.seconds <= 0 or args.repetitions < 2:
+            parser.error("Timing needs positive --seconds and at least two repetitions")
     out = args.out.resolve()
     if args.action == "prepare":
         prepare(out)

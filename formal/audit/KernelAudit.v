@@ -1003,7 +1003,13 @@ Print Assumptions LnExactFma.reciprocal_dyadic_certificate.
 Print Assumptions LnExactFma.normalized_fma_identical.
 Print Assumptions LnExactFma.reduced_fma_identical.
 
-Require FastRandomAngular FastRandomBound FastRandomWords FastRandom.
+Require FastRandomAngular FastRandomBound FastRandomWords FastRandomLog FastRandom.
+Print Assumptions FastRandomLog.pair_sequences_difference.
+Print Assumptions FastRandomLog.pair_stage_difference.
+Print Assumptions FastRandomLog.pair_regular_difference.
+Print Assumptions FastRandomLog.pair_log_near_one.
+Print Assumptions FastRandomLog.pair_log_ok.
+Print Assumptions FastRandomBound.bm_far_radius_difference.
 Print Assumptions FastRandomAngular.bm_sin_ok.
 Print Assumptions FastRandomAngular.bm_cos_ok.
 Print Assumptions FastRandomAngular.bm_zero_angle.
