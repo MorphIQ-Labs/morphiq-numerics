@@ -1,4 +1,4 @@
-# Normal-pair feasibility screen
+# Normal-pair native benchmarks
 
 This harness compares the public bounded normal pair with two standalone
 polynomial candidates and black-box system libm controls. All use the existing
@@ -53,12 +53,21 @@ the screen compares freshly generated short polynomials for the remaining work.
 
 ## Prepare and observe
 
-Run on native x86-64 Linux with AVX2/FMA, using the pinned Rust toolchain, C
-compiler, and the existing generator environment. Preparation builds a
+Run on native x86-64 Linux with AVX2/FMA or native Apple Silicon macOS, using
+the pinned Rust toolchain, C compiler and existing generator environment.
+On Linux, preparation builds a
 standalone Rust `cdylib` with `std,simd`, `target-cpu=x86-64-v3`, one codegen
 unit and fat LTO. The C comparator uses `-O3 -march=x86-64-v3`, disabled
 contraction, black-box system `log` and `sincos` calls, and hardware square root
 with `-fno-math-errno`, matching the Rust candidate's square-root instruction.
+
+On Apple Silicon, the wrapper uses `target-cpu=apple-m1`, the C timer uses
+`-mcpu=apple-m1`, and both libraries are native `.dylib` files. The C control
+calls Apple's public `__sincos` entry; Rust uses its platform `sin_cos`.
+Observation must verify that the Rust and C controls return identical bits.
+Apple system libm remains a black box: its load commands and macOS build
+identify the OS dyld-shared-cache implementation; there is no claim of a
+standalone libm-file hash. Compiler versions and all actual flags are retained.
 
 ```sh
 target/generators-venv/bin/python scripts/bench_fast/normal_pair/screen.py \
@@ -85,7 +94,10 @@ python3 scripts/bench_fast/normal_pair/screen.py \
   measure target/issue-282/screen-01 --cpu 2
 ```
 
-Choose an allowed CPU with an idle SMT sibling. Preparation and observation
+On Linux choose an allowed CPU with an idle SMT sibling. On macOS omit
+`--cpu`; supplying it is an error. Every timing process establishes
+`QOS_CLASS_USER_INITIATED`, as in the existing ARM runner. This is not CPU
+affinity and does not guarantee performance-core residency. Preparation and observation
 finish before timing. The manifest records source revision and source hashes,
 compiler versions, flags, CPU, libc version, exact input banks and binary
 hashes. Each operation verifies the frozen inputs. Keep the run directory
@@ -170,9 +182,47 @@ that upper ratio at most one and valid durations. There is no aggregation
 across cells, outlier removal or retry until passing. Failure or missing
 evidence leaves the corresponding parity requirement unestablished.
 
-This runner qualifies one native x86-64-v3 Linux host. ARM performance and
-the consumer's pricing accuracy/cost are separate qualifications; the
-Linux-only runner does not claim to run unchanged on macOS.
+This runner qualifies the declared workload on one native host. Linux and
+macOS runs are separate decisions; their absolute timings are not compared.
+Consumer pricing accuracy/cost remains separately qualified.
+
+### Native Mac preparation and qualification
+
+Use the same commands and input populations, omitting `--cpu`:
+
+```sh
+target/generators-venv/bin/python scripts/bench_fast/normal_pair/screen.py \
+  prepare target/issue-282/macos-public-01
+python3 scripts/bench_fast/normal_pair/screen.py \
+  observe target/issue-282/macos-public-01
+python3 scripts/bench_fast/normal_pair/qualify.py \
+  target/issue-282/macos-public-01 --out target/issue-282/macos-qualification-01
+```
+
+Freeze a clean committed harness and identify the library release separately.
+For a harness-only change, verify the library/architecture sources, workspace
+manifests/lockfile and toolchain against that release before preparing; retain
+both identities and the comparison command. Changed runtime sources need a new
+explicit source decision, not the release's label. Each run uses a fresh output
+directory; failed preparation and timing attempts are retained through review.
+
+Before timing, finish compilation, oracle checks and disassembly inspection.
+Use AC power and a quiet host; do not stop unrelated work without authorization.
+Record `pmset` power/battery/thermal reports, `sysctl` hardware identity, process
+CPU snapshots and load before and after each timing process. Telemetry commands
+run outside measured intervals. Frequency and per-core residency are not sampled;
+QoS does not prevent migration or interference. State these limits in the result.
+The existing calibration, ten processes, two alternating paired rounds, minimum
+duration and every-cell upper-95% rule apply without amendment. No automatic
+retry or removal of slow samples is permitted.
+
+The preparation contains the timer and wrapper binaries, exact input banks,
+coefficient and source hashes, build logs, toolchain identities and frozen
+runner/host/protocol copies. Native linkage records the Apple OS build, not
+external implementation source. The final report must link the preparation and
+all raw attempts, state unavailable telemetry, and separate observed errors from
+the public whole-domain proof. A preparation or CI pass is not qualification.
+
 
 ## Generated code
 
@@ -186,6 +236,10 @@ objdump -d --disassemble=candidate7 \
   target/issue-282/screen-01/target/release/libnormal_pair_screen.so \
   > target/issue-282/screen-01/candidate7.asm
 ```
+
+On macOS, use `otool -tvV` on the wrapper/timer `.dylib` files instead of
+GNU objdump. Inspect only our wrapper and timing code; system libm is a
+black-box comparator.
 
 Profile the same fixed-bank calling context separately from uninstrumented
 qualification. The profile count is a workload size, not a timing acceptance
