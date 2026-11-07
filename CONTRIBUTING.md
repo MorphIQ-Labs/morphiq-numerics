@@ -86,18 +86,18 @@ version or edit a released changelog section by hand. A tag always equals
 the workspace version at its commit; `scripts/check_release_version.sh`
 enforces it.
 
-The independent `fuzz/` workspace has its own lockfile. The release-plz workflow
-updates the root workspace only, so refresh the fuzz lockfile on the release
-branch after each version bump:
+The independent `fuzz/` workspace has its own lockfile, which release-plz does
+not update. After each version bump the release workflow refreshes it on the
+release branch (`scripts/sync_release_fuzz_lock.sh`), committing through
+GitHub's API so that GitHub signs the commit: `main` admits only verified
+signatures. The required license check uses `--locked` and rejects a stale fuzz
+lockfile. If the step fails, refresh it by hand with a signed commit, checking
+that only the local library and arch package versions changed:
 
 ```sh
 cargo update --manifest-path fuzz/Cargo.toml --workspace
 ./scripts/check_fuzz_licenses.sh
 ```
-
-Commit `fuzz/Cargo.lock` with the release changes, checking that only the local
-library and arch package versions changed. The required license check uses
-`--locked` and rejects a stale fuzz lockfile.
 
 Until 0.1 a release is a git tag only (`v0.0.N`); 0.1.0 is reserved for the
 first crates.io release ([#90](https://github.com/MorphIQ-Labs/morphiq-numerics/issues/90)).
