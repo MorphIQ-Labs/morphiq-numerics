@@ -84,6 +84,18 @@
       "target": "lib",
       "test": "ln::tests::the_rounding_test_decides_at_its_boundary",
       "failure_contains": "assertion `left == right` failed:"
+    },
+    {
+      "id": "skipped-complementarity-check",
+      "category": "unsound-rounding-decision",
+      "source": "crates/morphiq-numerics/src/linalg/tridiagonal.rs",
+      "patch": "patches/skipped-complementarity-check.patch",
+      "derivation": "docs/tridiagonal.md",
+      "reason": "Return the obstacle sweep without its complementarity check; a two-sided contact set must not be reported solved.",
+      "package": "morphiq-numerics",
+      "target": "lib",
+      "test": "linalg::tridiagonal::tests::the_obstacle_sweep_solves_one_sided_contact_and_refuses_every_other",
+      "failure_contains": "accepted a non-solution"
     }
   ]
 }

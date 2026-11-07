@@ -871,3 +871,278 @@ fn finite_preflight_covers_vector_tails_and_preserves_outputs() {
         }
     }
 }
+
+/// A deterministic generator for the obstacle cases (SplitMix64).
+struct Mix(u64);
+
+impl Mix {
+    fn unit(&mut self) -> f64 {
+        self.0 = self.0.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut z = self.0;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        ((z ^ (z >> 31)) >> 11) as f64 / (1u64 << 53) as f64
+    }
+}
+
+/// A strictly row-dominant M-matrix of `n` rows: positive diagonal,
+/// nonpositive off-diagonals.
+fn m_matrix(
+    rng: &mut Mix,
+    n: usize,
+) -> (std::vec::Vec<f64>, std::vec::Vec<f64>, std::vec::Vec<f64>) {
+    let lower: std::vec::Vec<f64> = (1..n).map(|_| -rng.unit()).collect();
+    let upper: std::vec::Vec<f64> = (1..n).map(|_| -rng.unit()).collect();
+    let diagonal = (0..n)
+        .map(|i| {
+            let left = if i > 0 { -lower[i - 1] } else { 0.0 };
+            let right = if i + 1 < n { -upper[i] } else { 0.0 };
+            left + right + 0.1 + rng.unit()
+        })
+        .collect();
+    (lower, diagonal, upper)
+}
+
+/// The complementarity solution by enumeration of every contact set, each
+/// solved densely: the unique `x` with `x >= g`, `A x >= b` and equality in one
+/// of each pair. An independent reference for small `n`, and its contact set.
+fn brute_force_lcp(
+    lower: &[f64],
+    diagonal: &[f64],
+    upper: &[f64],
+    rhs: &[f64],
+    obstacle: &[f64],
+) -> (std::vec::Vec<f64>, std::vec::Vec<bool>) {
+    let n = diagonal.len();
+    let entry = |i: usize, j: usize| {
+        if i == j {
+            diagonal[i]
+        } else if j + 1 == i {
+            lower[j]
+        } else if i + 1 == j {
+            upper[i]
+        } else {
+            0.0
+        }
+    };
+    for mask in 0u32..(1 << n) {
+        let contact = |i: usize| mask & (1 << i) != 0;
+        let mut a = std::vec![std::vec![0.0; n + 1]; n];
+        for i in 0..n {
+            if contact(i) {
+                a[i][i] = 1.0;
+                a[i][n] = obstacle[i];
+            } else {
+                for (j, value) in a[i].iter_mut().take(n).enumerate() {
+                    *value = entry(i, j);
+                }
+                a[i][n] = rhs[i];
+            }
+        }
+        // Gaussian elimination with partial pivoting on the augmented rows.
+        for col in 0..n {
+            let pivot = (col..n)
+                .max_by(|&p, &q| a[p][col].abs().total_cmp(&a[q][col].abs()))
+                .unwrap();
+            a.swap(col, pivot);
+            for row in col + 1..n {
+                let factor = a[row][col] / a[col][col];
+                let pivot_row = a[col].clone();
+                for (value, &above) in a[row].iter_mut().zip(&pivot_row).skip(col) {
+                    *value -= factor * above;
+                }
+            }
+        }
+        let mut x = std::vec![0.0; n];
+        for i in (0..n).rev() {
+            let tail: f64 = (i + 1..n).map(|j| a[i][j] * x[j]).sum();
+            x[i] = (a[i][n] - tail) / a[i][i];
+        }
+        let tolerance = 1e-12;
+        let feasible = (0..n).all(|i| {
+            let residual: f64 = (0..n).map(|j| entry(i, j) * x[j]).sum::<f64>() - rhs[i];
+            x[i] >= obstacle[i] - tolerance && residual >= -tolerance
+        });
+        if feasible {
+            return (x, (0..n).map(contact).collect());
+        }
+    }
+    unreachable!("an M-matrix complementarity problem has a solution")
+}
+
+#[test]
+fn an_obstacle_below_every_value_keeps_the_solve_bits() {
+    let mut rng = Mix(289);
+    for n in 0..12 {
+        let (lower, diagonal, upper) = m_matrix(&mut rng, n);
+        let rhs: std::vec::Vec<f64> = (0..n).map(|_| rng.unit() - 0.5).collect();
+        let matrix = DominantTridiagonal::new(&lower, &diagonal, &upper).unwrap();
+        let mut pivots = std::vec![0.0; n];
+        let mut normalized = std::vec![0.0; n.saturating_sub(1)];
+        let factors = matrix.factor_into(&mut pivots, &mut normalized).unwrap();
+        let (mut free, mut bounded) = (std::vec![0.0; n], std::vec![0.0; n]);
+        factors.solve_into(&rhs, &mut free).unwrap();
+        factors
+            .solve_obstacle_into(&rhs, &std::vec![-f64::MAX; n], &mut bounded)
+            .unwrap();
+        assert_eq!(
+            free.iter()
+                .map(|x| x.to_bits())
+                .collect::<std::vec::Vec<_>>(),
+            bounded
+                .iter()
+                .map(|x| x.to_bits())
+                .collect::<std::vec::Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn the_obstacle_sweep_solves_one_sided_contact_and_refuses_every_other() {
+    let mut rng = Mix(1977);
+    let (mut upper_cases, mut lower_cases, mut refused) = (0, 0, 0);
+    for case in 0..4000 {
+        let n = 1 + case % 9;
+        let (lower, diagonal, upper) = m_matrix(&mut rng, n);
+        let rhs: std::vec::Vec<f64> = (0..n).map(|_| rng.unit() - 0.5).collect();
+        // A rising obstacle tends to be met at the last rows; a falling one at
+        // the first.
+        let rising = case % 2 == 0;
+        let obstacle: std::vec::Vec<f64> = (0..n)
+            .map(|i| {
+                let t = i as f64 / n as f64;
+                (if rising { t } else { 1.0 - t }) - 0.6 + 0.3 * rng.unit()
+            })
+            .collect();
+        let (expected, contact) = brute_force_lcp(&lower, &diagonal, &upper, &rhs, &obstacle);
+        let first = contact.iter().position(|&c| c).unwrap_or(n);
+        let last = contact.iter().rposition(|&c| c).map_or(0, |i| i + 1);
+        let at_end = contact[first..].iter().all(|&c| c);
+        let at_start = contact[..last].iter().all(|&c| c);
+        let close = |x: &[f64]| {
+            x.iter()
+                .zip(&expected)
+                .all(|(a, b)| (a - b).abs() <= 1e-12 * (1.0 + b.abs()))
+        };
+        let reverse = |v: &[f64]| v.iter().rev().copied().collect::<std::vec::Vec<_>>();
+        // The reversed system, row i becoming row n - 1 - i, sweeps a contact
+        // set that begins at the first row.
+        for reversed in [false, true] {
+            let (l, d, u, b, g) = if reversed {
+                let (l, d, u) = (reverse(&upper), reverse(&diagonal), reverse(&lower));
+                (l, d, u, reverse(&rhs), reverse(&obstacle))
+            } else {
+                let (l, d, u) = (lower.clone(), diagonal.clone(), upper.clone());
+                (l, d, u, rhs.clone(), obstacle.clone())
+            };
+            let mut pivots = std::vec![0.0; n];
+            let mut normalized = std::vec![0.0; n.saturating_sub(1)];
+            let matrix = DominantTridiagonal::new(&l, &d, &u).unwrap();
+            let factors = matrix.factor_into(&mut pivots, &mut normalized).unwrap();
+            let mut x = std::vec![0.0; n];
+            let solved = factors.solve_obstacle_into(&b, &g, &mut x);
+            let x = if reversed { reverse(&x) } else { x };
+            let one_sided = if reversed { at_start } else { at_end };
+            match solved {
+                Ok(()) => assert!(
+                    close(&x),
+                    "case {case} {reversed}: accepted a non-solution {x:?} {expected:?}"
+                ),
+                Err(Error::NotComplementary(_)) => {
+                    assert!(!one_sided, "case {case} {reversed}: refused");
+                    assert!(x.iter().zip(&obstacle).all(|(v, g)| v >= g));
+                    refused += 1;
+                }
+                Err(error) => panic!("case {case} {reversed}: {error:?}"),
+            }
+            if one_sided {
+                if reversed {
+                    lower_cases += 1;
+                } else {
+                    upper_cases += 1;
+                }
+            }
+            if !at_end && !at_start {
+                assert!(
+                    solved.is_err(),
+                    "case {case} {reversed}: two-sided accepted"
+                );
+            }
+        }
+    }
+    assert!(
+        upper_cases > 500 && lower_cases > 500 && refused > 500,
+        "{upper_cases} {lower_cases} {refused}"
+    );
+}
+
+/// A long, graded M-matrix of the kind a parabolic stage produces, with an
+/// obstacle met over its last rows: the check admits a sweep whose rows carry
+/// thousands of eliminations, and refuses the same sweep's output once one
+/// continuation row is moved by a few rounding bounds.
+#[test]
+fn a_long_one_sided_sweep_is_admitted_and_a_perturbed_row_is_not() {
+    let n = 2049;
+    let (mut lower, mut diagonal, mut upper) = (
+        std::vec![0.0; n - 1],
+        std::vec![0.0; n],
+        std::vec![0.0; n - 1],
+    );
+    for i in 0..n {
+        let spacing = 1.0 + (i as f64 / n as f64);
+        let coupling = 40.0 / spacing;
+        if i > 0 {
+            lower[i - 1] = -coupling;
+        }
+        if i + 1 < n {
+            upper[i] = -coupling;
+        }
+        diagonal[i] = 1.0 + 2.0 * coupling;
+    }
+    let rhs: std::vec::Vec<f64> = (0..n).map(|i| 1.0 - i as f64 / n as f64).collect();
+    let obstacle: std::vec::Vec<f64> = (0..n).map(|i| 2.0 * i as f64 / n as f64 - 0.9).collect();
+    let matrix = DominantTridiagonal::new(&lower, &diagonal, &upper).unwrap();
+    let mut pivots = std::vec![0.0; n];
+    let mut normalized = std::vec![0.0; n - 1];
+    let factors = matrix.factor_into(&mut pivots, &mut normalized).unwrap();
+    let mut x = std::vec![0.0; n];
+    factors
+        .solve_obstacle_into(&rhs, &obstacle, &mut x)
+        .unwrap();
+    let contact = x.iter().zip(&obstacle).filter(|(v, g)| v == g).count();
+    assert!(contact > 100 && contact < n - 100, "{contact}");
+    // One continuation row's right-hand side moved by about ten thousand
+    // rounding units: the sweep's own output no longer solves it.
+    let free = 10;
+    assert!(x[free] > obstacle[free]);
+    let mut moved = rhs.clone();
+    moved[free] += 1e4 * f64::EPSILON * (1.0 + rhs[free].abs());
+    assert_eq!(
+        factors.factors.check_complementarity(&moved, &obstacle, &x),
+        Err(Error::NotComplementary(free))
+    );
+}
+
+#[test]
+fn obstacle_arguments_are_checked_before_any_output_is_written() {
+    let matrix = DominantTridiagonal::new(&[1.0], &[2.0, 2.0], &[1.0]).unwrap();
+    let mut pivots = [0.0; 2];
+    let mut normalized = [0.0];
+    let factors = matrix.factor_into(&mut pivots, &mut normalized).unwrap();
+    let mut out = [7.0; 2];
+    assert_eq!(
+        factors.solve_obstacle_into(&[1.0, 1.0], &[0.0], &mut out),
+        Err(Error::Shape)
+    );
+    assert_eq!(
+        factors.solve_obstacle_into(&[1.0, 1.0], &[0.0, f64::NAN], &mut out),
+        Err(Error::NonFinite)
+    );
+    assert_eq!(out, [7.0; 2]);
+    factors
+        .solve_obstacle_into(&[3.0, 3.0], &[0.0, 1.5], &mut out)
+        .unwrap();
+    // Unconstrained [1, 1]; the last row is raised to 1.5 and the first
+    // reads it: (3 - 1.5) / 2.
+    assert_eq!(out, [0.75, 1.5]);
+}

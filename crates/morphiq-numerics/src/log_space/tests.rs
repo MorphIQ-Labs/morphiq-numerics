@@ -6,7 +6,8 @@
 //! exact result, rounded inward, so the comparison is exact.
 
 use super::{
-    log_diff_exp, log_sum_exp, log_sum_exp_and_normalize, log_sum_exp_pairs, scalar_terms, shift,
+    NormalizeError, log_diff_exp, log_sum_exp, log_sum_exp_and_normalize, log_sum_exp_pairs,
+    normalize_log_weights, scalar_terms, shift,
 };
 use crate::test_exact::{entries, field, word};
 use std::vec::Vec;
@@ -242,18 +243,51 @@ fn check_pairs<const N: usize>(pairs: &[[f64; 2]]) {
 
 /// §1's normalized pair by its stated operations, one scalar `exp` and
 /// `ln_1p` each: `hi` the index of the larger entry, `d = x[lo] − x[hi]`,
-/// `p[hi] = −ln_1p(exp(d))`, `p[lo] = d + p[hi]`; `None` when `x[hi] = −∞`.
-fn normalized_reference(x: [f64; 2]) -> Option<[f64; 2]> {
+/// `p[hi] = −ln_1p(exp(d))`, `p[lo] = d + p[hi]`, after §1's refusals.
+fn normalized_reference(x: [f64; 2]) -> Result<[f64; 2], NormalizeError> {
+    for (index, v) in x.iter().enumerate() {
+        if v.is_nan() || *v == f64::INFINITY {
+            return Err(NormalizeError::InvalidWeight(index));
+        }
+    }
     let hi = usize::from(x[1] > x[0]);
     if x[hi] == f64::NEG_INFINITY {
-        return None;
+        return Err(NormalizeError::ZeroMass);
     }
     let d = x[1 - hi] - x[hi];
     let top = -crate::elementary::ln_1p(crate::elementary::exp(d));
     let mut p = [0.0; 2];
     p[hi] = top;
     p[1 - hi] = d + top;
-    Some(p)
+    if x[1 - hi].is_finite() && !p[1 - hi].is_finite() {
+        return Err(NormalizeError::Unrepresentable(1 - hi));
+    }
+    Ok(p)
+}
+
+/// The pair normalization refuses exactly what `normalize_log_weights`
+/// refuses on the same pair, with the same error, and a gap too wide for
+/// binary64 is never returned as a finite entry's zero mass.
+#[test]
+fn the_pair_normalization_refuses_as_the_checked_normalization_does() {
+    for pair in pair_corpus() {
+        let [(_, fused)] = log_sum_exp_and_normalize(&[pair]);
+        let mut out = [0.0; 2];
+        match (fused, normalize_log_weights(&pair, &mut out)) {
+            (Ok(p), Ok(_)) => assert!(p.iter().all(|v| *v <= 0.0), "{pair:?}: {p:?}"),
+            (Err(a), Err(b)) => assert_eq!(a, b, "{pair:?}"),
+            (a, b) => panic!("{pair:?}: {a:?} against {b:?}"),
+        }
+    }
+    for (pair, lo) in [([1e308, -1e308], 1), ([-f64::MAX, f64::MAX], 0)] {
+        let [(_, p)] = log_sum_exp_and_normalize(&[pair]);
+        assert_eq!(p, Err(NormalizeError::Unrepresentable(lo)), "{pair:?}");
+    }
+    let [(_, p)] = log_sum_exp_and_normalize(&[[0.0, f64::NEG_INFINITY]]);
+    assert_eq!(
+        p.map(|p| p.map(f64::to_bits)),
+        Ok([(-0.0f64).to_bits(), f64::NEG_INFINITY.to_bits()])
+    );
 }
 
 /// `log_sum_exp_and_normalize::<N>` against `log_sum_exp` and
@@ -263,13 +297,9 @@ fn check_normalize<const N: usize>(pairs: &[[f64; 2]]) {
         let batch: [[f64; 2]; N] = core::array::from_fn(|i| pairs[(start + i) % pairs.len()]);
         for ((y, p), pair) in log_sum_exp_and_normalize(&batch).iter().zip(&batch) {
             assert_eq!(y.to_bits(), log_sum_exp(pair).to_bits(), "{pair:?}");
-            // A NaN entry is NaN either way; its payload is not specified.
-            let bits = |p: &Option<[f64; 2]>| {
-                p.map(|p| p.map(|v| if v.is_nan() { u64::MAX } else { v.to_bits() }))
-            };
             assert_eq!(
-                bits(p),
-                bits(&normalized_reference(*pair)),
+                p.map(|p| p.map(f64::to_bits)),
+                normalized_reference(*pair).map(|p| p.map(f64::to_bits)),
                 "{pair:?} in a batch of {N}"
             );
         }
