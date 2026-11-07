@@ -1189,6 +1189,10 @@ fn tridiagonal_error(r: &mut Recorder, error: TridiagonalError) {
             r.u64(7);
             r.u64(link as u64);
         }
+        TridiagonalError::NotComplementary(row) => {
+            r.u64(8);
+            r.u64(row as u64);
+        }
     }
 }
 

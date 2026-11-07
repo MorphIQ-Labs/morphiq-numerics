@@ -45,6 +45,10 @@ pub enum Error {
     ZeroPivot(usize),
     /// Arithmetic or a required finite enclosure is unrepresentable.
     Range,
+    /// An obstacle sweep's result fails complementarity at this row: its
+    /// contact set is not one the sweep solves. The output holds the
+    /// unverified sweep.
+    NotComplementary(usize),
 }
 
 /// An immutable, conservatively validated strictly dominant tridiagonal matrix.
@@ -466,16 +470,18 @@ impl UnpivotedThomasFactors<'_, '_> {
     /// kept. With an obstacle below every unconstrained value the bits are
     /// [`Self::solve_into`]'s.
     ///
-    /// For an M-matrix whose complementarity solution has its contact set
-    /// ending at the last row, the result solves
-    /// `min(A x - rhs, x - obstacle) = 0`. Nothing here checks that
-    /// structure; a caller verifies complementarity before relying on it.
-    /// Reverse the system's rows for a contact set beginning at the first.
+    /// The sweep solves `min(A x - rhs, x - obstacle) = 0` when the solution's
+    /// contact set ends at the last row (reverse the system's rows for one
+    /// beginning at the first). Every result is checked against the original
+    /// matrix in one further O(n) pass: success means the output is an exact
+    /// solution of the problem with each `rhs` entry perturbed by at most
+    /// twice its row's rounding bound (`docs/tridiagonal.md`, Obstacle solves).
     ///
     /// # Errors
     /// [`Error::Shape`] or [`Error::NonFinite`] (in `rhs` or `obstacle`)
     /// leaves output unchanged; [`Error::Range`] invalidates the partially
-    /// written output.
+    /// written output. [`Error::NotComplementary`] leaves the unverified
+    /// sweep, finite and at or above the obstacle, for the caller's fallback.
     pub fn solve_obstacle_into(
         &self,
         rhs: &[f64],
@@ -578,7 +584,52 @@ impl Factors<'_, '_> {
             return Err(Error::NonFinite);
         }
         self.forward(rhs.iter(), out.iter_mut())?;
-        self.backward_obstacle(out.iter_mut(), obstacle)
+        self.backward_obstacle(out.iter_mut(), obstacle)?;
+        self.check_complementarity(rhs, obstacle, out)
+    }
+
+    // A row at its obstacle needs `(A x - rhs)[i] >= -bound`; any other row
+    // needs `|(A x - rhs)[i]| <= bound`. The computed solve satisfies
+    // `|A x - rhs| <= 5u |L||U||x|` on every row whose own and previous
+    // back-substitution step was unclamped; the residual's evaluation adds
+    // `4u (|A||x| + |rhs|)`, with `|A| <= (1 + u)|L||U|`. So `5 eps = 10u`
+    // times `|L||U||x| + |rhs|` admits every one-sided sweep, and an accepted
+    // result's exact residual is within twice the bound. At most eight
+    // products and quotients enter a row, each with absolute underflow error
+    // at most `eta/2` scaled by the bracketed factors, giving `4 eta`, doubled
+    // for the bound's own rounding.
+    fn check_complementarity(&self, rhs: &[f64], obstacle: &[f64], x: &[f64]) -> Result<(), Error> {
+        let a = self.matrix;
+        let n = a.len();
+        let eta = f64::from_bits(1);
+        for i in 0..n {
+            let (lower, previous, previous_upper) = match i {
+                0 => (0.0, 0.0, 0.0),
+                _ => (a.lower[i - 1], x[i - 1], self.normalized_upper[i - 1]),
+            };
+            let (upper, next, normalized) = if i + 1 < n {
+                (a.upper[i], x[i + 1], self.normalized_upper[i])
+            } else {
+                (0.0, 0.0, 0.0)
+            };
+            let pivot = self.pivots[i];
+            let residual = lower * previous + a.diagonal[i] * x[i] + upper * next - rhs[i];
+            let factored = lower.abs() * (previous.abs() + previous_upper.abs() * x[i].abs())
+                + pivot.abs() * (x[i].abs() + normalized.abs() * next.abs());
+            let underflow = 8.0
+                * eta
+                * (1.0 + lower.abs() + pivot.abs())
+                * (1.0 + previous.abs() + x[i].abs() + next.abs());
+            let bound = 5.0 * f64::EPSILON * (factored + rhs[i].abs()) + underflow;
+            if !residual.is_finite() || !bound.is_finite() {
+                return Err(Error::Range);
+            }
+            let contact = x[i] == obstacle[i];
+            if residual < -bound || (!contact && residual > bound) {
+                return Err(Error::NotComplementary(i));
+            }
+        }
+        Ok(())
     }
 
     // The back substitution of `backward`, each value raised to its obstacle
@@ -739,16 +790,18 @@ impl ThomasFactors<'_, '_> {
     /// kept. With an obstacle below every unconstrained value the bits are
     /// [`Self::solve_into`]'s.
     ///
-    /// For an M-matrix whose complementarity solution has its contact set
-    /// ending at the last row, the result solves
-    /// `min(A x - rhs, x - obstacle) = 0`. Nothing here checks that
-    /// structure; a caller verifies complementarity before relying on it.
-    /// Reverse the system's rows for a contact set beginning at the first.
+    /// The sweep solves `min(A x - rhs, x - obstacle) = 0` when the solution's
+    /// contact set ends at the last row (reverse the system's rows for one
+    /// beginning at the first). Every result is checked against the original
+    /// matrix in one further O(n) pass: success means the output is an exact
+    /// solution of the problem with each `rhs` entry perturbed by at most
+    /// twice its row's rounding bound (`docs/tridiagonal.md`, Obstacle solves).
     ///
     /// # Errors
     /// [`Error::Shape`] or [`Error::NonFinite`] (in `rhs` or `obstacle`)
     /// leaves output unchanged; [`Error::Range`] invalidates the partially
-    /// written output.
+    /// written output. [`Error::NotComplementary`] leaves the unverified
+    /// sweep, finite and at or above the obstacle, for the caller's fallback.
     pub fn solve_obstacle_into(
         &self,
         rhs: &[f64],
@@ -881,16 +934,18 @@ impl SignThomasFactors<'_, '_> {
     /// kept. With an obstacle below every unconstrained value the bits are
     /// [`Self::solve_into`]'s.
     ///
-    /// For an M-matrix whose complementarity solution has its contact set
-    /// ending at the last row, the result solves
-    /// `min(A x - rhs, x - obstacle) = 0`. Nothing here checks that
-    /// structure; a caller verifies complementarity before relying on it.
-    /// Reverse the system's rows for a contact set beginning at the first.
+    /// The sweep solves `min(A x - rhs, x - obstacle) = 0` when the solution's
+    /// contact set ends at the last row (reverse the system's rows for one
+    /// beginning at the first). Every result is checked against the original
+    /// matrix in one further O(n) pass: success means the output is an exact
+    /// solution of the problem with each `rhs` entry perturbed by at most
+    /// twice its row's rounding bound (`docs/tridiagonal.md`, Obstacle solves).
     ///
     /// # Errors
     /// [`Error::Shape`] or [`Error::NonFinite`] (in `rhs` or `obstacle`)
     /// leaves output unchanged; [`Error::Range`] invalidates the partially
-    /// written output.
+    /// written output. [`Error::NotComplementary`] leaves the unverified
+    /// sweep, finite and at or above the obstacle, for the caller's fallback.
     pub fn solve_obstacle_into(
         &self,
         rhs: &[f64],

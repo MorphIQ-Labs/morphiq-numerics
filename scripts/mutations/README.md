@@ -18,8 +18,8 @@ both scalar and `simd,std` configurations, using an output directory in
 `runner.temp` named for the workflow run and attempt. Receipts and builds stay
 outside the restored Cargo cache, and artifact uploads select that attempt's
 receipts and logs. This checks numerical behavior,
-not native performance. A successful receipt has twelve numerical rejections
-(six faults in two configurations) and two equivalent-control passes, each
+not native performance. A successful receipt has fourteen numerical rejections
+(seven faults in two configurations) and two equivalent-control passes, each
 preceded by a passing baseline. It does not claim a whole-crate mutation score.
 
 ## Fault catalog
@@ -36,6 +36,7 @@ contracts:
 | Discard Q128's addition carry | The significand is no longer normalized |
 | Reduce the splitter's shift from 27 to 26 | Exact integer multiplication differs from the two components |
 | Subtract ln's rounding uncertainty | A midpoint-crossing interval is incorrectly accepted |
+| Skip the obstacle sweep's complementarity check | A two-sided contact set is reported solved |
 
 Compilation failure, timeout, signal termination, zero or ignored tests, a
 different failing test and an unrelated panic do not count as kills. The named
@@ -80,7 +81,7 @@ automatically in CI or lower them merely to pass a failed gate.
 equivalent control. It survived the assigned split-tie test and the broader
 exact-product tests. Survival alone does not establish equivalence. The
 arithmetic argument is below; the control must pass its exact-product test and
-is recorded separately from the six faults.
+is recorded separately from the seven faults.
 
 On the existing split domain, `|x| <= 2^994`, multiplying a binary64 `x` by
 `2^27` is exact and finite. Let `P = 2^27*x`. The replacement computes

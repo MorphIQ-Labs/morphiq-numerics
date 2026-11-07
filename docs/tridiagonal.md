@@ -152,11 +152,40 @@ solution's contact set `{i : x[i] = g[i]}` is a final interval of rows
 (Brennan and Schwartz 1977; Jaillet, Lamberton and Lapeyre 1990 for the American
 put's discretization). A contact set that begins at row 0 is the reversed
 system's: reverse the diagonal, swap and reverse the off-diagonals, solve with
-reversed `rhs` and `obstacle`, and reverse the output. Nothing here checks the
-contact structure; a consumer that cannot guarantee it verifies complementarity
-on the result and falls back to a general LCP solver. Tests compare the sweep
-against enumeration of every contact set, solved densely, on random M-matrix
-systems of orders 1–9 with contact at either end.
+reversed `rhs` and `obstacle`, and reverse the output. Any other contact set
+makes the sweep's output a vector that is not a solution, so every call checks
+its result before returning it.
+
+**Complementarity check.** With `r = A x − rhs` evaluated on the original
+matrix, a row at its obstacle (`x[i] = g[i]`) needs `r[i] ≥ −τ[i]` and any
+other row `|r[i]| ≤ τ[i]`, else the call returns `NotComplementary(i)` at the
+first failing row, with the output holding the unverified sweep (finite and at
+or above the obstacle) for a caller's fallback. The bound is
+
+    τ[i] = 5ε (m[i] + |rhs[i]|) + 8η (1 + |l[i]| + |d[i]|)(1 + |x[i−1]| + |x[i]| + |x[i+1]|)
+    m[i] = |l[i]| (|x[i−1]| + |c[i−1]| |x[i]|) + |d[i]| (|x[i]| + |c[i]| |x[i+1]|)
+
+with `l` the lower diagonal, `d` the pivots, `c` the normalized upper
+diagonal, `m = (|L||U||x|)[i]`, `ε = 2u = 2⁻⁵²` and `η = 2⁻¹⁰⁷⁴`. It is
+derived, not tuned. Factorization, forward and back recurrences each round
+once or twice per row, so a row whose own and previous back-substitution steps
+were not clamped satisfies `|r| ≤ 5u |L||U||x|`; the residual's own evaluation
+adds `4u (|A||x| + |rhs|)` with `|A| ≤ (1 + u)|L||U|`, which `10u = 5ε` covers.
+At most eight products and quotients enter a row, each with absolute
+underflow error at most `η/2` times the bracketed factors, which `8η` covers
+with the bound's own rounding. So every sweep whose contact set is one-sided is
+admitted, and an admitted output is the exact solution of the problem with each
+`rhs[i]` moved by at most `2τ[i]`: rows at the obstacle keep `A x ≥ rhs'`,
+others meet `A x = rhs'`. A nonfinite residual or bound is `Range`. The check
+costs one O(n) pass over the original coefficients and allocates nothing.
+
+Tests compare the sweep against enumeration of every contact set, solved
+densely, on 4,000 random M-matrix systems of orders 1–9: each orientation whose
+contact set is one-sided is admitted and matches, and every two-sided case is
+refused in both orientations. A 2,049-row graded system with contact over its
+last rows is admitted, and refused once one continuation row's right-hand side
+moves by 10⁴ε. The numerical mutation catalog's `skipped-complementarity-check`
+fault, which returns the sweep unchecked, must fail the enumeration test.
 
 ## SIMD across right-hand sides
 

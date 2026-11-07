@@ -1,0 +1,12 @@
+--- a/crates/morphiq-numerics/src/linalg/tridiagonal.rs
++++ b/crates/morphiq-numerics/src/linalg/tridiagonal.rs
+@@ -585,7 +585,8 @@
+         }
+         self.forward(rhs.iter(), out.iter_mut())?;
+         self.backward_obstacle(out.iter_mut(), obstacle)?;
+-        self.check_complementarity(rhs, obstacle, out)
++        let _ = (rhs, Self::check_complementarity);
++        Ok(())
+     }
+ 
+     // A row at its obstacle needs `(A x - rhs)[i] >= -bound`; any other row

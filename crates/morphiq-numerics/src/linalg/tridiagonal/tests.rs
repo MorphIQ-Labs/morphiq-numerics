@@ -998,9 +998,9 @@ fn an_obstacle_below_every_value_keeps_the_solve_bits() {
 }
 
 #[test]
-fn the_obstacle_sweep_solves_complementarity_with_its_contact_set_at_either_end() {
+fn the_obstacle_sweep_solves_one_sided_contact_and_refuses_every_other() {
     let mut rng = Mix(1977);
-    let (mut upper_cases, mut lower_cases) = (0, 0);
+    let (mut upper_cases, mut lower_cases, mut refused) = (0, 0, 0);
     for case in 0..4000 {
         let n = 1 + case % 9;
         let (lower, diagonal, upper) = m_matrix(&mut rng, n);
@@ -1024,34 +1024,102 @@ fn the_obstacle_sweep_solves_complementarity_with_its_contact_set_at_either_end(
                 .zip(&expected)
                 .all(|(a, b)| (a - b).abs() <= 1e-12 * (1.0 + b.abs()))
         };
-        let mut pivots = std::vec![0.0; n];
-        let mut normalized = std::vec![0.0; n.saturating_sub(1)];
-        if at_end {
-            let matrix = DominantTridiagonal::new(&lower, &diagonal, &upper).unwrap();
+        let reverse = |v: &[f64]| v.iter().rev().copied().collect::<std::vec::Vec<_>>();
+        // The reversed system, row i becoming row n - 1 - i, sweeps a contact
+        // set that begins at the first row.
+        for reversed in [false, true] {
+            let (l, d, u, b, g) = if reversed {
+                let (l, d, u) = (reverse(&upper), reverse(&diagonal), reverse(&lower));
+                (l, d, u, reverse(&rhs), reverse(&obstacle))
+            } else {
+                let (l, d, u) = (lower.clone(), diagonal.clone(), upper.clone());
+                (l, d, u, rhs.clone(), obstacle.clone())
+            };
+            let mut pivots = std::vec![0.0; n];
+            let mut normalized = std::vec![0.0; n.saturating_sub(1)];
+            let matrix = DominantTridiagonal::new(&l, &d, &u).unwrap();
             let factors = matrix.factor_into(&mut pivots, &mut normalized).unwrap();
             let mut x = std::vec![0.0; n];
-            factors
-                .solve_obstacle_into(&rhs, &obstacle, &mut x)
-                .unwrap();
-            assert!(close(&x), "case {case}: {x:?} against {expected:?}");
-            upper_cases += 1;
-        } else if at_start {
-            // The reversed system: row i becomes row n - 1 - i.
-            let reverse = |v: &[f64]| v.iter().rev().copied().collect::<std::vec::Vec<_>>();
-            let (rl, rd, ru) = (reverse(&upper), reverse(&diagonal), reverse(&lower));
-            let matrix = DominantTridiagonal::new(&rl, &rd, &ru).unwrap();
-            let factors = matrix.factor_into(&mut pivots, &mut normalized).unwrap();
-            let mut x = std::vec![0.0; n];
-            factors
-                .solve_obstacle_into(&reverse(&rhs), &reverse(&obstacle), &mut x)
-                .unwrap();
-            assert!(close(&reverse(&x)), "case {case}: reversed");
-            lower_cases += 1;
+            let solved = factors.solve_obstacle_into(&b, &g, &mut x);
+            let x = if reversed { reverse(&x) } else { x };
+            let one_sided = if reversed { at_start } else { at_end };
+            match solved {
+                Ok(()) => assert!(
+                    close(&x),
+                    "case {case} {reversed}: accepted a non-solution {x:?} {expected:?}"
+                ),
+                Err(Error::NotComplementary(_)) => {
+                    assert!(!one_sided, "case {case} {reversed}: refused");
+                    assert!(x.iter().zip(&obstacle).all(|(v, g)| v >= g));
+                    refused += 1;
+                }
+                Err(error) => panic!("case {case} {reversed}: {error:?}"),
+            }
+            if one_sided {
+                if reversed {
+                    lower_cases += 1;
+                } else {
+                    upper_cases += 1;
+                }
+            }
+            if !at_end && !at_start {
+                assert!(
+                    solved.is_err(),
+                    "case {case} {reversed}: two-sided accepted"
+                );
+            }
         }
     }
     assert!(
-        upper_cases > 500 && lower_cases > 500,
-        "{upper_cases} {lower_cases}"
+        upper_cases > 500 && lower_cases > 500 && refused > 500,
+        "{upper_cases} {lower_cases} {refused}"
+    );
+}
+
+/// A long, graded M-matrix of the kind a parabolic stage produces, with an
+/// obstacle met over its last rows: the check admits a sweep whose rows carry
+/// thousands of eliminations, and refuses the same sweep's output once one
+/// continuation row is moved by a few rounding bounds.
+#[test]
+fn a_long_one_sided_sweep_is_admitted_and_a_perturbed_row_is_not() {
+    let n = 2049;
+    let (mut lower, mut diagonal, mut upper) = (
+        std::vec![0.0; n - 1],
+        std::vec![0.0; n],
+        std::vec![0.0; n - 1],
+    );
+    for i in 0..n {
+        let spacing = 1.0 + (i as f64 / n as f64);
+        let coupling = 40.0 / spacing;
+        if i > 0 {
+            lower[i - 1] = -coupling;
+        }
+        if i + 1 < n {
+            upper[i] = -coupling;
+        }
+        diagonal[i] = 1.0 + 2.0 * coupling;
+    }
+    let rhs: std::vec::Vec<f64> = (0..n).map(|i| 1.0 - i as f64 / n as f64).collect();
+    let obstacle: std::vec::Vec<f64> = (0..n).map(|i| 2.0 * i as f64 / n as f64 - 0.9).collect();
+    let matrix = DominantTridiagonal::new(&lower, &diagonal, &upper).unwrap();
+    let mut pivots = std::vec![0.0; n];
+    let mut normalized = std::vec![0.0; n - 1];
+    let factors = matrix.factor_into(&mut pivots, &mut normalized).unwrap();
+    let mut x = std::vec![0.0; n];
+    factors
+        .solve_obstacle_into(&rhs, &obstacle, &mut x)
+        .unwrap();
+    let contact = x.iter().zip(&obstacle).filter(|(v, g)| v == g).count();
+    assert!(contact > 100 && contact < n - 100, "{contact}");
+    // One continuation row's right-hand side moved by about ten thousand
+    // rounding units: the sweep's own output no longer solves it.
+    let free = 10;
+    assert!(x[free] > obstacle[free]);
+    let mut moved = rhs.clone();
+    moved[free] += 1e4 * f64::EPSILON * (1.0 + rhs[free].abs());
+    assert_eq!(
+        factors.factors.check_complementarity(&moved, &obstacle, &x),
+        Err(Error::NotComplementary(free))
     );
 }
 
