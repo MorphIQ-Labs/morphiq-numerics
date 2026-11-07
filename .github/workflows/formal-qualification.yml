@@ -1,0 +1,64 @@
+# One-off #233 evidence runner; this workflow stays on qualify/233-formal.
+# Only the reusable benchmark script is proposed for the implementation PR.
+name: formal qualification
+on:
+  push:
+    branches: [qualify/233-formal]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  full-control:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: formal-inputs
+          run-id: 42421275469
+          github-token: ${{ github.token }}
+          path: target
+      - name: Restore the exact family-run corpora and generated proofs
+        run: tar -xzf target/formal-inputs.tar.gz -C target
+      - name: Coq dependency cache identity
+        id: key
+        run: echo "deps=coq-deps-$(sha256sum .cargo/coq-image .cargo/coq-packages scripts/formal_deps.sh | sha256sum | cut -c1-64)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/coq-deps
+          key: ${{ steps.key.outputs.deps }}
+          fail-on-cache-miss: true
+      - name: Pull the pinned Coq image
+        run: docker pull --quiet "$(cat .cargo/coq-image)"
+      - name: Full gate, empty proof build followed by a warm repeat
+        run: |
+          mkdir -p target/qualification
+          chmod a+rwx target/qualification
+          docker run --rm -v "$PWD:/w:ro" -v "$PWD/target/qualification:/result" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
+            ./scripts/bench_formal.sh /t/coq-deps/coq-deps.tar.gz target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs /result/full
+      - name: Reject corrupted internal and bivariate expected results
+        run: |
+          for family in internal-crosscheck bivariate; do
+            mutation=$family
+            if [ "$family" = bivariate ]; then mutation=bvn-crosscheck; fi
+            docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
+              ./scripts/check_formal_negative.sh --family "$family" "$mutation" /t/coq-deps/coq-deps.tar.gz \
+              target/qualification/full/build target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs \
+              2>&1 | tee "target/qualification/negative-$mutation.log"
+          done
+      - name: Retain timings, exact inputs and every failed attempt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: formal-full-control
+          path: |
+            target/qualification/full/*.txt
+            target/qualification/full/*.tsv
+            target/qualification/full/*.log
+            target/qualification/negative-*.log
+            target/formal-plan/families.json
+          if-no-files-found: error
