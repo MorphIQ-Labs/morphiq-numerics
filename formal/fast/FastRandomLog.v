@@ -1,9 +1,9 @@
 (** Private radius logarithm: comparison with the certified full stage. *)
-From Coq Require Import Reals ZArith Lia Lra Psatz.
+From Coq Require Import Reals ZArith Lia Lra Psatz Bool.
 From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add Encodings RoundingTest.
 From Interval Require Import Tactic.
-Require Import StageGappa Ln1pCertificates Ln1pStageH LnStageEvaluation
+Require Import StageGappa Ln1pCertificates Ln1pStageH Ln1pStageB LnStageEvaluation
  LnReduction Ln1pReduction Ln1pCheck Ln1pTables Ln1pLemmas LnNormalized LnUnit FastLn.
 Require normal_normal_pair_log.
 Open Scope R_scope.
@@ -46,8 +46,8 @@ Ltac pair_bound :=
 Ltac pair_op op k a b F V C :=
  destruct (op k 0%Z a b ltac:(assumption) ltac:(assumption)
    ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia)
-   ltac:(unfold bnd;bpow_num;cbn [IZR];pair_bound)) as [F [V C]];
- unfold bnd in C;revert C;bpow_num;cbn [IZR];intro C.
+   ltac:(unfold bnd;StageGappa.bpow_num;cbn [IZR];pair_bound)) as [F [V C]];
+ unfold bnd in C;revert C;StageGappa.bpow_num;cbn [IZR];intro C.
 
 Lemma pair_sequences_ieee hi lo z : finite hi -> finite lo -> finite z ->
  Rabs(B hi)<=38 -> Rabs(B lo)<=1 -> Rabs(B z)<=1 ->
@@ -168,18 +168,18 @@ Proof.
  destruct (of_int_ok E ltac:(lia)) as [Fe Ve].
  assert (EI:Rabs(B(of_int E))<=53) by (rewrite Ve,<-abs_IZR;apply IZR_le;lia).
  destruct (fmul_bnd 75 (-1) (of_int E) st_l1 Fe FL1 ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia)) as [Fhi [Vhi Chi]].
- { unfold bnd;bpow_num;cbn [IZR]. rewrite Rabs_mult.
+ { unfold bnd;StageGappa.bpow_num;cbn [IZR]. rewrite Rabs_mult.
    apply Rle_trans with (53*0.7);[apply Rmult_le_compat;try apply Rabs_pos;assumption|lra]. }
  unfold bnd in Chi;bpow_num_in Chi.
  destruct (fadd_bnd 38 0 (fmul (of_int E) st_l1) (st_th(rd_i(bits_of_b64 h))) Fhi Fth ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia)) as [Fh1 [Vh1 Ch1]].
- { unfold bnd;bpow_num;cbn [IZR]. eapply Rle_trans;[apply Rabs_triang|lra]. }
- unfold bnd in Ch1;bpow_num_in Ch1.
+ { unfold bnd;StageGappa.bpow_num;cbn [IZR]. eapply Rle_trans;[apply Rabs_triang|lra]. }
+ unfold bnd in Ch1;change (bpow radix2 0) with 1 in Ch1.
  destruct (fmul_bnd 53 (-44) (of_int E) st_l0 Fe FL0 ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia)) as [Flo [Vlo Clo]].
- { unfold bnd;bpow_num;cbn [IZR]. rewrite Rabs_mult.
-   apply Rle_trans with (53*/17592186044416);[apply Rmult_le_compat;try apply Rabs_pos;assumption|lra]. }
+ { unfold bnd;StageGappa.bpow_num;cbn [IZR]. rewrite Rabs_mult.
+   apply Rle_trans with (53*/17592186044416);[apply Rmult_le_compat;try apply Rabs_pos;[exact EI|lra]|lra]. }
  unfold bnd in Clo;bpow_num_in Clo.
  destruct (fadd_bnd 54 (-44) (fmul (of_int E) st_l0) (st_tl(rd_i(bits_of_b64 h))) Flo Ftl ltac:(lia) ltac:(lia) ltac:(reflexivity) ltac:(lia)) as [Fl1 [Vl1 Cl1]].
- { unfold bnd;bpow_num;cbn [IZR]. eapply Rle_trans;[apply Rabs_triang|lra]. }
+ { unfold bnd;StageGappa.bpow_num;cbn [IZR]. eapply Rle_trans;[apply Rabs_triang|lra]. }
  unfold bnd in Cl1;bpow_num_in Cl1.
  assert (Z:Rabs(B(rd_z h))<=/2^9) by (eapply Rle_trans;[exact Zz|];eapply Rle_trans;[exact Zi|];simpl;lra).
  pose proof (pair_sequences_difference _ _ _ Fh1 Fl1 Fz ltac:(cbn [IZR] in Ch1;lra) ltac:(cbn [IZR] in Cl1;lra) Z) as D.
@@ -259,7 +259,7 @@ Proof.
  intros Fx X.
  destruct (fast_ln_regular_ok x Fx ltac:(lra) ltac:(lra)) as [Fo O].
  unfold pair_log64;destruct (pair_unit x) eqn:U.
- - split;[exact Fo|left;bpow_num_all;exact O].
+ - split;[exact Fo|left;bpow_num_all;lra].
  - destruct (pair_regular_difference x Fx X) as [Fn D]. split;[exact Fn|right].
    assert (Far:B x<511/512).
    { destruct (Rlt_dec (B x) (511/512));[assumption|].
