@@ -1,5 +1,7 @@
 import os
 import tempfile
+import subprocess
+from pathlib import Path
 import unittest
 
 from scripts import formal_relevant as fr
@@ -44,8 +46,27 @@ class FormalRelevantTest(unittest.TestCase):
 
     def test_unclassified_paths_select_the_full_gate(self):
         for path in ["CHANGELOG.md", "docs/unbound.md", "crates/reference/fixtures/exp.json",
-                     "generators/unbound.py", ".github/workflows/release.yml", "unknown.file"]:
+                     "generators/unbound.py", ".github/workflows/release.yml", "unknown.file", "README.md "]:
             self.assertEqual(first(path), path)
+
+    def test_renaming_a_proof_to_prose_keeps_the_removed_source_in_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            previous = os.getcwd()
+            try:
+                os.chdir(directory)
+                def git(*args):
+                    return subprocess.check_output(["git", "-c", "commit.gpgsign=false", *args], text=True, stderr=subprocess.DEVNULL).strip()
+                git("init"); git("config", "user.name", "fixture"); git("config", "user.email", "fixture@example.invalid")
+                Path("formal/exp").mkdir(parents=True)
+                Path("formal/exp/Old.v").write_text("(* proof fixture *)\n")
+                git("add", "."); git("commit", "-m", "fixture: original")
+                base = git("rev-parse", "HEAD")
+                git("mv", "formal/exp/Old.v", "README.md"); git("commit", "-m", "fixture: rename")
+                paths = fr.changed_paths(base, "HEAD")
+                self.assertEqual(set(paths), {"formal/exp/Old.v", "README.md"})
+                self.assertEqual(fr.first_affecting(paths, set()), "formal/exp/Old.v")
+            finally:
+                os.chdir(previous)
 
     def test_the_bindings_are_read_from_every_manifest(self):
         with tempfile.TemporaryDirectory() as root:

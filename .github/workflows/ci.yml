@@ -537,15 +537,15 @@ jobs:
             exit 0
           fi
           if [ "${{ github.event_name }}" = pull_request ]; then
-            git diff --name-only HEAD^1 HEAD > target/changed-files.txt
-            verdict=$(python3 scripts/formal_relevant.py --changed target/changed-files.txt)
+            verdict=$(python3 scripts/formal_relevant.py --git-base HEAD^1 --write-changed target/changed-files.txt)
           else
             verdict="affected: push to the default branch"
           fi
           echo "formal lane: $verdict"
           case "$verdict" in
-            affected*) echo "affected=true" >> "$GITHUB_OUTPUT" ;;
-            *) echo "affected=false" >> "$GITHUB_OUTPUT" ;;
+            'affected: '*) echo "affected=true" >> "$GITHUB_OUTPUT" ;;
+            'not affected') echo "affected=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "invalid formal scope decision" >&2; exit 1 ;;
           esac
       - name: Write the cross-check corpus from the Rust library
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}

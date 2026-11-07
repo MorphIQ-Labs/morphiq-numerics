@@ -18,6 +18,7 @@ prints `affected: PATH` or `not affected`, and exits 0 either way.
 import argparse
 import glob
 import os
+import subprocess
 import sys
 
 ALWAYS = (
@@ -58,7 +59,6 @@ def is_test_source(path):
 def first_affecting(paths, bound):
     """The first changed path that can alter the lane's result, or None."""
     for path in paths:
-        path = path.strip()
         if not path:
             continue
         if path.startswith(ALWAYS) or path in bound:
@@ -75,13 +75,32 @@ def first_affecting(paths, bound):
     return None
 
 
+def changed_paths(base, head):
+    # Disabling rename detection retains the deleted source path as well as
+    # the destination. Git quotes control characters; these stay unfamiliar
+    # paths rather than becoming several apparently harmless prose paths.
+    return subprocess.check_output(
+        ["git", "diff", "--no-renames", "--name-only", base, head], text=True
+    ).splitlines()
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--changed", required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--changed")
+    source.add_argument("--git-base")
+    parser.add_argument("--git-head", default="HEAD")
+    parser.add_argument("--write-changed")
     parser.add_argument("--root", default=".")
     args = parser.parse_args()
-    with open(args.changed) as handle:
-        paths = handle.read().split("\n")
+    if args.changed:
+        with open(args.changed) as handle:
+            paths = handle.read().splitlines()
+    else:
+        paths = changed_paths(args.git_base, args.git_head)
+    if args.write_changed:
+        with open(args.write_changed, "w") as handle:
+            handle.write("\n".join(paths) + "\n")
     path = first_affecting(paths, bound_files(args.root))
     print("not affected" if path is None else f"affected: {path}")
     return 0
