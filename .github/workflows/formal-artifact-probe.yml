@@ -22,13 +22,18 @@ jobs:
   consumer:
     needs: producer
     runs-on: ubuntu-24.04
+    outputs:
+      attempt: ${{ steps.marker.outputs.attempt }}
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: formal-probe-input
-      - run: |
+      - id: marker
+        run: |
           cat input.txt
+          test "$(cat input.txt)" = 'producer attempt ${{ needs.producer.outputs.attempt }}'
           echo 'producer output ${{ needs.producer.outputs.attempt }}'
+          echo 'attempt=${{ github.run_attempt }}' >> "$GITHUB_OUTPUT"
           echo 'consumer attempt ${{ github.run_attempt }}' > result.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -38,3 +43,18 @@ jobs:
       - name: Deliberate first-attempt failure, after uploading evidence
         if: github.run_attempt == '1'
         run: exit 1
+  aggregate:
+    needs: [producer, consumer]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - run: |
+          test '${{ needs.producer.result }}' = success
+          test '${{ needs.consumer.result }}' = success
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: formal-probe-result*
+          merge-multiple: true
+      - run: |
+          cat result.txt
+          test "$(cat result.txt)" = 'consumer attempt ${{ needs.consumer.outputs.attempt }}'
