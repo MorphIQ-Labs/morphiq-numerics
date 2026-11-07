@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 
 SPEC = importlib.util.spec_from_file_location("normal_pair_screen", Path(__file__).with_name("screen.py"))
 screen = importlib.util.module_from_spec(SPEC)
@@ -12,6 +13,47 @@ SPEC.loader.exec_module(screen)
 
 
 class ScreenTests(unittest.TestCase):
+    def test_only_supported_native_platforms_are_admitted(self):
+        for system, machine, expected in [("Linux", "x86_64", "x86-linux"),
+                                           ("Darwin", "arm64", "arm-macos")]:
+            with patch.object(screen.host.platform, "system", return_value=system), \
+                 patch.object(screen.host.platform, "machine", return_value=machine):
+                self.assertEqual(screen.host.configuration()["name"], expected)
+        for system, machine in [("Darwin", "x86_64"), ("Linux", "aarch64"), ("Windows", "ARM64")]:
+            with patch.object(screen.host.platform, "system", return_value=system), \
+                 patch.object(screen.host.platform, "machine", return_value=machine):
+                with self.assertRaisesRegex(RuntimeError, "Unsupported native host"):
+                    screen.host.configuration()
+
+    def test_mac_rejects_a_claimed_cpu_affinity(self):
+        with patch.object(screen.host, "configuration", return_value={"name": "arm-macos"}):
+            screen.host.validate_cpu(None)
+            with self.assertRaisesRegex(ValueError, "omit --cpu"):
+                screen.host.validate_cpu(2)
+
+    def test_linux_requires_an_allowed_cpu(self):
+        with patch.object(screen.host, "configuration", return_value={"name": "x86-linux"}), \
+             patch.object(screen.host.os, "sched_getaffinity", return_value={2, 3}, create=True):
+            screen.host.validate_cpu(2)
+            for cpu in [None, 0]:
+                with self.assertRaisesRegex(ValueError, "allowed affinity"):
+                    screen.host.validate_cpu(cpu)
+
+    def test_failed_mac_qos_is_not_reported_as_configured(self):
+        native = Mock()
+        native.bench_set_qos.return_value = 1
+        with patch.object(screen.host, "configuration", return_value={"name": "arm-macos"}):
+            with self.assertRaisesRegex(RuntimeError, "Cannot establish"):
+                screen.host.configure(None, native)
+
+    def test_preparation_for_another_platform_is_refused_before_loading(self):
+        with tempfile.TemporaryDirectory(prefix="normal-pair-screen-test-") as directory:
+            out = Path(directory)
+            (out / "manifest.json").write_text(json.dumps(dict(
+                files={}, source_files={}, native_platform={"name": "different-host"})))
+            with self.assertRaisesRegex(RuntimeError, "different native platform"):
+                screen.load(out)
+
     def test_qualification_covers_the_declared_interfaces_and_short_slices(self):
         spec = importlib.util.spec_from_file_location("normal_pair_qualify", Path(__file__).with_name("qualify.py"))
         module = importlib.util.module_from_spec(spec)

@@ -5,6 +5,14 @@
 #include <stdint.h>
 #include <time.h>
 #include <string.h>
+#ifdef __APPLE__
+#include <pthread/qos.h>
+// Apple's public combined sine/cosine entry; system libm is a black box.
+#define sincos __sincos
+int bench_set_qos(void) {
+    return pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
+}
+#endif
 
 typedef struct { double x, y; } pair;
 typedef pair (*pair_fn)(uint64_t, uint64_t);
