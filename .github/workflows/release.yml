@@ -93,5 +93,8 @@ jobs:
 
       # The fuzz harness is a separate workspace, so release-plz does not
       # refresh its lockfile when it bumps the path dependencies' versions.
+      # The script commits through the API so that GitHub signs the commit.
       - name: Synchronize the release pull request's fuzz lockfile
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
         run: ./scripts/sync_release_fuzz_lock.sh "$RUNNER_TEMP/release-pr.json"
