@@ -10,6 +10,16 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.26](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.25...v0.0.26) - 2026-11-07
+
+### Added
+
+- *(linalg)* [**breaking**] checked Brennan–Schwartz obstacle solve; typed pair-normalization refusals ([#292](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/292))
+
+### Performance
+
+- *(random)* specialize fast normal-pair radius and short slices ([#291](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/291))
+
 ## [0.0.25](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.24...v0.0.25) - 2026-11-04
 
 ### Added
