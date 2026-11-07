@@ -96,7 +96,7 @@ that the independent pairs of a two-state recursion's step can share SIMD
 lanes (decision 7). Its working storage is a few `[f64; N]` arrays on the
 stack, so `N` is meant to be small.
 
-### `log_sum_exp_and_normalize<const N: usize>(x: &[[f64; 2]; N]) -> [(f64, Option<[f64; 2]>); N]`
+### `log_sum_exp_and_normalize<const N: usize>(x: &[[f64; 2]; N]) -> [(f64, Result<[f64; 2], NormalizeError>); N]`
 
 For each pair `x`, this returns `log_sum_exp(&x)`, bit for bit, together
 with `x` divided by its own sum, relative to its larger entry:
@@ -106,11 +106,17 @@ hi = 1 if x[1] > x[0], else 0;   lo = 1 − hi
 d = RN(x[lo] − x[hi]);   p[hi] = −RN(ln_1p(RN(exp(d))));   p[lo] = RN(d + p[hi])
 ```
 
-The pair is `None` when `x[hi] = −∞`, which means no entry has mass.
-- **Finite entries.** Then `d ≤ 0`, `ln_1p(e^d) ≥ 0` and `p[lo] ≤ p[hi] ≤ 0`,
-  so neither entry is positive.
-- **`x[lo] = −∞`** gives `p[hi] = −0` and `p[lo] = −∞`.
-- **A NaN entry** gives NaN entries, with an unspecified payload.
+The pair is refused exactly as `normalize_log_weights` refuses the same pair,
+with the same error; the log-sum is returned either way.
+- **A NaN or `+∞` entry** is `InvalidWeight` at its first index.
+- **`x[hi] = −∞`**, no entry with mass, is `ZeroMass`.
+- **Finite entries whose gap overflows**, `d = −∞`, are `Unrepresentable(lo)`:
+  a positive-mass entry is never returned as zero mass.
+- **Otherwise finite entries.** Then `d ≤ 0`, `ln_1p(e^d) ≥ 0` and
+  `p[lo] ≤ p[hi] ≤ 0`, so neither entry is positive.
+- **`x[lo] = −∞`** gives `p[hi] = −0` and `p[lo] = −∞`, exact zero mass.
+
+The refusals cost a comparison or two per pair, after the lanes' arithmetic.
 
 This record makes no error claim for the pair beyond those operations, each
 of which is correctly rounded except `ln_1p` ([ln.md](ln.md)). A two-state
@@ -562,8 +568,8 @@ timed loops; it is distinct from the per-loop wall measurements above.
 
    - `log_sum_exp_and_normalize` equals `log_sum_exp` and the stated
      normalization, written out with one scalar `exp` and `ln_1p` each, on
-     the same pairs and batch sizes. Entries are compared bit for bit,
-     except that a NaN entry need only be NaN.
+     the same pairs and batch sizes. Entries and refusals are compared bit
+     for bit, and every pair's refusal equals `normalize_log_weights`'s.
 
    Sum2's result rarely depends on the order of its summands: reversing each
    chunk changed no result on 240,000 random slices. So these tests cannot

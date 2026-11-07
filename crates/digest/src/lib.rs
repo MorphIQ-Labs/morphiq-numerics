@@ -1380,21 +1380,23 @@ fn log_normalization_record(r: &mut Recorder, x: &[f64], output: &mut [f64]) {
             r.f64(value.log_sum());
             r.f64(value.max_absolute_error());
         }
-        Err(error) => {
-            let (code, index) = match error {
-                NormalizeError::LengthMismatch => (1, 0),
-                NormalizeError::ZeroMass => (2, 0),
-                NormalizeError::InvalidWeight(i) => (3, i),
-                NormalizeError::TooManyFiniteTerms => (4, 0),
-                NormalizeError::Unrepresentable(i) => (5, i),
-            };
-            r.u64(code);
-            r.u64(index as u64);
-        }
+        Err(error) => normalize_error(r, error),
     }
     for &p in output.iter() {
         r.f64(p);
     }
+}
+
+fn normalize_error(r: &mut Recorder, error: NormalizeError) {
+    let (code, index) = match error {
+        NormalizeError::LengthMismatch => (1, 0),
+        NormalizeError::ZeroMass => (2, 0),
+        NormalizeError::InvalidWeight(i) => (3, i),
+        NormalizeError::TooManyFiniteTerms => (4, 0),
+        NormalizeError::Unrepresentable(i) => (5, i),
+    };
+    r.u64(code);
+    r.u64(index as u64);
 }
 
 fn log_normalization_section(r: &mut Recorder) {
@@ -1470,22 +1472,18 @@ fn normalize_section<const N: usize>(r: &mut Recorder, words: &mut Words) {
     normalize_record(r, &pairs);
 }
 
-/// Each pair's log-sum and normalized pair. A normalized pair that is absent
-/// records a code; a NaN entry, whose payload is unspecified, records one too.
+/// Each pair's log-sum and normalized pair, or the pair's refusal as its code.
 fn normalize_record<const N: usize>(r: &mut Recorder, pairs: &[[f64; 2]; N]) {
     for (y, p) in log_sum_exp_and_normalize(pairs) {
         r.f64(y);
         match p {
-            None => r.u64(1),
-            Some(p) => {
+            Ok(p) => {
+                r.u64(0);
                 for v in p {
-                    if v.is_nan() {
-                        r.u64(2);
-                    } else {
-                        r.f64(v);
-                    }
+                    r.f64(v);
                 }
             }
+            Err(error) => normalize_error(r, error),
         }
     }
 }
