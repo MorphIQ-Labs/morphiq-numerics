@@ -1,0 +1,40 @@
+name: formal artifact probe
+on:
+  push:
+    branches: [qualify/233-artifacts]
+permissions:
+  contents: read
+jobs:
+  producer:
+    runs-on: ubuntu-24.04
+    outputs:
+      attempt: ${{ steps.marker.outputs.attempt }}
+    steps:
+      - id: marker
+        run: |
+          echo 'attempt=${{ github.run_attempt }}' >> "$GITHUB_OUTPUT"
+          echo 'producer attempt ${{ github.run_attempt }}' > input.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: formal-probe-input
+          path: input.txt
+          if-no-files-found: error
+  consumer:
+    needs: producer
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: formal-probe-input
+      - run: |
+          cat input.txt
+          echo 'producer output ${{ needs.producer.outputs.attempt }}'
+          echo 'consumer attempt ${{ github.run_attempt }}' > result.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: formal-probe-result
+          path: result.txt
+          if-no-files-found: error
+      - name: Deliberate first-attempt failure, after uploading evidence
+        if: github.run_attempt == '1'
+        run: exit 1
