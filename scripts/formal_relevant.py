@@ -34,6 +34,7 @@ ALWAYS = (
     "crates/reference/Cargo.toml",
 )
 LIBRARY = "crates/morphiq-numerics/src/"
+PROSE = {"AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md", "README.md"}
 
 
 def bound_files(root="."):
@@ -64,6 +65,13 @@ def first_affecting(paths, bound):
             return path
         if path.startswith(LIBRARY) and not is_test_source(path):
             return path
+        if path.startswith(LIBRARY) and is_test_source(path):
+            continue
+        if path in PROSE or (path.startswith("docs/adr/") and path.count("/") == 2 and path.endswith(".md")):
+            continue
+        # Unknown paths must reach the family planner's full-selection default.
+        # An earlier permissive default could bypass that protection entirely.
+        return path
     return None
 
 

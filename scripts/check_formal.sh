@@ -43,6 +43,12 @@
 # run, against the build's .vo files, all at once.
 #
 # Options:
+#   --family NAME build/audit only this family's coqdep closure and run its
+#                 owned extractions. Global binding/admission checks still run.
+#   --plan-out FILE write the complete family ownership/dependency plan.
+#   --plan-only     assemble and plan, without compiling or claiming gate success.
+#   --receipt FILE  write a new family completion receipt only after every owned
+#                   audit and extraction passes; --family is required.
 #   --build-only  prepare a retained --build tree for caching, then exit before
 #                 the audits and cross-checks. This is not a passing formal
 #                 gate; CI follows it with the complete invocation below.
@@ -65,7 +71,8 @@
 #                scripts/formal_affected.py keeps the entries of a changed module
 #                or of one that depends on it (by coqdep), and any entry the base
 #                audit lacks; a path it does not know selects the whole audit. CI
-#                passes these on pull requests only: a push to main audits it all.
+#                uses family selection instead. This legacy full-build option
+#                remains available locally; a push to main audits every family.
 #
 # Runs inside the pinned Coq image (.cargo/coq-image; see the formal jobs in
 # .github/workflows/ci.yml), which provides coqc, coq_makefile and opam; the
@@ -76,6 +83,10 @@ build=
 build_only=0
 changed=
 base_audit=
+family=
+plan_out=
+plan_only=0
+receipt=
 while [ $# -gt 0 ]; do
   case $1 in
     --build-only) build_only=1; shift ;;
@@ -83,6 +94,10 @@ while [ $# -gt 0 ]; do
     --build) mkdir -p "$2"; build=$(realpath "$2"); shift 2 ;;
     --changed) changed=$(realpath "$2"); shift 2 ;;
     --base-audit) base_audit=$(realpath "$2"); shift 2 ;;
+    --family) family=$2; shift 2 ;;
+    --plan-out) plan_out=$(realpath -m "$2"); shift 2 ;;
+    --plan-only) plan_only=1; shift ;;
+    --receipt) receipt=$(realpath -m "$2"); shift 2 ;;
     --) shift; break ;;
     -*) echo "unknown option $1" >&2; exit 2 ;;
     *) break ;;
@@ -92,12 +107,16 @@ if [ $# -ne 3 ]; then
   echo "usage: $0 [--deps <tar>] [--build <dir>] [--build-only] <cross-check corpus> <internal cross-check corpus> <Gappa proofs directory>" >&2
   exit 2
 fi
-if [ -n "$changed" ] && [ -z "$base_audit" ] || [ -z "$changed" ] && [ -n "$base_audit" ]; then
+if [ -z "$family" ] && [ "$plan_only" -eq 0 ] && { [ -n "$changed" ] && [ -z "$base_audit" ] || [ -z "$changed" ] && [ -n "$base_audit" ]; }; then
   echo "--changed and --base-audit go together" >&2
   exit 2
 fi
 if [ "$build_only" -eq 1 ] && [ -z "$build" ]; then
   echo "--build-only requires a retained --build directory" >&2
+  exit 2
+fi
+if [ -n "$receipt" ] && [ -z "$family" ]; then
+  echo "--receipt requires --family" >&2
   exit 2
 fi
 corpus=$(realpath "$1")
@@ -106,8 +125,9 @@ proofs=$(realpath "$3")
 cd "$(dirname "$0")/.."
 
 sha256sum --check --quiet formal/binding.sha256
+binding_identity=$(sha256sum formal/binding.sha256)
 
-if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v formal/binary64/*.v formal/extraction/*.v formal/q/*.v \
+if grep -n -w -E 'Admitted|admit' formal/double-word/*.v formal/two-prod/*.v formal/binary64/*.v formal/extraction/*.v formal/audit/*.v formal/q/*.v \
     formal/fast/*.v formal/exp/*.v formal/ln/*.v formal/erfcx/*.v formal/normal/*.v formal/asin/*.v formal/asinh/*.v formal/atan2/*.v formal/bivariate/*.v formal/gappa/*.v "$proofs"/*/*.v; then
   echo "a proof admits a goal" >&2
   exit 1
@@ -138,6 +158,9 @@ src="$work/src"
 mkdir "$src"
 cp -r formal/double-word formal/two-prod formal/binary64 formal/q formal/audit formal/extraction "$src/"
 rm "$src/double-word/_CoqProject"
+# KernelAudit is compiled beside the kernel modules below, never twice under
+# two logical paths in the dependency graph.
+rm "$src/audit/KernelAudit.v"
 mkdir "$src/gappa"
 cp formal/gappa/Hints.v "$src/gappa/"
 # The Gappa certificates: each hint hypothesis becomes a lemma proved by [hint].
@@ -170,6 +193,29 @@ cp formal/fast/*.v formal/exp/*.v formal/ln/*.v formal/erfcx/*.v formal/normal/*
   find double-word two-prod binary64 q gappa -name '*.v' \
     ! -name CertificateAudit.v ! -name KernelAudit.v | LC_ALL=C sort
 } > _CoqProject)
+
+if [ -n "$family" ] || [ -n "$plan_out" ] || [ "$plan_only" -eq 1 ]; then
+  [ -n "$plan_out" ] || plan_out="$work/families.json"
+  set -- --src "$src" --out "$plan_out" --corpus "$corpus" --internal-corpus "$icorpus"
+  [ -z "$changed" ] || set -- "$@" --changed "$changed"
+  [ -z "$family" ] || set -- "$@" --family "$family"
+  python3 scripts/formal_families.py "$@"
+fi
+if [ "$plan_only" -eq 1 ]; then
+  echo "formal plan prepared; proofs, audits and cross-checks have not run"
+  exit 0
+fi
+
+# Stage timings are diagnostics, written to stderr so they cannot be parsed as
+# axiom reports. Per-file proof compilation retains coq_makefile's TIMED=1.
+timed() {
+  stage=$1; shift
+  started=$(date +%s)
+  status=0
+  "$@" || status=$?
+  echo "formal timing: $stage $(( $(date +%s) - started )) seconds (exit $status)" >&2
+  return "$status"
+}
 
 # The build tree. A kept one is reused only where nothing it was built from
 # has changed.
@@ -215,8 +261,13 @@ done
   fi
 done
 echo "$toolchain" > "$build/.toolchain"
+# Family pruning can leave a mapped namespace empty; preserve its directory
+# so coq_makefile/coqc do not warn about missing logical-library roots.
+for directory in double-word two-prod binary64 q gappa audit extraction; do
+  mkdir -p "$build/$directory"
+done
 
-(cd "$build" && coq_makefile -f _CoqProject -o Makefile && make -j"$(nproc)" TIMED=1)
+(cd "$build" && coq_makefile -f _CoqProject -o Makefile && timed proof-build make -j"$(nproc)" TIMED=1)
 touch "$build/.built"
 if [ "$build_only" -eq 1 ]; then
   echo "proof build prepared; audits and cross-checks have not run"
@@ -236,10 +287,13 @@ compile_extraction() (
 
 # The audits and the cross-checks are independent, so they run at once; each is
 # then judged in turn, and the first to fail fails the lane.
-(cd "$build/audit" && coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" -R ../binary64 Binary64 -R ../q Q Audit.v) \
+audit=
+if [ -e "$build/audit/Audit.v" ]; then
+(cd "$build/audit" && timed base-audit coqc -R ../double-word Double -I ../two-prod -R ../two-prod "" -R ../binary64 Binary64 -R ../q Q Audit.v) \
   > "$work/audit.log" 2> "$work/audit.err" &
 audit=$!
-(cd "$build/gappa" && coqc -R . "" CertificateAudit.v) \
+fi
+(cd "$build/gappa" && timed certificate-audit coqc -R . "" CertificateAudit.v) \
   > "$work/certificate_audit.log" 2> "$work/certificate_audit.err" &
 certificate_audit=$!
 # Memory is what bounds the parallel steps, so it is logged while they run.
@@ -254,7 +308,7 @@ memwatch=$!
 # reports, so they are the checks of one file: the same entries, the same
 # expected axioms, the same report count.
 kernel_audit_file="$build/gappa/KernelAudit.v"
-if [ -n "$changed" ]; then
+if [ -n "$changed" ] && [ -z "$family" ]; then
   (cd "$build" && coqdep -R double-word Double -R two-prod "" -R binary64 Binary64 -R q Q -R gappa "" \
     $(find double-word two-prod binary64 q gappa -name '*.v' \
       ! -name CertificateAudit.v ! -name KernelAudit.v ! -name 'KernelAuditPart*.v' | LC_ALL=C sort)) \
@@ -284,29 +338,38 @@ while [ "$i" -lt "$kernel_chunks" ]; do
     /^Print Assumptions / { if (count++ % n == part) print; next }
     { print }
   ' "$kernel_audit_file" > "$chunk"
-  (cd "$build/gappa" && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" "KernelAuditPart$i.v") \
+  (cd "$build/gappa" && timed "kernel-audit-$i" coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R . "" "KernelAuditPart$i.v") \
     > "$work/kernel_audit$i.log" 2> "$work/kernel_audit$i.err" &
   kernel_pids="$kernel_pids $!"
   i=$((i + 1))
 done
+crosscheck=
+if [ -e "$build/extraction/Crosscheck.v" ]; then
 (cd "$build/extraction" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../gappa "" Crosscheck.v \
-  && compile_extraction -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
+  && timed public-extraction coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../gappa "" Crosscheck.v \
+  && timed public-ocaml compile_extraction -o crosscheck crosscheck.mli crosscheck.ml driver.ml \
   && echo "extraction: running crosscheck" \
-  && ./crosscheck "$corpus") > "$work/crosscheck.log" 2> "$work/crosscheck.err" &
+  && timed public-corpus ./crosscheck "$corpus") > "$work/crosscheck.log" 2> "$work/crosscheck.err" &
 crosscheck=$!
+fi
+internal_crosscheck=
+if [ -e "$build/extraction/InternalCrosscheck.v" ]; then
 (cd "$build/extraction" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R ../gappa "" InternalCrosscheck.v \
-  && compile_extraction -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
+  && timed internal-extraction coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../q Q -R ../gappa "" InternalCrosscheck.v \
+  && timed internal-ocaml compile_extraction -o internalcrosscheck internalcrosscheck.mli internalcrosscheck.ml internaldriver.ml \
   && echo "extraction: running internalcrosscheck" \
-  && ./internalcrosscheck "$icorpus") > "$work/internal_crosscheck.log" 2> "$work/internal_crosscheck.err" &
+  && timed internal-corpus ./internalcrosscheck "$icorpus") > "$work/internal_crosscheck.log" 2> "$work/internal_crosscheck.err" &
 internal_crosscheck=$!
+fi
+bvn_crosscheck=
+if [ -e "$build/extraction/BvnCrosscheck.v" ]; then
 (cd "$build/extraction" \
-  && coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../gappa "" BvnCrosscheck.v \
-  && compile_extraction -o bvncrosscheck bvncrosscheck.mli bvncrosscheck.ml bvndriver.ml \
+  && timed bvn-extraction coqc -R ../double-word Double -R ../binary64 Binary64 -R ../two-prod "" -R ../gappa "" BvnCrosscheck.v \
+  && timed bvn-ocaml compile_extraction -o bvncrosscheck bvncrosscheck.mli bvncrosscheck.ml bvndriver.ml \
   && echo "extraction: running bvncrosscheck" \
-  && ./bvncrosscheck "$icorpus") > "$work/bvn_crosscheck.log" 2> "$work/bvn_crosscheck.err" &
+  && timed bvn-corpus ./bvncrosscheck "$icorpus") > "$work/bvn_crosscheck.log" 2> "$work/bvn_crosscheck.err" &
 bvn_crosscheck=$!
+fi
 # finish NAME PID: waits for the step, shows its errors, and fails if it did.
 finish() {
   status=0
@@ -319,6 +382,8 @@ finish() {
   fi
 }
 
+sort -u formal/axioms.expected > "$work/expected"
+if [ -n "$audit" ]; then
 finish audit "$audit"
 # Each axiom entry starts unindented; its type follows on the same line or on
 # indented lines after it, depending on its length.
@@ -340,6 +405,7 @@ if [ "$reports" -ne "$(grep -c '^Print Assumptions' formal/audit/Audit.v)" ]; th
   echo "the audit reported on $reports theorems, not every one in formal/audit/Audit.v" >&2
   exit 1
 fi
+fi
 
 finish certificate_audit "$certificate_audit"
 grep -E '^[^[:space:]]' "$work/certificate_audit.log" \
@@ -349,7 +415,7 @@ if ! comm -23 "$work/certificate-axioms" "$work/expected" | diff /dev/null - >&2
   echo "a certificate's theorem rests on an axiom outside formal/axioms.expected" >&2
   exit 1
 fi
-certificates=$(grep -c '^Print Assumptions' "$build/gappa/CertificateAudit.v")
+certificates=$(grep -c '^Print Assumptions' "$build/gappa/CertificateAudit.v" || true)
 reports=$(( $(grep -c '^Axioms:' "$work/certificate_audit.log" || true) + $(grep -c 'Closed under the global context' "$work/certificate_audit.log" || true) ))
 if [ "$reports" -ne "$certificates" ]; then
   echo "the certificate audit reported on $reports theorems, not $certificates" >&2
@@ -382,10 +448,16 @@ if [ "$reports" -ne "$kernels" ]; then
 fi
 echo "kernel proofs: $kernels proved"
 
-finish crosscheck "$crosscheck"
-cat "$work/crosscheck.log"
-finish internal_crosscheck "$internal_crosscheck"
-cat "$work/internal_crosscheck.log"
-finish bvn_crosscheck "$bvn_crosscheck"
-cat "$work/bvn_crosscheck.log"
+if [ -n "$crosscheck" ]; then finish crosscheck "$crosscheck"; cat "$work/crosscheck.log"; fi
+if [ -n "$internal_crosscheck" ]; then finish internal_crosscheck "$internal_crosscheck"; cat "$work/internal_crosscheck.log"; fi
+if [ -n "$bvn_crosscheck" ]; then finish bvn_crosscheck "$bvn_crosscheck"; cat "$work/bvn_crosscheck.log"; fi
+if [ "$(sha256sum formal/binding.sha256)" != "$binding_identity" ]; then
+  echo "source binding changed during the formal run" >&2
+  exit 1
+fi
+sha256sum --check --quiet formal/binding.sha256
+if [ -n "$receipt" ]; then
+  python3 scripts/formal_results.py receipt --plan "$plan_out" --family "$family" \
+    --kernel-reports "$kernels" --certificate-reports "$certificates" --out "$receipt"
+fi
 echo "formal: OK"

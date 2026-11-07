@@ -39,10 +39,13 @@ class FormalRelevantTest(unittest.TestCase):
         ):
             self.assertEqual(first(path), path, path)
 
-    def test_unrelated_paths_are_not_affected(self):
-        self.assertIsNone(first("README.md", "CHANGELOG.md", "docs/unbound.md", "AGENTS.md",
-                                "crates/reference/fixtures/exp.json", "generators/unbound.py",
-                                ".github/workflows/release.yml", ""))
+    def test_known_prose_paths_are_not_affected(self):
+        self.assertIsNone(first("README.md", "AGENTS.md", "docs/adr/0002-fma.md", ""))
+
+    def test_unclassified_paths_select_the_full_gate(self):
+        for path in ["CHANGELOG.md", "docs/unbound.md", "crates/reference/fixtures/exp.json",
+                     "generators/unbound.py", ".github/workflows/release.yml", "unknown.file"]:
+            self.assertEqual(first(path), path)
 
     def test_the_bindings_are_read_from_every_manifest(self):
         with tempfile.TemporaryDirectory() as root:
