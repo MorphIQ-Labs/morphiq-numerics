@@ -78,7 +78,6 @@ def changed_modules(paths, graph):
     """The module keys a list of changed paths touches, or None for everything."""
     modules = set()
     for path in paths:
-        path = path.strip()
         if not path or path in IGNORED:
             continue
         if path.startswith(EVERYTHING):
