@@ -1159,6 +1159,7 @@ pub fn corpus_digest() -> [u8; 32] {
     tridiagonal_batch_section(&mut r);
     tridiagonal_sign_section(&mut r);
     tridiagonal_unpivoted_section(&mut r);
+    tridiagonal_obstacle_section(&mut r);
     bivariate_normal_section(&mut r);
     fast_section(&mut r);
     double_word_exp_section(&mut r);
@@ -1187,6 +1188,10 @@ fn tridiagonal_error(r: &mut Recorder, error: TridiagonalError) {
         TridiagonalError::SameSignLink(link) => {
             r.u64(7);
             r.u64(link as u64);
+        }
+        TridiagonalError::NotComplementary(row) => {
+            r.u64(8);
+            r.u64(row as u64);
         }
     }
 }
@@ -1246,6 +1251,67 @@ fn tridiagonal_system<const N: usize>(r: &mut Recorder, scale: f64) {
             }
             Err(e) => tridiagonal_error(r, e),
         }
+    }
+}
+
+/// The Brennan–Schwartz sweep on M-matrix systems of order `N`: obstacles met
+/// at the last rows, nowhere, and below zero, each solution's bits or error.
+fn tridiagonal_obstacle_system<const N: usize>(r: &mut Recorder, scale: f64) {
+    let mut lower = [0.0; N];
+    let mut diagonal = [0.0; N];
+    let mut upper = [0.0; N];
+    for i in 0..N {
+        lower[i] = -scale;
+        diagonal[i] = 3.0 * scale;
+        upper[i] = -0.5 * scale;
+    }
+    let off = N.saturating_sub(1);
+    let a = match DominantTridiagonal::new(&lower[..off], &diagonal, &upper[..off]) {
+        Ok(a) => a,
+        Err(e) => {
+            tridiagonal_error(r, e);
+            return;
+        }
+    };
+    let mut pivots = [0.0; N];
+    let mut normalized = [0.0; N];
+    let f = match a.factor_into(&mut pivots, &mut normalized[..off]) {
+        Ok(f) => f,
+        Err(e) => {
+            tridiagonal_error(r, e);
+            return;
+        }
+    };
+    let mut rhs = [0.0; N];
+    for (i, x) in rhs.iter_mut().enumerate() {
+        *x = f64::from(u32::try_from(i % 5).unwrap()) * scale - scale;
+    }
+    for rise in [1.0, 0.0, -1.0] {
+        let mut obstacle = [0.0; N];
+        for (i, g) in obstacle.iter_mut().enumerate() {
+            *g = rise * f64::from(u32::try_from(i).unwrap()) / 4.0 - 0.5;
+        }
+        let mut out = [0.0; N];
+        match f.solve_obstacle_into(&rhs, &obstacle, &mut out) {
+            Ok(()) => {
+                r.u64(0);
+                for x in out {
+                    r.f64(x);
+                }
+            }
+            Err(e) => tridiagonal_error(r, e),
+        }
+    }
+}
+
+fn tridiagonal_obstacle_section(r: &mut Recorder) {
+    r.label("linalg::tridiagonal::solve_obstacle_into");
+    for scale in [f64::MIN_POSITIVE, 0.125, 1.0, 1e200] {
+        tridiagonal_obstacle_system::<0>(r, scale);
+        tridiagonal_obstacle_system::<1>(r, scale);
+        tridiagonal_obstacle_system::<2>(r, scale);
+        tridiagonal_obstacle_system::<3>(r, scale);
+        tridiagonal_obstacle_system::<17>(r, scale);
     }
 }
 
@@ -1314,21 +1380,23 @@ fn log_normalization_record(r: &mut Recorder, x: &[f64], output: &mut [f64]) {
             r.f64(value.log_sum());
             r.f64(value.max_absolute_error());
         }
-        Err(error) => {
-            let (code, index) = match error {
-                NormalizeError::LengthMismatch => (1, 0),
-                NormalizeError::ZeroMass => (2, 0),
-                NormalizeError::InvalidWeight(i) => (3, i),
-                NormalizeError::TooManyFiniteTerms => (4, 0),
-                NormalizeError::Unrepresentable(i) => (5, i),
-            };
-            r.u64(code);
-            r.u64(index as u64);
-        }
+        Err(error) => normalize_error(r, error),
     }
     for &p in output.iter() {
         r.f64(p);
     }
+}
+
+fn normalize_error(r: &mut Recorder, error: NormalizeError) {
+    let (code, index) = match error {
+        NormalizeError::LengthMismatch => (1, 0),
+        NormalizeError::ZeroMass => (2, 0),
+        NormalizeError::InvalidWeight(i) => (3, i),
+        NormalizeError::TooManyFiniteTerms => (4, 0),
+        NormalizeError::Unrepresentable(i) => (5, i),
+    };
+    r.u64(code);
+    r.u64(index as u64);
 }
 
 fn log_normalization_section(r: &mut Recorder) {
@@ -1404,22 +1472,18 @@ fn normalize_section<const N: usize>(r: &mut Recorder, words: &mut Words) {
     normalize_record(r, &pairs);
 }
 
-/// Each pair's log-sum and normalized pair. A normalized pair that is absent
-/// records a code; a NaN entry, whose payload is unspecified, records one too.
+/// Each pair's log-sum and normalized pair, or the pair's refusal as its code.
 fn normalize_record<const N: usize>(r: &mut Recorder, pairs: &[[f64; 2]; N]) {
     for (y, p) in log_sum_exp_and_normalize(pairs) {
         r.f64(y);
         match p {
-            None => r.u64(1),
-            Some(p) => {
+            Ok(p) => {
+                r.u64(0);
                 for v in p {
-                    if v.is_nan() {
-                        r.u64(2);
-                    } else {
-                        r.f64(v);
-                    }
+                    r.f64(v);
                 }
             }
+            Err(error) => normalize_error(r, error),
         }
     }
 }

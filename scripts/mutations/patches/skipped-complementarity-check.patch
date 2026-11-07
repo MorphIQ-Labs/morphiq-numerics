@@ -1,0 +1,8 @@
+--- a/crates/morphiq-numerics/src/linalg/tridiagonal.rs
++++ b/crates/morphiq-numerics/src/linalg/tridiagonal.rs
+@@ -587,3 +587,4 @@
+         self.backward_obstacle(out.iter_mut(), obstacle)?;
+-        self.check_complementarity(rhs, obstacle, out)
++        let _ = (rhs, Self::check_complementarity);
++        Ok(())
+     }

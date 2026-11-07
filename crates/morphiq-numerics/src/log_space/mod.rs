@@ -105,8 +105,11 @@ pub fn log_sum_exp_pairs<const N: usize>(x: &[[f64; 2]; N]) -> [f64; N] {
 }
 
 /// For each of `N` pairs `x`: `log_sum_exp(&x)`, bit for bit, and `x`
-/// divided by its own sum relative to its larger entry (§1), which is
-/// `None` when the larger entry is `−∞`.
+/// divided by its own sum relative to its larger entry (§1), refused as
+/// [`normalize_log_weights`] refuses the same pair: a NaN or `+∞` entry is
+/// [`NormalizeError::InvalidWeight`] at its first index, two `−∞` entries are
+/// [`NormalizeError::ZeroMass`], and a finite entry whose normalized log is
+/// not finite is [`NormalizeError::Unrepresentable`], never zero mass.
 ///
 /// With `hi` the index of the larger entry (1 only if `x[1] > x[0]`),
 /// `lo = 1 − hi` and `d = x[lo] − x[hi]`, the pair is
@@ -115,10 +118,9 @@ pub fn log_sum_exp_pairs<const N: usize>(x: &[[f64; 2]; N]) -> [f64; N] {
 /// `two_sum(x[lo], −x[hi])`, so the two results share one `exp(d)`; their
 /// two `ln_1p`s, and the `N` pairs' exponentials, are evaluated together, in
 /// SIMD lanes with the `simd` feature (decision 8).
-#[must_use]
 pub fn log_sum_exp_and_normalize<const N: usize>(
     x: &[[f64; 2]; N],
-) -> [(f64, Option<[f64; 2]>); N] {
+) -> [(f64, Result<[f64; 2], NormalizeError>); N] {
     let mut hi = [0; N];
     let mut d = [0.0; N];
     let mut dl = [0.0; N];
@@ -131,7 +133,7 @@ pub fn log_sum_exp_and_normalize<const N: usize>(
     // Each pair's t̂ (§3 steps 2–4, the term e^(d + dl)), then its e, so one
     // ln_1p_slice call evaluates both logarithms of every pair.
     let mut args = [[0.0; 2]; N];
-    let mut results = [(0.0, None); N];
+    let mut results = [(0.0, Err(NormalizeError::ZeroMass)); N];
     let mut tops = [0.0; N];
     for i in 0..N {
         let mut sum = Sum2Stream::default();
@@ -153,12 +155,21 @@ pub fn log_sum_exp_and_normalize<const N: usize>(
                 }
             }
         };
-        if x[i][hi[i]] != f64::NEG_INFINITY {
-            let mut pair = [0.0; 2];
-            pair[hi[i]] = tops[i];
-            pair[1 - hi[i]] = d[i] + tops[i];
-            results[i].1 = Some(pair);
-        }
+        let lo = 1 - hi[i];
+        results[i].1 = match x[i].iter().position(|v| v.is_nan() || *v == f64::INFINITY) {
+            Some(index) => Err(NormalizeError::InvalidWeight(index)),
+            None if x[i][hi[i]] == f64::NEG_INFINITY => Err(NormalizeError::ZeroMass),
+            // Only a finite gap's overflow takes a finite entry to −∞.
+            None if x[i][lo].is_finite() && d[i] == f64::NEG_INFINITY => {
+                Err(NormalizeError::Unrepresentable(lo))
+            }
+            None => {
+                let mut pair = [0.0; 2];
+                pair[hi[i]] = tops[i];
+                pair[lo] = d[i] + tops[i];
+                Ok(pair)
+            }
+        };
     }
     results
 }

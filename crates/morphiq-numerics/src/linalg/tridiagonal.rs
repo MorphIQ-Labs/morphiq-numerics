@@ -45,6 +45,10 @@ pub enum Error {
     ZeroPivot(usize),
     /// Arithmetic or a required finite enclosure is unrepresentable.
     Range,
+    /// An obstacle sweep's result fails complementarity at this row: its
+    /// contact set is not one the sweep solves. The output holds the
+    /// unverified sweep.
+    NotComplementary(usize),
 }
 
 /// An immutable, conservatively validated strictly dominant tridiagonal matrix.
@@ -458,6 +462,35 @@ impl UnpivotedThomasFactors<'_, '_> {
         self.factors.solve_into(rhs, out)
     }
 
+    /// The Brennan–Schwartz sweep for `x >= obstacle` (`docs/tridiagonal.md`,
+    /// Obstacle solves): [`Self::solve_into`]'s forward recurrence, then its
+    /// back substitution from the last row with each value raised to its
+    /// obstacle before the next row consumes it. A value below its obstacle
+    /// takes the obstacle; any other value, including a signed-zero tie, is
+    /// kept. With an obstacle below every unconstrained value the bits are
+    /// [`Self::solve_into`]'s.
+    ///
+    /// The sweep solves `min(A x - rhs, x - obstacle) = 0` when the solution's
+    /// contact set ends at the last row (reverse the system's rows for one
+    /// beginning at the first). Every result is checked against the original
+    /// matrix in one further O(n) pass: success means the output is an exact
+    /// solution of the problem with each `rhs` entry perturbed by at most
+    /// twice its row's rounding bound (`docs/tridiagonal.md`, Obstacle solves).
+    ///
+    /// # Errors
+    /// [`Error::Shape`] or [`Error::NonFinite`] (in `rhs` or `obstacle`)
+    /// leaves output unchanged; [`Error::Range`] invalidates the partially
+    /// written output. [`Error::NotComplementary`] leaves the unverified
+    /// sweep, finite and at or above the obstacle, for the caller's fallback.
+    pub fn solve_obstacle_into(
+        &self,
+        rhs: &[f64],
+        obstacle: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), Error> {
+        self.factors.solve_obstacle_into(rhs, obstacle, out)
+    }
+
     /// Shared scalar/SIMD row-interleaved solve, bit-identical per RHS.
     /// Layout and complexity follow [`ThomasFactors::solve_many_into`].
     ///
@@ -533,6 +566,97 @@ impl Factors<'_, '_> {
                 return Err(Error::Range);
             }
             previous = *value;
+        }
+        Ok(())
+    }
+
+    pub fn solve_obstacle_into(
+        &self,
+        rhs: &[f64],
+        obstacle: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), Error> {
+        let n = self.matrix.len();
+        if rhs.len() != n || obstacle.len() != n || out.len() != n {
+            return Err(Error::Shape);
+        }
+        if !all_finite(rhs) || !all_finite(obstacle) {
+            return Err(Error::NonFinite);
+        }
+        self.forward(rhs.iter(), out.iter_mut())?;
+        self.backward_obstacle(out.iter_mut(), obstacle)?;
+        self.check_complementarity(rhs, obstacle, out)
+    }
+
+    // A row at its obstacle needs `(A x - rhs)[i] >= -bound`; any other row
+    // needs `|(A x - rhs)[i]| <= bound`. The computed solve satisfies
+    // `|A x - rhs| <= 5u |L||U||x|` on every row whose own and previous
+    // back-substitution step was unclamped; the residual's evaluation adds
+    // `4u (|A||x| + |rhs|)`, with `|A| <= (1 + u)|L||U|`. So `5 eps = 10u`
+    // times `|L||U||x| + |rhs|` admits every one-sided sweep, and an accepted
+    // result's exact residual is within twice the bound. At most eight
+    // products and quotients enter a row, each with absolute underflow error
+    // at most `eta/2` scaled by the bracketed factors, giving `4 eta`, doubled
+    // for the bound's own rounding.
+    fn check_complementarity(&self, rhs: &[f64], obstacle: &[f64], x: &[f64]) -> Result<(), Error> {
+        let a = self.matrix;
+        let n = a.len();
+        let eta = f64::from_bits(1);
+        for i in 0..n {
+            let (lower, previous, previous_upper) = match i {
+                0 => (0.0, 0.0, 0.0),
+                _ => (a.lower[i - 1], x[i - 1], self.normalized_upper[i - 1]),
+            };
+            let (upper, next, normalized) = if i + 1 < n {
+                (a.upper[i], x[i + 1], self.normalized_upper[i])
+            } else {
+                (0.0, 0.0, 0.0)
+            };
+            let pivot = self.pivots[i];
+            let residual = lower * previous + a.diagonal[i] * x[i] + upper * next - rhs[i];
+            let factored = lower.abs() * (previous.abs() + previous_upper.abs() * x[i].abs())
+                + pivot.abs() * (x[i].abs() + normalized.abs() * next.abs());
+            let underflow = 8.0
+                * eta
+                * (1.0 + lower.abs() + pivot.abs())
+                * (1.0 + previous.abs() + x[i].abs() + next.abs());
+            let bound = 5.0 * f64::EPSILON * (factored + rhs[i].abs()) + underflow;
+            if !residual.is_finite() || !bound.is_finite() {
+                return Err(Error::Range);
+            }
+            let contact = x[i] == obstacle[i];
+            if residual < -bound || (!contact && residual > bound) {
+                return Err(Error::NotComplementary(i));
+            }
+        }
+        Ok(())
+    }
+
+    // The back substitution of `backward`, each value raised to its obstacle
+    // before the next row consumes it. A value below its obstacle takes the
+    // obstacle; every other value, including a signed zero tie, is kept.
+    fn backward_obstacle<'o>(
+        &self,
+        out: impl DoubleEndedIterator<Item = &'o mut f64>,
+        obstacle: &[f64],
+    ) -> Result<(), Error> {
+        let mut values = out.rev().zip(obstacle.iter().rev());
+        let Some((last, &floor)) = values.next() else {
+            return Ok(());
+        };
+        if *last < floor {
+            *last = floor;
+        }
+        let mut next = *last;
+        for ((value, &floor), &upper) in values.zip(self.normalized_upper.iter().rev()) {
+            *value -= upper * next;
+            if !value.is_finite() {
+                return Err(Error::Range);
+            }
+            if *value < floor {
+                *value = floor;
+            }
+            next = *value;
         }
         Ok(())
     }
@@ -658,6 +782,35 @@ impl ThomasFactors<'_, '_> {
         self.factors.solve_into(rhs, out)
     }
 
+    /// The Brennan–Schwartz sweep for `x >= obstacle` (`docs/tridiagonal.md`,
+    /// Obstacle solves): [`Self::solve_into`]'s forward recurrence, then its
+    /// back substitution from the last row with each value raised to its
+    /// obstacle before the next row consumes it. A value below its obstacle
+    /// takes the obstacle; any other value, including a signed-zero tie, is
+    /// kept. With an obstacle below every unconstrained value the bits are
+    /// [`Self::solve_into`]'s.
+    ///
+    /// The sweep solves `min(A x - rhs, x - obstacle) = 0` when the solution's
+    /// contact set ends at the last row (reverse the system's rows for one
+    /// beginning at the first). Every result is checked against the original
+    /// matrix in one further O(n) pass: success means the output is an exact
+    /// solution of the problem with each `rhs` entry perturbed by at most
+    /// twice its row's rounding bound (`docs/tridiagonal.md`, Obstacle solves).
+    ///
+    /// # Errors
+    /// [`Error::Shape`] or [`Error::NonFinite`] (in `rhs` or `obstacle`)
+    /// leaves output unchanged; [`Error::Range`] invalidates the partially
+    /// written output. [`Error::NotComplementary`] leaves the unverified
+    /// sweep, finite and at or above the obstacle, for the caller's fallback.
+    pub fn solve_obstacle_into(
+        &self,
+        rhs: &[f64],
+        obstacle: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), Error> {
+        self.factors.solve_obstacle_into(rhs, obstacle, out)
+    }
+
     /// Solve `rhs_count` right-hand sides sharing these factors.
     ///
     /// Both slices have exactly `matrix.len() * rhs_count` entries, interleaved
@@ -771,6 +924,35 @@ impl SignThomasFactors<'_, '_> {
     /// [`Error::Range`] invalidates the entire partially written output.
     pub fn solve_into(&self, rhs: &[f64], out: &mut [f64]) -> Result<(), Error> {
         self.factors.solve_into(rhs, out)
+    }
+
+    /// The Brennan–Schwartz sweep for `x >= obstacle` (`docs/tridiagonal.md`,
+    /// Obstacle solves): [`Self::solve_into`]'s forward recurrence, then its
+    /// back substitution from the last row with each value raised to its
+    /// obstacle before the next row consumes it. A value below its obstacle
+    /// takes the obstacle; any other value, including a signed-zero tie, is
+    /// kept. With an obstacle below every unconstrained value the bits are
+    /// [`Self::solve_into`]'s.
+    ///
+    /// The sweep solves `min(A x - rhs, x - obstacle) = 0` when the solution's
+    /// contact set ends at the last row (reverse the system's rows for one
+    /// beginning at the first). Every result is checked against the original
+    /// matrix in one further O(n) pass: success means the output is an exact
+    /// solution of the problem with each `rhs` entry perturbed by at most
+    /// twice its row's rounding bound (`docs/tridiagonal.md`, Obstacle solves).
+    ///
+    /// # Errors
+    /// [`Error::Shape`] or [`Error::NonFinite`] (in `rhs` or `obstacle`)
+    /// leaves output unchanged; [`Error::Range`] invalidates the partially
+    /// written output. [`Error::NotComplementary`] leaves the unverified
+    /// sweep, finite and at or above the obstacle, for the caller's fallback.
+    pub fn solve_obstacle_into(
+        &self,
+        rhs: &[f64],
+        obstacle: &[f64],
+        out: &mut [f64],
+    ) -> Result<(), Error> {
+        self.factors.solve_obstacle_into(rhs, obstacle, out)
     }
 
     /// Solve row-interleaved RHS columns using the shared scalar/SIMD kernel.

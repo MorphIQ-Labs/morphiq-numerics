@@ -81,7 +81,7 @@ fn run(name: &str, x: &[f64], out: &mut [f64], scratch: &mut [f64], calls: usize
                 black_box(shifted(black_box(x), black_box(out), black_box(scratch)).unwrap());
             }
             "legacy_pair" => {
-                black_box(log_sum_exp_and_normalize(black_box(&[[x[0], x[1]]])));
+                let _ = black_box(log_sum_exp_and_normalize(black_box(&[[x[0], x[1]]])));
             }
             _ => unreachable!(),
         }

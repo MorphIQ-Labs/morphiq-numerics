@@ -37,7 +37,7 @@ functions unnoticed.
 | `random` | four seeds | 4,096 words of each stream, both uniforms of each SplitMix64 word, and a word after `jump` and after `long_jump` |
 | `log_sum_exp` | the special values and zero-mass cases of [log_space.md](log_space.md) §1, overflow and `±max` pairs; 1,000 slices of each length from 1 to 8, gaps below their maximum from `2^−40` to `2^11`; 4,000 pairs with exponents in `[−1022, 1023]`; 20 slices of each length from 9 to 100, with `−∞` and underflowing terms among them | `log_sum_exp` |
 | `log_sum_exp_pairs` | every pairing of ten special values; 1,000 batches each of 1, 2, 3, 8 and 17 pairs, gaps from `2^−40` to `2^11`, the maximum first or second | every element of each result |
-| `log_sum_exp_and_normalize` | the same kinds of input as `log_sum_exp_pairs`, drawn afresh | each log-sum, and each normalized pair's entries; an absent pair and a NaN entry (payload unspecified) as codes |
+| `log_sum_exp_and_normalize` | the same kinds of input as `log_sum_exp_pairs`, drawn afresh | each log-sum, and each normalized pair's entries or its refusal's code |
 | `log_diff_exp` | the special values of [log_space.md](log_space.md) §1, the region boundary `T`, underflow and overflow; 10,000 pairs with gaps from `2^−60` to `2^12`; 4,000 ordered pairs with exponents in `[−1022, 1023]` | `log_diff_exp` |
 | `log_norm_pdf` | NaN, ±∞, ±0, the least subnormal, each regime boundary of [log_norm_pdf.md](log_norm_pdf.md) §1 (`2^−27`, `2^500`, `2^512`, `2^513`), the overflow threshold and its successor, all with both signs, and a regime-L tie; 20,000 arguments with exponents in `[−40, 512]`; 10,000 in `[−8, 8)` | `log_norm_pdf` |
 | `erfcx`, `erfcx_slice` | special values, neighbors of the overflow/one/subnormal boundaries, all region boundaries, random encodings and inputs in `[-27, 520)`; 20,000 scalar inputs and 1,000 slices of each length 1–17 | each scalar and batched output |
@@ -50,6 +50,7 @@ functions unnoticed.
 
 | `linalg::tridiagonal` | orders 0, 1, 2, 3, 17, 64; mixed signs; six scales including subnormal/overflow; repeated RHSs; invalid shape/nonfinite/dominance and range cases | admitted margin, finite solution bits, absolute residual/error bounds, typed errors |
 | `linalg::tridiagonal::solve_many_into` | orders 0, 1, 2, 3, 17; RHS counts 0–17 around every lane width; four scales including subnormals; shape/overflow/nonfinite errors | interleaved solution bits and typed errors |
+| `linalg::tridiagonal::solve_obstacle_into` | M-matrix systems of orders 0, 1, 2, 3, 17; four scales including the least normal; obstacles met at the last rows, nowhere, and below zero | solution bits and typed errors |
 | `linalg::tridiagonal::sign_domain` | non-dominant systems, orders 0–17, RHS counts 0–17, four scales including subnormal; zero links, signed zeros and invalid signs/diagonals | scalar/SIMD solution bits, residual-only bounds and typed errors |
 
 | `fast::exp`, `fast::erfcx`, `fast::norm_cdf`, `fast::ln`, `fast::log_norm_cdf`, `fast::exp_coarse` and matching slices | signed special values, subnormals, screen boundaries and neighbors; 512 mixed scalar inputs per function; eight slices of each length 0–17, 31–33, 51–53 and 63–65 | every scalar and batched output; separate seed preserves all earlier corpus sections |
