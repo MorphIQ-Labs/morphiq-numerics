@@ -1601,18 +1601,7 @@ fn logarithm_fallback_corpus(out: &mut String) {
 /// inputs. Exp supplies its unchanged strong owner's result separately; the
 /// extraction verifies dispatch and the complete accelerated arithmetic.
 fn fast_corpus(out: &mut String) {
-    let mut pairs = SplitMix64::new(282);
-    for i in 0..2048 {
-        let w1 = if i < 3 {
-            [0, u64::MAX, 1 << 63][i]
-        } else {
-            pairs.next_u64()
-        };
-        let w2 = if i < 24 {
-            (i as u64 % 8) << 61
-        } else {
-            pairs.next_u64()
-        };
+    let mut write_pair = |w1, w2: u64| {
         let u = crate::random::unit_open(w1);
         let (_, phi) = crate::random::folded_angle(w2 >> 11);
         let (c, s) = crate::fast::random::components(u, phi);
@@ -1625,6 +1614,27 @@ fn fast_corpus(out: &mut String) {
             s.to_bits()
         )
         .unwrap();
+    };
+    let mut pairs = SplitMix64::new(282);
+    for i in 0..2048 {
+        let w1 = if i < 3 {
+            [0, u64::MAX, 1 << 63][i]
+        } else {
+            pairs.next_u64()
+        };
+        let w2 = if i < 24 {
+            (i as u64 % 8) << 61
+        } else {
+            pairs.next_u64()
+        };
+        write_pair(w1, w2);
+    }
+    for row in crate::test_exact::entries(
+        include_str!("../../reference/fixtures/fast_pair_radius.json"),
+        &["rows"],
+    ) {
+        let w1 = u64::from_str_radix(crate::test_exact::field(row, "word"), 16).unwrap();
+        write_pair(w1, 0);
     }
     let mut write = |x: f64| {
         writeln!(

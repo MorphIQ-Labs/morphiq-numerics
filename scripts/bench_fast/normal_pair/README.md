@@ -22,8 +22,11 @@ investigation. Consumer pricing qualification remains separate.
 An absolute budget handles angular zeros. This candidate budget comes from
 composing the existing logarithm's bound through the radius, rather than from
 Monte Carlo sampling noise. Let `L = -ln(u)` for the existing open-uniform
-grid. Then `2^-53 <= L < 37`, and the fast logarithm's absolute error is at
-most `2^-53 L + 2^-65`. The absolute term matters as `u` approaches one.
+grid. Then `2^-53 <= L < 37`, and the standalone polynomial candidates use the public fast logarithm's
+bound `2^-53 L + 2^-65`. The public normal pair uses the private radius
+logarithm described in [fast_random.md](../../../docs/fast_random.md): that
+same bound near one, and `2^-48 L + 2^-45` away from the reciprocal-one
+cells. The absolute term matters as `u` approaches one.
 The radius perturbation follows from
 `sqrt(a) - sqrt(b) = (a-b)/(sqrt(a)+sqrt(b))`; correctly rounded square roots,
 the bounded angular polynomials and final products add their own errors.

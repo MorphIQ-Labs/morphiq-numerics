@@ -5,7 +5,7 @@ From Flocq Require Import Core Relative IEEE754.Binary IEEE754.Bits.
 From Binary64 Require Import Binary64Add IEEE64 IEEE64Add IEEE64Sqrt Encodings
  Grid RoundingGaps RoundingCore RoundingConstant RoundingTest.
 From Interval Require Import Tactic.
-Require Import StageGappa FastLn FastRandomAngular FastRandomBound.
+Require Import StageGappa FastLn FastRandomLog FastRandomAngular FastRandomBound.
 Open Scope R_scope.
 
 Definition bm_neg_two : f64 := b64_of_bits 13835058055282163712.
@@ -16,7 +16,7 @@ Proof.
  cbn. field.
 Qed.
 
-Definition bm_radius64 u := fsqrt (fmul bm_neg_two (fast_ln_public64 u)).
+Definition bm_radius64 u := fsqrt (fmul bm_neg_two (pair_log64 u)).
 Definition bm_pair64 u phi :=
  let r:=bm_radius64 u in
  (fmul r (bm_cos64 phi),fmul r (bm_sin64 phi)).
@@ -75,30 +75,31 @@ Proof.
 Qed.
 
 Theorem bm_radius_ok u : finite u -> bm_unit<=B u<=1-bm_unit ->
- let a:= -B(fast_ln_public64 u) in
+ let a:= -B(pair_log64 u) in
  finite (bm_radius64 u) /\ Rabs(B(bm_radius64 u)-sqrt(2*a))<=/2^50 /\
  Rabs(B(bm_radius64 u))<=9.
 Proof.
  intros Fu U a. pose proof (bm_uniform_log_range u U) as Lr.
  assert (Up : 0<B u) by (unfold bm_unit in U;lra).
- destruct (fast_ln_public_ok u Fu Up) as [Fl Log].
+ destruct (pair_log_ok u Fu ltac:(unfold bm_unit in U;lra)) as [Fl Log].
  set (L:= -ln(B u)) in *.
- assert (A : Rabs(a-L)<=bm_unit*L+bm_log_floor).
- { unfold a,L. replace (-B(fast_ln_public64 u)- -ln(B u)) with
-     (-(B(fast_ln_public64 u)-ln(B u))) by ring.
-   rewrite Rabs_Ropp. rewrite (Rabs_left (ln(B u))) in Log by (unfold L in Lr;unfold bm_unit in Lr;lra).
-   bpow_num_all;unfold bm_unit,bm_log_floor;lra. }
- destruct (bm_log_ranges L a L Lr A) as [[Al Au] _].
+ assert (A : bm_pair_log_error L a).
+ { unfold bm_pair_log_error,a,L.
+   replace (-B(pair_log64 u)- -ln(B u)) with (-(B(pair_log64 u)-ln(B u))) by ring.
+   rewrite Rabs_Ropp.
+   rewrite (Rabs_left (ln(B u))) in Log by (unfold L in Lr;unfold bm_unit in Lr;lra).
+   unfold bm_unit,bm_log_floor. exact Log. }
+ destruct (bm_pair_log_ranges L a L Lr A) as [[Al Au] _].
  { rewrite Rminus_diag_eq,Rabs_R0 by reflexivity. unfold bm_unit in Lr |- *;nra. }
  assert (Ar : 0<=a<=38) by (unfold bm_unit in Lr;nra).
- assert (Abs : Rabs(B(fast_ln_public64 u))<=38).
- { replace (B(fast_ln_public64 u)) with (-a) by (unfold a;ring).
+ assert (Abs : Rabs(B(pair_log64 u))<=38).
+ { replace (B(pair_log64 u)) with (-a) by (unfold a;ring).
    rewrite Rabs_Ropp,Rabs_pos_eq by lra;lra. }
  destruct (bm_twice_exact _ Fl Abs) as [Fp Vp].
- unfold bm_radius64. destruct (sqrt_ieee (fmul bm_neg_two (fast_ln_public64 u))) as [V Fin].
- assert (P : B(fmul bm_neg_two (fast_ln_public64 u))=2*a) by (rewrite Vp;unfold a;ring).
+ unfold bm_radius64. destruct (sqrt_ieee (fmul bm_neg_two (pair_log64 u))) as [V Fin].
+ assert (P : B(fmul bm_neg_two (pair_log64 u))=2*a) by (rewrite Vp;unfold a;ring).
  rewrite P in V,Fin.
- assert (Fr : finite(fsqrt(fmul bm_neg_two (fast_ln_public64 u)))) by (apply Fin;split;[exact Fp|nra]).
+ assert (Fr : finite(fsqrt(fmul bm_neg_two (pair_log64 u)))) by (apply Fin;split;[exact Fp|nra]).
  assert (R : 0<=sqrt(2*a)<=9- /2^50) by (interval with (i_prec 100)).
  assert (Mag : Rabs(sqrt(2*a))<=16) by (rewrite Rabs_pos_eq;lra).
  pose proof (bm_round16 (sqrt(2*a)) Mag) as Round.
@@ -130,12 +131,14 @@ Proof.
  pose proof (bm_uniform_log_range u U) as Lr.
  set (L:= -ln(B u)) in *.
  assert (Up:0<B u) by (unfold bm_unit in U;lra).
- destruct (fast_ln_public_ok u Fu Up) as [Fl Log].
- set (a:= -B(fast_ln_public64 u)).
- assert (A:Rabs(a-L)<=bm_unit*L+bm_log_floor).
- { unfold a,L. replace (-B(fast_ln_public64 u)- -ln(B u)) with
-    (-(B(fast_ln_public64 u)-ln(B u))) by ring. rewrite Rabs_Ropp.
-   rewrite (Rabs_left (ln(B u))) in Log by (unfold L in Lr;unfold bm_unit in Lr;lra). bpow_num_all;unfold bm_unit,bm_log_floor;lra. }
+ destruct (pair_log_ok u Fu ltac:(unfold bm_unit in U;lra)) as [Fl Log].
+ set (a:= -B(pair_log64 u)).
+ assert (A:bm_pair_log_error L a).
+ { unfold bm_pair_log_error,a,L.
+   replace (-B(pair_log64 u)- -ln(B u)) with (-(B(pair_log64 u)-ln(B u))) by ring.
+   rewrite Rabs_Ropp.
+   rewrite (Rabs_left (ln(B u))) in Log by (unfold L in Lr;unfold bm_unit in Lr;lra).
+   unfold bm_unit,bm_log_floor. exact Log. }
  pose proof (bm_reference_log L Lr) as RefLog.
  destruct (bm_radius_ok u Fu U) as [Fr [Rerror Rrange]]. fold a in Rerror.
  destruct (bm_reference_radius L Lr) as [Serror Srange].
