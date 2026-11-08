@@ -128,13 +128,18 @@ transcriptions they actually import. Bivariate owns its separate extraction.
 The planner requires every kernel entry, certificate and extraction to have
 one owner. No proof or axiom allowlist is weakened by selecting a family.
 
-CI prepares identical corpora/generated proofs once, then runs selected families
-with separate caches keyed by their dependency content and pinned controls.
+CI prepares identical corpora/generated proofs once. When all families are
+selected, one unsplit full gate builds and audits their shared dependencies
+once. A proper subset runs as family jobs, with separate caches keyed by
+their dependency content and pinned controls. The full gate retains its own
+cache and can restore the existing unsplit build cache. All restored builds
+are checked against the current sources and toolchain; audits always rerun.
 Known proof/certificate changes select their owning and dependent families;
 shared, toolchain, gate, removed or unclassified paths select all. Main pushes
 always select all. The required `formal (coq)` aggregate checks prerequisite
-outcomes and the exact set of completion receipts, including their source and
-corpus identities. Missing, duplicate, stale, failed or skipped selected work
+outcomes and the exact completion evidence: one full-gate receipt for an
+all-family selection, or one receipt per selected family for a proper subset,
+including their source and corpus identities. Mixed execution evidence fails. Missing, duplicate, stale, failed or skipped selected work
 cannot pass. Prose-only handling retains the repository's narrow allowlist.
 Build/audit/extraction timings and failure logs are retained as CI artifacts.
 

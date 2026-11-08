@@ -47,8 +47,8 @@
 #                 owned extractions. Global binding/admission checks still run.
 #   --plan-out FILE write the complete family ownership/dependency plan.
 #   --plan-only     assemble and plan, without compiling or claiming gate success.
-#   --receipt FILE  write a new family completion receipt only after every owned
-#                   audit and extraction passes; --family is required.
+#   --receipt FILE  write a new full or family completion receipt only after
+#                   every required audit and extraction passes.
 #   --build-only  prepare a retained --build tree for caching, then exit before
 #                 the audits and cross-checks. This is not a passing formal
 #                 gate; CI follows it with the complete invocation below.
@@ -115,8 +115,8 @@ if [ "$build_only" -eq 1 ] && [ -z "$build" ]; then
   echo "--build-only requires a retained --build directory" >&2
   exit 2
 fi
-if [ -n "$receipt" ] && [ -z "$family" ]; then
-  echo "--receipt requires --family" >&2
+if [ -n "$receipt" ] && { [ "$build_only" -eq 1 ] || [ "$plan_only" -eq 1 ] || [ -n "$changed" ] || [ -n "$base_audit" ]; }; then
+  echo "--receipt requires a complete full or family gate, without legacy audit selection" >&2
   exit 2
 fi
 corpus=$(realpath "$1")
@@ -194,7 +194,7 @@ cp formal/fast/*.v formal/exp/*.v formal/ln/*.v formal/erfcx/*.v formal/normal/*
     ! -name CertificateAudit.v ! -name KernelAudit.v | LC_ALL=C sort
 } > _CoqProject)
 
-if [ -n "$family" ] || [ -n "$plan_out" ] || [ "$plan_only" -eq 1 ]; then
+if [ -n "$family" ] || [ -n "$plan_out" ] || [ -n "$receipt" ] || [ "$plan_only" -eq 1 ]; then
   [ -n "$plan_out" ] || plan_out="$work/families.json"
   set -- --src "$src" --out "$plan_out" --corpus "$corpus" --internal-corpus "$icorpus"
   [ -z "$changed" ] || set -- "$@" --changed "$changed"
@@ -457,7 +457,9 @@ if [ "$(sha256sum formal/binding.sha256)" != "$binding_identity" ]; then
 fi
 sha256sum --check --quiet formal/binding.sha256
 if [ -n "$receipt" ]; then
-  python3 scripts/formal_results.py receipt --plan "$plan_out" --family "$family" \
+  set --
+  [ -z "$family" ] || set -- --family "$family"
+  python3 scripts/formal_results.py receipt --plan "$plan_out" "$@" \
     --kernel-reports "$kernels" --certificate-reports "$certificates" --out "$receipt"
 fi
 echo "formal: OK"

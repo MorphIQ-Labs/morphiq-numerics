@@ -5,7 +5,7 @@
 # Runtime tests follow the checks. Formal validation prepares its own inputs
 # and runs alongside the other checks after basic hygiene/formatting gates.
 # Every independent gate is a required status check in
-# the "Main branch protection" ruleset; formal family jobs are enforced by
+# the "Main branch protection" ruleset; formal execution jobs are enforced by
 # the fail-closed formal (coq) aggregate, including exact receipt coverage.
 # GitHub can report downstream skips as passing, so independent gates remain
 # individually required. New independent gates enter the ruleset with their CI change.
@@ -495,8 +495,9 @@ jobs:
 
   # Formal families own an exact partition of audit entries and extractions.
   # coqdep supplies build closures and selection; unclassified paths select all.
-  # The required formal (coq) aggregate checks job results AND every receipt,
-  # so a failed/skipped/missing selected family cannot produce a green gate.
+  # All families use one unsplit gate to avoid duplicate builds/audit traversal.
+  # Proper subsets use family jobs. The required aggregate checks job results
+  # AND exact receipts, so failed/skipped/missing work cannot pass.
   formal-plan:
     name: formal / plan
     outputs:
@@ -509,7 +510,7 @@ jobs:
     needs: [commit-convention, repository-hygiene, secret-scan, fmt]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-24.04
-    # Preparation emits no success receipt; only completed family gates do.
+    # Preparation emits no success receipt; only completed gates do.
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -625,12 +626,8 @@ jobs:
           docker run --rm -v "$PWD:/w:ro" -v "$PWD/target/formal-plan:/plan" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
             ./scripts/check_formal.sh --deps /t/coq-deps/coq-deps.tar.gz --plan-only --plan-out /plan/families.json \
             "${args[@]}" target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
-          python3 - <<'PYCODE' >> "$GITHUB_OUTPUT"
-          import json
-          from pathlib import Path
-          plan = json.loads(Path('target/formal-plan/families.json').read_text())
-          print('matrix=' + json.dumps({'include': [dict(family=n, key=plan['families'][n]['cache_key']) for n in plan['selected']]}))
-          PYCODE
+          matrix=$(python3 scripts/formal_results.py matrix --plan target/formal-plan/families.json)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
           tar -czf target/formal-inputs.tar.gz -C target crosscheck.txt internal-crosscheck.txt gappa-proofs formal-plan
       - name: Retain the source-bound formal inputs and plan
         if: steps.scope.outputs.affected == 'true'
@@ -640,12 +637,13 @@ jobs:
           path: target/formal-inputs.tar.gz
           if-no-files-found: error
 
-  formal-family:
-    name: formal / ${{ matrix.family }}
+  formal-execution:
+    name: formal / ${{ matrix.name }}
     needs: formal-plan
     if: needs.formal-plan.outputs.affected == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    # The matched cold full gate took 179 minutes before setup/artifact costs.
+    timeout-minutes: 240
     defaults:
       run:
         shell: bash
@@ -655,6 +653,7 @@ jobs:
       matrix: ${{ fromJSON(needs.formal-plan.outputs.matrix) }}
     env:
       FORMAL_FAMILY: ${{ matrix.family }}
+      FORMAL_NAME: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -668,21 +667,23 @@ jobs:
           path: ${{ runner.temp }}/coq-deps
           key: ${{ needs.formal-plan.outputs.deps }}
           fail-on-cache-miss: true
-      - name: Restore this family's proof closure
+      - name: Restore the selected proof build
         id: build
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/formal-build
-          key: formal-family-${{ matrix.family }}-${{ needs.formal-plan.outputs.deps }}-${{ matrix.key }}
+          key: ${{ matrix.cache }}-${{ needs.formal-plan.outputs.deps }}-${{ matrix.key }}
           restore-keys: |
-            formal-family-${{ matrix.family }}-${{ needs.formal-plan.outputs.deps }}-
-      - name: Build the source-bound family closure
+            ${{ matrix.cache }}-${{ needs.formal-plan.outputs.deps }}-
+      - name: Build the source-bound selected proofs
         run: |
           mkdir -p "$RUNNER_TEMP/formal-build"
           rm -f "$RUNNER_TEMP/formal-build/.built"
           chmod -R a+rwX "$RUNNER_TEMP/formal-build"
+          args=()
+          if [ -n "$FORMAL_FAMILY" ]; then args=(--family "$FORMAL_FAMILY"); fi
           docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
-            ./scripts/check_formal.sh --family "$FORMAL_FAMILY" --build-only \
+            ./scripts/check_formal.sh "${args[@]}" --build-only \
             --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
             target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs 2>&1 | tee target/formal-build.log
       - name: Was the proof build completed
@@ -695,26 +696,28 @@ jobs:
         with:
           path: ${{ runner.temp }}/formal-build
           key: ${{ steps.build.outputs.cache-primary-key }}
-      - name: Audit assumptions and cross-check owned extractions
+      - name: Audit assumptions and cross-check selected extractions
         run: |
           mkdir -p target/formal-result
           chmod a+rwx target/formal-result
+          args=()
+          if [ -n "$FORMAL_FAMILY" ]; then args=(--family "$FORMAL_FAMILY"); fi
           docker run --rm -v "$PWD:/w:ro" -v "$PWD/target/formal-result:/result" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
-            ./scripts/check_formal.sh --family "$FORMAL_FAMILY" \
+            ./scripts/check_formal.sh "${args[@]}" \
             --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
-            --plan-out /result/actual-plan.json --receipt "/result/$FORMAL_FAMILY.json" \
+            --plan-out /result/actual-plan.json --receipt "/result/$FORMAL_NAME.json" \
             target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs 2>&1 | tee target/formal-audit.log
-      - name: Retain the completed family's receipt
+      - name: Retain the completed gate receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: formal-receipt-${{ matrix.family }}
-          path: target/formal-result/${{ matrix.family }}.json
+          name: formal-receipt-${{ matrix.name }}
+          path: target/formal-result/${{ matrix.name }}.json
           if-no-files-found: error
       - name: Retain stage timings and failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: formal-logs-${{ matrix.family }}
+          name: formal-logs-${{ matrix.name }}
           path: |
             target/formal-build.log
             target/formal-audit.log
@@ -722,7 +725,7 @@ jobs:
 
   formal:
     name: formal (coq)
-    needs: [repository-hygiene, formal-plan, formal-family]
+    needs: [repository-hygiene, formal-plan, formal-execution]
     if: always()
     runs-on: ubuntu-24.04
     steps:
@@ -732,9 +735,9 @@ jobs:
           HYGIENE: ${{ needs.repository-hygiene.result }}
           PLAN: ${{ needs.formal-plan.result }}
           AFFECTED: ${{ needs.formal-plan.outputs.affected }}
-          FAMILIES: ${{ needs.formal-family.result }}
+          EXECUTION: ${{ needs.formal-execution.result }}
         run: |
-          python3 scripts/formal_results.py status --hygiene "$HYGIENE" --planner "$PLAN" --affected "$AFFECTED" --families "$FAMILIES"
+          python3 scripts/formal_results.py status --hygiene "$HYGIENE" --planner "$PLAN" --affected "$AFFECTED" --execution "$EXECUTION"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         if: needs.formal-plan.outputs.affected == 'true'
         with:
