@@ -148,8 +148,7 @@ path = %s
 ''' % (json.dumps(str(artifacts / "package" / f"morphiq-numerics-{version}")), json.dumps(features),
        json.dumps(str(artifacts / "package" / f"morphiq-numerics-arch-{version}")))
         (consumer / "Cargo.toml").write_text(manifest)
-        if not (consumer / "Cargo.lock").exists():
-            run("cargo", "generate-lockfile", "--offline", cwd=consumer)
+        run("cargo", "generate-lockfile", "--offline", cwd=consumer)
         run("cargo", "run", "--offline", "--locked", cwd=consumer)
         if features == ["simd", "std"]:
             env = dict(os.environ, RUSTDOCFLAGS="-D warnings")
