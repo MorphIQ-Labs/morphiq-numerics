@@ -1,8 +1,11 @@
-# morphiq-numerics
+# MorphIQ Numerics
 
-Target-independent binary64 numerics for Rust, with explicit numerical
-contracts: correctly rounded results where established, proved error bounds
-elsewhere, and a separate `fast` namespace for bounded approximations.
+`morphiq-numerics` is a standalone, general-purpose Rust library for reproducible
+binary64 numerics, available under MIT OR Apache-2.0.
+
+Each API has an explicit numerical contract: correctly rounded results where
+established, proved error bounds elsewhere, and a separate `fast` namespace for
+bounded approximations.
 
 The library provides elementary and probability functions, log-space and
 double-word arithmetic, seeded random streams, reductions, finite intervals,
