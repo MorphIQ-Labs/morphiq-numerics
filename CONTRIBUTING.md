@@ -107,6 +107,38 @@ first crates.io release ([#90](https://github.com/MorphIQ-Labs/morphiq-numerics/
 By contributing, you agree that your contributions are dual licensed under
 MIT OR Apache-2.0, as described in the [README](README.md#license).
 
+## Release package verification
+
+From a clean committed checkout, run `python3 scripts/check_packages.py` with
+the pinned toolchain. Use `--out target/package-check-2` for a subsequent run;
+the output directory must be new. The command keeps its archives, build output
+and verification receipt under that directory and never uploads a package.
+
+Before first publication, Cargo cannot resolve the optional architecture crate
+from crates.io while both source manifests have `publish = false`. The check
+archives the committed tree and enables only those two flags in an isolated
+copy. Like Tollgate, the check runs `cargo publish --locked --workspace --dry-run`
+and requires the publishable set to match the release allowlist. Cargo supplies
+its temporary registry and verifies both normalized archives. The source manifests and release-plz
+publication guards stay unchanged.
+
+The check verifies packaged licenses, notices, README links and dependency
+metadata. An external consumer uses only the unpacked archives, with an offline
+patch for the packaged architecture dependency. It runs with default, `std`,
+`simd` and combined features and builds dependency documentation with warnings
+denied. This tests package consumption; the complete oracle/proof/mutation
+suite still runs from the repository with its unpublished tooling and fixtures.
+Packaging success does not establish numerical or performance qualification.
+
+Initial crates.io publication requires token authentication before Trusted
+Publishing can be configured for each crate. Registry enablement and the
+bootstrap authentication belong in the reviewed release change after #90's
+acceptance is met; this preflight does not enable either. Keep the normal
+release-plz version/tag workflow and publish the architecture dependency before
+the library. Subsequent Trusted Publishing uses the configured repository and
+workflow identity with job-scoped `id-token: write`, as described in the
+[release-plz setup](https://release-plz.dev/docs/github/quickstart).
+
 ## Formal families
 
 The full local gate remains `scripts/check_formal.sh` with the public corpus,

@@ -7,10 +7,14 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+readme = "README.md"
 keywords = ["simd", "no-std"]
 categories = ["hardware-support", "no-std", "no-std::no-alloc"]
 # Published with morphiq-numerics, which depends on it behind its `simd` feature.
 publish = false
+
+[package.metadata.docs.rs]
+all-features = true
 
 [features]
 # Runtime CPU feature detection (`std::arch::is_*_feature_detected!`). Without

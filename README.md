@@ -57,12 +57,12 @@ assurance limits.
 | --- | --- |
 | `elementary` | `exp`, `exp2`, `expm1`, `ln`, `ln_1p`, `log2`, `log10`, `sin`, `cos`, `sincos`, `tan`, `sqrt`, `asin`, `asinh`, `atan2`; correct rounding on the established domains, stated bounds elsewhere. See the [API and derivation links](crates/morphiq-numerics/src/elementary.rs). |
 | `normal` | Density, CDF, complementary and centered CDF, log-density, log-CDF, and scaled complementary error function `erfcx`; accepted rounding tests are correctly rounded, with bounded fallbacks. [Normal family](docs/normal.md), [log-density](docs/log_norm_pdf.md), [erfcx](docs/erfcx.md). |
-| `fast` | Explicit bounded `exp`, `exp_coarse`, `ln`, `erfcx`, `norm_cdf`, and `log_norm_cdf`, each with a matching slice API. [Domains and bounds](docs/fast.md). |
+| `fast` | Explicit bounded `exp`, `exp_coarse`, `ln`, `erfcx`, `norm_cdf`, and `log_norm_cdf`, each with a matching slice API. [Domains and bounds](docs/fast.md). `fast::random` adds deterministic bounded normal pairs and slices ([contract](docs/fast_random.md)). |
 | `bivariate_normal` | Bivariate normal CDF, bounded and batched forms, and a reusable per-correlation evaluator; an absolute error contract with explicit tail limitations. [Contract](docs/bivariate_normal.md). |
 | `log_space` | Log-sums, log-differences, paired operations, and checked log-weight normalization with a returned error bound. [Arithmetic](docs/log_space.md), [normalization](docs/log_normalize.md). |
 | `eft`, `double_word` | Error-free transforms on their stated domains, double-word arithmetic with proved bounds, and `DoubleWord::exp_split` with a separate binary exponent. [Contracts](docs/double-word.md). |
 | `random` | Seeded SplitMix64 and xoshiro256++ streams, jump operations, exact unit uniforms, and Box–Muller normal pairs. [Contract](docs/random.md). |
-| `reduce`, `ulp` | Ordered sums, dot products and sums of squares, compensated variants, and ULP utilities. [Reductions](docs/reduce.md), [ULPs](docs/ulp.md). |
+| `reduce`, `ulp` | Ordered sums, dot products and sums of squares, compensated variants, checked mergeable moments, and ULP utilities. [Reductions](docs/reduce.md), [moments](docs/moments.md), [ULPs](docs/ulp.md). |
 | `interval` | Finite conservative outward enclosures and checked arithmetic, `ln`, `exp`, and `sqrt`, with typed domain/range failures. [Contract and proof boundary](docs/interval.md). |
 | `linalg::tridiagonal` | Reusable Thomas factors and scalar/batched solves for dominant, sign-domain, and general checked unpivoted matrices; residual and solution-error certificates where supported. [Admission rules and certificates](docs/tridiagonal.md). |
 
