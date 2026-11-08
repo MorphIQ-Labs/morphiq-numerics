@@ -1,0 +1,56 @@
+name: qualify main formal routing
+on:
+  push:
+    branches: [qualify/90-formal-main]
+permissions:
+  contents: read
+jobs:
+  pr-only:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - run: 'true'
+  plan:
+    needs: pr-only
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-24.04
+    outputs:
+      affected: ${{ steps.plan.outputs.affected }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - id: plan
+        run: |
+          echo 'affected=true' >> "$GITHUB_OUTPUT"
+          echo 'matrix={"name":["full"]}' >> "$GITHUB_OUTPUT"
+  old-execution:
+    needs: plan
+    if: ${{ needs.plan.outputs.affected == 'true' }}
+    strategy:
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: 'true'
+  fixed-execution:
+    needs: plan
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.affected == 'true' }}
+    strategy:
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: 'true'
+  verify:
+    needs: [pr-only, plan, old-execution, fixed-execution]
+    if: always()
+    runs-on: ubuntu-24.04
+    env:
+      RESULTS: ${{ toJSON(needs) }}
+    steps:
+      - name: Reproduce the skipped-ancestor defect and verify the correction
+        run: |
+          python3 - <<'PY'
+          import json, os
+          actual = {name: value['result'] for name, value in json.loads(os.environ['RESULTS']).items()}
+          expected = {'pr-only': 'skipped', 'plan': 'success', 'old-execution': 'skipped', 'fixed-execution': 'success'}
+          print(actual)
+          assert actual == expected, (actual, expected)
+          PY
