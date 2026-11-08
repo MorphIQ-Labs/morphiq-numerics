@@ -108,7 +108,7 @@ def main():
     check_publishable(metadata)
     run("cargo", "publish", "--dry-run", "--locked", "--workspace", "--all-features",
         "--target-dir", str(artifacts), cwd=stage)
-    results = [check_archive(artifacts / "package" / f"{name}-{version}.crate", name, version, stage)
+    results = [check_archive(artifacts / "package/tmp-crate" / f"{name}-{version}.crate", name, version, stage)
                for name in CRATES]
 
     # Consume only Cargo's unpacked archives. The registry dependency was
