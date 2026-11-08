@@ -4,8 +4,13 @@
 # Neither the checkout nor the reusable build is changed. A case passes only
 # when the formal gate exits nonzero AND reports the intended rejection.
 set -eu
+family=
+if [ "${1:-}" = --family ]; then
+  family=$2
+  shift 2
+fi
 if [ "$#" -ne 6 ]; then
-  echo "usage: $0 <binding|admitted|axiom|certificate|crosscheck|internal-crosscheck|bvn-crosscheck> <deps.tar.gz> <build> <corpus> <internal corpus> <gappa proofs>" >&2
+  echo "usage: $0 [--family NAME] <binding|admitted|axiom|certificate|crosscheck|internal-crosscheck|bvn-crosscheck> <deps.tar.gz> <build> <corpus> <internal corpus> <gappa proofs>" >&2
   exit 2
 fi
 mutation=$1
@@ -117,7 +122,9 @@ esac
 
 started=$(date +%s)
 status=0
-./scripts/check_formal.sh --deps "$deps" --build "$work/build" \
+set --
+[ -z "$family" ] || set -- --family "$family"
+./scripts/check_formal.sh "$@" --deps "$deps" --build "$work/build" \
   "$work/crosscheck.txt" "$work/internal-crosscheck.txt" "$work/proofs" \
   > "$work/result.log" 2>&1 || status=$?
 cat "$work/result.log"

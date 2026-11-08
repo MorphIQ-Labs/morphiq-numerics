@@ -54,6 +54,8 @@ class FormalAffected(unittest.TestCase):
             "formal/binary64/Foo.v",
             "formal/exp/Missing.v",
             "formal/exp/notes.txt",
+            "formal/exp/A.v ",
+            "formal/binding.sha256 ",
             "formal/unknown/A.v",
             "formal/axioms.expected",
             "formal/audit/Audit.v",

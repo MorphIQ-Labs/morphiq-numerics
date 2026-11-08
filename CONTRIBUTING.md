@@ -106,3 +106,51 @@ first crates.io release ([#90](https://github.com/MorphIQ-Labs/morphiq-numerics/
 
 By contributing, you agree that your contributions are dual licensed under
 MIT OR Apache-2.0, as described in the [README](README.md#license).
+
+## Formal families
+
+The full local gate remains `scripts/check_formal.sh` with the public corpus,
+internal corpus and generated Gappa proof directory as its three arguments.
+Run it in the pinned Coq image, with the pinned dependency archive as described
+in `AGENTS.md`.
+
+`--plan-only --plan-out target/formal-plan.json` writes the check ownership and
+`coqdep` closures without building proofs or claiming a passing gate.
+`--family bivariate --build target/formal-bivariate` builds only that family's
+closure, audits its owned kernel/certificate entries and runs its extraction.
+The complete source-binding and no-admission checks still run. Omit `--family`
+to run the full gate. `--build-only` never establishes assurance by itself.
+
+Families follow proof-source ownership. The base audit stays together in
+`shared`. The public and internal extraction models remain composite units
+(`crosscheck` and `internal-crosscheck`); their dependency closures include the
+transcriptions they actually import. Bivariate owns its separate extraction.
+The planner requires every kernel entry, certificate and extraction to have
+one owner. No proof or axiom allowlist is weakened by selecting a family.
+
+CI prepares identical corpora/generated proofs once. When all families are
+selected, one unsplit full gate builds and audits their shared dependencies
+once. A proper subset runs as family jobs, with separate caches keyed by
+their dependency content and pinned controls. The full gate retains its own
+cache and can restore the existing unsplit build cache. All restored builds
+are checked against the current sources and toolchain; audits always rerun.
+Known proof/certificate changes select their owning and dependent families;
+shared, toolchain, gate, removed or unclassified paths select all. Main pushes
+always select all. The required `formal (coq)` aggregate checks prerequisite
+outcomes and the exact completion evidence: one full-gate receipt for an
+all-family selection, or one receipt per selected family for a proper subset,
+including their source and corpus identities. Mixed execution evidence fails. Missing, duplicate, stale, failed or skipped selected work
+cannot pass. Prose-only handling retains the repository's narrow allowlist.
+Build/audit/extraction timings and failure logs are retained as CI artifacts.
+
+For a reproducible cold/warm comparison, run `scripts/bench_formal.sh` in the
+same pinned Coq image. Its five arguments are the dependency archive, public
+corpus, internal corpus, generated Gappa proof directory and a new output
+directory under `target/`. Add `--family NAME` to measure one family; omitting
+it measures the full gate. It records the host, source/input hashes, separate
+build and audit wall times, exit statuses and raw logs. The cold pass requires
+an unused directory; the warm pass reuses its compiled proofs and repeats all
+audits and extractions. Keep failed and interrupted attempts through review.
+For a parallel CI matrix, report elapsed time from planning through aggregation
+separately from the sum of runner times; summing parallel stage times does not
+give the feedback latency.

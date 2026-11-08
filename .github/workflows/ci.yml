@@ -4,10 +4,11 @@
 #
 # Runtime tests follow the checks. Formal validation prepares its own inputs
 # and runs alongside the other checks after basic hygiene/formatting gates.
-# Every job is a required status check in
-# the "Main branch protection" ruleset; GitHub reports a job skipped behind a
-# failed stage as passing, so the failed job itself must be required. A job is
-# added to the ruleset in the same change that adds it here.
+# Every independent gate is a required status check in
+# the "Main branch protection" ruleset; formal execution jobs are enforced by
+# the fail-closed formal (coq) aggregate, including exact receipt coverage.
+# GitHub can report downstream skips as passing, so independent gates remain
+# individually required. New independent gates enter the ruleset with their CI change.
 #
 # The toolchain comes from rust-toolchain.toml. Third-party actions are pinned
 # to full commit SHAs; the comment names the release. Tool versions come from
@@ -492,29 +493,24 @@ jobs:
         if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
         run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
 
-  # The Coq proofs (scripts/check_formal.sh). The Coq image is pinned by digest
-  # (.cargo/coq-image) and its libraries by version (.cargo/coq-packages).
-  # Two caches keep the job short; neither is trusted for a result:
-  # - coq-deps: the libraries' install (scripts/formal_deps.sh), keyed on the
-  #   image, the versions and the script that builds it. The proof step checks
-  #   the restored versions.
-  # - formal-build: the proof build's tree. check_formal.sh reuses a .vo only
-  #   if its source's bytes, the generated _CoqProject and the toolchain's
-  #   fingerprint are unchanged, so the key decides only how much is reused.
-  #   The admits check, the audits and the cross-checks run on every run.
-  # A pull request's caches are visible only to that pull request; main's are
-  # visible to every pull request, and main reads only its own.
-  formal:
-    name: formal (coq)
+  # Formal families own an exact partition of audit entries and extractions.
+  # coqdep supplies build closures and selection; unclassified paths select all.
+  # All families use one unsplit gate to avoid duplicate builds/audit traversal.
+  # Proper subsets use family jobs. The required aggregate checks job results
+  # AND exact receipts, so failed/skipped/missing work cannot pass.
+  formal-plan:
+    name: formal / plan
+    outputs:
+      affected: ${{ steps.scope.outputs.affected }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      deps: ${{ steps.keys.outputs.deps }}
     # This job builds its own Rust corpora and Gappa proofs; it consumes no
     # artifacts from the other check jobs. Starting it independently shortens
     # proof-failure feedback. All other checks remain required for merging.
     needs: [commit-convention, repository-hygiene, secret-scan, fmt]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-24.04
-    # The erfcx/normal cold build alone took 64 minutes on this runner; the
-    # 533-entry kernel audit and extracted corpora need additional time.
-    # Checkpoint the completed build before running the full assurance gate.
+    # Preparation emits no success receipt; only completed gates do.
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -526,7 +522,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: The selections' tests
-        run: python3 -m unittest scripts.test_formal_affected scripts.test_formal_relevant
+        run: python3 -m unittest scripts.test_formal_affected scripts.test_formal_relevant scripts.test_formal_families scripts.test_formal_results
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: Whether the change can affect the proofs
         # A pull request that touches no proof, no file a proof is bound to, no
@@ -537,19 +533,21 @@ jobs:
         id: scope
         run: |
           mkdir -p target
+          if [ "${{ needs.repository-hygiene.outputs.prose_only }}" = true ]; then
+            echo "affected=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "${{ github.event_name }}" = pull_request ]; then
-            git diff --name-only HEAD^1 HEAD > target/changed-files.txt
-            git show HEAD^1:formal/audit/KernelAudit.v > target/KernelAudit.base.v
-            verdict=$(python3 scripts/formal_relevant.py --changed target/changed-files.txt)
+            verdict=$(python3 scripts/formal_relevant.py --git-base HEAD^1 --write-changed target/changed-files.txt)
           else
             verdict="affected: push to the default branch"
           fi
           echo "formal lane: $verdict"
           case "$verdict" in
-            affected*) echo "affected=true" >> "$GITHUB_OUTPUT" ;;
-            *) echo "affected=false" >> "$GITHUB_OUTPUT" ;;
+            'affected: '*) echo "affected=true" >> "$GITHUB_OUTPUT" ;;
+            'not affected') echo "affected=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "invalid formal scope decision" >&2; exit 1 ;;
           esac
-        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' }}
       - name: Write the cross-check corpus from the Rust library
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
         # target/ doesn't exist on a fresh checkout, and the shell opens the
@@ -615,47 +613,144 @@ jobs:
         with:
           path: ${{ runner.temp }}/coq-deps
           key: ${{ steps.keys.outputs.deps }}
-      - name: Restore the proof build
-        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
+      - name: Plan dependency closures and exact check ownership
+        id: plan
+        if: steps.scope.outputs.affected == 'true'
+        run: |
+          args=()
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            args=(--changed target/changed-files.txt)
+          fi
+          mkdir -p target/formal-plan
+          chmod a+rwx target/formal-plan
+          docker run --rm -v "$PWD:/w:ro" -v "$PWD/target/formal-plan:/plan" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
+            ./scripts/check_formal.sh --deps /t/coq-deps/coq-deps.tar.gz --plan-only --plan-out /plan/families.json \
+            "${args[@]}" target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
+          matrix=$(python3 scripts/formal_results.py matrix --plan target/formal-plan/families.json)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          tar -czf target/formal-inputs.tar.gz -C target crosscheck.txt internal-crosscheck.txt gappa-proofs formal-plan
+      - name: Retain the source-bound formal inputs and plan
+        if: steps.scope.outputs.affected == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: formal-inputs
+          path: target/formal-inputs.tar.gz
+          if-no-files-found: error
+
+  formal-execution:
+    name: formal / ${{ matrix.name }}
+    needs: formal-plan
+    if: needs.formal-plan.outputs.affected == 'true'
+    runs-on: ubuntu-24.04
+    # The matched cold full gate took 179 minutes before setup/artifact costs.
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.formal-plan.outputs.matrix) }}
+    env:
+      FORMAL_FAMILY: ${{ matrix.family }}
+      FORMAL_NAME: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: formal-inputs
+          path: target
+      - name: Restore identical corpora and generated proof sources
+        run: tar -xzf target/formal-inputs.tar.gz -C target
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/coq-deps
+          key: ${{ needs.formal-plan.outputs.deps }}
+          fail-on-cache-miss: true
+      - name: Restore the selected proof build
         id: build
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/formal-build
-          key: formal-build-${{ steps.keys.outputs.deps }}-${{ hashFiles('formal/**', 'scripts/check_formal.sh', 'target/gappa-proofs/**') }}
-          restore-keys: formal-build-${{ steps.keys.outputs.deps }}-
-      - name: Build the source-bound proofs for the cache
-        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
+          key: ${{ matrix.cache }}-${{ needs.formal-plan.outputs.deps }}-${{ matrix.key }}
+          restore-keys: |
+            ${{ matrix.cache }}-${{ needs.formal-plan.outputs.deps }}-
+      - name: Build the source-bound selected proofs
         run: |
           mkdir -p "$RUNNER_TEMP/formal-build"
           rm -f "$RUNNER_TEMP/formal-build/.built"
           chmod -R a+rwX "$RUNNER_TEMP/formal-build"
+          args=()
+          if [ -n "$FORMAL_FAMILY" ]; then args=(--family "$FORMAL_FAMILY"); fi
           docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
-            ./scripts/check_formal.sh --build-only --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
-            target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
-      # Save immediately after a completed build, before the costly audits.
-      # A timeout there must not discard the compiled proofs. Every later
-      # invocation still checks source/toolchain identity and reruns the audits.
+            ./scripts/check_formal.sh "${args[@]}" --build-only \
+            --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
+            target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs 2>&1 | tee target/formal-build.log
       - name: Was the proof build completed
         id: built
-        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true' && (!cancelled() && steps.build.outputs.cache-hit != 'true')) }}
+        if: ${{ !cancelled() && steps.build.outputs.cache-hit != 'true' }}
         run: if [ -e "$RUNNER_TEMP/formal-build/.built" ]; then echo "built=true" >> "$GITHUB_OUTPUT"; fi
-      - name: Save the proof build
-        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true' && (!cancelled() && steps.built.outputs.built == 'true')) }}
+      - name: Save compiled proofs before running audits
+        if: ${{ !cancelled() && steps.built.outputs.built == 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/formal-build
           key: ${{ steps.build.outputs.cache-primary-key }}
-      - name: Proofs are bound to the source, assume only the expected axioms, and match the Rust bit for bit
-        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (steps.scope.outputs.affected == 'true') }}
-        id: proofs
+      - name: Audit assumptions and cross-check selected extractions
         run: |
-          formal_args=()
-          if [ "${{ github.event_name }}" = pull_request ]; then
-            formal_args=(--changed target/changed-files.txt --base-audit target/KernelAudit.base.v)
-          fi
-          docker run --rm -v "$PWD:/w:ro" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
-            ./scripts/check_formal.sh --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
-            "${formal_args[@]}" target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs
-      - name: Prose-only change
-        if: ${{ needs.repository-hygiene.outputs.prose_only == 'true' }}
-        run: echo "Reviewed prose-only paths; this job's build and runtime checks are not applicable."
+          mkdir -p target/formal-result
+          chmod a+rwx target/formal-result
+          args=()
+          if [ -n "$FORMAL_FAMILY" ]; then args=(--family "$FORMAL_FAMILY"); fi
+          docker run --rm -v "$PWD:/w:ro" -v "$PWD/target/formal-result:/result" -v "$RUNNER_TEMP:/t" -w /w "$(cat .cargo/coq-image)" \
+            ./scripts/check_formal.sh "${args[@]}" \
+            --deps /t/coq-deps/coq-deps.tar.gz --build /t/formal-build \
+            --plan-out /result/actual-plan.json --receipt "/result/$FORMAL_NAME.json" \
+            target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs 2>&1 | tee target/formal-audit.log
+      - name: Retain the completed gate receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: formal-receipt-${{ matrix.name }}
+          path: target/formal-result/${{ matrix.name }}.json
+          if-no-files-found: error
+      - name: Retain stage timings and failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: formal-logs-${{ matrix.name }}
+          path: |
+            target/formal-build.log
+            target/formal-audit.log
+            target/formal-result/actual-plan.json
+
+  formal:
+    name: formal (coq)
+    needs: [repository-hygiene, formal-plan, formal-execution]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Require successful planning and selected execution
+        env:
+          HYGIENE: ${{ needs.repository-hygiene.result }}
+          PLAN: ${{ needs.formal-plan.result }}
+          AFFECTED: ${{ needs.formal-plan.outputs.affected }}
+          EXECUTION: ${{ needs.formal-execution.result }}
+        run: |
+          python3 scripts/formal_results.py status --hygiene "$HYGIENE" --planner "$PLAN" --affected "$AFFECTED" --execution "$EXECUTION"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: needs.formal-plan.outputs.affected == 'true'
+        with:
+          name: formal-inputs
+          path: target
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: needs.formal-plan.outputs.affected == 'true'
+        with:
+          pattern: formal-receipt-*
+          merge-multiple: true
+          path: target/formal-receipts
+      - name: Verify every selected check completed against the planned inputs
+        if: needs.formal-plan.outputs.affected == 'true'
+        run: |
+          tar -xzf target/formal-inputs.tar.gz -C target formal-plan/families.json
+          python3 scripts/formal_results.py aggregate --plan target/formal-plan/families.json --receipts target/formal-receipts

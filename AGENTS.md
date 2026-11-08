@@ -200,7 +200,7 @@ Releases follow the MorphIQ Labs model, driven by release-plz (`.github/workflow
 | Default branch | `main` | One long-lived branch. |
 | Organization ruleset "Default branch policy" | PR required, linear history, signed commits, no force-push or deletion, threads resolved | Inherited; GitHub signs the squash commits it creates. |
 | Organization rulesets | `v*` tag protection; repository transfer and deletion blocked | Inherited. |
-| Repository ruleset "Main branch protection" | squash only; every CI job a strict required check; no bypass | GitHub reports a job skipped behind a failed one as passing, so every job must itself be required. A job is added here in the same change that adds it to CI. |
+| Repository ruleset "Main branch protection" | squash only; every independent CI gate a strict required check; no bypass | GitHub can report a job skipped behind a failed one as passing. Formal execution jobs are enforced by the required `formal (coq)` aggregate: it rejects failed/cancelled/skipped planning or selected execution and requires source/input-bound completion evidence: one full-gate receipt when all families are selected, or exactly one receipt per family for a proper subset. Other jobs remain individually required; new independent gates are added to the ruleset with their workflow change. |
 | Merge method | squash only; title from the PR | Release automation reads the subject. |
 | Delete branch on merge | on | |
 | Security | secret scanning and push protection, private vulnerability reporting, Dependabot alerts | Public repository. |
