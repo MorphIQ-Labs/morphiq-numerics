@@ -1,17 +1,20 @@
 [package]
 name = "morphiq-numerics"
-description = "Correctly rounded, target-independent binary64 numerics: elementary functions, seeded random streams and the normal family."
+description = "Target-independent binary64 numerics with explicit rounding and error contracts, seeded random streams and scalar-equivalent SIMD."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-readme = "../../README.md"
+readme = "README.md"
 keywords = ["math", "floating-point", "correctly-rounded", "no-std", "random"]
 categories = ["mathematics", "no-std", "no-std::no-alloc", "science"]
 # Not published until release 0.1 (milestone M6, issue #90).
 publish = false
+
+[package.metadata.docs.rs]
+all-features = true
 
 [lints]
 workspace = true

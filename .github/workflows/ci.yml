@@ -94,6 +94,11 @@ jobs:
         run: |
           cargo package --locked --allow-dirty --list -p morphiq-numerics | grep -qx THIRD_PARTY_NOTICES.md
         if: ${{ steps.prose.outputs.prose_only != 'true' }}
+      - name: Release archives and external consumers work without the workspace
+        if: ${{ steps.prose.outputs.prose_only != 'true' }}
+        run: |
+          python3 -m unittest scripts.test_packages
+          python3 scripts/check_packages.py
       - name: The library depends only on the first-party arch crate, optionally
         # Target independence and clean provenance rest on the library being
         # self-contained; its one dependency is the optional first-party lane
@@ -640,7 +645,9 @@ jobs:
   formal-execution:
     name: formal / ${{ matrix.name }}
     needs: formal-plan
-    if: needs.formal-plan.outputs.affected == 'true'
+    # main skips PR-only ancestors of the planner. An explicit status function
+    # prevents their skips from suppressing this successful planner's work.
+    if: ${{ !cancelled() && needs.formal-plan.result == 'success' && needs.formal-plan.outputs.affected == 'true' }}
     runs-on: ubuntu-24.04
     # The matched cold full gate took 179 minutes before setup/artifact costs.
     timeout-minutes: 240
