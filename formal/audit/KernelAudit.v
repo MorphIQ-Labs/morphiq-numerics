@@ -1019,3 +1019,15 @@ Print Assumptions FastRandomWords.bm_word_m_range.
 Print Assumptions FastRandomWords.bm_word_angle_range.
 Print Assumptions FastRandom.bm_radius_ok.
 Print Assumptions FastRandom.bm_pair_ok.
+
+Require LogRadixConstants LogRadixAccurate.
+Print Assumptions LogRadixConstants.inv_ln2_q_normalized.
+Print Assumptions LogRadixConstants.inv_ln2_q_residual.
+Print Assumptions LogRadixConstants.inv_ln10_q_normalized.
+Print Assumptions LogRadixConstants.inv_ln10_q_residual.
+Print Assumptions LogRadixAccurate.scale_bound.
+Print Assumptions LogRadixAccurate.scale10_bound.
+Print Assumptions LogRadixAccurate.reconstruct2_bound.
+Print Assumptions LogRadixAccurate.reduced_ln_bound.
+Print Assumptions LogRadixAccurate.log2_acc_bound.
+Print Assumptions LogRadixAccurate.log10_acc_bound.

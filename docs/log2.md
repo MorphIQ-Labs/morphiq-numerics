@@ -99,12 +99,38 @@ Both paths err by less than half an ulp of `n`, so both return `n` exactly.
 | Artifact | Establishes |
 |---|---|
 | `generators/radix_constants.py` | `1/ln 2` and `1/ln 10` as double-words and in `Q128`, with their errors (`src/log2/tables.rs`) |
+| `formal/ln/LogRadixConstants.v` | generated Q128 encodings, normalized significands and independent CoqInterval proofs of both reciprocal-log residuals |
+| `formal/ln/LogRadixAccurate.v` | executable Q128 scaling and exponent reconstruction, with the shared `ln` accurate theorem discharging the input error bounds |
 | `generators/radix_certificates.py` | writes the four certificates below; the ratio bound is enclosed with `mpmath.iv` |
 | `formal/log2/fast_log2.g`, `accurate_log2.g` | `log2`'s paths: `2^−63` and `2^−122` |
 | `formal/log2/fast_log10.g`, `accurate_log10.g` | `log10`'s paths: `2^−63` and `2^−122` |
 | `generators/log2_log10_reference.py` | the fixture: [LM] Table 7 and its §5.2 siblings, exact powers, special values, random arguments, and 1,200 values to 192 bits per function |
 
 Every certificate's Coq proof is also built, with each rewriting hint proved, by the formal job ([exp.md](exp.md), gates).
+
+The accurate reconstruction now has a Coq transcription. `log2_acc_bound`
+proves its unrounded result within `2^-122` relatively of `ln(x)/ln(2)` for
+every finite positive binary64 input, including the zero intermediate at
+`x = 1` and exact-power reductions. `log10_acc_bound` proves the same bound
+against `ln(x)/ln(10)` for finite positive `x != 1`; the public entry screens
+one before evaluating this path.
+
+These proofs establish the constant residuals independently with CoqInterval,
+using a common `2^-127` bound. Q128 multiplication then contributes at most
+`5 * 2^-125` relative error after scaling an input with the shared logarithm's
+`2^-123` bound. For `log2`, the reduced logarithm divided by `ln(2)` has magnitude
+at most `0.51`; a nonzero integer exponent limits cancellation enough to keep
+the final Q128 addition within `2^-122`. No tighter sampled constant estimate
+is needed for this reconstruction proof.
+
+The theorem names above enter the kernel axiom audit and source binding. The
+extracted accurate paths are compared with the Rust Q128 sign, exponent and
+significand, before binary64 rounding, on independent reference-fixture inputs,
+all representable powers of two, table-boundary neighbors and exponent extremes.
+Those comparisons test correspondence; they do not replace the real-number
+error proofs. The fast-path certificate linkage, rounding/entry composition
+and matching SIMD proof obligations are not established by these accurate-path
+theorems.
 
 The binding `formal/log2/binding.sha256` covers this document, the constants,
 the certificates and the source.
