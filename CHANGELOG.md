@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.28](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.27...v0.0.28) - 2026-11-11
+
+### Other
+
+- *(formal)* prove accurate radix logarithm reconstruction ([#299](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/299))
+
 ## [0.0.27](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.26...v0.0.27) - 2026-11-09
 
 ### Other
