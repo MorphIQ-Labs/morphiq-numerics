@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.27](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.26...v0.0.27) - 2026-11-09
+
+### Other
+
+- *(release)* verify registry packages and post-merge formal execution ([#298](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/298))
+
 ## [0.0.26](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.25...v0.0.26) - 2026-11-07
 
 ### Added
