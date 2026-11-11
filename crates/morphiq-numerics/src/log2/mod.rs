@@ -111,4 +111,10 @@ fn log10_accurate(reduced: &Reduced) -> Q128 {
 }
 
 #[cfg(test)]
+pub(crate) fn crosscheck_accurate(x: f64) -> (Q128, Q128) {
+    let reduced = Reduced::of(x);
+    (log2_accurate(&reduced), log10_accurate(&reduced))
+}
+
+#[cfg(test)]
 mod tests;

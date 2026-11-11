@@ -41,6 +41,7 @@ mod asin;
 mod asinh;
 mod atan2;
 mod bivariate;
+mod log_radix;
 mod normal;
 
 fn q128(q: Q128) -> String {
@@ -260,6 +261,7 @@ fn internal_crosscheck_corpus() {
     asinh::write(&mut out);
     atan2::write(&mut out);
     bivariate::write(&mut out);
+    log_radix::write(&mut out);
     q256_exponent_corpus(&mut out);
     erfcx_accurate_tail_corpus(&mut out);
     erfcx_accurate_exponential_corpus(&mut out);
