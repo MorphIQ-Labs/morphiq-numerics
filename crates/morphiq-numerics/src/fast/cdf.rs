@@ -42,7 +42,8 @@ pub(super) const RATIONAL_LIMIT: f64 = 8.0;
 /// kernel inside its domain, and the exponent `-a²/2` inside exp's `|x| < 704`.
 pub(super) const FAR_LIMIT: f64 = 22.5;
 
-/// `Phi(x)` for `2^-33 <= |x| <= FAR_LIMIT`.
+/// `Phi(x)` for `2^-33 <= |x| <= RATIONAL_LIMIT` and for
+/// `-FAR_LIMIT <= x <= -RATIONAL_LIMIT` (the caller's screen).
 #[inline(always)]
 pub(super) fn in_domain(x: f64) -> f64 {
     let a = x.abs();

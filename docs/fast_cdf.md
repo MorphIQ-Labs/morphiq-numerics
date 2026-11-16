@@ -8,7 +8,8 @@ NEON/SSE2/AVX2/AVX-512 cascade when SIMD is enabled. The strong
 
 ## Numerical decision and consumer purpose
 
-On the accelerated domain `2^-33 <= abs(x) <= 22.5`, writing `Y` for the returned
+On the accelerated domain `2^-33 <= abs(x) <= 8` together with
+`-22.5 <= x <= -8`, writing `Y` for the returned
 value and `u = 2^-53`,
 
 ```
@@ -17,9 +18,9 @@ abs(Y - Φ(x)) <= 2^-48 * Φ(x) = 32u * Φ(x),
 ```
 
 including every rounding. `Y` is finite and normal, in `[2^-400, 1]` (for
-`abs(x) <= 8`, in `[2^-58, 1]`; for `x > 8`, in `[1/2, 1]`). Outside
+`abs(x) <= 8`, in `[2^-58, 1]`; for `x < -8`, in `[2^-400, 2^-46]`). Outside
 the domain the strong owner supplies its result and special-value semantics:
-`Φ(±0) = 1/2` correctly rounded, the tails beyond 22.5, infinities and NaN
+`Φ(±0) = 1/2` correctly rounded, `x > 8` (where `Φ` rounds to 1 from about 8.4 and the strong entry returns it without a tail evaluation, so no accelerated row can beat it), `x < -22.5`, infinities and NaN
 payloads. Correct rounding and faithful rounding are not the fast contract; the
 fast and strong results may differ.
 
@@ -37,8 +38,8 @@ within it.
 | --- | --- | --- | --- | --- |
 | `y = RN(abs(x)/√2) <= 15/32` (`abs(x) <~ 0.663`) | `16u` absolute; `32u` relative for `x < 0` (proved `3u` absolute) | finite normal in `[29/128, 25/32]`; scalar and slice bit-identical | degree-8 polynomial in `y²`, Estrin, no division, no transcendental | `FastCdf.fast_cdf_body_ok` |
 | `15/32 < y`, `abs(x) <= 8` | `16u` absolute; `32u` relative for `x < 0` | finite normal; bit-identical | one exact exponent split, the bounded cubic `exp`, one 8/9 rational, one division | `FastCdf.fast_cdf_lower_ok`, `fast_cdf_outer_ok` |
-| `8 < abs(x) <= 22.5` (`y < 16`) | `16u` absolute; `32u` relative for `x < 0` (proved `32u`) | finite normal, `[2^-400, 1]`; bit-identical | the same exact split and `(1 + e)` correction, the bounded cubic `exp` on `[-256, -32]`, and the erfcx table in place of the rational | `FastCdfFar.fast_cdf_far_lower_ok`, `fast_cdf_far_outer_ok` |
-| `abs(x) < 2^-33`, `abs(x) > 22.5`, non-finite | strong owner's contract | strong owner's bits | strong dispatch | `FastCdfFar.fast_cdf_far_fallback_contract`, `fast_cdf_far_nonfinite`, `fast_cdf_far_zeros` |
+| `-22.5 <= x < -8` (`y < 16`) | `16u` absolute; `32u` relative for `x < 0` (proved `32u`) | finite normal, `[2^-400, 1]`; bit-identical | the same exact split and `(1 + e)` correction, the bounded cubic `exp` on `[-256, -32]`, and the erfcx table in place of the rational | `FastCdfFar.fast_cdf_far_lower_ok`, `fast_cdf_far_outer_ok` |
+| `abs(x) < 2^-33`, `x > 8`, `x < -22.5`, non-finite | strong owner's contract | strong owner's bits | strong dispatch | `FastCdfFar.fast_cdf_far_fallback_contract`, `fast_cdf_far_nonfinite`, `fast_cdf_far_zeros` |
 
 ## Derivation
 
@@ -99,7 +100,7 @@ the lower tail's relative error is below `29.6u <= 32u`, and `lower <= 0.41`.
 The complement's rounding adds `u/2`, so both signs stay within `16u`
 absolute.
 
-**Far tail (`8 < a <= 22.5`).** Beyond the rational's fit range the ratio is
+**Far tail (`-22.5 <= x < -8`).** Beyond the rational's fit range the ratio is
 `erfcx(y)` from the bounded erfcx table (`erfcx::bounded::table`, relative
 `4u` for `y < 16`; `RN(22.5/√2) < 15.92`), with the same exponent split and
 `(1 + e)` correction. Here `-256 <= p <= -32`, so `abs(e) <= 2^-53 * abs(p) <=
@@ -111,9 +112,17 @@ terms are the table `4u`, the argument sensitivity `11/2 u` (the same
 and the roundings of `r + r e` and the final product `2u`, which compose, with the rest of the chain, to below
 `20u <= 32u` (`FastCdfFar.fast_cdf_far_lower_ok`); `erfcx(Y) >= 1/62`
 on `[5, 16]` (`cdf_far_erfcx_floor`). `lower <= 2^-46`, so the complement for
-`x > 0` adds only its `u/2` rounding. Beyond `22.5` the argument leaves the
+`x > 0` adds only its `u/2` rounding (the proof keeps both signs, `FastCdfFar.fast_cdf_far_ok`; the
+screen `fast_cdf_far_screen64` admits only `x < 0` past 8). Beyond `22.5` the argument leaves the
 table's domain and the strong owner supplies the result; a row for `y >= 16`
-is not part of this contract.
+is not part of this contract: the consumer (#302) takes `Φ(-a) < 2e-113` for `a/√2 >= 16` as zero
+and no longer needs it.
+
+**Why `x > 8` is not accelerated.** A paired native measurement (below) of the
+row on `8 < x <= 22.5` against the strong entry gave a ratio of 1.4 on scalar
+throughput and up to 6 on dependent latency: the strong entry saturates to 1
+without evaluating a tail. The screen therefore leaves it with the strong owner,
+which is the behavior before this row.
 
 ## Checked by
 
@@ -123,13 +132,13 @@ is not part of this contract.
   The extracted entry `FastCdfFar.fast_cdf_far_entry64` is cross-checked against the
   Rust entry on the internal corpus (`fast_normal` lines), including the body
   edge `a = 0x1.536948017480fp-1`, the far-tail seam at 8, the limit 22.5 and
-  their neighbours.
+  their neighbours of both signs.
 - `generators/fast_cdf_constants.py` writes the Rust tables, the Coq constants,
   the residual and anchor proofs and both certificates, and is replayed by
   `scripts/check_generators.sh`.
 - `generators/fast_reference.py` writes independent 600- and 1000-bit oracle
   intervals (`crates/reference/fixtures/fast.json`) on the strong fixture's
-  arguments, the body edge of both signs and a negative-tail sweep, and a far-tail sweep of both signs on `8 < abs(x) <= 22.5`;
+  arguments, the body edge of both signs and a negative-tail sweep, and a far-tail sweep on `-22.5 <= x < -8` with the domain's neighbours;
   `crates/reference/tests/fast.rs` decides both bounds in exact integer
   arithmetic including the oracle's enclosure.
 - The fast tests compare scalar and slice bits on mixed packets, remainders and
@@ -172,6 +181,36 @@ Diagnostics: a mixed bank with fallbacks 0.58; SLEEF's AVX-512 erfc-based CDF
 on 4096 pricing values 0.27; the unchanged strong `norm_cdf` control
 1.002–1.006, the noise floor of the paired protocol. These are native
 measurements on that host only. Native ARM qualification is not yet run; the
-corresponding claims are unestablished. The far-tail row (`8 < abs(x) <= 22.5`)
-has no native qualification yet: its cost against the previous strong
-fallback and the consumer's composition is unestablished.
+corresponding claims are unestablished.
+
+**Far-tail row (`-22.5 <= x < -8`), observation, not qualification.**
+`crates/reference/src/bin/bench-fast-cdf-far.rs` (release build, `cargo run --release -p
+morphiq-numerics-reference --bin bench-fast-cdf-far`) times 4096 exact-bit-reproducible
+values per bank (xorshift, `a` uniform on the stated interval), 15 alternating paired rounds of 200
+passes, every sample printed; ratios are new/reference, median (min–max) over the rounds.
+Host: Apple M1 Pro (aarch64 NEON), AC power, other processes running (load about 2), toolchain from
+`rust-toolchain.toml`; one run, uncontrolled affinity and thermals. Ratios below 1 mean the new
+entry is faster.
+
+| Bank (4096 values) | Cell | vs strong `norm_cdf` | vs consumer composition |
+| --- | --- | --- | --- |
+| `x` in `[-22.5, -8]` | scalar throughput | 0.22 (0.22–0.25) | 1.07 (1.04–1.10) |
+| | dependent latency | 0.40 (0.38–0.40) | 1.02 (1.01–1.02) |
+| | slice | 0.21 (0.20–0.21) | 1.04 (1.00–1.06) |
+| both signs, `a` in `[8, 22.5]` | scalar throughput | 0.33 (0.32–0.35) | 0.80 (0.78–0.81) |
+| | dependent latency | 0.38 (0.37–0.38) | 0.26 (0.26–0.27) |
+| | slice | 0.31 (0.30–0.35) | 0.82 (0.77–0.86) |
+| both signs, `a` in `[8, 16]` | scalar throughput | 0.36 (0.34–0.37) | 0.84 (0.81–0.86) |
+| | dependent latency | 0.40 (0.39–0.41) | 0.28 (0.27–0.29) |
+| | slice | 0.33 (0.32–0.34) | 0.84 (0.81–0.86) |
+| `x` in `[8, 22.5]` (strong fallback) | scalar throughput | 1.03 (0.98–1.05) | |
+| | slice | 1.56 (1.47–1.62) | |
+
+Sampled maximum error against the strong entry, in `u = 2^-53`, relative for `x < 0`:
+the row 5.3u (proved `<= 32u`); the consumer's composition 130u on `[-22.5, -8]`, the `256u`
+effect of its unsplit exponent. The composition is a diagnostic comparator (a weaker contract),
+not a parity gate. The positive-side slice ratio 1.56 is the lane kernel's existing cost for a
+slice whose every lane falls back (evaluate, then substitute), the same as before this row. No x86-64
+measurement was possible in this change (Apple Silicon host only), and the declared ARM
+qualification matrix was not run, so parity and regression claims remain unestablished beyond this
+observation.

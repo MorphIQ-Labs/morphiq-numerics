@@ -137,6 +137,10 @@ fn unaccelerated_inputs_retain_strong_results() {
         -super::cdf::FAR_LIMIT.next_up(),
         0.0,
         -0.0,
+        // Positive arguments beyond 8 stay with the strong owner.
+        super::cdf::RATIONAL_LIMIT.next_up(),
+        9.0,
+        super::cdf::FAR_LIMIT,
         super::cdf::FAR_LIMIT.next_up(),
         38.0,
     ] {

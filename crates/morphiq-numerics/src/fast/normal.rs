@@ -24,7 +24,9 @@ pub fn erfcx(x: f64) -> f64 {
 
 /// Standard-normal cumulative distribution, `P(Z <= x)`.
 ///
-/// Absolute error is at most `2^-49` on `2^-33 <= |x| <= 22.5`, and for
+/// Absolute error is at most `2^-49` on `2^-33 <= |x| <= 8` and on
+/// `-22.5 <= x <= -8` (positive `x` beyond 8 stays with the strong entry, which
+/// returns the saturated value without a tail evaluation), and for
 /// `x < 0` there also relative error at most `2^-48`. With
 /// `y = RN(|x|/sqrt(2))`, `y <= 15/32` evaluates a generated erf polynomial;
 /// larger `y` evaluates `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` with
@@ -35,7 +37,14 @@ pub fn erfcx(x: f64) -> f64 {
 #[inline]
 pub fn norm_cdf(x: f64) -> f64 {
     let a = x.abs();
-    if !(MIN_MAGNITUDE..=super::cdf::FAR_LIMIT).contains(&a) {
+    // Bodies and the rational tail on both sides; the erfcx-table tail only for
+    // x < 0 (`FastCdfFar.fast_cdf_far_screen64`).
+    let limit = if x < 0.0 {
+        super::cdf::FAR_LIMIT
+    } else {
+        super::cdf::RATIONAL_LIMIT
+    };
+    if !(MIN_MAGNITUDE..=limit).contains(&a) {
         return norm_cdf_fallback(x);
     }
     super::cdf::in_domain(x)

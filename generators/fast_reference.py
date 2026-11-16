@@ -94,22 +94,25 @@ def generate():
             for x in [math.nextafter(edge, -math.inf), edge, math.nextafter(edge, math.inf)]:
                 rows += [dict(x=word(x)), dict(x=word(-x))]
             rows += [dict(x=word(-8 + i / 64)) for i in range(0, 470)]
-            # The far tail 8 < a <= 22.5, where the erfcx table replaces the
-            # rational: both signs on a 1/64 grid, the seam at 8, the erfcx
+            # The far tail -22.5 <= x < -8, where the erfcx table replaces the
+            # rational: a 1/64 grid, the seam at 8, the erfcx
             # table's y = 16 neighbourhood, and the accelerated limit.
             far_limit = 22.5
             for i in range(1, 929):
                 a = 8 + i / 64
                 if a <= far_limit:
-                    rows += [dict(x=word(a)), dict(x=word(-a))]
+                    rows.append(dict(x=word(-a)))
+            # Positive arguments beyond 8 stay with the strong owner and are
+            # outside the accelerated domain.
             for a in [8.0, far_limit, math.nextafter(8.0, math.inf),
                       math.nextafter(far_limit, -math.inf)]:
-                rows += [dict(x=word(a)), dict(x=word(-a))]
+                rows.append(dict(x=word(-a)))
+            rows.append(dict(x=word(8.0)))
         for row in rows:
             x = number(row['x'])
             active = (abs(x) < 704 if primitive == 'exp' else
                       -.5 <= x < 16 and abs(x) >= 2**-33 if primitive == 'erfcx' else
-                      2**-33 <= abs(x) <= 22.5)
+                      2**-33 <= abs(x) <= 8 or (x < 0 and abs(x) <= 22.5))
             if not active:
                 continue
             first = reference(primitive, x, 600)

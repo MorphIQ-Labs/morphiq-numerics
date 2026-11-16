@@ -15,7 +15,7 @@ feature changes an existing API's numerical identity.
 | `fast::elementary::exp_coarse` | `abs(x) < 704` | Relative `2^-38` |
 | `fast::elementary::ln` | All finite `x > 0` | Absolute `2^-53 * abs(ln(x)) + 2^-65`; exact at one |
 | `fast::normal::erfcx` | `-0.5 <= x < 16`, `abs(x) >= 2^-33` | Relative `2^-51` |
-| `fast::normal::norm_cdf` | `2^-33 <= abs(x) <= 22.5` | Absolute `2^-49`; relative `2^-48` for `x < 0` |
+| `fast::normal::norm_cdf` | `2^-33 <= abs(x) <= 8` or `-22.5 <= x <= -8` | Absolute `2^-49`; relative `2^-48` for `x < 0` |
 | `fast::normal::log_norm_cdf` | `-22.5 <= x <= -2^-33` or `2^-33 <= x <= 8` | Absolute `2^-51 * abs(ln Φ(x)) + 2^-48`, natural-log units |
 
 The word-to-pair API `fast::random::normal_pair` and its matching

@@ -38,8 +38,16 @@ Definition fast_cdf_far_outer64 x :=
   if normal_lt x normal_zero then lower else fsub (erfcx_pow2 0) lower.
 Definition fast_cdf_far64 x :=
   if normal_lt (erfcx_pow2 3) (b64_abs x) then fast_cdf_far_outer64 x else fast_cdf64 x.
+(** Positive arguments beyond 8 stay with the strong owner: [Phi(a)] rounds to 1
+    from [a ~ 8.4] and the strong entry returns it without evaluating a tail,
+    so no accelerated row can beat it there. *)
 Definition fast_cdf_far_screen64 x :=
-  normal_le(erfcx_pow2(-33))(b64_abs x) && normal_le(b64_abs x) cdf_far_limit.
+  normal_le(erfcx_pow2(-33))(b64_abs x) &&
+  (normal_le(b64_abs x)(erfcx_pow2 3) ||
+   (normal_lt x normal_zero && normal_le(b64_abs x) cdf_far_limit)).
+
+Definition cdf_far_domain (x:R) : Prop :=
+  bpow radix2(-33)<=Rabs x /\ (Rabs x<=8 \/ (x<0 /\ Rabs x<=45/2)).
 Definition fast_cdf_far_entry64 x :=
   if fast_cdf_far_screen64 x then fast_cdf_far64 x else normal_entry64 NormalCdf x.
 
@@ -415,23 +423,28 @@ Proof.
 Qed.
 
 Theorem fast_cdf_far_screen_finite x : finite x ->
-  (fast_cdf_far_screen64 x=true <-> bpow radix2(-33)<=Rabs(B x)<=45/2).
+  (fast_cdf_far_screen64 x=true <-> cdf_far_domain(B x)).
 Proof.
   intros Fx;assert(Fa : finite(b64_abs x))by(unfold b64_abs;destruct x;exact Fx).
   destruct(erfcx_pow2_ok(-33)ltac:(lia))as[Fmin Min].
+  destruct(erfcx_pow2_ok 3 ltac:(lia))as[F8 V8]. change (bpow radix2 3) with 8 in V8.
   destruct cdf_far_limit_ok as[Fmax Max].
-  unfold fast_cdf_far_screen64;rewrite andb_true_iff,
-    (normal_le_true _ _ Fmin Fa),(normal_le_true _ _ Fa Fmax),Min,Max,B_abs.
+  assert(Z : B normal_zero=0)by reflexivity.
+  assert(Fz : finite normal_zero)by reflexivity.
+  unfold fast_cdf_far_screen64,cdf_far_domain;rewrite andb_true_iff,orb_true_iff,andb_true_iff,
+    (normal_le_true _ _ Fmin Fa),(normal_le_true _ _ Fa F8),(normal_le_true _ _ Fa Fmax),
+    (normal_lt_true _ _ Fx Fz),Min,V8,Max,Z,B_abs.
   tauto.
 Qed.
 
-Theorem fast_cdf_far_entry_ok x : finite x -> bpow radix2(-33)<=Rabs(B x)<=45/2 ->
+Theorem fast_cdf_far_entry_ok x : finite x -> cdf_far_domain(B x) ->
   finite(fast_cdf_far_entry64 x) /\ bpow radix2(-400)<=B(fast_cdf_far_entry64 x)<=1 /\
   Rabs(B(fast_cdf_far_entry64 x)-normal_cdf(B x))<=bpow radix2(-49) /\
   (B x<0 -> Rabs(B(fast_cdf_far_entry64 x)-normal_cdf(B x))<=bpow radix2(-48)*normal_cdf(B x)).
 Proof.
   intros Fx X;unfold fast_cdf_far_entry64.
-  rewrite(proj2(fast_cdf_far_screen_finite x Fx)X);apply fast_cdf_far_ok;assumption.
+  rewrite(proj2(fast_cdf_far_screen_finite x Fx)X);apply fast_cdf_far_ok;[assumption|].
+  destruct X as[X1[X2|[X3 X4]]];[split;[exact X1|lra]|split;[exact X1|exact X4]].
 Qed.
 
 Theorem fast_cdf_far_fallback x : fast_cdf_far_screen64 x=false ->
