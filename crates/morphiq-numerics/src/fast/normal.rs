@@ -24,18 +24,18 @@ pub fn erfcx(x: f64) -> f64 {
 
 /// Standard-normal cumulative distribution, `P(Z <= x)`.
 ///
-/// Absolute error is at most `2^-49` on `2^-33 <= |x| <= 8`, and for
+/// Absolute error is at most `2^-49` on `2^-33 <= |x| <= 22.5`, and for
 /// `x < 0` there also relative error at most `2^-48`. With
 /// `y = RN(|x|/sqrt(2))`, `y <= 15/32` evaluates a generated erf polynomial;
 /// larger `y` evaluates `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` with
-/// the exponent split exactly and one generated erfcx rational
-/// (`FastCdf.fast_cdf_entry_ok`). Other inputs use [`crate::normal::norm_cdf`],
+/// the exponent split exactly and, up to `|x| = 8`, one generated erfcx
+/// rational, beyond it the erfcx table (`FastCdfFar.fast_cdf_far_entry_ok`). Other inputs use [`crate::normal::norm_cdf`],
 /// retaining its special values.
 #[must_use]
 #[inline]
 pub fn norm_cdf(x: f64) -> f64 {
     let a = x.abs();
-    if !(MIN_MAGNITUDE..=8.0).contains(&a) {
+    if !(MIN_MAGNITUDE..=super::cdf::FAR_LIMIT).contains(&a) {
         return norm_cdf_fallback(x);
     }
     super::cdf::in_domain(x)

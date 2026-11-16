@@ -54,6 +54,8 @@ fn mixed_slices_preserve_fast_scalar_bits_and_remainders() {
         cdf_body_edge(),
         1.0,
         8.0,
+        super::cdf::FAR_LIMIT,
+        -super::cdf::FAR_LIMIT,
         16.0,
         704.0,
     ] {
@@ -132,10 +134,10 @@ fn unaccelerated_inputs_retain_strong_results() {
     }
     for x in [
         -38.0,
-        -8.0_f64.next_up(),
+        -super::cdf::FAR_LIMIT.next_up(),
         0.0,
         -0.0,
-        8.0_f64.next_up(),
+        super::cdf::FAR_LIMIT.next_up(),
         38.0,
     ] {
         assert_eq!(
@@ -219,4 +221,31 @@ fn the_two_exp_kernels_are_distinct_and_exact_at_zero() {
         .map(|i| f64::from(i) * 0.03125 - 1.0)
         .any(|x| elementary::exp(x).to_bits() != elementary::exp_coarse(x).to_bits());
     assert!(differs);
+}
+
+#[test]
+fn cdf_far_tail_tracks_the_strong_owner_and_the_slice_bits() {
+    const N: usize = 2048;
+    let mut xs = [0.0; N];
+    for (i, x) in xs.iter_mut().enumerate() {
+        // Both sides of the rational/table seam at 8 and of the limit.
+        let a = 7.9 + (super::cdf::FAR_LIMIT + 0.1 - 7.9) * (i as f64 + 0.5) / N as f64;
+        *x = if i % 2 == 0 { -a } else { a };
+    }
+    let mut out = [0.0; N];
+    normal::norm_cdf_slice(&xs, &mut out);
+    for (&x, &y) in xs.iter().zip(&out) {
+        assert_eq!(normal::norm_cdf(x).to_bits(), y.to_bits(), "slice at {x}");
+        let strong = crate::normal::norm_cdf(x);
+        assert!(
+            (y - strong).abs() <= f64::from_bits(0x3ce0_0000_0000_0000),
+            "absolute at {x}"
+        );
+        if x < 0.0 {
+            assert!(
+                ((y - strong) / strong).abs() <= f64::from_bits(0x3cf0_0000_0000_0000),
+                "relative at {x}"
+            );
+        }
+    }
 }

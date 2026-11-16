@@ -1700,6 +1700,10 @@ fn fast_corpus(out: &mut String) {
         16.0,
         -8.0,
         8.0,
+        // The CDF's far-tail limit and the erfcx table's y = 16 reach.
+        -22.5,
+        22.5,
+        -f64::from_bits(0x4030_0000_0000_0000) * core::f64::consts::SQRT_2,
         -f64::from_bits(0x3de0_0000_0000_0000),
         f64::from_bits(0x3de0_0000_0000_0000),
         -745.0,
@@ -1721,5 +1725,6 @@ fn fast_corpus(out: &mut String) {
         write(-704.0 + 1408.0 * unit(&mut rng));
         write(-0.5 + 16.5 * unit(&mut rng));
         write(-8.0 + 16.0 * unit(&mut rng));
+        write(-23.0 + 46.0 * unit(&mut rng));
     }
 }

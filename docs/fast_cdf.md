@@ -8,7 +8,7 @@ NEON/SSE2/AVX2/AVX-512 cascade when SIMD is enabled. The strong
 
 ## Numerical decision and consumer purpose
 
-On the accelerated domain `2^-33 <= abs(x) <= 8`, writing `Y` for the returned
+On the accelerated domain `2^-33 <= abs(x) <= 22.5`, writing `Y` for the returned
 value and `u = 2^-53`,
 
 ```
@@ -16,9 +16,10 @@ abs(Y - Φ(x)) <= 2^-49 = 16u,      and for x < 0 also
 abs(Y - Φ(x)) <= 2^-48 * Φ(x) = 32u * Φ(x),
 ```
 
-including every rounding. `Y` is finite and normal, in `[2^-58, 1]`. Outside
+including every rounding. `Y` is finite and normal, in `[2^-400, 1]` (for
+`abs(x) <= 8`, in `[2^-58, 1]`; for `x > 8`, in `[1/2, 1]`). Outside
 the domain the strong owner supplies its result and special-value semantics:
-`Φ(±0) = 1/2` correctly rounded, the tails beyond eight, infinities and NaN
+`Φ(±0) = 1/2` correctly rounded, the tails beyond 22.5, infinities and NaN
 payloads. Correct rounding and faithful rounding are not the fast contract; the
 fast and strong results may differ.
 
@@ -36,7 +37,8 @@ within it.
 | --- | --- | --- | --- | --- |
 | `y = RN(abs(x)/√2) <= 15/32` (`abs(x) <~ 0.663`) | `16u` absolute; `32u` relative for `x < 0` (proved `3u` absolute) | finite normal in `[29/128, 25/32]`; scalar and slice bit-identical | degree-8 polynomial in `y²`, Estrin, no division, no transcendental | `FastCdf.fast_cdf_body_ok` |
 | `15/32 < y`, `abs(x) <= 8` | `16u` absolute; `32u` relative for `x < 0` | finite normal; bit-identical | one exact exponent split, the bounded cubic `exp`, one 8/9 rational, one division | `FastCdf.fast_cdf_lower_ok`, `fast_cdf_outer_ok` |
-| `abs(x) < 2^-33`, `abs(x) > 8`, non-finite | strong owner's contract | strong owner's bits | strong dispatch | `fast_cdf_fallback_contract`, `fast_cdf_nonfinite`, `fast_cdf_zeros` |
+| `8 < abs(x) <= 22.5` (`y < 16`) | `16u` absolute; `32u` relative for `x < 0` (proved `32u`) | finite normal, `[2^-400, 1]`; bit-identical | the same exact split and `(1 + e)` correction, the bounded cubic `exp` on `[-256, -32]`, and the erfcx table in place of the rational | `FastCdfFar.fast_cdf_far_lower_ok`, `fast_cdf_far_outer_ok` |
+| `abs(x) < 2^-33`, `abs(x) > 22.5`, non-finite | strong owner's contract | strong owner's bits | strong dispatch | `FastCdfFar.fast_cdf_far_fallback_contract`, `fast_cdf_far_nonfinite`, `fast_cdf_far_zeros` |
 
 ## Derivation
 
@@ -97,25 +99,43 @@ the lower tail's relative error is below `29.6u <= 32u`, and `lower <= 0.41`.
 The complement's rounding adds `u/2`, so both signs stay within `16u`
 absolute.
 
+**Far tail (`8 < a <= 22.5`).** Beyond the rational's fit range the ratio is
+`erfcx(y)` from the bounded erfcx table (`erfcx::bounded::table`, relative
+`4u` for `y < 16`; `RN(22.5/√2) < 15.92`), with the same exponent split and
+`(1 + e)` correction. Here `-256 <= p <= -32`, so `abs(e) <= 2^-53 * abs(p) <=
+2^-45`, and `exp(e) = 1 + e` to within `2^-89`. The consumer's earlier interim
+composition used the unsplit `RN(-a²/2)`, whose rounding error `a² u / 2`
+becomes up to `256u` relative after `exp`; the split removes it. The relative
+terms are the table `4u`, the argument sensitivity `11/2 u` (the same
+`cdf_erfcx_relative_argument` bound, valid for every `Y >= 2/5`), `exp` `4u`
+and the roundings of `r + r e` and the final product `2u`, which compose, with the rest of the chain, to below
+`20u <= 32u` (`FastCdfFar.fast_cdf_far_lower_ok`); `erfcx(Y) >= 1/62`
+on `[5, 16]` (`cdf_far_erfcx_floor`). `lower <= 2^-46`, so the complement for
+`x > 0` adds only its `u/2` rounding. Beyond `22.5` the argument leaves the
+table's domain and the strong owner supplies the result; a row for `y >= 16`
+is not part of this contract.
+
 ## Checked by
 
-- `formal/fast/FastCdf.v` and the `FastCdf*` files it imports, bound to the
+- `formal/fast/FastCdf.v`, `formal/fast/FastCdfFar.v` (the far tail and the
+  entry) and the `FastCdf*` files they import, bound to the
   sources in `formal/binding.sha256` and audited in `formal/audit/KernelAudit.v`.
-  The extracted entry `FastCdf.fast_cdf_entry64` is cross-checked against the
+  The extracted entry `FastCdfFar.fast_cdf_far_entry64` is cross-checked against the
   Rust entry on the internal corpus (`fast_normal` lines), including the body
-  edge `a = 0x1.536948017480fp-1` and its neighbours.
+  edge `a = 0x1.536948017480fp-1`, the far-tail seam at 8, the limit 22.5 and
+  their neighbours.
 - `generators/fast_cdf_constants.py` writes the Rust tables, the Coq constants,
   the residual and anchor proofs and both certificates, and is replayed by
   `scripts/check_generators.sh`.
 - `generators/fast_reference.py` writes independent 600- and 1000-bit oracle
   intervals (`crates/reference/fixtures/fast.json`) on the strong fixture's
-  arguments, the body edge of both signs and a negative-tail sweep;
+  arguments, the body edge of both signs and a negative-tail sweep, and a far-tail sweep of both signs on `8 < abs(x) <= 22.5`;
   `crates/reference/tests/fast.rs` decides both bounds in exact integer
   arithmetic including the oracle's enclosure.
 - The fast tests compare scalar and slice bits on mixed packets, remainders and
   the body edge; the determinism digest covers `fast::norm_cdf` and its slice.
 
-Observed on 30,438 mpmath references in the domain (`fast::norm_cdf`, default
+Observed on 30,438 mpmath references in `abs(x) <= 8` (`fast::norm_cdf`, default
 and `x86-64-v3` builds, same bits): body 2 ULP, lower tail 7 ULP, upper 2 ULP,
 absolute `2u`, relative `7.3u` for `x < 0`. These are observations, not the
 contract.
@@ -152,4 +172,6 @@ Diagnostics: a mixed bank with fallbacks 0.58; SLEEF's AVX-512 erfc-based CDF
 on 4096 pricing values 0.27; the unchanged strong `norm_cdf` control
 1.002–1.006, the noise floor of the paired protocol. These are native
 measurements on that host only. Native ARM qualification is not yet run; the
-corresponding claims are unestablished.
+corresponding claims are unestablished. The far-tail row (`8 < abs(x) <= 22.5`)
+has no native qualification yet: its cost against the previous strong
+fallback and the consumer's composition is unestablished.

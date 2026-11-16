@@ -14,7 +14,7 @@ impl Kernel for Cdf {
         let a = k.abs(x);
         let active = k.and_m(
             k.le(k.splat(super::normal::MIN_MAGNITUDE), a),
-            k.le(a, k.splat(8.0)),
+            k.le(a, k.splat(super::cdf::FAR_LIMIT)),
         );
         let y = super::cdf::lanes(k, x, active);
         let mut out = k.store(y);
