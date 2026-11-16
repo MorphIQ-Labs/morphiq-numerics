@@ -1,5 +1,5 @@
 //! Scalar operation sequences through the library's existing SIMD dispatch.
-use crate::lanes::{Kernel, lanes_mask};
+use crate::lanes::{Cold, Kernel, cold, cold_arrays, lanes_mask};
 use morphiq_numerics_arch::Simd;
 
 pub(super) struct Cdf;
@@ -14,17 +14,70 @@ impl Kernel for Cdf {
         let a = k.abs(x);
         let active = k.and_m(
             k.le(k.splat(super::normal::MIN_MAGNITUDE), a),
-            k.and_m(
-                k.le(k.splat(-super::cdf::FAR_LIMIT), x),
-                k.le(x, k.splat(super::cdf::RATIONAL_LIMIT)),
-            ),
+            k.le(a, k.splat(super::cdf::RATIONAL_LIMIT)),
         );
-        let y = super::cdf::lanes(k, x, active);
-        let mut out = k.store(y);
         let active_bits = k.mask_bits(active);
+        let y = if active_bits != 0 {
+            super::cdf::lanes(k, x, active)
+        } else {
+            k.splat(0.0)
+        };
+        let mut out = k.store(y);
         if active_bits != lanes_mask::<K>() {
+            let far = far_mask(k, x);
+            if k.mask_bits(far) != 0 {
+                // Runtime AVX-512 cannot inline vector conversions into a
+                // baseline-ISA trampoline. Static backends keep the vector
+                // boundary, which preserves their common-path register lifetimes.
+                if cfg!(all(target_arch = "x86_64", not(target_feature = "avx512f")))
+                    && K::LANES == 8
+                {
+                    return finish_cdf(k, active_bits, k.store(x), k.store(y));
+                }
+                return k.store(cold(k, FinishCdf { near: active_bits }, x, y));
+            }
             for (i, value) in out.as_mut().iter_mut().enumerate() {
                 if active_bits >> i & 1 == 0 {
+                    *value = crate::normal::norm_cdf(input.as_ref()[i]);
+                }
+            }
+        }
+        out
+    }
+}
+
+#[inline(always)]
+fn far_mask<K: Simd>(k: K, x: K::F) -> K::M {
+    k.and_m(
+        k.le(k.splat(-super::cdf::FAR_LIMIT), x),
+        k.lt(x, k.splat(-super::cdf::RATIONAL_LIMIT)),
+    )
+}
+
+// Own snapshots at this boundary so the caller's original arrays do not escape.
+// All lane operations remain in the backend wrapper entered by cold_arrays.
+#[inline(never)]
+fn finish_cdf<K: Simd>(k: K, near: u64, input: K::Array, out: K::Array) -> K::Array {
+    cold_arrays(k, FinishCdf { near }, &input, &out)
+}
+
+/// Complete far-tail and screened lanes outside the common near-domain frame,
+/// while retaining the backend token and vector arithmetic.
+struct FinishCdf {
+    near: u64,
+}
+
+impl Cold for FinishCdf {
+    #[inline(always)]
+    fn run<K: Simd>(self, k: K, input: K::Array, out: K::Array) -> K::Array {
+        let x = k.load(input);
+        let far = far_mask(k, x);
+        let y = super::cdf::far_lanes(k, x, far);
+        let mut out = k.store(k.select(far, y, k.load(out)));
+        let active = self.near | k.mask_bits(far);
+        if active != lanes_mask::<K>() {
+            for (i, value) in out.as_mut().iter_mut().enumerate() {
+                if active >> i & 1 == 0 {
                     *value = crate::normal::norm_cdf(input.as_ref()[i]);
                 }
             }

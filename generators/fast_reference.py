@@ -94,9 +94,9 @@ def generate():
             for x in [math.nextafter(edge, -math.inf), edge, math.nextafter(edge, math.inf)]:
                 rows += [dict(x=word(x)), dict(x=word(-x))]
             rows += [dict(x=word(-8 + i / 64)) for i in range(0, 470)]
-            # The far tail -22.5 <= x < -8, where the erfcx table replaces the
-            # rational: a 1/64 grid, the seam at 8, the erfcx
-            # table's y = 16 neighbourhood, and the accelerated limit.
+            # The fixed-coefficient far tail: a 1/64 grid, the seam at 8
+            # and the accelerated limit. Expected values remain independent
+            # high-precision evaluations of the defining normal integral.
             far_limit = 22.5
             for i in range(1, 929):
                 a = 8 + i / 64
@@ -108,6 +108,8 @@ def generate():
                       math.nextafter(far_limit, -math.inf)]:
                 rows.append(dict(x=word(-a)))
             rows.append(dict(x=word(8.0)))
+            # Retained worst observation of the degree-10 fixed-tail candidate.
+            rows.append(dict(x='c0292080269395f8'))
         for row in rows:
             x = number(row['x'])
             active = (abs(x) < 704 if primitive == 'exp' else

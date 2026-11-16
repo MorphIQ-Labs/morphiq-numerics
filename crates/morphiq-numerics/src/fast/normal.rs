@@ -31,20 +31,15 @@ pub fn erfcx(x: f64) -> f64 {
 /// `y = RN(|x|/sqrt(2))`, `y <= 15/32` evaluates a generated erf polynomial;
 /// larger `y` evaluates `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` with
 /// the exponent split exactly and, up to `|x| = 8`, one generated erfcx
-/// rational, beyond it the erfcx table (`FastCdfFar.fast_cdf_far_entry_ok`). Other inputs use [`crate::normal::norm_cdf`],
+/// rational, beyond it a fixed polynomial in `1/a²`
+/// (`FastCdfFar.fast_cdf_far_entry_ok`). Other inputs use [`crate::normal::norm_cdf`],
 /// retaining its special values.
 #[must_use]
 #[inline]
 pub fn norm_cdf(x: f64) -> f64 {
     let a = x.abs();
-    // Bodies and the rational tail on both sides; the erfcx-table tail only for
-    // x < 0 (`FastCdfFar.fast_cdf_far_screen64`).
-    let limit = if x < 0.0 {
-        super::cdf::FAR_LIMIT
-    } else {
-        super::cdf::RATIONAL_LIMIT
-    };
-    if !(MIN_MAGNITUDE..=limit).contains(&a) {
+    // Keep the established near-domain screen independent of the far tail.
+    if !(MIN_MAGNITUDE..=super::cdf::RATIONAL_LIMIT).contains(&a) {
         return norm_cdf_fallback(x);
     }
     super::cdf::in_domain(x)
@@ -62,10 +57,13 @@ pub(super) fn lower(a: f64) -> f64 {
     (0.5 * exponential) * crate::erfcx::bounded::table(scaled)
 }
 
-// Keep the strong entry's register requirements out of the accelerated caller.
+// Keep the far-tail composition and strong entry out of the near-domain frame.
 #[cold]
 #[inline(never)]
 fn norm_cdf_fallback(x: f64) -> f64 {
+    if (-super::cdf::FAR_LIMIT..-super::cdf::RATIONAL_LIMIT).contains(&x) {
+        return super::cdf::far(x);
+    }
     crate::normal::norm_cdf(x)
 }
 

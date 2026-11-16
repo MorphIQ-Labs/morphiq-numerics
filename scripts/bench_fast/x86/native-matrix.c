@@ -12,7 +12,9 @@ int bench_set_qos(void) { return pthread_set_qos_class_self_np(QOS_CLASS_USER_IN
 #include <immintrin.h>
 #else
 #include <arm_neon.h>
+#ifndef NO_SLEEF
 #include <sleef.h>
+#endif
 #endif
 typedef double (*scalar1)(double);
 typedef double (*scalar2)(double,int);

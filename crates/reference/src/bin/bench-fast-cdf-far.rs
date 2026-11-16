@@ -2,6 +2,8 @@
 //! and the consumer's interim composition (#302). Same-host, paired, alternating
 //! rounds; every sample is printed. Not CI timing.
 //! `MORPHIQ_FAR_ROUNDS` (default 15) and `MORPHIQ_FAR_REPS` (default 200) tune it.
+//! Build with `--features simd,std` to exercise the production slice dispatch.
+//! This exploratory timer does not replace the native qualification matrix.
 use morphiq_numerics::{fast, normal};
 use std::{hint::black_box, time::Instant};
 

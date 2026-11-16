@@ -1,6 +1,6 @@
 (** The bounded normal CDF beyond [|x| = 8]: the actual binary64 sequence of
     the far-tail row of [fast/cdf.rs] (exact exponent split, the full bounded
-    exponential, the erfcx table), and the composed entry contract on
+    exponential, a fixed-coefficient tail polynomial), and the composed entry contract on
     [2^-33 <= |x| <= 45/2]: absolute error at most [2^-49], and relative error
     at most [2^-48] for [x < 0]. [FastCdf] proves the region [|x| <= 8]. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz Bool Classical.
@@ -14,7 +14,7 @@ Require Import StageGappa ErfcxDecision ErfcxPublicModel ErfcxConstants ErfcxTay
   ErfcxTableEvaluation ErfcxReciprocal NormalConstants NormalComparisons NormalCentered
   NormalTailAnalytic NormalErfcxSensitivity NormalErfcxFastScaled NormalPublicEntry NormalPublicModel
   NormalAccurateCentralCdf NormalFastDispatch FastExp FastErfcx FastNormalArgument FastCdfConstants
-  FastCdfOde FastCdfApprox FastCdfBody FastCdf.
+  FastCdfOde FastCdfApprox FastCdfBody FastCdf FastCdfFarArithmetic FastCdfFarRatio.
 Open Scope R_scope.
 
 Definition cdf_far_limit : f64 := b64_of_bits 4627026404658118656.
@@ -30,7 +30,7 @@ Qed.
 
 Definition fast_cdf_far_lower64 a :=
   let '(p,e):=two_prod64 (fmul erfcx_negative_half a) a in
-  let r:=fast_erfcx_table64 (fast_normal_argument64 a) in
+  let r:=fast_cdf_far_ratio64 a in
   fmul (fmul cdf_half (fast_exp_entry64 p)) (fadd r (fmul r e)).
 
 Definition fast_cdf_far_outer64 x :=
@@ -101,49 +101,6 @@ Proof.
   lra.
 Qed.
 
-(** {1 The argument} *)
-
-Theorem cdf_far_argument a : finite a -> 8<B a<=45/2 ->
-  finite(fast_normal_argument64 a) /\ 5<=B(fast_normal_argument64 a)<16 /\
-  Rabs(B(fast_normal_argument64 a)-B a/sqrt 2)<=2*bpow radix2(-53)*(B a/sqrt 2).
-Proof.
-  intros Fa A. destruct normal_inv_sqrt2_hi_ok as [Fc C].
-  assert (Cerror : Rabs(B normal_inv_sqrt2_hi-/sqrt 2)<=7/10*bpow radix2(-53)/sqrt 2).
-  { rewrite C;bpow_num;interval with(i_prec 160). }
-  assert (Crange : 7/10<=B normal_inv_sqrt2_hi<=71/100) by (rewrite C;interval with(i_prec 80)).
-  assert (Bound : bnd 1 4 (B a*B normal_inv_sqrt2_hi)).
-  { unfold bnd;rewrite Rmult_1_l,Rabs_pos_eq by nra. change(bpow radix2 4)with 16;nra. }
-  destruct (fmul_bnd 1 4 a normal_inv_sqrt2_hi Fa Fc ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia) Bound)
-    as [Fz [Z _]].
-  fold (fast_normal_argument64 a) in Fz,Z.
-  assert (Normal : bpow radix2(-1022)<=Rabs(B a*B normal_inv_sqrt2_hi)).
-  { rewrite Rabs_pos_eq by nra. assert (bpow radix2 (-1022)<=bpow radix2 0) by (apply bpow_le;lia).
-    change (bpow radix2 0) with 1 in H. nra. }
-  pose proof (rnd_rel _ Normal) as Round.
-  change (Rabs(rndF(B a*B normal_inv_sqrt2_hi)-B a*B normal_inv_sqrt2_hi)<=
-    bpow radix2(-53)*Rabs(B a*B normal_inv_sqrt2_hi)) in Round.
-  rewrite <-Z,(Rabs_pos_eq (B a*B normal_inv_sqrt2_hi)) in Round by nra.
-  assert (Error : Rabs(B(fast_normal_argument64 a)-B a/sqrt 2)<=2*bpow radix2(-53)*(B a/sqrt 2)).
-  { replace (B(fast_normal_argument64 a)-B a/sqrt 2) with
-      ((B(fast_normal_argument64 a)-B a*B normal_inv_sqrt2_hi)+B a*(B normal_inv_sqrt2_hi-/sqrt 2))
-      by (unfold Rdiv;ring).
-    eapply Rle_trans;[apply Rabs_triang|]. rewrite Rabs_mult,(Rabs_pos_eq (B a)) by lra.
-    pose proof (Rabs_le_inv _ _ Cerror) as Cr.
-    assert (Sc : B a*Rabs(B normal_inv_sqrt2_hi-/sqrt 2)<=B a*(7/10*bpow radix2(-53)/sqrt 2))
-      by (apply Rmult_le_compat_l;lra).
-    assert (S2 : 0</sqrt 2) by (apply Rinv_0_lt_compat;interval).
-    assert (High : B a*B normal_inv_sqrt2_hi<=B a*(/sqrt 2+7/10*bpow radix2(-53)/sqrt 2)) by (unfold Rdiv in *;nra).
-    bpow_num_all. unfold Rdiv in *. nra. }
-  assert (Ylo : 5.6<=B a/sqrt 2).
-  { apply (Rmult_le_reg_r (sqrt 2));[interval|];rewrite cdf_sqrt2_cancel;interval. }
-  assert (Yhi : B a/sqrt 2<=15.92).
-  { apply (Rmult_le_reg_r (sqrt 2));[interval|];rewrite cdf_sqrt2_cancel;interval. }
-  pose proof (Rabs_le_inv _ _ Error) as E'.
-  assert (U : bpow radix2(-53)<=/2^50) by (bpow_num;lra).
-  split;[exact Fz|]. split;[|exact Error].
-  split;nra.
-Qed.
-
 (** {1 The lower tail [Phi(-a)] for [8 < a <= 45/2]} *)
 
 Theorem fast_cdf_far_lower_ok a : finite a -> 8<B a<=45/2 ->
@@ -155,8 +112,6 @@ Proof.
   intros Fa A. unfold fast_cdf_far_lower64. cbv zeta.
   assert (Apos : 0<B a) by lra.
   pose proof (bpow_gt_0 radix2 (-53)) as U.
-  destruct (cdf_far_argument a Fa A) as [Fz [Zr Zerr]].
-  set (z:=fast_normal_argument64 a) in *. clearbody z.
   set (Y:=B a/sqrt 2) in *.
   assert (Ylo : 5.6<=Y).
   { unfold Y;apply (Rmult_le_reg_r (sqrt 2));[interval|];rewrite cdf_sqrt2_cancel;interval. }
@@ -164,28 +119,15 @@ Proof.
   { unfold Y;apply (Rmult_le_reg_r (sqrt 2));[interval|];rewrite cdf_sqrt2_cancel;interval. }
   assert (Ypos : 0<Y) by lra.
   assert (U53 : bpow radix2 (-53)<=/2^50) by (bpow_num;lra).
-  pose proof (Rabs_le_inv _ _ Zerr) as Zr2.
-  assert (Zclose : Rabs(B z-Y)<=Y/1000) by (eapply Rle_trans;[exact Zerr|nra]).
-  (* The table row. *)
-  destruct (fast_erfcx_table_ok z Fz ltac:(split;lra)) as [Fr [_ Ferr]].
-  set (r:=fast_erfcx_table64 z) in *. clearbody r.
-  pose proof (cdf_erfcx_relative_argument (B z) Y ltac:(lra) Zclose) as Sens.
-  set (Ez:=gaussian_erfcx (B z)) in *. set (EY:=gaussian_erfcx Y) in *.
+  destruct (fast_cdf_far_ratio_ok a Fa ltac:(split;lra)) as [Fr CB].
+  fold Y in CB.
+  set (r:=fast_cdf_far_ratio64 a) in *. clearbody r.
+  set (EY:=gaussian_erfcx Y) in *.
   assert (EYr : 1/62<=EY<=1).
   { split;[apply cdf_far_erfcx_floor;lra|apply normal_erfcx_unit_upper;lra]. }
-  assert (Ezp : 0<Ez) by (apply normal_erfcx_positive;lra).
-  assert (Q : Rabs(B z-Y)/Y<=2*bpow radix2(-53)).
-  { unfold Rdiv. apply (Rmult_le_reg_r Y);[lra|]. rewrite Rmult_assoc,Rinv_l,Rmult_1_r by lra. lra. }
-  assert (Sens' : Rabs(Ez-EY)<=11/2*bpow radix2(-53)*EY).
-  { eapply Rle_trans;[exact Sens|]. assert (0<=EY) by lra.
-    assert (11/4*(Rabs(B z-Y)/Y)<=11/2*bpow radix2(-53)) by lra.
-    apply Rmult_le_compat_r;lra. }
-  assert (Ferr' : Rabs(B r-Ez)<=4*bpow radix2(-53)*Ez) by (bpow_num_all;lra).
-  pose proof (cdf_rel_chain (B r) Ez EY _ _ Ferr' Sens' ltac:(lra) ltac:(lra) ltac:(lra)) as CB.
-  apply (cdf_rel_weaken _ _ _ (10*bpow radix2(-53))) in CB;[|lra|bpow_num;interval].
   pose proof (Rabs_le_inv _ _ CB) as CBr.
-  assert (Rr : 1/70<=B r<=2) by (split;bpow_num_all;nra).
-  clear Sens Sens' Ferr Ferr' Q Zerr Zclose Zr Fz.
+  assert (Rr : 1/70<=B r<=2).
+  { clear - CBr EYr. bpow_num_all. split; lra. }
   (* The exponent, exactly: p + e = -a^2/2. *)
   destruct erfcx_negative_half_ok as [Fnh Half].
   assert (Mag : (-32<=mag radix2(B a))%Z).
@@ -277,7 +219,7 @@ Proof.
     pose proof (rnd_rel _ N) as K. rewrite (Rabs_pos_eq (B r+B re)) in K by lra. exact K. }
   set (t:=fadd r re) in *. clearbody t.
   pose proof (Rabs_le_inv _ _ Rt) as Rt'.
-  assert (Trng : 1/200<=B t<=4) by (bpow_num_all;split;nra).
+  assert (Trng : 1/200<=B t<=4) by (clear - Wr Rt'; bpow_num_all;split;nra).
   assert (Hrng : bpow radix2(-372)<=B h<=1).
   { rewrite Vh. assert (H46 : bpow radix2(-46)<=1/1000) by (bpow_num;lra).
     assert (bpow radix2 (-372)=/2*bpow radix2 (-371)) by (bpow_num;lra).
@@ -467,3 +409,75 @@ Theorem fast_cdf_far_zeros :
   fast_cdf_far_entry64(B754_zero 53 1024 false)=erfcx_pow2(-1) /\
   fast_cdf_far_entry64(B754_zero 53 1024 true)=erfcx_pow2(-1).
 Proof. split;reflexivity. Qed.
+
+(** The source keeps the old near-domain entry in its common frame.  The
+    negative far-tail screen is evaluated only when that screen rejects.
+    This is a dispatch refactoring, not a change to the numerical entry. *)
+Definition fast_cdf_far_only_screen64 x :=
+  normal_le (fneg cdf_far_limit) x && normal_lt x (fneg (erfcx_pow2 3)).
+Definition fast_cdf_far_split64 x :=
+  if fast_cdf_screen64 x then fast_cdf64 x
+  else if fast_cdf_far_only_screen64 x then fast_cdf_far_lower64 (b64_abs x)
+  else normal_entry64 NormalCdf x.
+
+Lemma fast_cdf_far_split_finite x : finite x ->
+  fast_cdf_far_split64 x = fast_cdf_far_entry64 x.
+Proof.
+  intros Fx.
+  assert (Fa : finite (b64_abs x)) by (unfold b64_abs; destruct x; exact Fx).
+  destruct (erfcx_pow2_ok 3 ltac:(lia)) as [F8 V8].
+  change (bpow radix2 3) with 8 in V8.
+  destruct cdf_far_limit_ok as [Fmax Vmax].
+  assert (Nf : forall w, finite w -> finite (fneg w)) by
+    (intros w Fw; unfold fneg,b64_opp; rewrite is_finite_Bopp; exact Fw).
+  assert (Nb : forall w, B (fneg w) = - B w) by (intros; apply B2R_Bopp).
+  assert (Far : fast_cdf_far_only_screen64 x = true <-> -(45/2) <= B x < -8).
+  { unfold fast_cdf_far_only_screen64. rewrite andb_true_iff,
+      (normal_le_true _ _ (Nf _ Fmax) Fx), (normal_lt_true _ _ Fx (Nf _ F8)),
+      !Nb, Vmax, V8. reflexivity. }
+  assert (Min8 : bpow radix2 (-33) <= 8) by (bpow_num; lra).
+  unfold fast_cdf_far_split64, fast_cdf_far_entry64.
+  destruct (fast_cdf_screen64 x) eqn:Near.
+  - pose proof (proj1 (fast_cdf_screen_finite x Fx) Near) as X.
+    assert (Screen : fast_cdf_far_screen64 x = true).
+    { apply (proj2 (fast_cdf_far_screen_finite x Fx)).
+      unfold cdf_far_domain. split; [lra|left; lra]. }
+    rewrite Screen. unfold fast_cdf_far64.
+    assert (Tail : normal_lt (erfcx_pow2 3) (b64_abs x) = false).
+    { apply (proj2 (normal_lt_false _ _ F8 Fa)). rewrite V8, B_abs. lra. }
+    now rewrite Tail.
+  - assert (NotNear : ~ bpow radix2 (-33) <= Rabs (B x) <= 8).
+    { intros X. apply (proj2 (fast_cdf_screen_finite x Fx)) in X.
+      rewrite Near in X; discriminate. }
+    destruct (fast_cdf_far_only_screen64 x) eqn:Only.
+    + pose proof (proj1 Far eq_refl) as X.
+      assert (Abs : Rabs (B x) = - B x) by (apply Rabs_left1; lra).
+      assert (Screen : fast_cdf_far_screen64 x = true).
+      { apply (proj2 (fast_cdf_far_screen_finite x Fx)).
+        unfold cdf_far_domain. rewrite Abs. split; [lra|right; split; lra]. }
+      rewrite Screen. unfold fast_cdf_far64, fast_cdf_far_outer64.
+      assert (Tail : normal_lt (erfcx_pow2 3) (b64_abs x) = true).
+      { apply (proj2 (normal_lt_true _ _ F8 Fa)). rewrite V8, B_abs, Abs. lra. }
+      assert (Neg : normal_lt x normal_zero = true).
+      { apply (proj2 (normal_lt_true x normal_zero Fx ltac:(reflexivity))).
+        change (B normal_zero) with 0. lra. }
+      now rewrite Tail, Neg.
+    + destruct (fast_cdf_far_screen64 x) eqn:Screen; [|reflexivity].
+      exfalso. pose proof (proj1 (fast_cdf_far_screen_finite x Fx) Screen) as X.
+      unfold cdf_far_domain in X. destruct X as [Min [Small|[Neg Max]]].
+      * apply NotNear; split; assumption.
+      * assert (Abs : Rabs (B x) = - B x) by (apply Rabs_left1; lra).
+        assert (Large : 8 < Rabs (B x)) by (apply Rnot_le_lt; intros H; apply NotNear; split; assumption).
+        assert (Yes : false = true).
+        { apply (proj2 Far). rewrite Abs in Max, Large. split; lra. }
+        discriminate.
+Qed.
+
+Theorem fast_cdf_far_split_eq x : fast_cdf_far_split64 x = fast_cdf_far_entry64 x.
+Proof.
+  destruct (is_finite 53 1024 x) eqn:Fx.
+  - apply fast_cdf_far_split_finite; exact Fx.
+  - destruct x as [s|s|s p Hp|s m e Hm]; try discriminate.
+    + destruct s; reflexivity.
+    + reflexivity.
+Qed.

@@ -335,6 +335,103 @@ only: acceptance still requires all 394 cells measured and all 244 required
 cells passing. Native ARM and manifests without groups retain the original
 single-group schedule.
 
+## Far-tail CDF change qualification
+
+`prepare-cdf-far.py` builds candidate and pre-change baseline CDF wrappers with
+matching flags and stages the existing paired timer. On x86 it builds automatic
+dispatch (`simd,std`, `x86-64-v3`), static AVX2/FMA (`simd`, `x86-64-v3`) and
+static AVX-512 (`simd`, `x86-64-v4`). Apple Silicon uses `simd,std` and NEON.
+Run on native hardware; CPU affinity is available on Linux, while the Mac timer
+requests user-initiated QoS. Record Mac power mode and thermal/load conditions.
+On each host, run `cargo test --workspace --all-features --locked` and
+`./scripts/check_fma.sh` before timing. Finish these checks and the linked-product
+oracle observations before starting any performance process.
+
+On x86 hosts affected by Intel's JCC microcode mitigation, code placement can
+change decoded-cache usage even when instruction sequences match. Inspect the
+actual caller and use hardware counters outside timing to investigate this.
+`--x86-jcc-mitigation` stages a separate diagnostic build with LLVM's
+`--x86-branches-within-32B-boundaries` flag on candidate, baseline and composition
+products alike. Retain default-build results separately; this option does not
+establish their performance or change the acceptance rule. See
+[Intel's JCC guidance](https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/best-practices/mitigation-strategies-jcc-microcode.html).
+
+```sh
+git worktree add --detach target/cdf-far-baseline f29d59b
+python3 scripts/bench_fast/prepare-cdf-far.py --cpu 2 \
+  --baseline target/cdf-far-baseline --out target/cdf-far-001
+python scripts/bench_fast/observe-cdf-far.py target/cdf-far-001  # pinned mpmath environment
+python3 target/cdf-far-001/screen-ln.py --limit 63  # 21 priority cells per x86 build
+```
+
+The shared screen retains its historical filename; it reads the staged matrix.
+Use `--limit 21` for the single Mac/NEON build. A screen is exploratory: one
+process, two alternating paired rounds, 150 ms calibration target. Investigate
+material costs before qualification; retain every attempt. Build and validate
+before timing, with no concurrent profiling or oracle work on the timed host.
+
+Each backend has 120 required before/after cells: twelve banks, scalar throughput
+and dependent latency on 52 values, and slice lengths 1/2/4/8/13/52/53/4096.
+Banks cover negative far tails, two signed mixtures, positive fallback, unchanged
+pricing/body/lower/upper/wide domains, seam neighbours, mixed near/far/fallback
+lanes and all-fallback packets. Exact input words, hashes and fallback counts
+are retained. Nine consumer-composition comparisons and three unchanged strong
+controls are diagnostics. The composition has an unsplit exponent and a weaker
+error guarantee; it cannot establish comparable-contract parity. The independent
+fixture check and exact-bit observations run outside timing on the linked products.
+Its separate cost/spread rule in the far-tail decision record still requires
+review; classifying it as a diagnostic does not waive that acceptance obligation.
+
+Before qualification, record the matrix, pinned baseline, host and decision in
+the owning issue/PR, and commit methodology/source changes. Then use `freeze.py`,
+the staged `run-qualification.py`, and `freeze.py --verify` as above. Every
+required cell must pass the shared ten-process upper-95% ratio rule; the runner
+stops at its first completed required failure. Review strong controls separately.
+This focused change matrix does not replace the broader competitor matrix or
+consumer end-to-end qualification. Native x86 results leave ARM cells open.
+Remove the clean baseline worktree after the comparison; retain linked binaries,
+raw samples, failed attempts and logs under ignored `target/` through review.
+
+### Canonical CDF references
+
+`build-cdf-references.py` builds QuantLib 1.44 at revision
+`ab4cb476d35f7275834bc05b47d1324403d1823b`, Boost.Math 1.86.0 with both its
+default policy and `promote_double<false>`, and the pinned SLEEF 3.9.0 `erfc_u15`
+composition. It fetches QuantLib's compatible license before its selected
+sources. Supply the pinned Boost headers and SLEEF source/build; used headers,
+licenses, compiler commands and linked products are hashed in `references.json`.
+The supplied Boost tree is identified by its used headers; the manifest does
+not claim verification against the published archive unless it was performed.
+
+QuantLib and Boost use scalar loops for slices. SLEEF uses AVX-512, AVX2 or NEON
+with scalar remainders. The SLEEF composition is
+`0.5 * erfc(x * -RN(1/sqrt(2)))`; an `erfc` ULP claim does not establish a CDF
+relative bound after argument rounding. Boost's internal promotion policy also
+does not recover precision already lost in the distribution's argument scaling.
+The C adapters catch C++ domain exceptions, count them, and return NaN; the
+accuracy record reports these adaptations and special-value results explicitly.
+
+```sh
+python3 scripts/bench_fast/build-cdf-references.py --out target/cdf-references-001 \
+  --boost /path/to/boost_1_86_0 --sleef-source target/bench-fast-refs/sleef \
+  --sleef-build target/bench-fast-refs/sleef-build
+python scripts/bench_fast/observe-cdf-references.py --run target/cdf-far-001 \
+  --references target/cdf-references-001  # pinned mpmath environment
+python3 scripts/bench_fast/stage-cdf-references.py --run target/cdf-far-001 \
+  --references target/cdf-references-001 --out target/cdf-canonical-001
+python3 target/cdf-canonical-001/screen-ln.py
+```
+
+The observer checks the complete CDF against mpmath at 200/400 bits on the
+existing exact input banks and independent CDF fixture inputs. It records
+absolute and negative normal-output relative maxima, exact witnesses, scalar
+versus slice differences, and exceptional results. These are observations, not
+proofs of reference bounds. The staged cells compare independent scalar
+throughput, dependent latency, and 4096-value slices on the negative far tail
+and unchanged pricing domain. They are separate diagnostics; baseline controls,
+comparable-contract acceptance, native ARM and consumer qualification retain
+their requirements. Finish all builds, oracles and profiles before timing.
+
 ## Focused log-CDF comparison
 
 The `x86/prepare-log-cdf.py` adapter times the bounded `log_norm_cdf`

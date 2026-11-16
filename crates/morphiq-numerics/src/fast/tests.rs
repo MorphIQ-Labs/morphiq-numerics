@@ -253,3 +253,70 @@ fn cdf_far_tail_tracks_the_strong_owner_and_the_slice_bits() {
         }
     }
 }
+
+#[cfg(feature = "simd")]
+#[test]
+fn cdf_region_mixtures_preserve_each_lane_on_every_backend() {
+    use crate::lanes::Kernel;
+    use morphiq_numerics_arch::{Simd, WithSimd};
+
+    struct Regions;
+    impl WithSimd for Regions {
+        type Output = ();
+
+        #[inline(always)]
+        fn with<K: Simd>(self, k: K) {
+            let check = |xs: K::Array| {
+                let ys = super::lanes::Cdf::lanes(k, xs);
+                for (&x, &y) in xs.as_ref().iter().zip(ys.as_ref()) {
+                    assert_eq!(
+                        y.to_bits(),
+                        normal::norm_cdf(x).to_bits(),
+                        "{}: {x:?}",
+                        K::NAME
+                    );
+                }
+            };
+            // Every assignment of near, far and strong-owner lanes, including
+            // homogeneous packets, across the entire backend width.
+            for mut pattern in 0..3_usize.pow(u32::try_from(K::LANES).unwrap()) {
+                let mut xs = K::Array::default();
+                for x in xs.as_mut() {
+                    *x = [0.25, -12.0, 9.0][pattern % 3];
+                    pattern /= 3;
+                }
+                check(xs);
+            }
+            // Move special values and both sides of each seam through every
+            // lane while the other lanes require both accelerated paths.
+            for x in [
+                -22.5_f64.next_up(),
+                -22.5,
+                -22.5_f64.next_down(),
+                -8.0_f64.next_up(),
+                -8.0,
+                -8.0_f64.next_down(),
+                8.0_f64.next_up(),
+                0.0,
+                -0.0,
+                f64::from_bits(1),
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+                f64::from_bits(0x7ff8_1234_5678_9abc),
+                f64::from_bits(0xfff0_1234_5678_9abc),
+            ] {
+                for slot in 0..K::LANES {
+                    let mut xs = K::Array::default();
+                    for (i, value) in xs.as_mut().iter_mut().enumerate() {
+                        *value = if i % 2 == 0 { -12.0 } else { 0.25 };
+                    }
+                    xs.as_mut()[slot] = x;
+                    check(xs);
+                }
+            }
+        }
+    }
+    for backend in crate::lanes::tests::backends() {
+        backend.vectorize(Regions);
+    }
+}
