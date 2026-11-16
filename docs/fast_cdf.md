@@ -124,6 +124,52 @@ throughput and up to 6 on dependent latency: the strong entry saturates to 1
 without evaluating a tail. The screen therefore leaves it with the strong owner,
 which is the behavior before this row.
 
+## Decision record: the far-tail row (#302)
+
+Following [the decision form](numerical-decision-template.md).
+
+- **Consumer purpose.** MorphIQ Risk's closed-form kernel evaluated `Φ(x)` for
+  `8 < |x| < 16√2` with a hand composition of the bounded `exp` and `erfcx`; the
+  unsplit exponent `RN(-a²/2)` costs up to `256u` relative after `exp`. A lane row
+  replaces it and the consumer deletes the composition once a release carries the
+  row. For `a/√2 >= 16` the consumer takes `Φ(-a) < 2e-113` as zero, so a row for
+  `y >= 16` is not required (#302 update).
+- **Accuracy budget.** The published contract is unchanged: `2^-49` absolute and
+  `2^-48` relative for `x < 0`; the proof gives `20u <= 32u` relative in the row.
+  Tightening it buys the consumer nothing; the consumer's budget already absorbed
+  the composition's `256u`.
+- **Cost budget and acceptance rule (stated before the measurement).** Not slower
+  than the strong entry in any bank (the previous behavior in this region), and
+  no worse than the consumer's composition by more than the paired-run spread on
+  the negative-tail bank, where the consumer's own trade-off is cost against the
+  `256u` term. Cells: three banks, scalar throughput, dependent latency and a
+  4096-value slice; 15 alternating paired rounds; stop when the strong-entry rule
+  is decided.
+- **Outcome on the measured host (aarch64, observation only).** The first design
+  accelerated both signs on `8 < a <= 22.5`. It failed the first rule: for
+  `x > 8` it was 1.4 times (scalar throughput) to 6 times (dependent latency) the
+  strong entry's time, because `Φ(x)` rounds to 1 from `x ~ 8.4` and the strong
+  entry returns it without a tail evaluation. The screen was narrowed to
+  `x < 0` past 8, which restores the previous behavior there. On `-22.5 <= x < -8` the row
+  takes 0.22 (scalar), 0.40 (latency) and 0.21 (slice) of the strong entry's time and
+  1.02–1.07 of the composition's, with sampled error about `5u` against about
+  `130u`. The composition's small time advantage on that bank is the cost of its
+  `256u` term being removed; the mixed banks, which add the composition's
+  complement and branch, favor the row (0.26–0.84).
+- **Rejected.** An unsplit exponent (the consumer's composition: `256u`); a
+  `y >= 16` row (not needed, a second table and proof for a region the
+  consumer takes as zero); acceleration of `x > 8` (slower than saturation).
+  Re-evaluate if a consumer needs `a > 22.63` or if `x > 8` becomes costly in
+  the strong entry.
+- **Fallback.** Outside the screen the strong entry returns its own bits
+  (`FastCdfFar.fast_cdf_far_fallback_contract`); there is no refinement work and
+  no unestablished outcome.
+- **Evidence.** Proved: `FastCdfFar.fast_cdf_far_entry_ok`; oracle fixture rows
+  decided in exact arithmetic; extracted entry bit-identical on the internal corpus.
+  Missing: native x86-64 timing, the declared ARM qualification matrix (the
+  benchmark above is one uncontrolled run), and the x86 determinism digest and
+  SDE/codegen gates. These are unestablished, not satisfied.
+
 ## Checked by
 
 - `formal/fast/FastCdf.v`, `formal/fast/FastCdfFar.v` (the far tail and the
