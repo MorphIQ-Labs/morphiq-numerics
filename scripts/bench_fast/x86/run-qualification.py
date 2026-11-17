@@ -74,6 +74,7 @@ for group_index,group in enumerate(groups):
    if (index+1)%10==0:print(f'Group {group_index+1}/{len(groups)}, block {block+1}/2: {index+1}/{len(group)} cells',flush=True)
 rows=summaries();assert len(rows)==len(cells)
 failures=[r for r in rows if r['required'] and not r['passes']]
-result=dict(complete=True,cells=len(rows),required=sum(c['required_parity'] for c in cells),failures=[r['id'] for r in failures],all_required_pass=not failures)
+required=sum(c['required_parity'] for c in cells)
+result=dict(complete=True,cells=len(rows),required=required,failures=[r['id'] for r in failures],all_required_pass=(not failures) if required else None, purpose=manifest.get('purpose', 'qualification'))
 (root/'result.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result),flush=True)
 if failures:raise SystemExit('Required parity cells failed; do not claim qualification.')

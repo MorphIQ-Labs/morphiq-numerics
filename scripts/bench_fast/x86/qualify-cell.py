@@ -137,6 +137,11 @@ def main():
     else:
         raise ValueError(args.reference)
     entries['reference'] = ref, method
+    if args.reference == 'identical-binary':
+        if not args.reference_product or product == ref:
+            raise RuntimeError('Identical-binary control requires distinct loaded function addresses')
+        if hashlib.sha256(Path(args.product).read_bytes()).digest() != hashlib.sha256(Path(args.reference_product).read_bytes()).digest():
+            raise RuntimeError('Identical-binary control products differ')
     if args.kind == 'latency':
         entries = {key: (ptr, {'measure1': 'measure_chain1', 'measure2': 'measure_chain2'}[method])
                    for key, (ptr, method) in entries.items()}
@@ -146,6 +151,13 @@ def main():
         method = getattr(cache, name)
         method.argtypes = [C.c_void_p, D, D, C.c_size_t, C.c_uint64, C.c_size_t]
         method.restype = C.c_uint64
+    for timer in [native, cache]:
+        try:
+            timer.bench_last_stack_address.argtypes = []
+            timer.bench_last_stack_address.restype = C.c_size_t
+        except AttributeError as error:
+            raise RuntimeError('Rebuild native-matrix and native-cache with this harness version') from error
+    stack_address = (cache if args.cache_slots > 1 else native).bench_last_stack_address
     values = inputs(args.primitive, args.population, args.length)
     words = values*args.cache_slots
     if platform.system() == 'Darwin':
@@ -173,13 +185,13 @@ def main():
     def record(name, kind, count, round_number):
         elapsed = measure(name, count)
         row = dict(name=name, kind=kind, count=count, elapsed_ns=elapsed,
-                   ns_per_call=elapsed/count, round=round_number)
+                   ns_per_call=elapsed/count, round=round_number, stack_address=stack_address())
         records.append(row)
         with (out/'samples.jsonl').open('a') as stream:
             stream.write(json.dumps(row)+'\n')
         return elapsed
     def record_calibration(name,kind,count,elapsed):
-        row=dict(name=name,kind=kind,count=count,elapsed_ns=elapsed,ns_per_call=elapsed/count,round=0)
+        row=dict(name=name,kind=kind,count=count,elapsed_ns=elapsed,ns_per_call=elapsed/count,round=0,stack_address=stack_address())
         with (out/'samples.jsonl').open('a') as stream:stream.write(json.dumps(row)+'\n')
     counts_path = Path(args.counts)
     if args.process == 'calibration':
@@ -208,6 +220,10 @@ def main():
                     input_sha256=hashlib.sha256(input_bytes).hexdigest(),
                     product_sha256=hashlib.sha256(Path(args.product).read_bytes()).hexdigest(),
                     input_address=input_address, output_address=output_address,
+                    call_addresses={name: ptr for name, (ptr, _) in entries.items()},
+                    timer_addresses={name: C.cast(getattr(cache if args.cache_slots > 1 else native,
+                        method+'_cache' if args.cache_slots > 1 else method), C.c_void_p).value
+                        for name, (_, method) in entries.items()},
                     placement=dict(policy='allocator' if platform.system() == 'Darwin' else 'fixed-4KiB',
                                    input_page_offset=input_address % PAGE,
                                    output_minus_input_mod_page=(output_address-input_address) % PAGE))

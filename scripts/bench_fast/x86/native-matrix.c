@@ -34,11 +34,27 @@ __attribute__((target("avx512f,fma"))) void sleef_ln_avx512(const double*x,doubl
 void sleef_ln_neon(const double*x,double*y,size_t n){size_t i=0;for(;i+2<=n;i+=2)vst1q_f64(y+i,Sleef_logd2_u10advsimd(vld1q_f64(x+i)));for(;i<n;i++)y[i]=Sleef_logd1_u10purecfma(x[i]);}
 #endif
 #endif
+/* Single-threaded harness metadata, captured before warmup and both clocks.
+ * Reading SP avoids imposing a frame pointer on the measured call context. */
+static uintptr_t last_stack_address;
+static inline __attribute__((always_inline)) void capture_stack(void) {
+    uintptr_t sp;
+#if defined(__x86_64__)
+    __asm__ volatile("mov %%rsp, %0" : "=r"(sp));
+#elif defined(__aarch64__)
+    __asm__ volatile("mov %0, sp" : "=r"(sp));
+#else
+#error Unsupported native benchmark target
+#endif
+    last_stack_address = sp;
+    __asm__ volatile("" ::: "memory");
+}
+uintptr_t bench_last_stack_address(void) { return last_stack_address; }
 static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000000000ULL+t.tv_nsec;}
 #define BARRIER(x,y) __asm__ volatile("" : : "r"(x),"r"(y) : "memory")
-uint64_t measure1(scalar1 f,const double*x,double*y,size_t n,uint64_t it){for(size_t w=0;w<100;w++){for(size_t i=0;i<n;i++)y[i]=f(x[i]);BARRIER(x,y);}uint64_t start=now_ns();for(uint64_t r=0;r<it;r++){BARRIER(x,y);for(size_t i=0;i<n;i++)y[i]=f(x[i]);BARRIER(x,y);}return now_ns()-start;}
-uint64_t measure2(scalar2 f,const double*x,double*y,size_t n,uint64_t it){for(size_t w=0;w<100;w++){for(size_t i=0;i<n;i++)y[i]=f(x[i],1);BARRIER(x,y);}uint64_t start=now_ns();for(uint64_t r=0;r<it;r++){BARRIER(x,y);for(size_t i=0;i<n;i++)y[i]=f(x[i],1);BARRIER(x,y);}return now_ns()-start;}
-uint64_t measure_packet(packet f,const double*x,double*y,size_t n,uint64_t it){for(size_t w=0;w<100;w++){f(x,y,n);BARRIER(x,y);}uint64_t start=now_ns();for(uint64_t r=0;r<it;r++){BARRIER(x,y);f(x,y,n);BARRIER(x,y);}return now_ns()-start;}
+uint64_t measure1(scalar1 f,const double*x,double*y,size_t n,uint64_t it){capture_stack();for(size_t w=0;w<100;w++){for(size_t i=0;i<n;i++)y[i]=f(x[i]);BARRIER(x,y);}uint64_t start=now_ns();for(uint64_t r=0;r<it;r++){BARRIER(x,y);for(size_t i=0;i<n;i++)y[i]=f(x[i]);BARRIER(x,y);}return now_ns()-start;}
+uint64_t measure2(scalar2 f,const double*x,double*y,size_t n,uint64_t it){capture_stack();for(size_t w=0;w<100;w++){for(size_t i=0;i<n;i++)y[i]=f(x[i],1);BARRIER(x,y);}uint64_t start=now_ns();for(uint64_t r=0;r<it;r++){BARRIER(x,y);for(size_t i=0;i<n;i++)y[i]=f(x[i],1);BARRIER(x,y);}return now_ns()-start;}
+uint64_t measure_packet(packet f,const double*x,double*y,size_t n,uint64_t it){capture_stack();for(size_t w=0;w<100;w++){f(x,y,n);BARRIER(x,y);}uint64_t start=now_ns();for(uint64_t r=0;r<it;r++){BARRIER(x,y);f(x,y,n);BARRIER(x,y);}return now_ns()-start;}
 #ifndef NO_SLEEF
 extern double Sleef_expd1_u10purecfma(double);
 double sleef_ln_exp_scalar_fma(double x){return Sleef_expd1_u10purecfma(Sleef_logd1_u10purecfma(x));}
@@ -63,5 +79,5 @@ void sleef_exp_sse2(const double*x,double*y,size_t n){size_t i=0;for(;i+2<=n;i+=
 void sleef_cdf_sse2(const double*x,double*y,size_t n){size_t i=0;for(;i+2<=n;i+=2){__m128d z=_mm_mul_pd(_mm_loadu_pd(x+i),_mm_set1_pd(-0x1.6a09e667f3bcdp-1));_mm_storeu_pd(y+i,_mm_mul_pd(_mm_set1_pd(0.5),Sleef_erfcd2_u15sse2(z)));}for(;i<n;i++)y[i]=0.5*Sleef_erfcd1_u15purec(x[i]*(-0x1.6a09e667f3bcdp-1));}
 #endif
 #endif
-uint64_t measure_chain1(scalar1 f,const double*x,double*y,size_t n,uint64_t it){double previous=0;for(size_t w=0;w<100;w++)for(size_t i=0;i<n;i++)previous=f((previous-previous)+x[i]);uint64_t start=now_ns();for(uint64_t r=0;r<it;r++){for(size_t i=0;i<n;i++)previous=f((previous-previous)+x[i]);BARRIER(x,y);}*y=previous;return now_ns()-start;}
-uint64_t measure_chain2(scalar2 f,const double*x,double*y,size_t n,uint64_t it){double previous=0;for(size_t w=0;w<100;w++)for(size_t i=0;i<n;i++)previous=f((previous-previous)+x[i],1);uint64_t start=now_ns();for(uint64_t r=0;r<it;r++){for(size_t i=0;i<n;i++)previous=f((previous-previous)+x[i],1);BARRIER(x,y);}*y=previous;return now_ns()-start;}
+uint64_t measure_chain1(scalar1 f,const double*x,double*y,size_t n,uint64_t it){capture_stack();double previous=0;for(size_t w=0;w<100;w++)for(size_t i=0;i<n;i++)previous=f((previous-previous)+x[i]);uint64_t start=now_ns();for(uint64_t r=0;r<it;r++){for(size_t i=0;i<n;i++)previous=f((previous-previous)+x[i]);BARRIER(x,y);}*y=previous;return now_ns()-start;}
+uint64_t measure_chain2(scalar2 f,const double*x,double*y,size_t n,uint64_t it){capture_stack();double previous=0;for(size_t w=0;w<100;w++)for(size_t i=0;i<n;i++)previous=f((previous-previous)+x[i],1);uint64_t start=now_ns();for(uint64_t r=0;r<it;r++){for(size_t i=0;i<n;i++)previous=f((previous-previous)+x[i],1);BARRIER(x,y);}*y=previous;return now_ns()-start;}

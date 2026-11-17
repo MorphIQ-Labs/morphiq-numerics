@@ -441,6 +441,36 @@ and unchanged pricing domain. They are separate diagnostics; baseline controls,
 comparable-contract acceptance, native ARM and consumer qualification retain
 their requirements. Finish all builds, oracles and profiles before timing.
 
+### Byte-identical CDF controls
+
+When process variation obscures a comparison, declare a diagnostic matrix from
+the existing run before collecting more samples. The adapter copies each selected
+product without rebuilding it, retaining the input bits, timers, pairing and
+ten-process protocol. Stage from a run prepared with the current native timers;
+the adapter installs the current paired runner. The runner checks that the two products have identical
+bytes and distinct loaded function addresses.
+
+```sh
+python3 scripts/bench_fast/stage-cdf-aa.py --run target/cdf-far-001 \
+  --out target/cdf-aa-001 \
+  --cell auto-pricing-scalar-52-baseline \
+  --cell avx2-body-scalar-52-baseline
+python3 target/cdf-aa-001/run-qualification.py
+```
+
+Choose IDs present in that host's manifest. Every staged cell is diagnostic;
+these results neither replace baseline comparisons nor change their acceptance
+rule. A diagnostic-only result has `required: 0` and `all_required_pass: null`.
+Retain incomplete attempts and failures as well as completed samples.
+
+New native harness builds record loaded product/timer addresses and the timer's
+stack pointer for each warmup, calibration and timed call, alongside buffer
+placement. Stack capture precedes warmup and both clocks; metadata is read after
+the timer returns. It adds no operation to the measured loop, but rebuilding a
+timer can change code layout, so compare both products with the same frozen timer.
+Rebuild both native timer libraries when using the updated paired runner. Existing
+frozen runs retain their original harness and remain separate evidence.
+
 ## Focused log-CDF comparison
 
 The `x86/prepare-log-cdf.py` adapter times the bounded `log_norm_cdf`
