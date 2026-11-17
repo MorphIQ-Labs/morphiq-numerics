@@ -27,6 +27,7 @@ for c in cells[:a.limit]:
              '--target-ms','150','--cache-slots',str(c.get('cache_slots',1)),'--diagnostic']
     if c['control']:command+=['--symbol-prefix','control_','--reference-product',c['control_product']]
     elif c.get('reference_product'):command+=['--reference-product',c['reference_product']]
+    if c.get('balanced_stack'):command+=['--balanced-stack']
     for proc in ['calibration','0']:
         done=out/(proc+'.complete')
         if done.exists():continue

@@ -14,6 +14,7 @@ import platform
 import shutil
 import struct
 import subprocess
+import tomllib
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -28,9 +29,14 @@ def main():
     ap.add_argument('--out', required=True, type=Path)
     ap.add_argument('--baseline', required=True, type=Path)
     ap.add_argument('--cpu', type=int, default=2)
+    ap.add_argument('--control-overhead-percent', type=float, default=0,
+                    help='Owner-approved upper confidence budget for inputs outside the new far-tail domain')
     ap.add_argument('--x86-jcc-mitigation', action='store_true',
                     help='Separate diagnostic build: align branches on both products using LLVM JCC mitigation')
     args = ap.parse_args()
+    if not math.isfinite(args.control_overhead_percent) or args.control_overhead_percent < 0:
+        ap.error('Control overhead must be finite and nonnegative')
+    toolchain = tomllib.loads((REPO/'rust-toolchain.toml').read_text())['toolchain']['channel']
     machine, system = platform.machine(), platform.system()
     mac = system == 'Darwin' and machine == 'arm64'
     if not mac and (system != 'Linux' or machine not in ('x86_64', 'aarch64')):
@@ -113,7 +119,7 @@ codegen-units=1
                         'CARGO_BUILD_TARGET', 'CARGO_BUILD_RUSTFLAGS'):
                 env.pop(key, None)
             # Reuse build output; retain the exact linked products separately.
-            env.update(RUSTFLAGS=flags, CARGO_TARGET_DIR=str(out / 'build'))
+            env.update(RUSTFLAGS=flags, CARGO_TARGET_DIR=str(out / 'build'), RUSTUP_TOOLCHAIN=toolchain)
             run(['cargo', 'build', '--release', '--manifest-path', str(folder / 'Cargo.toml')], env=env)
             product = out / 'bin' / f'{backend}-{role}.so'
             shutil.copy2(out / 'build/release' / ('libcdf_far_wrapper.dylib' if mac else 'libcdf_far_wrapper.so'), product)
@@ -162,6 +168,12 @@ codegen-units=1
                 primitive='cdf', backend=backend, kind=kind, length=n, population=pop,
                 reference=ref, control=control, required_parity=ref == 'baseline' and not control,
                 product=products['candidate'], reference_product=products[ref], input=entries[key])
+            unchanged = not any(-22.5 <= x < -8 for x in
+                                (banks[pop][i % len(banks[pop])] for i in range(n)))
+            cell['unchanged_domain'] = unchanged
+            cell['max_time_ratio'] = (1+args.control_overhead_percent/100
+                                      if unchanged and ref == 'baseline' else 1)
+            cell['balanced_stack'] = machine == 'x86_64' and kind != 'latency'
             if control:
                 cell['control_product'] = products['baseline']
             cells.append(cell)
@@ -207,10 +219,11 @@ codegen-units=1
         protocol=dict(processes=10, blocks=2, paired_rounds_per_process=2,
                       target_ms=600, minimum_ms=250, upper95_t9=1.8331129326536335),
         stop_on_required_failure=True, execution_groups=groups,
-        interpretation='All candidate/baseline cells required: upper one-sided 95% ratio <= 1, no aggregation or slowdown allowance. Composition and unchanged strong controls reviewed separately; the decision record composition cost/spread criterion is not waived by diagnostic classification. Native host only; not consumer end-to-end or the historical full competitor matrix.')
+        toolchain=toolchain, control_overhead_percent=args.control_overhead_percent,
+        interpretation='Every required cell must meet its declared max_time_ratio at upper one-sided 95% confidence. No aggregation across cells. Independent x86 throughput averages all 256 ABI-aligned stack positions, interleaving paired chunks. Latency retains uninterrupted chains. Composition and unchanged strong controls reviewed separately; the composition cost/spread criterion is not waived by diagnostic classification. Native host only; not consumer end-to-end or the historical full competitor matrix.')
     (out / 'qualification-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     (out / 'host.json').write_text(json.dumps(dict(platform=platform.platform(), machine=machine,
-        rustc=subprocess.check_output(['rustc', '-Vv'], text=True),
+        rustc=subprocess.check_output(['rustc', '+'+toolchain, '-Vv'], text=True),
         cc=subprocess.check_output(['cc', '--version'], text=True)), indent=2) + '\n')
     print(f'Staged {len(cells)} cells. Run observations before screen-ln.py or qualification.')
 

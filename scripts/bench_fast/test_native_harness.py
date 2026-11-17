@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -28,6 +29,9 @@ class NativeHarness(unittest.TestCase):
                             '-dynamiclib' if platform.system() == 'Darwin' else '-shared',
                             '-DNO_SLEEF', '-ffp-contract=off', str(HERE/'x86'/f'{name}.c'),
                             '-o', str(cls.root/'bin'/f'{name}.so')], check=True)
+        if not C.CDLL(str(cls.root/'bin/native-matrix.so')).bench_supported():
+            cls.scratch.cleanup()
+            raise unittest.SkipTest('native x86 performance timers require AVX')
         for name in ['qualify-cell.py', 'run-qualification.py']:
             shutil.copy2(HERE/'x86'/name, cls.root/name)
         for name in ['protocol.py', 'inputs.py']:
@@ -85,6 +89,55 @@ class NativeHarness(unittest.TestCase):
                         self.assertEqual(skip_arguments, [1]*expected)
                     self.assertGreater(lib.bench_last_stack_address(), 0)
                     self.assertEqual(lib.bench_last_stack_address() % 8, 0)
+
+    @unittest.skipUnless(platform.machine() in ['x86_64', 'AMD64'], 'x86 SIMD state')
+    def test_all_timers_clear_inherited_upper_register_state(self):
+        fixture = self.root/'state.so'
+        subprocess.run(['cc', '-O3', '-fPIC',
+                        '-dynamiclib' if platform.system() == 'Darwin' else '-shared',
+                        '-mavx', '-mno-vzeroupper',
+                        str(HERE/'test-native-state.c'), '-o', str(fixture)], check=True)
+        state = C.CDLL(str(fixture))
+        state.invoke_dirty.argtypes = [C.c_void_p, C.c_void_p, D, D,
+                                      C.c_size_t, C.c_uint64, C.c_size_t]
+        state.invoke_dirty.restype = None
+        state.probe_calls.restype = C.c_size_t
+        x = (C.c_double*4)(1, 2, 3, 4)
+        y = (C.c_double*4)()
+        for library, names in [
+            ('native-matrix', ['measure1', 'measure2', 'measure_packet', 'measure_chain1', 'measure_chain2']),
+            ('native-cache', ['measure1_cache', 'measure_packet_cache']),
+        ]:
+            lib = C.CDLL(str(self.root/'bin'/f'{library}.so'))
+            for name in names:
+                with self.subTest(timer=name):
+                    callback = (state.probe_packet if 'packet' in name else
+                                state.probe2 if name in ['measure2', 'measure_chain2'] else state.probe1)
+                    slots = 2 if name.endswith('_cache') else 0
+                    state.invoke_dirty(getattr(lib, name), callback, x, y, 2, 3, slots)
+                    expected = (slots or 100)+3
+                    if 'packet' not in name:
+                        expected *= 2
+                    self.assertEqual(state.probe_calls(), expected)
+                    self.assertEqual(state.probe_dirty_seen(), 0)
+
+    @unittest.skipUnless(platform.system() == 'Linux' and platform.machine() == 'x86_64'
+                         and shutil.which('objdump'), 'native x86 GNU disassembler')
+    def test_timer_float_instructions_use_vex_encoding(self):
+        legacy = {'movsd', 'movapd', 'movupd', 'movaps', 'movups', 'addsd',
+                  'subsd', 'mulsd', 'divsd', 'xorpd', 'xorps', 'pxor'}
+        for library, names in [
+            ('native-matrix', ['measure1', 'measure2', 'measure_packet', 'measure_chain1', 'measure_chain2']),
+            ('native-cache', ['measure1_cache', 'measure_packet_cache']),
+        ]:
+            for name in names:
+                with self.subTest(timer=name):
+                    assembly = subprocess.check_output(
+                        ['objdump', '-d', '--no-show-raw-insn', '--disassemble='+name,
+                         str(self.root/'bin'/f'{library}.so')], text=True)
+                    mnemonics = set(re.findall(r'^\s*[0-9a-f]+:\s+([a-z0-9]+)', assembly, re.M))
+                    self.assertIn('vzeroupper', mnemonics)
+                    self.assertFalse(mnemonics & legacy, mnemonics & legacy)
 
     def test_diagnostic_matrix_cannot_report_qualification(self):
         # Complete synthetic records exercise reporting without collecting timings.
@@ -146,6 +199,126 @@ class NativeHarness(unittest.TestCase):
             self.assertNotEqual(rejected.returncode, 0)
             self.assertIn('Product changed', rejected.stderr)
             self.assertFalse((root/'changed').exists())
+
+    def test_declared_cost_limit_preserves_duration_gate_and_strict_default(self):
+        for limit, ratio, duration, passes in [
+            (None, 1.005, 600_000_000, False),
+            (1.01, 1.005, 600_000_000, True),
+            (1.01, 1.02, 600_000_000, False),
+            (1.01, .995, 249_000_000, False),
+        ]:
+            with self.subTest(limit=limit, ratio=ratio, duration=duration), \
+                    tempfile.TemporaryDirectory(dir=self.root) as directory:
+                run = Path(directory)
+                product = run/'product.so'
+                product.write_bytes(b'synthetic product; never loaded')
+                inputs = run/'inputs.json'
+                inputs.write_text('["0000000000000000"]')
+                cell = dict(id='control', product=str(product), backend='test',
+                            input=dict(file=str(inputs), sha256=hashlib.sha256(bytes(8)).hexdigest()),
+                            required_parity=True)
+                if limit is not None:
+                    cell['max_time_ratio'] = limit
+                manifest = dict(cells=[cell], builds=[dict(name='test', sha256=hashlib.sha256(product.read_bytes()).hexdigest())],
+                                protocol=dict(upper95_t9=1.8331129326536335))
+                (run/'qualification-manifest.json').write_text(json.dumps(manifest))
+                shutil.copy2(HERE/'x86/run-qualification.py', run/'run-qualification.py')
+                out = run/'qualification/control'
+                out.mkdir(parents=True)
+                (out/'calibration.complete').touch()
+                for process in range(10):
+                    path = out/str(process)
+                    path.mkdir()
+                    rows = [dict(name='ours', kind='warmup', round=-1,
+                                 elapsed_ns=1, ns_per_call=1)]
+                    rows += [dict(name=name, kind='timed', round=r, elapsed_ns=duration,
+                                  ns_per_call=1000*(ratio if name == 'ours' else 1))
+                             for r in range(2) for name in ['ours', 'reference']]
+                    (path/'samples.jsonl').write_text(''.join(json.dumps(row)+'\n' for row in rows))
+                    (out/f'{process}.complete').touch()
+                result = subprocess.run([sys.executable, str(run/'run-qualification.py')], capture_output=True)
+                self.assertEqual(result.returncode == 0, passes)
+                summary = json.loads((out.parent/'summary.json').read_text())[0]
+                self.assertEqual(summary['passes'], passes)
+                self.assertEqual(summary['max_time_ratio'], limit or 1)
+                self.assertAlmostEqual(summary['upper95'], ratio)
+
+    @unittest.skipUnless(platform.machine() == 'x86_64', 'x86 stack placement')
+    def test_stack_trampoline_preserves_callback_count_and_results(self):
+        lib = C.CDLL(str(self.root/'bin/native-matrix.so'))
+        lib.bench_set_inner_warmup.argtypes = [C.c_int]
+        lib.bench_set_inner_warmup.restype = None
+        lib.bench_last_stack_address.restype = C.c_size_t
+        lib.bench_with_stack.argtypes = [C.c_void_p, C.c_void_p, D, D,
+                                        C.c_size_t, C.c_uint64, C.c_size_t]
+        lib.bench_with_stack.restype = C.c_uint64
+        x = (C.c_double*2)(1, 2)
+        y = (C.c_double*2)()
+        calls = []
+
+        def callback(value):
+            calls.append(value)
+            return value+1
+
+        function = C.CFUNCTYPE(C.c_double, C.c_double)(callback)
+        lib.bench_set_inner_warmup(0)
+        try:
+            lib.bench_with_stack(lib.measure1, function, x, y, 2, 0, 0)
+            base = lib.bench_last_stack_address()
+            self.assertEqual(calls, [])
+            for offset in range(0, 4096, 16):
+                lib.bench_with_stack(lib.measure1, function, x, y, 2, 3, (base-offset) % 4096)
+                self.assertEqual(lib.bench_last_stack_address() % 4096, offset)
+                self.assertEqual(list(y), [2, 3])
+            self.assertEqual(calls, [1, 2]*(3*256))
+        finally:
+            lib.bench_set_inner_warmup(1)
+
+    @unittest.skipUnless(platform.machine() == 'x86_64', 'x86 stack placement')
+    def test_balanced_sampling_preserves_work_and_all_stack_positions(self):
+        # A tiny native identity workload exercises the actual subprocess runner.
+        with tempfile.TemporaryDirectory(dir=self.root) as directory:
+            run = Path(directory)
+            source = run/'product.c'
+            source.write_text('double prod_norm_cdf(double x) { return x; }\n')
+            product = run/'product.so'
+            subprocess.run(['cc', '-O3', '-fPIC',
+                            '-dynamiclib' if platform.system() == 'Darwin' else '-shared',
+                            str(source), '-o', str(product)], check=True)
+            counts = run/'counts.json'
+            counts.write_text(json.dumps(dict(ours=512, reference=1024)))
+            inputs = run/'inputs.json'
+            inputs.write_text('["3ff0000000000000"]')
+            out = run/'samples'
+            command = [sys.executable, str(self.root/'qualify-cell.py'),
+                       '--product', str(product), '--reference-product', str(product),
+                       '--reference', 'baseline', '--primitive', 'cdf', '--kind', 'scalar',
+                       '--length', '1', '--population', str(inputs), '--process', '0',
+                       '--counts', str(counts), '--out', str(out), '--diagnostic',
+                       '--balanced-stack']
+            subprocess.run(command, check=True, capture_output=True)
+            rows = [json.loads(line) for line in (out/'samples.jsonl').read_text().splitlines()]
+            self.assertEqual([(row['name'], row['count'], row['round']) for row in rows if row['kind'] == 'timed'],
+                             [('ours', 512, 0), ('reference', 1024, 0), ('ours', 512, 1), ('reference', 1024, 1)])
+            chunks = [json.loads(line) for line in (out/'chunks.jsonl').read_text().splitlines()]
+            self.assertEqual(len(chunks), 2*2*2*256)
+            for role, count in [('ours', 512), ('reference', 1024)]:
+                for kind, expected in [('warmup', count//2), ('timed', count)]:
+                    for r in range(2):
+                        group = [row for row in chunks if row['name'] == role and row['kind'] == kind and row['round'] == r]
+                        self.assertEqual(sum(row['count'] for row in group), expected)
+                        self.assertEqual([row['stack_address'] % 4096 for row in group], list(range(0, 4096, 16)))
+                        aggregate = next(row for row in rows if row['name'] == role and row['kind'] == kind and row['round'] == r)
+                        self.assertEqual(aggregate['elapsed_ns'], sum(row['elapsed_ns'] for row in group))
+            self.assertEqual([row['name'] for row in chunks[:8]],
+                             ['ours', 'ours', 'reference', 'reference', 'reference', 'reference', 'ours', 'ours'])
+            # An unbalanced count must fail before collecting measured chunks.
+            counts.write_text(json.dumps(dict(ours=513, reference=1024)))
+            command[command.index('--out')+1] = str(run/'invalid')
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Balanced counts must be divisible', result.stderr)
+
 
 
 if __name__ == '__main__':

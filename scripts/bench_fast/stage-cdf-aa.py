@@ -41,7 +41,7 @@ def main():
             ap.error(f'Input changed: {cell["id"]}')
     for name in ['native-matrix.so', 'native-cache.so']:
         timer = ctypes.CDLL(str((args.run/'bin'/name).resolve()))
-        if not hasattr(timer, 'bench_last_stack_address'):
+        if not all(hasattr(timer, name) for name in ['bench_last_stack_address', 'bench_supported']):
             ap.error('Prepare a fresh run with the current native timers; preserve the older capsule')
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=False)

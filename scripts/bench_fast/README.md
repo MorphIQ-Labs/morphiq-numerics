@@ -147,7 +147,10 @@ and predeclare a new complete run when needed.
 
 The decision uses per-process paired log ratios and a one-sided 95% Student-t
 upper bound (9 degrees of freedom, critical value 1.8331129326536335). Every
-required cell must have an upper ratio at most 1.0 and valid durations. Report
+required cell must have an upper ratio at most its declared `max_time_ratio`
+(1.0 when omitted) and valid durations. A different limit requires the owner's
+explicit cost decision in the owning issue/PR before the new run; competitor
+parity stays at 1.0. Report
 spread and drift alongside the decision. Diagnostic cells do not establish
 parity; missing or failing required cells leave qualification incomplete.
 ARM writes `qualification-summary.json`; x86 writes `qualification/result.json`
@@ -470,6 +473,52 @@ the timer returns. It adds no operation to the measured loop, but rebuilding a
 timer can change code layout, so compare both products with the same frozen timer.
 Rebuild both native timer libraries when using the updated paired runner. Existing
 frozen runs retain their original harness and remain separate evidence.
+
+On x86, the shared timers require CPU/OS AVX support, checked before timing.
+Their scalar loads and arithmetic use VEX encoding, and each invocation clears
+inherited upper-register state before warmup and both clocks. This prevents
+legacy-SSE merge dependencies in the timer from charging a previous caller's
+SIMD state to the product under measurement. The setting applies to scalar,
+packet, dependent-latency and cache timers; it does not change the reference
+wrappers' target attributes or numerical work. ARM retains its native timer
+instructions. `test_native_harness.py` deliberately dirties an upper register
+and checks every timer's entry state and complete callback count.
+
+This state control does not establish timing stability or remove address-layout
+effects. A short warmup is not evidence that a fresh process has reached a stable
+execution state. Inspect all retained rounds and identical-implementation controls
+before attributing a shift to a numerical change. Counter profiles and deliberately
+reduced-work experiments diagnose a mechanism; they cannot replace unchanged-work,
+uninstrumented qualification samples or alter the declared acceptance criterion.
+
+The x86 CDF adapter declares `balanced_stack` for independent scalar and packet
+throughput. Each paired round visits all 256 ABI-aligned stack positions modulo
+4 KiB, giving each position equal work for each product. The native trampoline
+sets the stack outside the clocks, and every observed position is checked. At
+successive positions the starting product alternates; it also alternates across
+processes and rounds. This balances address-dependent costs and reduces the time
+between paired measurements during execution-state transitions.
+
+Calibration counts round upward to a multiple of 512 so both timed work and the
+half-count warmup divide equally across the 256 positions. The redundant native
+100-iteration warmup is disabled in this mode; the declared half-count warmup is
+distributed equally across positions. `chunks.jsonl` retains every interval, count, order,
+clock span and stack address. Each statistical sample sums its 256 native timed
+intervals and divides by their complete work count. The 600 ms target and 250 ms
+minimum apply to this aggregate, not each chunk. Report clock/call overhead for
+this granularity separately. Ten fresh processes, two paired rounds, the same
+confidence calculation and the first-failure stop rule remain in force.
+
+This is an average over the declared stack distribution, not a guarantee for
+every consumer call site. Dependent-latency and cache-traversal measurements keep
+their uninterrupted loops; `--balanced-stack` rejects those modes. ARM keeps its
+native calling context. Rebuild both Rust products with the repository's pinned
+toolchain; the CDF adapter explicitly applies that same toolchain to the baseline.
+Its `--control-overhead-percent` defaults to zero. A nonzero value requires the
+owner's recorded decision and applies only to baseline cells whose exact inputs
+exclude the newly approximated negative far tail. New-domain and competitor
+parity limits are unchanged.
+
 
 ## Focused log-CDF comparison
 
