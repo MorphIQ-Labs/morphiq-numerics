@@ -291,6 +291,24 @@ fn cdf_region_mixtures_preserve_each_lane_on_every_backend() {
                 }
                 check(xs);
             }
+            // Homogeneous outer rows and every body/outer mixture exercise
+            // both complete-row returns and the masked path between them.
+            for outer in [-8.0, -3.0, -1.0, 1.0, 3.0, 8.0] {
+                for pattern in 0..(1_usize << K::LANES) {
+                    let mut xs = K::Array::default();
+                    for (i, x) in xs.as_mut().iter_mut().enumerate() {
+                        *x = if pattern >> i & 1 == 0 { outer } else { 0.25 };
+                    }
+                    check(xs);
+                    // The public slice also traverses the fixed-packet entry
+                    // when its length matches an available native backend.
+                    let mut ys = K::Array::default();
+                    normal::norm_cdf_slice(xs.as_ref(), ys.as_mut());
+                    for (&x, &y) in xs.as_ref().iter().zip(ys.as_ref()) {
+                        assert_eq!(y.to_bits(), normal::norm_cdf(x).to_bits());
+                    }
+                }
+            }
             // Move special values and both sides of each seam through every
             // lane while the other lanes require both accelerated paths.
             for x in [

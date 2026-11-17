@@ -57,9 +57,12 @@ objdump -d --no-show-raw-insn --demangle=rust "$binary" | awk '
         printf "fused operation in %s\n", fn > "/dev/stderr"
         fused++
     }
-    /v(p)?gather/ && fn ~ /(exp::bounded::|ln::bounded::|fast::lanes::(Cdf|FinishCdf|finish_cdf|LogCdf))/ {
+    /v(p)?gather/ && fn ~ /(exp::bounded::|ln::bounded::|fast::lanes::(Cdf|FinishCdf|finish_cdf|LogCdf)|fast::normal::(CdfPacket|norm_cdf_packet|norm_cdf_slice_loop))/ {
         if (fn ~ /exp::bounded::/ && fn ~ /avx512_run/) { exp_avx512_gather++; next }
         if (fn ~ /(exp::bounded::|fast::lanes::(Cdf|FinishCdf|finish_cdf|LogCdf))/ && fn ~ /(avx512_run|x86_64::Avx512)/) next
+        # Fixed CDF packets may inline the AVX-512 backend into a static build;
+        # their gather must still be the 512-bit operation, never AVX2.
+        if (fn ~ /fast::normal::(CdfPacket|norm_cdf_packet|norm_cdf_slice_loop)/ && /%zmm/) next
         printf "hardware gather in bounded kernel %s\n", fn > "/dev/stderr"
         gather++
     }

@@ -147,17 +147,24 @@ outside the declared domain. No new tail domain or consumer error budget is
 introduced by this specialization.
 
 **Dispatch and SIMD ownership.** The scalar entry first screens the original
-`2^-33 <= abs(x) <= 8` domain. Its body/rational kernel contains no far-tail
-polynomial branch. Arguments outside it complete the strong owner's exact positive
-endpoint at the generated threshold before crossing a cold function boundary.
+`2^-33 <= abs(x) <= 8` domain with an unsigned encoding comparison:
+`bits(abs(x)).wrapping_sub(bits(2^-33)) <= bits(8) - bits(2^-33)`.
+Positive normal binary64 encodings have the same order as their values;
+wrapping subtraction rejects smaller magnitudes, and infinities and NaNs remain
+outside the interval. `FastCdfFar.fast_cdf_bits_screen_eq` proves this screen
+equivalent to the floating-point comparisons for every binary64 input.
+Its body/rational kernel contains no far-tail polynomial branch. Arguments
+outside it complete the strong owner's exact positive endpoint at the generated
+threshold before crossing a cold function boundary.
 Remaining arguments enter a separate function, which evaluates the far-tail
 composition only for `-22.5 <= x < -8` and otherwise calls the strong owner.
 These screens partition the same proved entry domain.
 
 SIMD packets evaluate the near kernel only when at least one lane is in its
-domain. A packet entirely inside the body polynomial returns that evaluation
-directly, with the same operations per lane and no substitute arguments or
-result masking. Mixed packets retain safe substitutes for inactive lanes.
+domain. A packet entirely inside either the body polynomial or the outer
+rational row returns that evaluation directly, with the same operations per
+lane and no substitute arguments or result masking. Mixed packets retain safe
+substitutes for inactive lanes.
 If a packet contains far-tail lanes, the existing `lanes::cold` boundary passes
 its original inputs and partial results into `FinishCdf`, inside the same
 backend's target-feature wrapper. For runtime AVX-512 in an x86 build without
@@ -180,6 +187,19 @@ approximation or threshold is introduced.
 Inactive far lanes use `a = 8`, keeping every speculative polynomial and exponential
 argument in its certified domain. This separates register lifetimes without
 changing any active lane's arithmetic sequence or result.
+
+The slice entry preserves known lengths for one- and two-value packets and
+for complete x86 native-width packets. Four-value packets specialize when AVX2
+is targeted or runtime detection is available; eight-value packets specialize
+when AVX-512 is targeted or runtime detection is available. Fixed arrays carry
+the length through the existing token-gated `WithSimd` boundary, so a complete
+packet needs neither a chunk loop nor a remainder pass. Backend selection and
+per-lane arithmetic remain those of the ordinary cascade; unsupported backends
+and other lengths retain the general mapper. The input/output length assertion
+precedes dispatch, and the packet adapter enforces equality with the selected
+backend's lane count. The adapter's equality folds away for a matched native
+packet.
+
 `FastCdfFar.fast_cdf_far_split_eq` proves the split scalar entry identical to
 the original entry for every binary64 input, including special values. The
 internal extraction check evaluates `fast_cdf_saturated_split64` directly.

@@ -14,7 +14,7 @@ Require Import StageGappa ErfcxDecision ErfcxPublicModel ErfcxConstants ErfcxTay
   ErfcxTableEvaluation ErfcxReciprocal NormalConstants NormalComparisons NormalCentered
   NormalTailAnalytic NormalErfcxSensitivity NormalErfcxFastScaled NormalPublicEntry NormalPublicModel
   NormalAccurateCentralCdf NormalFastDispatch NormalTailThresholdConstants FastExp FastErfcx FastNormalArgument FastCdfConstants
-  FastCdfOde FastCdfApprox FastCdfBody FastCdf FastCdfFarArithmetic FastCdfFarRatio.
+  FastCdfOde FastCdfApprox FastCdfBody FastCdf FastCdfFarArithmetic FastCdfFarRatio Ln1pReduction.
 Open Scope R_scope.
 
 Definition cdf_far_limit : f64 := b64_of_bits 4627026404658118656.
@@ -482,10 +482,119 @@ Proof.
     + reflexivity.
 Qed.
 
+(** The unsigned scalar screen preserves the floating-point near-domain
+    screen on every binary64 value. Normal positive encodings are ordered by
+    value; wrapping subtraction also rejects words below the lower endpoint. *)
+Definition cdf_screen_low_word : Z := ((1023 - 33) * 2^52)%Z.
+Definition cdf_screen_high_word : Z := ((1023 + 3) * 2^52)%Z.
+
+Lemma cdf_unsigned_range n : (0 <= n < 2^64)%Z ->
+ (((n - cdf_screen_low_word) mod 2^64 <=
+    cdf_screen_high_word - cdf_screen_low_word)%Z <->
+  (cdf_screen_low_word <= n <= cdf_screen_high_word)%Z).
+Proof.
+ intros N. unfold cdf_screen_low_word, cdf_screen_high_word.
+ destruct (Z_le_gt_dec ((1023-33)*2^52) n) as [L|L].
+ - rewrite Z.mod_small by lia. lia.
+ - replace (n-(1023-33)*2^52)%Z with
+     ((n-(1023-33)*2^52+2^64)+(-1)*2^64)%Z at 1 by ring.
+   rewrite Z.mod_add by lia. rewrite Z.mod_small by lia. lia.
+Qed.
+
+Lemma cdf_normal_word_range n : (2^52 <= n < 2047*2^52)%Z ->
+ ((cdf_screen_low_word <= n <= cdf_screen_high_word)%Z <->
+  bpow radix2 (-33) <= B (b64_of_bits n) <= 8).
+Proof.
+ intros N.
+ pose proof (Z.mod_pos_bound n (2^52) ltac:(lia)) as M.
+ pose proof (Z.div_mod n (2^52) ltac:(lia)) as D.
+ destruct (Ln1pReduction.normal_bits n N) as [Fn V].
+ set (m := (n mod 2^52)%Z) in *.
+ set (e := (n / 2^52)%Z) in *.
+ assert (Lo : bpow radix2 (e-1023) <= B (b64_of_bits n)).
+ { replace (e-1023)%Z with (52+(e-1075))%Z by lia.
+   rewrite bpow_plus, V. apply Rmult_le_compat_r; [apply bpow_ge_0|].
+   change (IZR (2^52) <= IZR (m+2^52)). apply IZR_le; lia. }
+ assert (Hi : B (b64_of_bits n) < bpow radix2 (e-1022)).
+ { replace (e-1022)%Z with (53+(e-1075))%Z by lia.
+   rewrite bpow_plus, V. apply Rmult_lt_compat_r; [apply bpow_gt_0|].
+   change (IZR (m+2^52) < IZR (2^53)). apply IZR_lt; lia. }
+ assert (Words : (cdf_screen_low_word <= n <= cdf_screen_high_word)%Z <->
+   ((990 <= e)%Z /\ ((e < 1026)%Z \/ (e = 1026%Z /\ m = 0%Z)))).
+ { unfold cdf_screen_low_word, cdf_screen_high_word. lia. }
+ rewrite Words. split.
+ - intros [El Eu]. split.
+   + eapply Rle_trans; [|exact Lo]. apply bpow_le; lia.
+   + destruct Eu as [Eu|[Ee Mm]].
+     * eapply Rle_trans; [apply Rlt_le; exact Hi|].
+       change 8 with (bpow radix2 3). apply bpow_le; lia.
+     * rewrite V, Ee, Mm. bpow_num; simpl; lra.
+ - intros [L U].
+   assert (El : (990 <= e)%Z).
+   { destruct (Z_le_gt_dec 990 e); [assumption|].
+     assert (bpow radix2 (e-1022) <= bpow radix2 (-33)) by (apply bpow_le; lia).
+     exfalso; lra. }
+   assert (Eu : (e <= 1026)%Z).
+   { destruct (Z_le_gt_dec e 1026); [assumption|].
+     assert (16 <= bpow radix2 (e-1023)) by
+       (change 16 with (bpow radix2 4); apply bpow_le; lia).
+     exfalso; lra. }
+   split; [exact El|]. destruct (Z_lt_ge_dec e 1026) as [Ee|Ee].
+   + left; exact Ee.
+   + right. assert (E : e = 1026%Z) by lia. split; [exact E|].
+     rewrite V, E in U. rewrite plus_IZR in U.
+     change (IZR (2^52)) with 4503599627370496 in U.
+     change (bpow radix2 (1026-1075)) with (/562949953421312) in U.
+     assert (m <= 0)%Z by (apply le_IZR; change (IZR m <= 0); lra).
+     lia.
+Qed.
+
+Definition fast_cdf_bits_screen64 x :=
+ (((bits_of_b64 (b64_abs x) - cdf_screen_low_word) mod 2^64) <=?
+  cdf_screen_high_word - cdf_screen_low_word)%Z.
+
+Lemma cdf_screen_word_range x : fast_cdf_bits_screen64 x = true <->
+ (cdf_screen_low_word <= bits_of_b64 (b64_abs x) <= cdf_screen_high_word)%Z.
+Proof.
+ unfold fast_cdf_bits_screen64. rewrite Z.leb_le.
+ apply cdf_unsigned_range.
+ exact (bits_of_binary_float_range 52 11 eq_refl eq_refl (b64_abs x)).
+Qed.
+
+Theorem fast_cdf_bits_screen_eq x : fast_cdf_bits_screen64 x = fast_cdf_screen64 x.
+Proof.
+ assert (Round : forall a, b64_of_bits (bits_of_b64 a) = a).
+ { intros a. exact (binary_float_of_bits_of_binary_float 52 11 eq_refl eq_refl eq_refl a). }
+ assert (Forward : fast_cdf_bits_screen64 x = true -> fast_cdf_screen64 x = true).
+ { intros H. apply cdf_screen_word_range in H.
+   assert (N : (2^52 <= bits_of_b64 (b64_abs x) < 2047*2^52)%Z)
+     by (unfold cdf_screen_low_word, cdf_screen_high_word in H; lia).
+   destruct (Ln1pReduction.normal_bits _ N) as [Fa _]. rewrite Round in Fa.
+   assert (Fx : finite x) by (unfold b64_abs in Fa; destruct x; exact Fa).
+   pose proof (proj1 (cdf_normal_word_range _ N) H) as X.
+   rewrite Round, B_abs in X.
+   apply (proj2 (fast_cdf_screen_finite x Fx)); exact X. }
+ assert (Backward : fast_cdf_screen64 x = true -> fast_cdf_bits_screen64 x = true).
+ { intros H.
+   assert (Fx : finite x).
+   { destruct x as [s|s|s p Hp|s m e Hm]; try reflexivity.
+     - destruct s; discriminate H.
+     - discriminate H. }
+   pose proof (proj1 (fast_cdf_screen_finite x Fx) H) as X.
+   assert (Fa : finite (b64_abs x)) by (unfold b64_abs; destruct x; exact Fx).
+   assert (Normal : bpow radix2 (-1022) <= B (b64_abs x)).
+   { rewrite B_abs. eapply Rle_trans; [|exact (proj1 X)]. apply bpow_le; lia. }
+   destruct (Ln1pReduction.bits_normal _ Fa Normal) as [N R].
+   apply cdf_screen_word_range, (proj2 (cdf_normal_word_range _ N)).
+   rewrite R, B_abs; exact X. }
+ destruct (fast_cdf_bits_screen64 x) eqn:A, (fast_cdf_screen64 x) eqn:B;
+   try reflexivity; exfalso; [pose proof (Forward eq_refl)|pose proof (Backward eq_refl)]; congruence.
+Qed.
+
 (** Exact endpoint completion shares the strong owner's generated threshold.
     The scalar split and SIMD masks retain the existing result bits. *)
 Definition fast_cdf_saturated_split64 x :=
-  if fast_cdf_screen64 x then fast_cdf64 x
+  if fast_cdf_bits_screen64 x then fast_cdf64 x
   else if normal_le normal_cdf_one x then erfcx_pow2 0
   else if fast_cdf_far_only_screen64 x then fast_cdf_far_lower64 (b64_abs x)
   else normal_entry64 NormalCdf x.
@@ -510,8 +619,9 @@ Qed.
 Theorem fast_cdf_saturated_split_eq x :
   fast_cdf_saturated_split64 x = fast_cdf_far_split64 x.
 Proof.
+  unfold fast_cdf_saturated_split64. rewrite fast_cdf_bits_screen_eq.
   destruct (is_finite 53 1024 x) eqn:Fx.
-  - unfold fast_cdf_saturated_split64, fast_cdf_far_split64.
+  - unfold fast_cdf_far_split64.
     destruct (fast_cdf_screen64 x); [reflexivity|].
     unfold fast_cdf_far_only_screen64.
     destruct (normal_le normal_cdf_one x) eqn:High.

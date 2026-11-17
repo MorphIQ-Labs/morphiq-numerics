@@ -139,23 +139,36 @@ pub(super) fn lanes<K: Simd>(k: K, x: K::F, active: K::M) -> K::F {
         out = k.select(body, value, out);
     }
     let outer = k.and_m(active, k.not_m(body));
-    if k.mask_bits(outer) != 0 {
+    let outer_bits = k.mask_bits(outer);
+    if outer_bits == crate::lanes::lanes_mask::<K>() {
+        // Every lane is in the proved outer row; substitutes and result masks
+        // are unnecessary, as in the complete body-row path above.
+        return outer_lanes(k, x, a, y);
+    }
+    if outer_bits != 0 {
         let safe = k.select(outer, a, k.splat(1.0));
         let ys = k.select(outer, y, k.splat(1.0));
-        let (p, e) = crate::lanes::two_prod(k, k.mul(k.splat(-0.5), safe), safe);
-        let exponential = crate::exp::bounded::in_domain_lanes(k, p);
-        let y2 = k.mul(ys, ys);
-        let y4 = k.mul(y2, y2);
-        let y8 = k.mul(y4, y4);
-        let r = k.div(
-            estrin9_lanes(k, ys, y2, y4, y8, &TAIL_N),
-            estrin10_lanes(k, ys, y2, y4, y8, &TAIL_D),
-        );
-        let lower = k.mul(k.mul(k.splat(0.5), exponential), k.add(r, k.mul(r, e)));
-        let value = k.select(k.lt(x, k.splat(0.0)), lower, k.sub(k.splat(1.0), lower));
+        let value = outer_lanes(k, x, safe, ys);
         out = k.select(outer, value, out);
     }
     out
+}
+
+/// The scalar outer-row operation sequence on domain-qualified lanes.
+#[cfg(feature = "simd")]
+#[inline(always)]
+fn outer_lanes<K: Simd>(k: K, x: K::F, safe: K::F, ys: K::F) -> K::F {
+    let (p, e) = crate::lanes::two_prod(k, k.mul(k.splat(-0.5), safe), safe);
+    let exponential = crate::exp::bounded::in_domain_lanes(k, p);
+    let y2 = k.mul(ys, ys);
+    let y4 = k.mul(y2, y2);
+    let y8 = k.mul(y4, y4);
+    let r = k.div(
+        estrin9_lanes(k, ys, y2, y4, y8, &TAIL_N),
+        estrin10_lanes(k, ys, y2, y4, y8, &TAIL_D),
+    );
+    let lower = k.mul(k.mul(k.splat(0.5), exponential), k.add(r, k.mul(r, e)));
+    k.select(k.lt(x, k.splat(0.0)), lower, k.sub(k.splat(1.0), lower))
 }
 
 /// The lower tail for `-FAR_LIMIT <= x < -RATIONAL_LIMIT`.

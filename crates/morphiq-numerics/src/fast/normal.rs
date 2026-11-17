@@ -37,9 +37,11 @@ pub fn erfcx(x: f64) -> f64 {
 #[must_use]
 #[inline]
 pub fn norm_cdf(x: f64) -> f64 {
-    let a = x.abs();
+    let magnitude = x.abs().to_bits();
     // Keep the established near-domain screen independent of the far tail.
-    if !(MIN_MAGNITUDE..=super::cdf::RATIONAL_LIMIT).contains(&a) {
+    if magnitude.wrapping_sub(MIN_MAGNITUDE.to_bits())
+        > super::cdf::RATIONAL_LIMIT.to_bits() - MIN_MAGNITUDE.to_bits()
+    {
         // Complete the strong owner's exact endpoint before the cold boundary,
         // as the SIMD entry does. No far-tail or strong evaluation is needed.
         if x >= crate::normal_distribution::CDF_ONE {
@@ -173,12 +175,79 @@ fn erfcx_slice_loop(x: &[f64], out: &mut [f64]) {
 ///
 /// # Panics
 /// If the input and output lengths differ.
+#[inline]
 pub fn norm_cdf_slice(x: &[f64], out: &mut [f64]) {
     assert_eq!(
         x.len(),
         out.len(),
         "norm_cdf_slice: slices of different lengths"
     );
+    // A single native-width packet does not need the general loop/remainder
+    // frame. Keep native-width packet lengths across backend dispatch while
+    // retaining each target's selected backend.
+    match x.len() {
+        0 => {}
+        1 => norm_cdf_packet::<1>(x.try_into().unwrap(), out.try_into().unwrap()),
+        2 => norm_cdf_packet::<2>(x.try_into().unwrap(), out.try_into().unwrap()),
+        #[cfg(all(target_arch = "x86_64", any(feature = "std", target_feature = "avx2")))]
+        4 => norm_cdf_packet::<4>(x.try_into().unwrap(), out.try_into().unwrap()),
+        #[cfg(all(
+            target_arch = "x86_64",
+            any(feature = "std", target_feature = "avx512f")
+        ))]
+        8 => norm_cdf_packet::<8>(x.try_into().unwrap(), out.try_into().unwrap()),
+        _ => norm_cdf_slice_loop(x, out),
+    }
+}
+
+#[inline(never)]
+fn norm_cdf_packet<const N: usize>(x: &[f64; N], out: &mut [f64; N]) {
+    #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+    {
+        use morphiq_numerics_arch::Simd;
+        if N == 8
+            && let Some(k) = morphiq_numerics_arch::Avx512::try_new()
+        {
+            return k.vectorize(CdfPacket { x, out });
+        }
+        if N == 4
+            && let Some(k) = morphiq_numerics_arch::Avx2::try_new()
+        {
+            return k.vectorize(CdfPacket { x, out });
+        }
+    }
+    #[cfg(feature = "simd")]
+    crate::lanes::map::<super::lanes::Cdf>(x, out);
+    #[cfg(not(feature = "simd"))]
+    for (o, &x) in out.iter_mut().zip(x) {
+        *o = norm_cdf(x);
+    }
+}
+
+// Keep the packet length in the operation's type across the runtime ISA boundary.
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
+struct CdfPacket<'a, const N: usize> {
+    x: &'a [f64; N],
+    out: &'a mut [f64; N],
+}
+
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
+impl<const N: usize> morphiq_numerics_arch::WithSimd for CdfPacket<'_, N> {
+    type Output = ();
+    #[inline(always)]
+    fn with<K: morphiq_numerics_arch::Simd>(self, k: K) {
+        use crate::lanes::Kernel;
+        // The caller selects exactly one complete packet on this backend.
+        assert_eq!(N, K::LANES);
+        let mut input = K::Array::default();
+        input.as_mut().copy_from_slice(self.x);
+        self.out
+            .copy_from_slice(super::lanes::Cdf::lanes(k, input).as_ref());
+    }
+}
+
+#[inline(never)]
+fn norm_cdf_slice_loop(x: &[f64], out: &mut [f64]) {
     #[cfg(feature = "simd")]
     crate::lanes::map::<super::lanes::Cdf>(x, out);
     #[cfg(not(feature = "simd"))]
