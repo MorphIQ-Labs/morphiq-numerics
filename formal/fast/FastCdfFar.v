@@ -486,10 +486,8 @@ Qed.
     The scalar split and SIMD masks retain the existing result bits. *)
 Definition fast_cdf_saturated_split64 x :=
   if fast_cdf_screen64 x then fast_cdf64 x
-  else if normal_lt x (fneg (erfcx_pow2 3)) then
-    if normal_le (fneg cdf_far_limit) x then fast_cdf_far_lower64 (b64_abs x)
-    else normal_entry64 NormalCdf x
   else if normal_le normal_cdf_one x then erfcx_pow2 0
+  else if fast_cdf_far_only_screen64 x then fast_cdf_far_lower64 (b64_abs x)
   else normal_entry64 NormalCdf x.
 
 Lemma cdf_saturation_owner_finite x : finite x ->
@@ -516,11 +514,22 @@ Proof.
   - unfold fast_cdf_saturated_split64, fast_cdf_far_split64.
     destruct (fast_cdf_screen64 x); [reflexivity|].
     unfold fast_cdf_far_only_screen64.
-    destruct (normal_lt x (fneg (erfcx_pow2 3))).
-    + rewrite andb_true_r. destruct (normal_le (fneg cdf_far_limit) x); reflexivity.
-    + rewrite andb_false_r.
-      destruct (normal_le normal_cdf_one x) eqn:High; [|reflexivity].
+    destruct (normal_le normal_cdf_one x) eqn:High.
+    + destruct normal_cdf_one_ok as [Fc Vc].
+      destruct (erfcx_pow2_ok 3 ltac:(lia)) as [F8 V8].
+      change (bpow radix2 3) with 8 in V8.
+      assert (Fn8 : finite (fneg (erfcx_pow2 3))) by
+        (unfold fneg,b64_opp; rewrite is_finite_Bopp; exact F8).
+      assert (Nb : forall w, B (fneg w) = - B w) by (intros; apply B2R_Bopp).
+      assert (Vn8 : B (fneg (erfcx_pow2 3)) = -8) by
+        (rewrite Nb, V8; reflexivity).
+      assert (Negative : normal_lt x (fneg (erfcx_pow2 3)) = false).
+      { apply (proj2 (normal_lt_false _ _ Fx Fn8)).
+        pose proof (proj1 (normal_le_true _ _ Fc Fx) High) as X.
+        rewrite Vn8, Vc in *. lra. }
+      rewrite Negative, andb_false_r.
       symmetry. apply cdf_saturation_owner_finite; assumption.
+    + reflexivity.
   - destruct x as [s|s|s p Hp|s m e Hm]; try discriminate.
     + destruct s; reflexivity.
     + reflexivity.

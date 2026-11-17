@@ -148,10 +148,11 @@ introduced by this specialization.
 
 **Dispatch and SIMD ownership.** The scalar entry first screens the original
 `2^-33 <= abs(x) <= 8` domain. Its body/rational kernel contains no far-tail
-polynomial branch. Arguments outside it enter a separate function, which evaluates
-the far-tail composition only for `-22.5 <= x < -8`. It returns the strong
-owner's exact positive endpoint at the generated threshold and otherwise calls
-the strong owner. The two screens partition the same proved entry domain.
+polynomial branch. Arguments outside it complete the strong owner's exact positive
+endpoint at the generated threshold before crossing a cold function boundary.
+Remaining arguments enter a separate function, which evaluates the far-tail
+composition only for `-22.5 <= x < -8` and otherwise calls the strong owner.
+These screens partition the same proved entry domain.
 
 SIMD packets evaluate the near kernel only when at least one lane is in its
 domain. A packet entirely inside the body polynomial returns that evaluation

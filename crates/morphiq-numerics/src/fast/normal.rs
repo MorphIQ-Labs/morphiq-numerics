@@ -40,6 +40,11 @@ pub fn norm_cdf(x: f64) -> f64 {
     let a = x.abs();
     // Keep the established near-domain screen independent of the far tail.
     if !(MIN_MAGNITUDE..=super::cdf::RATIONAL_LIMIT).contains(&a) {
+        // Complete the strong owner's exact endpoint before the cold boundary,
+        // as the SIMD entry does. No far-tail or strong evaluation is needed.
+        if x >= crate::normal_distribution::CDF_ONE {
+            return 1.0;
+        }
         return norm_cdf_fallback(x);
     }
     super::cdf::in_domain(x)
@@ -61,13 +66,8 @@ pub(super) fn lower(a: f64) -> f64 {
 #[cold]
 #[inline(never)]
 fn norm_cdf_fallback(x: f64) -> f64 {
-    if x < -super::cdf::RATIONAL_LIMIT {
-        if x >= -super::cdf::FAR_LIMIT {
-            return super::cdf::far(x);
-        }
-    } else if x >= crate::normal_distribution::CDF_ONE {
-        // Reuse the strong owner's proved endpoint; this is an exact result.
-        return 1.0;
+    if (-super::cdf::FAR_LIMIT..-super::cdf::RATIONAL_LIMIT).contains(&x) {
+        return super::cdf::far(x);
     }
     crate::normal::norm_cdf(x)
 }
