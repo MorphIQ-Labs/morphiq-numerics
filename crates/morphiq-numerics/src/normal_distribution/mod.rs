@@ -11,6 +11,10 @@ mod tables;
 
 /// Generated nearest-binary64 high word, shared with the bounded CDF.
 pub(crate) const INV_SQRT2_HIGH: f64 = tables::INV_SQRT2.0;
+/// First binary64 input whose normal CDF rounds to one, generated with its
+/// predecessor bracket (`NormalTailThresholdConstants.normal_cdf_one_tail_bracket`).
+/// Shared by exact endpoint completion in the strong and bounded entries.
+pub(crate) const CDF_ONE: f64 = tables::CDF_ONE;
 /// The generated high word of `ln 2` (`NormalConstants.normal_ln2_hi`).
 pub(crate) const LN2_HIGH: f64 = tables::LN2.0;
 
@@ -154,7 +158,7 @@ pub(crate) fn special(op: Operation, x: f64) -> Option<f64> {
     match op {
         Operation::Pdf if x.abs() < SMALL => Some(tables::DENSITY.0),
         Operation::Pdf if x.abs() >= tables::PDF_ZERO => Some(0.0),
-        Operation::Cdf if x >= tables::CDF_ONE => Some(1.0),
+        Operation::Cdf if x >= CDF_ONE => Some(1.0),
         Operation::Cdf if x <= -tables::TAIL_ZERO => Some(0.0),
         Operation::Centered if x.abs() >= tables::CENTERED_HALF => Some(0.5_f64.copysign(x)),
         Operation::LogCdf if x >= tables::TAIL_ZERO => Some(-0.0),

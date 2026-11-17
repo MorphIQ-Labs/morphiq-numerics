@@ -131,6 +131,9 @@ codegen-units=1
                 x = 8.0 + (hi-8.0) * ((word >> 11) / float(1 << 53))
                 values.append(-x if signs == 'negative' or signs == 'mixed' and i % 2 == 0 else x)
             return values
+        # Existing generated normal threshold; its neighbour bracket is proved
+        # in NormalTailThresholdConstants.normal_cdf_one_tail_bracket.
+        cdf_one = struct.unpack('>d', bytes.fromhex('402095b059d67c4d'))[0]
         banks = {'far_negative': far(22.5, 'negative'), 'far_mixed': far(22.5, 'mixed'),
                  'far_mixed16': far(16.0, 'mixed'), 'positive_fallback': far(22.5, 'positive'),
                  'pricing': [-4.+8.*(i+.5)/52 for i in range(52)],
@@ -138,7 +141,7 @@ codegen-units=1
                  'lower': [-8.+7.*(i+.5)/52 for i in range(52)],
                  'upper': [1.+7.*(i+.5)/52 for i in range(52)],
                  'wide': [-8.+16.*(i+.5)/52 for i in range(52)],
-                 'seams': [math.nextafter(x, direction) for x in (-22.5, -8., 8., 22.5)
+                 'seams': [math.nextafter(x, direction) for x in (-22.5, -8., 8., cdf_one, 22.5)
                            for direction in (-math.inf, x, math.inf)],
                  'mixed': [-30., -.3, -10., 9., -22., -4.2, -38., 0., -8., -22.5],
                  'fallback': [-40., -30., 0., 2.**-40, 9., 30.]}
@@ -153,7 +156,8 @@ codegen-units=1
                 entries[key] = dict(file=str(path), length=n,
                     sha256=hashlib.sha256(b''.join(bytes.fromhex(w) for w in words)).hexdigest(),
                     baseline_fallbacks=sum(not 2.**-33 <= abs(x) <= 8 for x in values),
-                    candidate_fallbacks=sum(not (2.**-33 <= abs(x) <= 8 or -22.5 <= x < -8) for x in values))
+                    candidate_fallbacks=sum(not (2.**-33 <= abs(x) <= 8 or -22.5 <= x < -8 or x >= cdf_one) for x in values),
+                    candidate_exact_endpoints=sum(x >= cdf_one for x in values))
             cell = dict(id=f'{backend}-{pop}-{kind}-{n}-{ref}' + ('-strong' if control else ''),
                 primitive='cdf', backend=backend, kind=kind, length=n, population=pop,
                 reference=ref, control=control, required_parity=ref == 'baseline' and not control,
@@ -178,6 +182,17 @@ codegen-units=1
     cells.sort(key=lambda c: (not (c['population'] in ('far_negative', 'pricing', 'lower', 'body', 'positive_fallback', 'far_mixed', 'far_mixed16') and
                                   (c['kind'] != 'vector' or c['length'] == 4096) and c['required_parity']),
                               next(i for i,b in enumerate(builds) if b['name'] == c['backend'])))
+    # Complete the observed regression-sensitive controls first, retaining
+    # every declared cell and the same per-cell confidence/stop rule.
+    priority = {('positive_fallback', 'scalar', 52),
+                ('positive_fallback', 'latency', 52),
+                ('positive_fallback', 'vector', 4096),
+                ('pricing', 'scalar', 52), ('pricing', 'vector', 8),
+                ('body', 'scalar', 52), ('lower', 'latency', 52)}
+    first = [c['id'] for c in cells if c['required_parity'] and
+             (c['population'], c['kind'], c['length']) in priority]
+    first_ids = set(first)
+    groups = [first, [c['id'] for c in cells if c['id'] not in first_ids]]
     source_paths = subprocess.check_output(
         ['git', 'ls-files', '--cached', '--others', '--exclude-standard'], text=True).splitlines()
     source_files = {name: sha(REPO / name) for name in source_paths
@@ -191,7 +206,7 @@ codegen-units=1
         baseline=subprocess.check_output(['git', '-C', str(baseline), 'rev-parse', 'HEAD'], text=True).strip(),
         protocol=dict(processes=10, blocks=2, paired_rounds_per_process=2,
                       target_ms=600, minimum_ms=250, upper95_t9=1.8331129326536335),
-        stop_on_required_failure=True,
+        stop_on_required_failure=True, execution_groups=groups,
         interpretation='All candidate/baseline cells required: upper one-sided 95% ratio <= 1, no aggregation or slowdown allowance. Composition and unchanged strong controls reviewed separately; the decision record composition cost/spread criterion is not waived by diagnostic classification. Native host only; not consumer end-to-end or the historical full competitor matrix.')
     (out / 'qualification-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     (out / 'host.json').write_text(json.dumps(dict(platform=platform.platform(), machine=machine,

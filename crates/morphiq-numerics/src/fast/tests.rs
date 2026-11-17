@@ -54,6 +54,7 @@ fn mixed_slices_preserve_fast_scalar_bits_and_remainders() {
         cdf_body_edge(),
         1.0,
         8.0,
+        crate::normal_distribution::CDF_ONE,
         super::cdf::FAR_LIMIT,
         -super::cdf::FAR_LIMIT,
         16.0,
@@ -139,6 +140,9 @@ fn unaccelerated_inputs_retain_strong_results() {
         -0.0,
         // Positive arguments beyond 8 stay with the strong owner.
         super::cdf::RATIONAL_LIMIT.next_up(),
+        crate::normal_distribution::CDF_ONE.next_down(),
+        crate::normal_distribution::CDF_ONE,
+        crate::normal_distribution::CDF_ONE.next_up(),
         9.0,
         super::cdf::FAR_LIMIT,
         super::cdf::FAR_LIMIT.next_up(),
@@ -277,13 +281,13 @@ fn cdf_region_mixtures_preserve_each_lane_on_every_backend() {
                     );
                 }
             };
-            // Every assignment of near, far and strong-owner lanes, including
-            // homogeneous packets, across the entire backend width.
-            for mut pattern in 0..3_usize.pow(u32::try_from(K::LANES).unwrap()) {
+            // Every assignment of near, far, saturated and strong-owner lanes,
+            // including homogeneous packets, across the entire backend width.
+            for mut pattern in 0..4_usize.pow(u32::try_from(K::LANES).unwrap()) {
                 let mut xs = K::Array::default();
                 for x in xs.as_mut() {
-                    *x = [0.25, -12.0, 9.0][pattern % 3];
-                    pattern /= 3;
+                    *x = [0.25, -12.0, 9.0, 8.125][pattern % 4];
+                    pattern /= 4;
                 }
                 check(xs);
             }
@@ -297,6 +301,9 @@ fn cdf_region_mixtures_preserve_each_lane_on_every_backend() {
                 -8.0,
                 -8.0_f64.next_down(),
                 8.0_f64.next_up(),
+                crate::normal_distribution::CDF_ONE.next_down(),
+                crate::normal_distribution::CDF_ONE,
+                crate::normal_distribution::CDF_ONE.next_up(),
                 0.0,
                 -0.0,
                 f64::from_bits(1),
@@ -318,5 +325,22 @@ fn cdf_region_mixtures_preserve_each_lane_on_every_backend() {
     }
     for backend in crate::lanes::tests::backends() {
         backend.vectorize(Regions);
+    }
+}
+
+#[test]
+fn cdf_saturation_preserves_the_proved_rounding_boundary() {
+    // The Gaussian-tail bracket places the CDF at the threshold's predecessor
+    // below the rounding midpoint near 1, and at the threshold above it.
+    // NormalTailThresholdConstants.normal_cdf_one_tail_bracket is the anchor.
+    let threshold = crate::normal_distribution::CDF_ONE;
+    for (x, expected) in [
+        (threshold.next_down(), 1.0_f64.next_down()),
+        (threshold, 1.0),
+        (threshold.next_up(), 1.0),
+        (f64::MAX, 1.0),
+        (f64::INFINITY, 1.0),
+    ] {
+        assert_eq!(normal::norm_cdf(x).to_bits(), expected.to_bits(), "{x:?}");
     }
 }

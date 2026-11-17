@@ -372,10 +372,13 @@ before timing, with no concurrent profiling or oracle work on the timed host.
 
 Each backend has 120 required before/after cells: twelve banks, scalar throughput
 and dependent latency on 52 values, and slice lengths 1/2/4/8/13/52/53/4096.
-Banks cover negative far tails, two signed mixtures, positive fallback, unchanged
+Banks cover negative far tails, two signed mixtures, the positive-tail control, unchanged
 pricing/body/lower/upper/wide domains, seam neighbours, mixed near/far/fallback
-lanes and all-fallback packets. Exact input words, hashes and fallback counts
-are retained. Nine consumer-composition comparisons and three unchanged strong
+lanes and previously all-fallback packets. The seam bank includes the generated positive
+saturation threshold and both neighbours. Exact input words, hashes, strong-call
+fallback counts and exact endpoint counts are retained; the historical
+`positive_fallback` bank name remains for before/after comparison. Exact endpoint
+completion retains the strong result and does not extend the approximation domain. Nine consumer-composition comparisons and three unchanged strong
 controls are diagnostics. The composition has an unsplit exponent and a weaker
 error guarantee; it cannot establish comparable-contract parity. The independent
 fixture check and exact-bit observations run outside timing on the linked products.
@@ -387,6 +390,12 @@ the owning issue/PR, and commit methodology/source changes. Then use `freeze.py`
 the staged `run-qualification.py`, and `freeze.py --verify` as above. Every
 required cell must pass the shared ten-process upper-95% ratio rule; the runner
 stops at its first completed required failure. Review strong controls separately.
+Qualification completes seven regression-sensitive cells per backend first:
+positive-tail scalar throughput, dependent latency and 4096-value slices;
+pricing scalar and 8-value slices; body scalar; and lower-domain latency.
+That group uses the same two blocks of five processes before the remaining
+cells. The groups partition the complete matrix; no cell or acceptance rule
+is removed. This exposes a required failure without first timing every bank.
 This focused change matrix does not replace the broader competitor matrix or
 consumer end-to-end qualification. Native x86 results leave ARM cells open.
 Remove the clean baseline worktree after the comparison; retain linked binaries,

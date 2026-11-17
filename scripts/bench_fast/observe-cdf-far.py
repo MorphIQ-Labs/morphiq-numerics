@@ -67,6 +67,7 @@ for build in manifest['builds']:
     max_relative = 0.0
     max_oracle_relative = 0.0
     max_composition_relative = 0.0
+    exact_endpoint_samples = 0
     for cell in (c for c in manifest['cells'] if c['backend'] == backend):
         path = cell['input']['file']
         if path in checked:
@@ -103,6 +104,15 @@ for build in manifest['builds']:
                         if -22.5 <= v < -8 and composition is not None:
                             comp_error = abs(mp.mpf(composition.prod_norm_cdf(v)) - oracle) + uncertainty
                             max_composition_relative = max(max_composition_relative, float(comp_error / (oracle - uncertainty)))
+            # Independently check the exact saturation and its predecessor;
+            # the reference interval must select a unique nearest binary64.
+            if v >= value('402095b059d67c4d') or words[i] == '402095b059d67c4c':
+                oracle, uncertainty = timed_oracle(words[i])
+                with mp.workprec(400):
+                    lo, hi = float(oracle - uncertainty), float(oracle + uncertainty)
+                assert bits(lo) == bits(hi), (backend, v, 'endpoint oracle undecided')
+                assert bits(got) == bits(hi), (backend, v, 'exact endpoint')
+                exact_endpoint_samples += 1
             strong = candidate.control_norm_cdf(v)
             assert bits(strong) == bits(baseline.control_norm_cdf(v)), (backend, v, 'strong')
             if -22.5 <= v < -8:
@@ -122,6 +132,7 @@ for build in manifest['builds']:
             assert error <= Fraction(1, 2**48) * (oracle - uncertainty), (backend, x, 'relative bound')
         count += 1
     results.append(dict(backend=backend, banks=len(checked), independent_fixture_cases=count,
+                        exact_endpoint_samples=exact_endpoint_samples,
                         far_max_relative_vs_strong=max_relative, scalar_slice_identical=True,
                         timed_max_negative_relative_with_uncertainty=max_oracle_relative,
                         composition_far_max_relative_with_uncertainty=max_composition_relative if composition is not None else None,

@@ -149,8 +149,9 @@ introduced by this specialization.
 **Dispatch and SIMD ownership.** The scalar entry first screens the original
 `2^-33 <= abs(x) <= 8` domain. Its body/rational kernel contains no far-tail
 polynomial branch. Arguments outside it enter a separate function, which evaluates
-the far-tail composition only for `-22.5 <= x < -8` and otherwise calls the
-strong owner. The two screens partition the same proved entry domain.
+the far-tail composition only for `-22.5 <= x < -8`. It returns the strong
+owner's exact positive endpoint at the generated threshold and otherwise calls
+the strong owner. The two screens partition the same proved entry domain.
 
 SIMD packets evaluate the near kernel only when at least one lane is in its
 domain. A packet entirely inside the body polynomial returns that evaluation
@@ -167,20 +168,30 @@ AVX2 and ARM retain the vector boundary. Both routes enter the same `FinishCdf`
 implementation. That routine evaluates the split exponent
 and fixed polynomial in SIMD, substitutes only the
 far-tail lanes, and completes remaining screened lanes with the strong owner.
-It preserves the already-computed near lanes, including in mixed packets.
-Packets without far lanes retain the near kernel and strong-owner completion.
+It preserves the already-computed near lanes and exact positive endpoints,
+including in mixed packets. The strong owner's generated `CDF_ONE` threshold
+completes saturated lanes as `1.0` in SIMD before considering the far-tail
+path. Packets consisting entirely of near and saturated lanes need no scalar
+completion. Positive inputs below that threshold still use the strong owner
+when outside the near domain. The threshold and its predecessor are bracketed
+by `NormalTailThresholdConstants.normal_cdf_one_tail_bracket`; no new
+approximation or threshold is introduced.
 Inactive far lanes use `a = 8`, keeping every speculative polynomial and exponential
 argument in its certified domain. This separates register lifetimes without
 changing any active lane's arithmetic sequence or result.
 `FastCdfFar.fast_cdf_far_split_eq` proves the split scalar entry identical to
 the original entry for every binary64 input, including special values. The
-internal extraction check evaluates the split entry directly.
+internal extraction check evaluates `fast_cdf_saturated_split64` directly.
+`FastCdfFar.fast_cdf_saturated_split_eq` proves its exact endpoint completion
+bit-identical to the previous split entry for every binary64 input.
 
 **Why `x > 8` is not accelerated.** A paired native measurement (below) of the
 row on `8 < x <= 22.5` against the strong entry gave a ratio of 1.4 on scalar
-throughput and up to 6 on dependent latency: the strong entry saturates to 1
-without evaluating a tail. The screen therefore leaves it with the strong owner,
-which is the behavior before this row.
+throughput and up to 6 on dependent latency. Most inputs in that bank already
+round to one under the strong owner's generated threshold. The exact saturated
+result is shared directly by the fast scalar and SIMD entries; inputs between
+8 and that threshold retain the strong calculation. The negative far-tail
+approximation is not extended to positive inputs.
 
 ## Decision record: the far-tail row (#302)
 

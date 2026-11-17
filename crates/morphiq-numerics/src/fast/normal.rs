@@ -25,8 +25,8 @@ pub fn erfcx(x: f64) -> f64 {
 /// Standard-normal cumulative distribution, `P(Z <= x)`.
 ///
 /// Absolute error is at most `2^-49` on `2^-33 <= |x| <= 8` and on
-/// `-22.5 <= x <= -8` (positive `x` beyond 8 stays with the strong entry, which
-/// returns the saturated value without a tail evaluation), and for
+/// `-22.5 <= x <= -8`. Positive inputs beyond 8 retain the strong result,
+/// including its exact saturation to one at the generated threshold. For
 /// `x < 0` there also relative error at most `2^-48`. With
 /// `y = RN(|x|/sqrt(2))`, `y <= 15/32` evaluates a generated erf polynomial;
 /// larger `y` evaluates `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` with
@@ -61,8 +61,13 @@ pub(super) fn lower(a: f64) -> f64 {
 #[cold]
 #[inline(never)]
 fn norm_cdf_fallback(x: f64) -> f64 {
-    if (-super::cdf::FAR_LIMIT..-super::cdf::RATIONAL_LIMIT).contains(&x) {
-        return super::cdf::far(x);
+    if x < -super::cdf::RATIONAL_LIMIT {
+        if x >= -super::cdf::FAR_LIMIT {
+            return super::cdf::far(x);
+        }
+    } else if x >= crate::normal_distribution::CDF_ONE {
+        // Reuse the strong owner's proved endpoint; this is an exact result.
+        return 1.0;
     }
     crate::normal::norm_cdf(x)
 }

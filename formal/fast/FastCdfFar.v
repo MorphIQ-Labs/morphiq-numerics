@@ -13,7 +13,7 @@ From Gappa Require Import Gappa_library.
 Require Import StageGappa ErfcxDecision ErfcxPublicModel ErfcxConstants ErfcxTaylorODE ErfcxGaussianTarget
   ErfcxTableEvaluation ErfcxReciprocal NormalConstants NormalComparisons NormalCentered
   NormalTailAnalytic NormalErfcxSensitivity NormalErfcxFastScaled NormalPublicEntry NormalPublicModel
-  NormalAccurateCentralCdf NormalFastDispatch FastExp FastErfcx FastNormalArgument FastCdfConstants
+  NormalAccurateCentralCdf NormalFastDispatch NormalTailThresholdConstants FastExp FastErfcx FastNormalArgument FastCdfConstants
   FastCdfOde FastCdfApprox FastCdfBody FastCdf FastCdfFarArithmetic FastCdfFarRatio.
 Open Scope R_scope.
 
@@ -477,6 +477,50 @@ Theorem fast_cdf_far_split_eq x : fast_cdf_far_split64 x = fast_cdf_far_entry64 
 Proof.
   destruct (is_finite 53 1024 x) eqn:Fx.
   - apply fast_cdf_far_split_finite; exact Fx.
+  - destruct x as [s|s|s p Hp|s m e Hm]; try discriminate.
+    + destruct s; reflexivity.
+    + reflexivity.
+Qed.
+
+(** Exact endpoint completion shares the strong owner's generated threshold.
+    The scalar split and SIMD masks retain the existing result bits. *)
+Definition fast_cdf_saturated_split64 x :=
+  if fast_cdf_screen64 x then fast_cdf64 x
+  else if normal_lt x (fneg (erfcx_pow2 3)) then
+    if normal_le (fneg cdf_far_limit) x then fast_cdf_far_lower64 (b64_abs x)
+    else normal_entry64 NormalCdf x
+  else if normal_le normal_cdf_one x then erfcx_pow2 0
+  else normal_entry64 NormalCdf x.
+
+Lemma cdf_saturation_owner_finite x : finite x ->
+  normal_le normal_cdf_one x = true ->
+  normal_entry64 NormalCdf x = erfcx_pow2 0.
+Proof.
+  intros Fx High.
+  destruct normal_cdf_one_ok as [Fc Vc].
+  pose proof (proj1 (normal_le_true _ _ Fc Fx) High) as X.
+  assert (Nan : is_nan 53 1024 x = false) by
+    (destruct x; try discriminate; reflexivity).
+  assert (Zero : normal_eq x normal_zero = false).
+  { destruct (normal_eq x normal_zero) eqn:E; [|reflexivity].
+    apply (proj1 (normal_eq_true x normal_zero Fx ltac:(reflexivity))) in E.
+    change (B normal_zero) with 0 in E. rewrite Vc in X. exfalso; lra. }
+  unfold normal_entry64, normal_special64.
+  rewrite Nan, Zero, High. reflexivity.
+Qed.
+
+Theorem fast_cdf_saturated_split_eq x :
+  fast_cdf_saturated_split64 x = fast_cdf_far_split64 x.
+Proof.
+  destruct (is_finite 53 1024 x) eqn:Fx.
+  - unfold fast_cdf_saturated_split64, fast_cdf_far_split64.
+    destruct (fast_cdf_screen64 x); [reflexivity|].
+    unfold fast_cdf_far_only_screen64.
+    destruct (normal_lt x (fneg (erfcx_pow2 3))).
+    + rewrite andb_true_r. destruct (normal_le (fneg cdf_far_limit) x); reflexivity.
+    + rewrite andb_false_r.
+      destruct (normal_le normal_cdf_one x) eqn:High; [|reflexivity].
+      symmetry. apply cdf_saturation_owner_finite; assumption.
   - destruct x as [s|s|s p Hp|s m e Hm]; try discriminate.
     + destruct s; reflexivity.
     + reflexivity.

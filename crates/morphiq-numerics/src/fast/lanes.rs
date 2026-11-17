@@ -24,6 +24,15 @@ impl Kernel for Cdf {
         };
         let mut out = k.store(y);
         if active_bits != lanes_mask::<K>() {
+            // Complete the strong owner's exact positive endpoint in SIMD.
+            // Mixed packets preserve these lanes through far-tail completion.
+            let saturated = k.le(k.splat(crate::normal_distribution::CDF_ONE), x);
+            let ready = active_bits | k.mask_bits(saturated);
+            let y = k.select(saturated, k.splat(1.0), y);
+            out = k.store(y);
+            if ready == lanes_mask::<K>() {
+                return out;
+            }
             let far = far_mask(k, x);
             if k.mask_bits(far) != 0 {
                 // Runtime AVX-512 cannot inline vector conversions into a
@@ -32,12 +41,12 @@ impl Kernel for Cdf {
                 if cfg!(all(target_arch = "x86_64", not(target_feature = "avx512f")))
                     && K::LANES == 8
                 {
-                    return finish_cdf(k, active_bits, k.store(x), k.store(y));
+                    return finish_cdf(k, ready, k.store(x), k.store(y));
                 }
-                return k.store(cold(k, FinishCdf { near: active_bits }, x, y));
+                return k.store(cold(k, FinishCdf { ready }, x, y));
             }
             for (i, value) in out.as_mut().iter_mut().enumerate() {
-                if active_bits >> i & 1 == 0 {
+                if ready >> i & 1 == 0 {
                     *value = crate::normal::norm_cdf(input.as_ref()[i]);
                 }
             }
@@ -57,14 +66,14 @@ fn far_mask<K: Simd>(k: K, x: K::F) -> K::M {
 // Own snapshots at this boundary so the caller's original arrays do not escape.
 // All lane operations remain in the backend wrapper entered by cold_arrays.
 #[inline(never)]
-fn finish_cdf<K: Simd>(k: K, near: u64, input: K::Array, out: K::Array) -> K::Array {
-    cold_arrays(k, FinishCdf { near }, &input, &out)
+fn finish_cdf<K: Simd>(k: K, ready: u64, input: K::Array, out: K::Array) -> K::Array {
+    cold_arrays(k, FinishCdf { ready }, &input, &out)
 }
 
 /// Complete far-tail and screened lanes outside the common near-domain frame,
 /// while retaining the backend token and vector arithmetic.
 struct FinishCdf {
-    near: u64,
+    ready: u64,
 }
 
 impl Cold for FinishCdf {
@@ -74,7 +83,7 @@ impl Cold for FinishCdf {
         let far = far_mask(k, x);
         let y = super::cdf::far_lanes(k, x, far);
         let mut out = k.store(k.select(far, y, k.load(out)));
-        let active = self.near | k.mask_bits(far);
+        let active = self.ready | k.mask_bits(far);
         if active != lanes_mask::<K>() {
             for (i, value) in out.as_mut().iter_mut().enumerate() {
                 if active >> i & 1 == 0 {

@@ -989,6 +989,7 @@ Print Assumptions FastCdfFar.fast_cdf_far_entry_ok.
 Print Assumptions FastCdfFar.fast_cdf_far_fallback_contract.
 Print Assumptions FastCdfFar.fast_cdf_far_nonfinite.
 Print Assumptions FastCdfFar.fast_cdf_far_split_eq.
+Print Assumptions FastCdfFar.fast_cdf_saturated_split_eq.
 Print Assumptions FastExp.fast_exp_public_accelerated.
 Print Assumptions FastExp.fast_exp_public_fallback.
 
