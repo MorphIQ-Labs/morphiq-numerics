@@ -101,21 +101,27 @@ batched!(
 batched!(
     /// [`exp2`] of every element of `x`, written to `out`, bit for bit.
     /// With `simd`, stages A and B run in lanes; undecided lanes call [`exp2`].
-    exp2_slice, exp2, crate::exp2::lanes::Exp2
+    exp2_slice,
+    exp2,
+    crate::exp2::lanes::Exp2
 );
 
 batched!(
     /// [`expm1`] of every element of `x`, written to `out`, bit for bit.
     /// With `simd`, the small-argument polynomial and stages A and B run in
     /// lanes; undecided lanes call [`expm1`].
-    expm1_slice, expm1, crate::expm1::lanes::Expm1
+    expm1_slice,
+    expm1,
+    crate::expm1::lanes::Expm1
 );
 
 batched!(
     /// [`asin`] of every element of `x`, written to `out`, bit for bit.
     /// With `simd`, the reduction, the series and the rounding test run in
     /// lanes; a lane the screen or the test doesn't settle calls [`asin`].
-    asin_slice, asin, crate::asin::lanes::Asin
+    asin_slice,
+    asin,
+    crate::asin::lanes::Asin
 );
 
 batched!(
@@ -123,7 +129,9 @@ batched!(
     /// With `simd`, the series, the logarithm of `x + √(x² + 1)`, the large
     /// form and the rounding test run in lanes; a lane the screen or the test
     /// doesn't settle calls [`asinh`].
-    asinh_slice, asinh, crate::asinh::lanes::Asinh
+    asinh_slice,
+    asinh,
+    crate::asinh::lanes::Asinh
 );
 
 /// [`atan2`] of every pair `(y[i], x[i])`, written to `out`: `out[i]` is

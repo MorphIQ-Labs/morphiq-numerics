@@ -748,7 +748,12 @@ pub(crate) fn atan2_corpus() -> (Vec<f64>, Vec<f64>) {
 fn fixture_pairs(fixture: &str) -> Vec<(f64, f64)> {
     let words: Vec<f64> = fixture_values(fixture);
     // Entries are y, x, result in order.
-    words.chunks_exact(3).map(|c| (c[0], c[1])).collect()
+    words
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|c| (c[0], c[1]))
+        .collect()
 }
 
 /// Runs `G`'s lane kernel on backend `k` over paired arguments and requires the
