@@ -17,6 +17,8 @@ receipt=root/'manifest.sha256'
 if receipt.exists():assert receipt.read_text().strip()==frozen
 else:receipt.write_text(frozen+'\n')
 for c in cells:
+ assert math.isfinite(c.get('max_time_ratio',1)) and c.get('max_time_ratio',1)>0
+ assert isinstance(c.get('balanced_stack',False),bool)
  assert hashlib.sha256(Path(c['product']).read_bytes()).hexdigest()==next(b['sha256'] for b in manifest['builds'] if b['name']==c['backend'])
  if c.get('control_product'):
   assert hashlib.sha256(Path(c['control_product']).read_bytes()).hexdigest()==next(b['control_sha256'] for b in manifest['builds'] if b['name']==c['backend'])
@@ -26,6 +28,7 @@ def command(c,out,proc):
  args=[sys.executable,str(P/'qualify-cell.py'),'--product',c['product'],'--primitive',c['primitive'],'--length',str(c['length']),'--population',c['input']['file'],'--kind',c['kind'],'--reference',c['reference'],'--counts',str(out/'counts.json'),'--target-ms','600','--cache-slots',str(c.get('cache_slots',1)),'--process',proc,'--out',str(out/proc)]
  if c['control']:args+=['--symbol-prefix','control_','--reference-product',str(c.get('control_product') or P/'final-bin/control.so')]
  elif c.get('reference_product'):args+=['--reference-product',c['reference_product']]
+ if c.get('balanced_stack'):args+=['--balanced-stack']
  return args
 
 def summaries():
@@ -43,7 +46,8 @@ def summaries():
    logs.append(statistics.median(pair))
   if len(logs)!=10:continue
   upper=math.exp(statistics.mean(logs)+manifest['protocol']['upper95_t9']*statistics.stdev(logs)/math.sqrt(10));ratio=math.exp(statistics.mean(logs));valid=min(durations)>=250_000_000
-  row=dict(id=c['id'],required=c['required_parity'],ratio=ratio,upper95=upper,passes=valid and upper<=1,valid_duration=valid,minimum_sample_ns=min(durations),ours_median_ns=statistics.median(ours),reference_median_ns=statistics.median(refs),ours_min_ns=min(ours),ours_max_ns=max(ours),reference_min_ns=min(refs),reference_max_ns=max(refs),block_ratio_drift=math.exp(statistics.mean(logs[5:])-statistics.mean(logs[:5]))-1,process_log_ratios=logs)
+  limit=c.get('max_time_ratio',1)
+  row=dict(id=c['id'],required=c['required_parity'],ratio=ratio,upper95=upper,max_time_ratio=limit,passes=valid and upper<=limit,valid_duration=valid,minimum_sample_ns=min(durations),ours_median_ns=statistics.median(ours),reference_median_ns=statistics.median(refs),ours_min_ns=min(ours),ours_max_ns=max(ours),reference_min_ns=min(refs),reference_max_ns=max(refs),block_ratio_drift=math.exp(statistics.mean(logs[5:])-statistics.mean(logs[:5]))-1,process_log_ratios=logs)
   rows.append(row)
  (root/'summary.json').write_text(json.dumps(rows,indent=2)+'\n')
  if rows:
@@ -74,6 +78,7 @@ for group_index,group in enumerate(groups):
    if (index+1)%10==0:print(f'Group {group_index+1}/{len(groups)}, block {block+1}/2: {index+1}/{len(group)} cells',flush=True)
 rows=summaries();assert len(rows)==len(cells)
 failures=[r for r in rows if r['required'] and not r['passes']]
-result=dict(complete=True,cells=len(rows),required=sum(c['required_parity'] for c in cells),failures=[r['id'] for r in failures],all_required_pass=not failures)
+required=sum(c['required_parity'] for c in cells)
+result=dict(complete=True,cells=len(rows),required=required,failures=[r['id'] for r in failures],all_required_pass=(not failures) if required else None, purpose=manifest.get('purpose', 'qualification'))
 (root/'result.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result),flush=True)
 if failures:raise SystemExit('Required parity cells failed; do not claim qualification.')

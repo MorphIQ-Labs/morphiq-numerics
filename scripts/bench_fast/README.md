@@ -147,7 +147,10 @@ and predeclare a new complete run when needed.
 
 The decision uses per-process paired log ratios and a one-sided 95% Student-t
 upper bound (9 degrees of freedom, critical value 1.8331129326536335). Every
-required cell must have an upper ratio at most 1.0 and valid durations. Report
+required cell must have an upper ratio at most its declared `max_time_ratio`
+(1.0 when omitted) and valid durations. A different limit requires the owner's
+explicit cost decision in the owning issue/PR before the new run; competitor
+parity stays at 1.0. Report
 spread and drift alongside the decision. Diagnostic cells do not establish
 parity; missing or failing required cells leave qualification incomplete.
 ARM writes `qualification-summary.json`; x86 writes `qualification/result.json`
@@ -334,6 +337,194 @@ A required failure stops the entire campaign. Staging changes execution order
 only: acceptance still requires all 394 cells measured and all 244 required
 cells passing. Native ARM and manifests without groups retain the original
 single-group schedule.
+
+## Far-tail CDF change qualification
+
+`prepare-cdf-far.py` builds candidate and pre-change baseline CDF wrappers with
+matching flags and stages the existing paired timer. On x86 it builds automatic
+dispatch (`simd,std`, `x86-64-v3`), static AVX2/FMA (`simd`, `x86-64-v3`) and
+static AVX-512 (`simd`, `x86-64-v4`). Apple Silicon uses `simd,std` and NEON.
+Run on native hardware; CPU affinity is available on Linux, while the Mac timer
+requests user-initiated QoS. Record Mac power mode and thermal/load conditions.
+On the shared i9 host, use the pinned `ai-program` perf-host verification before
+timing: CPU 2 at 3 GHz, CPU 14 offline, and the separate hardware-counter clock
+check. Linux host metadata records offline CPUs and reads frequency only from
+online CPUs; an offline CPU's cpufreq files can remain visible but reject reads.
+Sysfs frequency snapshots are metadata, not evidence of clock stability on an
+isolated `nohz_full` CPU. Errors reading an online CPU still stop the attempt.
+On each host, run `cargo test --workspace --all-features --locked` and
+`./scripts/check_fma.sh` before timing. Finish these checks and the linked-product
+oracle observations before starting any performance process.
+
+On x86 hosts affected by Intel's JCC microcode mitigation, code placement can
+change decoded-cache usage even when instruction sequences match. Inspect the
+actual caller and use hardware counters outside timing to investigate this.
+`--x86-jcc-mitigation` stages a separate diagnostic build with LLVM's
+`--x86-branches-within-32B-boundaries` flag on candidate, baseline and composition
+products alike. Retain default-build results separately; this option does not
+establish their performance or change the acceptance rule. See
+[Intel's JCC guidance](https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/best-practices/mitigation-strategies-jcc-microcode.html).
+
+```sh
+git worktree add --detach target/cdf-far-baseline f29d59b
+python3 scripts/bench_fast/prepare-cdf-far.py --cpu 2 \
+  --baseline target/cdf-far-baseline --out target/cdf-far-001
+python scripts/bench_fast/observe-cdf-far.py target/cdf-far-001  # pinned mpmath environment
+python3 target/cdf-far-001/screen-ln.py --limit 63  # 21 priority cells per x86 build
+```
+
+The shared screen retains its historical filename; it reads the staged matrix.
+Use `--limit 21` for the single Mac/NEON build. A screen is exploratory: one
+process, two alternating paired rounds, 150 ms calibration target. Investigate
+material costs before qualification; retain every attempt. Build and validate
+before timing, with no concurrent profiling or oracle work on the timed host.
+
+Each backend has 120 required before/after cells: twelve banks, scalar throughput
+and dependent latency on 52 values, and slice lengths 1/2/4/8/13/52/53/4096.
+Banks cover negative far tails, two signed mixtures, the positive-tail control, unchanged
+pricing/body/lower/upper/wide domains, seam neighbours, mixed near/far/fallback
+lanes and previously all-fallback packets. The seam bank includes the generated positive
+saturation threshold and both neighbours. Exact input words, hashes, strong-call
+fallback counts and exact endpoint counts are retained; the historical
+`positive_fallback` bank name remains for before/after comparison. Exact endpoint
+completion retains the strong result and does not extend the approximation domain. Nine consumer-composition comparisons and three unchanged strong
+controls are diagnostics. The composition has an unsplit exponent and a weaker
+error guarantee; it cannot establish comparable-contract parity. The independent
+fixture check and exact-bit observations run outside timing on the linked products.
+Its separate cost/spread rule in the far-tail decision record still requires
+review; classifying it as a diagnostic does not waive that acceptance obligation.
+
+Before qualification, record the matrix, pinned baseline, host and decision in
+the owning issue/PR, and commit methodology/source changes. Then use `freeze.py`,
+the staged `run-qualification.py`, and `freeze.py --verify` as above. Every
+required cell must pass the shared ten-process upper-95% ratio rule; the runner
+stops at its first completed required failure. Review strong controls separately.
+Qualification completes seven regression-sensitive cells per backend first:
+positive-tail scalar throughput, dependent latency and 4096-value slices;
+pricing scalar and 8-value slices; body scalar; and lower-domain latency.
+That group uses the same two blocks of five processes before the remaining
+cells. The groups partition the complete matrix; no cell or acceptance rule
+is removed. This exposes a required failure without first timing every bank.
+This focused change matrix does not replace the broader competitor matrix or
+consumer end-to-end qualification. Native x86 results leave ARM cells open.
+Remove the clean baseline worktree after the comparison; retain linked binaries,
+raw samples, failed attempts and logs under ignored `target/` through review.
+
+### Canonical CDF references
+
+`build-cdf-references.py` builds QuantLib 1.44 at revision
+`ab4cb476d35f7275834bc05b47d1324403d1823b`, Boost.Math 1.86.0 with both its
+default policy and `promote_double<false>`, and the pinned SLEEF 3.9.0 `erfc_u15`
+composition. It fetches QuantLib's compatible license before its selected
+sources. Supply the pinned Boost headers and SLEEF source/build; used headers,
+licenses, compiler commands and linked products are hashed in `references.json`.
+The supplied Boost tree is identified by its used headers; the manifest does
+not claim verification against the published archive unless it was performed.
+
+QuantLib and Boost use scalar loops for slices. SLEEF uses AVX-512, AVX2 or NEON
+with scalar remainders. The SLEEF composition is
+`0.5 * erfc(x * -RN(1/sqrt(2)))`; an `erfc` ULP claim does not establish a CDF
+relative bound after argument rounding. Boost's internal promotion policy also
+does not recover precision already lost in the distribution's argument scaling.
+The C adapters catch C++ domain exceptions, count them, and return NaN; the
+accuracy record reports these adaptations and special-value results explicitly.
+
+```sh
+python3 scripts/bench_fast/build-cdf-references.py --out target/cdf-references-001 \
+  --boost /path/to/boost_1_86_0 --sleef-source target/bench-fast-refs/sleef \
+  --sleef-build target/bench-fast-refs/sleef-build
+python scripts/bench_fast/observe-cdf-references.py --run target/cdf-far-001 \
+  --references target/cdf-references-001  # pinned mpmath environment
+python3 scripts/bench_fast/stage-cdf-references.py --run target/cdf-far-001 \
+  --references target/cdf-references-001 --out target/cdf-canonical-001
+python3 target/cdf-canonical-001/screen-ln.py
+```
+
+The observer checks the complete CDF against mpmath at 200/400 bits on the
+existing exact input banks and independent CDF fixture inputs. It records
+absolute and negative normal-output relative maxima, exact witnesses, scalar
+versus slice differences, and exceptional results. These are observations, not
+proofs of reference bounds. The staged cells compare independent scalar
+throughput, dependent latency, and 4096-value slices on the negative far tail
+and unchanged pricing domain. They are separate diagnostics; baseline controls,
+comparable-contract acceptance, native ARM and consumer qualification retain
+their requirements. Finish all builds, oracles and profiles before timing.
+
+### Byte-identical CDF controls
+
+When process variation obscures a comparison, declare a diagnostic matrix from
+the existing run before collecting more samples. The adapter copies each selected
+product without rebuilding it, retaining the input bits, timers, pairing and
+ten-process protocol. Stage from a run prepared with the current native timers;
+the adapter installs the current paired runner. The runner checks that the two products have identical
+bytes and distinct loaded function addresses.
+
+```sh
+python3 scripts/bench_fast/stage-cdf-aa.py --run target/cdf-far-001 \
+  --out target/cdf-aa-001 \
+  --cell auto-pricing-scalar-52-baseline \
+  --cell avx2-body-scalar-52-baseline
+python3 target/cdf-aa-001/run-qualification.py
+```
+
+Choose IDs present in that host's manifest. Every staged cell is diagnostic;
+these results neither replace baseline comparisons nor change their acceptance
+rule. A diagnostic-only result has `required: 0` and `all_required_pass: null`.
+Retain incomplete attempts and failures as well as completed samples.
+
+New native harness builds record loaded product/timer addresses and the timer's
+stack pointer for each warmup, calibration and timed call, alongside buffer
+placement. Stack capture precedes warmup and both clocks; metadata is read after
+the timer returns. It adds no operation to the measured loop, but rebuilding a
+timer can change code layout, so compare both products with the same frozen timer.
+Rebuild both native timer libraries when using the updated paired runner. Existing
+frozen runs retain their original harness and remain separate evidence.
+
+On x86, the shared timers require CPU/OS AVX support, checked before timing.
+Their scalar loads and arithmetic use VEX encoding, and each invocation clears
+inherited upper-register state before warmup and both clocks. This prevents
+legacy-SSE merge dependencies in the timer from charging a previous caller's
+SIMD state to the product under measurement. The setting applies to scalar,
+packet, dependent-latency and cache timers; it does not change the reference
+wrappers' target attributes or numerical work. ARM retains its native timer
+instructions. `test_native_harness.py` deliberately dirties an upper register
+and checks every timer's entry state and complete callback count.
+
+This state control does not establish timing stability or remove address-layout
+effects. A short warmup is not evidence that a fresh process has reached a stable
+execution state. Inspect all retained rounds and identical-implementation controls
+before attributing a shift to a numerical change. Counter profiles and deliberately
+reduced-work experiments diagnose a mechanism; they cannot replace unchanged-work,
+uninstrumented qualification samples or alter the declared acceptance criterion.
+
+The x86 CDF adapter declares `balanced_stack` for independent scalar and packet
+throughput. Each paired round visits all 256 ABI-aligned stack positions modulo
+4 KiB, giving each position equal work for each product. The native trampoline
+sets the stack outside the clocks, and every observed position is checked. At
+successive positions the starting product alternates; it also alternates across
+processes and rounds. This balances address-dependent costs and reduces the time
+between paired measurements during execution-state transitions.
+
+Calibration counts round upward to a multiple of 512 so both timed work and the
+half-count warmup divide equally across the 256 positions. The redundant native
+100-iteration warmup is disabled in this mode; the declared half-count warmup is
+distributed equally across positions. `chunks.jsonl` retains every interval, count, order,
+clock span and stack address. Each statistical sample sums its 256 native timed
+intervals and divides by their complete work count. The 600 ms target and 250 ms
+minimum apply to this aggregate, not each chunk. Report clock/call overhead for
+this granularity separately. Ten fresh processes, two paired rounds, the same
+confidence calculation and the first-failure stop rule remain in force.
+
+This is an average over the declared stack distribution, not a guarantee for
+every consumer call site. Dependent-latency and cache-traversal measurements keep
+their uninterrupted loops; `--balanced-stack` rejects those modes. ARM keeps its
+native calling context. Rebuild both Rust products with the repository's pinned
+toolchain; the CDF adapter explicitly applies that same toolchain to the baseline.
+Its `--control-overhead-percent` defaults to zero. A nonzero value requires the
+owner's recorded decision and applies only to baseline cells whose exact inputs
+exclude the newly approximated negative far tail. New-domain and competitor
+parity limits are unchanged.
+
 
 ## Focused log-CDF comparison
 

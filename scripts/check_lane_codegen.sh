@@ -13,6 +13,8 @@
 # backend) and disassembles them; test functions are not checked. The only
 # calls allowed are the store and load at `lanes::cold` and the scalar-only
 # prefix `ln::lanes::finish_ln_1p`, to enter and leave the vector wrapper.
+# Fast CDF's AVX-512 completion is a frequent far-tail path: its boundary must
+# not call those helpers, including in runtime-dispatched baseline-ISA builds.
 # The batched tridiagonal solve must also contain packed division in both
 # vector widths, with no fused operations: scalar-only dispatch would satisfy
 # numerical tests while failing to provide the promised SIMD implementation.
@@ -55,14 +57,22 @@ objdump -d --no-show-raw-insn --demangle=rust "$binary" | awk '
         printf "fused operation in %s\n", fn > "/dev/stderr"
         fused++
     }
-    /v(p)?gather/ && fn ~ /(exp::bounded::|ln::bounded::|fast::lanes::(Cdf|LogCdf))/ {
+    /v(p)?gather/ && fn ~ /(exp::bounded::|ln::bounded::|fast::lanes::(Cdf|FinishCdf|finish_cdf|LogCdf)|fast::normal::(CdfPacket|norm_cdf_packet|norm_cdf_slice_loop))/ {
         if (fn ~ /exp::bounded::/ && fn ~ /avx512_run/) { exp_avx512_gather++; next }
-        if (fn ~ /(exp::bounded::|fast::lanes::(Cdf|LogCdf))/ && fn ~ /(avx512_run|x86_64::Avx512)/) next
+        if (fn ~ /(exp::bounded::|fast::lanes::(Cdf|FinishCdf|finish_cdf|LogCdf))/ && fn ~ /(avx512_run|x86_64::Avx512)/) next
+        # Fixed CDF packets may inline the AVX-512 backend into a static build;
+        # their gather must still be the 512-bit operation, never AVX2.
+        if (fn ~ /fast::normal::(CdfPacket|norm_cdf_packet|norm_cdf_slice_loop)/ && /%zmm/) next
         printf "hardware gather in bounded kernel %s\n", fn > "/dev/stderr"
         gather++
     }
     /call.*helpers::(avx2|avx512)::/ {
         if (fn ~ /::tests::/) next
+        if (fn ~ /^morphiq_numerics::lanes::cold(::)?</ && fn ~ /fast::lanes::FinishCdf/ && /helpers::avx512::(load|store)>/) {
+            printf "out-of-line AVX-512 conversion in frequent CDF boundary: %s\n", fn > "/dev/stderr"
+            bad[fn]++
+            next
+        }
         if (fn ~ /^morphiq_numerics::(lanes::cold|ln::lanes::finish_ln_1p)(::)?</ && /helpers::(avx2|avx512)::(load|store)>/) next
         bad[fn]++
     }

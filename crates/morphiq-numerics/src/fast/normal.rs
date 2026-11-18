@@ -24,18 +24,29 @@ pub fn erfcx(x: f64) -> f64 {
 
 /// Standard-normal cumulative distribution, `P(Z <= x)`.
 ///
-/// Absolute error is at most `2^-49` on `2^-33 <= |x| <= 8`, and for
+/// Absolute error is at most `2^-49` on `2^-33 <= |x| <= 8` and on
+/// `-22.5 <= x <= -8`. Positive inputs beyond 8 retain the strong result,
+/// including its exact saturation to one at the generated threshold. For
 /// `x < 0` there also relative error at most `2^-48`. With
 /// `y = RN(|x|/sqrt(2))`, `y <= 15/32` evaluates a generated erf polynomial;
 /// larger `y` evaluates `Phi(-a) = 0.5 * exp(-a²/2) * erfcx(a/sqrt(2))` with
-/// the exponent split exactly and one generated erfcx rational
-/// (`FastCdf.fast_cdf_entry_ok`). Other inputs use [`crate::normal::norm_cdf`],
+/// the exponent split exactly and, up to `|x| = 8`, one generated erfcx
+/// rational, beyond it a fixed polynomial in `1/a²`
+/// (`FastCdfFar.fast_cdf_far_entry_ok`). Other inputs use [`crate::normal::norm_cdf`],
 /// retaining its special values.
 #[must_use]
 #[inline]
 pub fn norm_cdf(x: f64) -> f64 {
-    let a = x.abs();
-    if !(MIN_MAGNITUDE..=8.0).contains(&a) {
+    let magnitude = x.abs().to_bits();
+    // Keep the established near-domain screen independent of the far tail.
+    if magnitude.wrapping_sub(MIN_MAGNITUDE.to_bits())
+        > super::cdf::RATIONAL_LIMIT.to_bits() - MIN_MAGNITUDE.to_bits()
+    {
+        // Complete the strong owner's exact endpoint before the cold boundary,
+        // as the SIMD entry does. No far-tail or strong evaluation is needed.
+        if x >= crate::normal_distribution::CDF_ONE {
+            return 1.0;
+        }
         return norm_cdf_fallback(x);
     }
     super::cdf::in_domain(x)
@@ -53,10 +64,13 @@ pub(super) fn lower(a: f64) -> f64 {
     (0.5 * exponential) * crate::erfcx::bounded::table(scaled)
 }
 
-// Keep the strong entry's register requirements out of the accelerated caller.
+// Keep the far-tail composition and strong entry out of the near-domain frame.
 #[cold]
 #[inline(never)]
 fn norm_cdf_fallback(x: f64) -> f64 {
+    if (-super::cdf::FAR_LIMIT..-super::cdf::RATIONAL_LIMIT).contains(&x) {
+        return super::cdf::far(x);
+    }
     crate::normal::norm_cdf(x)
 }
 
@@ -161,12 +175,79 @@ fn erfcx_slice_loop(x: &[f64], out: &mut [f64]) {
 ///
 /// # Panics
 /// If the input and output lengths differ.
+#[inline]
 pub fn norm_cdf_slice(x: &[f64], out: &mut [f64]) {
     assert_eq!(
         x.len(),
         out.len(),
         "norm_cdf_slice: slices of different lengths"
     );
+    // A single native-width packet does not need the general loop/remainder
+    // frame. Keep native-width packet lengths across backend dispatch while
+    // retaining each target's selected backend.
+    match x.len() {
+        0 => {}
+        1 => norm_cdf_packet::<1>(x.try_into().unwrap(), out.try_into().unwrap()),
+        2 => norm_cdf_packet::<2>(x.try_into().unwrap(), out.try_into().unwrap()),
+        #[cfg(all(target_arch = "x86_64", any(feature = "std", target_feature = "avx2")))]
+        4 => norm_cdf_packet::<4>(x.try_into().unwrap(), out.try_into().unwrap()),
+        #[cfg(all(
+            target_arch = "x86_64",
+            any(feature = "std", target_feature = "avx512f")
+        ))]
+        8 => norm_cdf_packet::<8>(x.try_into().unwrap(), out.try_into().unwrap()),
+        _ => norm_cdf_slice_loop(x, out),
+    }
+}
+
+#[inline(never)]
+fn norm_cdf_packet<const N: usize>(x: &[f64; N], out: &mut [f64; N]) {
+    #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+    {
+        use morphiq_numerics_arch::Simd;
+        if N == 8
+            && let Some(k) = morphiq_numerics_arch::Avx512::try_new()
+        {
+            return k.vectorize(CdfPacket { x, out });
+        }
+        if N == 4
+            && let Some(k) = morphiq_numerics_arch::Avx2::try_new()
+        {
+            return k.vectorize(CdfPacket { x, out });
+        }
+    }
+    #[cfg(feature = "simd")]
+    crate::lanes::map::<super::lanes::Cdf>(x, out);
+    #[cfg(not(feature = "simd"))]
+    for (o, &x) in out.iter_mut().zip(x) {
+        *o = norm_cdf(x);
+    }
+}
+
+// Keep the packet length in the operation's type across the runtime ISA boundary.
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
+struct CdfPacket<'a, const N: usize> {
+    x: &'a [f64; N],
+    out: &'a mut [f64; N],
+}
+
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
+impl<const N: usize> morphiq_numerics_arch::WithSimd for CdfPacket<'_, N> {
+    type Output = ();
+    #[inline(always)]
+    fn with<K: morphiq_numerics_arch::Simd>(self, k: K) {
+        use crate::lanes::Kernel;
+        // The caller selects exactly one complete packet on this backend.
+        assert_eq!(N, K::LANES);
+        let mut input = K::Array::default();
+        input.as_mut().copy_from_slice(self.x);
+        self.out
+            .copy_from_slice(super::lanes::Cdf::lanes(k, input).as_ref());
+    }
+}
+
+#[inline(never)]
+fn norm_cdf_slice_loop(x: &[f64], out: &mut [f64]) {
     #[cfg(feature = "simd")]
     crate::lanes::map::<super::lanes::Cdf>(x, out);
     #[cfg(not(feature = "simd"))]

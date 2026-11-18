@@ -968,7 +968,14 @@ Print Assumptions FastErfcx.fast_erfcx_table_ok.
 Print Assumptions FastErfcx.fast_erfcx_entry_ok.
 Print Assumptions FastErfcx.fast_erfcx_fallback_contract.
 Print Assumptions FastNormal.fast_normal_lower_ok.
-Require FastCdfOde FastCdfApprox FastCdfBody FastCdf.
+Require FastCdfOde FastCdfApprox FastCdfBody FastCdf FastCdfFar.
+Require FastCdfFarResidual FastCdfFarAnchor FastCdfFarApprox FastCdfFarArithmetic FastCdfFarRatio.
+Print Assumptions FastCdfFarResidual.cdf_far_residual_bound.
+Print Assumptions FastCdfFarAnchor.cdf_far_anchor_error.
+Print Assumptions FastCdfFarApprox.cdf_far_poly_approx.
+Print Assumptions FastCdfFarArithmetic.fast_cdf_far_ratio_ieee.
+Print Assumptions FastCdfFarArithmetic.fast_cdf_far_ratio_certificate.
+Print Assumptions FastCdfFarRatio.fast_cdf_far_ratio_ok.
 Print Assumptions FastCdfOde.cdf_ode_relative.
 Print Assumptions FastCdfApprox.cdf_tail_approx.
 Print Assumptions FastCdfBody.cdf_body_approx.
@@ -977,6 +984,12 @@ Print Assumptions FastCdf.fast_cdf_lower_ok.
 Print Assumptions FastCdf.fast_cdf_entry_ok.
 Print Assumptions FastCdf.fast_cdf_fallback_contract.
 Print Assumptions FastCdf.fast_cdf_nonfinite.
+Print Assumptions FastCdfFar.fast_cdf_far_lower_ok.
+Print Assumptions FastCdfFar.fast_cdf_far_entry_ok.
+Print Assumptions FastCdfFar.fast_cdf_far_fallback_contract.
+Print Assumptions FastCdfFar.fast_cdf_far_nonfinite.
+Print Assumptions FastCdfFar.fast_cdf_far_split_eq.
+Print Assumptions FastCdfFar.fast_cdf_saturated_split_eq.
 Print Assumptions FastExp.fast_exp_public_accelerated.
 Print Assumptions FastExp.fast_exp_public_fallback.
 

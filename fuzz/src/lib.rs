@@ -298,7 +298,7 @@ fn check_cases<const N: usize>(op: Operation, data: &[u8]) {
     let mut ys = [0.0; N];
     let mut expected = [0.0; N];
     let count = data.len().min(16 * N) / 16;
-    for (i, pair) in data.chunks_exact(16).take(N).enumerate() {
+    for (i, pair) in data.as_chunks::<16>().0.iter().take(N).enumerate() {
         xs[i] = f64::from_bits(u64::from_le_bytes(pair[..8].try_into().unwrap()));
         ys[i] = f64::from_bits(u64::from_le_bytes(pair[8..].try_into().unwrap()));
         expected[i] = op.evaluate(xs[i], ys[i]);

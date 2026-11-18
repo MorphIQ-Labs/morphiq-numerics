@@ -401,7 +401,7 @@ fn measure_cost() {
     let mut sink = 0.0;
     let start = Instant::now();
     for _ in 0..16 {
-        for two in pairs.chunks_exact(2) {
+        for two in pairs.as_chunks::<2>().0 {
             let batch = [[two[0].0, two[0].1], [two[1].0, two[1].1]];
             let y = log_sum_exp_pairs(core::hint::black_box(&batch));
             sink += y[0] + y[1];

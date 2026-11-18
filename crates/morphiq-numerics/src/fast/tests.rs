@@ -54,6 +54,9 @@ fn mixed_slices_preserve_fast_scalar_bits_and_remainders() {
         cdf_body_edge(),
         1.0,
         8.0,
+        crate::normal_distribution::CDF_ONE,
+        super::cdf::FAR_LIMIT,
+        -super::cdf::FAR_LIMIT,
         16.0,
         704.0,
     ] {
@@ -132,10 +135,17 @@ fn unaccelerated_inputs_retain_strong_results() {
     }
     for x in [
         -38.0,
-        -8.0_f64.next_up(),
+        -super::cdf::FAR_LIMIT.next_up(),
         0.0,
         -0.0,
-        8.0_f64.next_up(),
+        // Positive arguments beyond 8 stay with the strong owner.
+        super::cdf::RATIONAL_LIMIT.next_up(),
+        crate::normal_distribution::CDF_ONE.next_down(),
+        crate::normal_distribution::CDF_ONE,
+        crate::normal_distribution::CDF_ONE.next_up(),
+        9.0,
+        super::cdf::FAR_LIMIT,
+        super::cdf::FAR_LIMIT.next_up(),
         38.0,
     ] {
         assert_eq!(
@@ -219,4 +229,136 @@ fn the_two_exp_kernels_are_distinct_and_exact_at_zero() {
         .map(|i| f64::from(i) * 0.03125 - 1.0)
         .any(|x| elementary::exp(x).to_bits() != elementary::exp_coarse(x).to_bits());
     assert!(differs);
+}
+
+#[test]
+fn cdf_far_tail_tracks_the_strong_owner_and_the_slice_bits() {
+    const N: usize = 2048;
+    let mut xs = [0.0; N];
+    for (i, x) in xs.iter_mut().enumerate() {
+        // Both sides of the rational/table seam at 8 and of the limit.
+        let a = 7.9 + (super::cdf::FAR_LIMIT + 0.1 - 7.9) * (i as f64 + 0.5) / N as f64;
+        *x = if i % 2 == 0 { -a } else { a };
+    }
+    let mut out = [0.0; N];
+    normal::norm_cdf_slice(&xs, &mut out);
+    for (&x, &y) in xs.iter().zip(&out) {
+        assert_eq!(normal::norm_cdf(x).to_bits(), y.to_bits(), "slice at {x}");
+        let strong = crate::normal::norm_cdf(x);
+        assert!(
+            (y - strong).abs() <= f64::from_bits(0x3ce0_0000_0000_0000),
+            "absolute at {x}"
+        );
+        if x < 0.0 {
+            assert!(
+                ((y - strong) / strong).abs() <= f64::from_bits(0x3cf0_0000_0000_0000),
+                "relative at {x}"
+            );
+        }
+    }
+}
+
+#[cfg(feature = "simd")]
+#[test]
+fn cdf_region_mixtures_preserve_each_lane_on_every_backend() {
+    use crate::lanes::Kernel;
+    use morphiq_numerics_arch::{Simd, WithSimd};
+
+    struct Regions;
+    impl WithSimd for Regions {
+        type Output = ();
+
+        #[inline(always)]
+        fn with<K: Simd>(self, k: K) {
+            let check = |xs: K::Array| {
+                let ys = super::lanes::Cdf::lanes(k, xs);
+                for (&x, &y) in xs.as_ref().iter().zip(ys.as_ref()) {
+                    assert_eq!(
+                        y.to_bits(),
+                        normal::norm_cdf(x).to_bits(),
+                        "{}: {x:?}",
+                        K::NAME
+                    );
+                }
+            };
+            // Every assignment of near, far, saturated and strong-owner lanes,
+            // including homogeneous packets, across the entire backend width.
+            for mut pattern in 0..4_usize.pow(u32::try_from(K::LANES).unwrap()) {
+                let mut xs = K::Array::default();
+                for x in xs.as_mut() {
+                    *x = [0.25, -12.0, 9.0, 8.125][pattern % 4];
+                    pattern /= 4;
+                }
+                check(xs);
+            }
+            // Homogeneous outer rows and every body/outer mixture exercise
+            // both complete-row returns and the masked path between them.
+            for outer in [-8.0, -3.0, -1.0, 1.0, 3.0, 8.0] {
+                for pattern in 0..(1_usize << K::LANES) {
+                    let mut xs = K::Array::default();
+                    for (i, x) in xs.as_mut().iter_mut().enumerate() {
+                        *x = if pattern >> i & 1 == 0 { outer } else { 0.25 };
+                    }
+                    check(xs);
+                    // The public slice also traverses the fixed-packet entry
+                    // when its length matches an available native backend.
+                    let mut ys = K::Array::default();
+                    normal::norm_cdf_slice(xs.as_ref(), ys.as_mut());
+                    for (&x, &y) in xs.as_ref().iter().zip(ys.as_ref()) {
+                        assert_eq!(y.to_bits(), normal::norm_cdf(x).to_bits());
+                    }
+                }
+            }
+            // Move special values and both sides of each seam through every
+            // lane while the other lanes require both accelerated paths.
+            for x in [
+                -22.5_f64.next_up(),
+                -22.5,
+                -22.5_f64.next_down(),
+                -8.0_f64.next_up(),
+                -8.0,
+                -8.0_f64.next_down(),
+                8.0_f64.next_up(),
+                crate::normal_distribution::CDF_ONE.next_down(),
+                crate::normal_distribution::CDF_ONE,
+                crate::normal_distribution::CDF_ONE.next_up(),
+                0.0,
+                -0.0,
+                f64::from_bits(1),
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+                f64::from_bits(0x7ff8_1234_5678_9abc),
+                f64::from_bits(0xfff0_1234_5678_9abc),
+            ] {
+                for slot in 0..K::LANES {
+                    let mut xs = K::Array::default();
+                    for (i, value) in xs.as_mut().iter_mut().enumerate() {
+                        *value = if i % 2 == 0 { -12.0 } else { 0.25 };
+                    }
+                    xs.as_mut()[slot] = x;
+                    check(xs);
+                }
+            }
+        }
+    }
+    for backend in crate::lanes::tests::backends() {
+        backend.vectorize(Regions);
+    }
+}
+
+#[test]
+fn cdf_saturation_preserves_the_proved_rounding_boundary() {
+    // The Gaussian-tail bracket places the CDF at the threshold's predecessor
+    // below the rounding midpoint near 1, and at the threshold above it.
+    // NormalTailThresholdConstants.normal_cdf_one_tail_bracket is the anchor.
+    let threshold = crate::normal_distribution::CDF_ONE;
+    for (x, expected) in [
+        (threshold.next_down(), 1.0_f64.next_down()),
+        (threshold, 1.0),
+        (threshold.next_up(), 1.0),
+        (f64::MAX, 1.0),
+        (f64::INFINITY, 1.0),
+    ] {
+        assert_eq!(normal::norm_cdf(x).to_bits(), expected.to_bits(), "{x:?}");
+    }
 }

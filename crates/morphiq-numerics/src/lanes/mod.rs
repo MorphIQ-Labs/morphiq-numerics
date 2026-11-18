@@ -31,6 +31,8 @@ pub(crate) trait Kernel {
 /// still runs in lanes. Only a last single element is left to the scalar
 /// function. On x86-64 the cascade is AVX-512F, AVX2, SSE2; on aarch64 NEON.
 /// Every backend returns the scalar bits, so the cascade does too.
+// Preserve caller-known packet lengths through backend selection and remainders.
+#[inline(always)]
 pub(crate) fn map<G: Kernel>(xs: &[f64], out: &mut [f64]) {
     #[cfg(any(
         all(target_arch = "x86_64", target_feature = "sse2"),

@@ -24,8 +24,10 @@ for c in cells[:a.limit]:
              '--primitive',c['primitive'],'--length',str(c['length']),
              '--population',c['input']['file'],'--kind',c['kind'],
              '--reference',c['reference'],'--counts',str(out/'counts.json'),
-             '--target-ms','150','--cache-slots',str(c['cache_slots']),'--diagnostic']
+             '--target-ms','150','--cache-slots',str(c.get('cache_slots',1)),'--diagnostic']
     if c['control']:command+=['--symbol-prefix','control_','--reference-product',c['control_product']]
+    elif c.get('reference_product'):command+=['--reference-product',c['reference_product']]
+    if c.get('balanced_stack'):command+=['--balanced-stack']
     for proc in ['calibration','0']:
         done=out/(proc+'.complete')
         if done.exists():continue
