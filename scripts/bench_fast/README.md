@@ -346,6 +346,12 @@ dispatch (`simd,std`, `x86-64-v3`), static AVX2/FMA (`simd`, `x86-64-v3`) and
 static AVX-512 (`simd`, `x86-64-v4`). Apple Silicon uses `simd,std` and NEON.
 Run on native hardware; CPU affinity is available on Linux, while the Mac timer
 requests user-initiated QoS. Record Mac power mode and thermal/load conditions.
+On the shared i9 host, use the pinned `ai-program` perf-host verification before
+timing: CPU 2 at 3 GHz, CPU 14 offline, and the separate hardware-counter clock
+check. Linux host metadata records offline CPUs and reads frequency only from
+online CPUs; an offline CPU's cpufreq files can remain visible but reject reads.
+Sysfs frequency snapshots are metadata, not evidence of clock stability on an
+isolated `nohz_full` CPU. Errors reading an online CPU still stop the attempt.
 On each host, run `cargo test --workspace --all-features --locked` and
 `./scripts/check_fma.sh` before timing. Finish these checks and the linked-product
 oracle observations before starting any performance process.

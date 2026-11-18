@@ -25,17 +25,35 @@ PAGE = 4096
 OUTPUT_PAGE_OFFSET = 2048
 
 
+def cpu_frequencies(root=Path('/sys/devices/system/cpu')):
+    """Read online CPUs only; offline cpufreq files can exist but reject reads."""
+    frequency, offline = {}, []
+    for cpu in sorted(root.glob('cpu[0-9]*')):
+        online = cpu / 'online'
+        state = online.read_text().strip() if online.exists() else '1'
+        if state == '0':
+            offline.append(cpu.name)
+            continue
+        if state != '1':
+            raise ValueError(f'Invalid CPU online state at {online}: {state!r}')
+        path = cpu / 'cpufreq/scaling_cur_freq'
+        if path.exists():
+            frequency[str(path)] = path.read_text().strip()
+    return frequency, offline
+
+
 def host():
     if platform.system() == 'Darwin':
         return dict(utc=time.time(), platform=platform.platform(),
                     affinity='macOS does not provide CPU affinity for this process',
                     cpuinfo=subprocess.check_output(['sysctl', '-a'], text=True, stderr=subprocess.DEVNULL),
                     power=subprocess.check_output(['pmset', '-g'], text=True))
+    frequency, offline = cpu_frequencies()
     return dict(utc=time.time(), affinity=sorted(os.sched_getaffinity(0)),
                 cpu_stat=Path('/proc/stat').read_text(),
                 load=Path('/proc/loadavg').read_text(),
                 cpuinfo=Path('/proc/cpuinfo').read_text(),
-                frequency={str(p):p.read_text().strip() for p in Path('/sys/devices/system/cpu').glob('cpu[0-9]*/cpufreq/scaling_cur_freq')},
+                frequency=frequency, offline_cpus=offline,
                 thermal={str(p):p.read_text().strip() for p in Path('/sys/class/thermal').glob('thermal_zone*/temp')})
 
 

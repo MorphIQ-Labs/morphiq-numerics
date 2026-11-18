@@ -1,6 +1,8 @@
 """Harness behavior checks; tiny counts and synthetic samples are not timings."""
 import ctypes as C
+import errno
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -11,9 +13,57 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 D = C.POINTER(C.c_double)
+
+
+class HostMetadata(unittest.TestCase):
+    def setUp(self):
+        self.scratch = tempfile.TemporaryDirectory(prefix='cdf-host-test-')
+        self.addCleanup(self.scratch.cleanup)
+        self.root = Path(self.scratch.name)
+        spec = importlib.util.spec_from_file_location('qualify_cell', HERE/'x86/qualify-cell.py')
+        self.cell = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.cell)
+
+    def cpu(self, number, state=None):
+        cpu = self.root/f'cpu{number}'
+        path = cpu/'cpufreq/scaling_cur_freq'
+        path.parent.mkdir(parents=True)
+        path.write_text('3000000\n')
+        if state is not None:
+            (cpu/'online').write_text(state+'\n')
+        return path
+
+    def test_offline_frequency_is_not_read_and_offline_cpu_is_recorded(self):
+        boot, active, offline = self.cpu(0), self.cpu(2, '1'), self.cpu(14, '0')
+        read = Path.read_text
+
+        def unavailable(path, *args, **kwargs):
+            if path == offline:
+                raise OSError(errno.EBUSY, 'offline frequency unavailable')
+            return read(path, *args, **kwargs)
+
+        with mock.patch.object(Path, 'read_text', unavailable):
+            frequencies, offline_cpus = self.cell.cpu_frequencies(self.root)
+        self.assertEqual(frequencies, {str(boot): '3000000', str(active): '3000000'})
+        self.assertEqual(offline_cpus, ['cpu14'])
+
+    def test_online_frequency_read_failure_is_not_suppressed(self):
+        frequency = self.cpu(2, '1')
+        read = Path.read_text
+
+        def unavailable(path, *args, **kwargs):
+            if path == frequency:
+                raise OSError(errno.EBUSY, 'online frequency unavailable')
+            return read(path, *args, **kwargs)
+
+        with mock.patch.object(Path, 'read_text', unavailable):
+            with self.assertRaises(OSError) as failure:
+                self.cell.cpu_frequencies(self.root)
+        self.assertEqual(failure.exception.errno, errno.EBUSY)
 
 
 @unittest.skipUnless(shutil.which('cc'), 'native C compiler required')
