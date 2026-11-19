@@ -352,7 +352,7 @@ jobs:
           python3 scripts/check_numerical_mutations.py "$RUNNER_TEMP/numerical-mutations-$MUTATION_ATTEMPT"
       - name: Retain numerical mutation receipts and inventory
         if: ${{ always() && needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: numerical-mutations-${{ matrix.os }}
           path: |
@@ -369,7 +369,7 @@ jobs:
         run: ./scripts/check_fuzz.sh 60
       - name: Retain fuzz failures, logs and evolved corpora
         if: ${{ always() && needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: elementary-fuzz-${{ matrix.os }}
           path: |
@@ -382,7 +382,7 @@ jobs:
         run: python3 scripts/check_tridiagonal_unpivoted_mutations.py "$RUNNER_TEMP/unpivoted-mutations-$MUTATION_ATTEMPT"
       - name: Retain mutation receipts
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (always() && runner.os == 'Linux') }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: unpivoted-mutations-${{ matrix.os }}
           path: ${{ runner.temp }}/unpivoted-mutations-${{ env.MUTATION_ATTEMPT }}/
@@ -636,7 +636,7 @@ jobs:
           tar -czf target/formal-inputs.tar.gz -C target crosscheck.txt internal-crosscheck.txt gappa-proofs formal-plan
       - name: Retain the source-bound formal inputs and plan
         if: steps.scope.outputs.affected == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: formal-inputs
           path: target/formal-inputs.tar.gz
@@ -663,7 +663,7 @@ jobs:
       FORMAL_NAME: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: formal-inputs
           path: target
@@ -715,14 +715,14 @@ jobs:
             --plan-out /result/actual-plan.json --receipt "/result/$FORMAL_NAME.json" \
             target/crosscheck.txt target/internal-crosscheck.txt target/gappa-proofs 2>&1 | tee target/formal-audit.log
       - name: Retain the completed gate receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: formal-receipt-${{ matrix.name }}
           path: target/formal-result/${{ matrix.name }}.json
           if-no-files-found: error
       - name: Retain stage timings and failures
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: formal-logs-${{ matrix.name }}
           path: |
@@ -745,12 +745,12 @@ jobs:
           EXECUTION: ${{ needs.formal-execution.result }}
         run: |
           python3 scripts/formal_results.py status --hygiene "$HYGIENE" --planner "$PLAN" --affected "$AFFECTED" --execution "$EXECUTION"
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         if: needs.formal-plan.outputs.affected == 'true'
         with:
           name: formal-inputs
           path: target
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         if: needs.formal-plan.outputs.affected == 'true'
         with:
           pattern: formal-receipt-*
