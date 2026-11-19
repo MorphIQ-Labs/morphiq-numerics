@@ -10,6 +10,12 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.29](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.28...v0.0.29) - 2026-11-18
+
+### Performance
+
+- *(fast)* specialize the normal CDF far tail
+
 ## [0.0.28](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.27...v0.0.28) - 2026-11-11
 
 ### Other
