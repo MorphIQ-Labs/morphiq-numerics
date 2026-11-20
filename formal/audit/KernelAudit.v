@@ -1151,3 +1151,10 @@ Print Assumptions TrigQuadrant.trig_selection_analytic.
 Print Assumptions TrigQuadrant.trig_accurate_value_correct.
 Print Assumptions TrigRounding.trig_accurate_round.
 Print Assumptions TrigRounding.trig_accurate_ulp.
+
+Require TrigReciprocal.
+Print Assumptions TrigReciprocal.q_to_float_finite_value.
+Print Assumptions TrigReciprocal.reciprocal_seed_float.
+Print Assumptions TrigReciprocal.q_reciprocal_seed.
+Print Assumptions TrigReciprocal.q_reciprocal_transcription.
+Print Assumptions TrigReciprocal.q_reciprocal_full_contract.
