@@ -179,6 +179,30 @@ admitted, and an admitted output is the exact solution of the problem with each
 others meet `A x = rhs'`. A nonfinite residual or bound is `Range`. The check
 costs one O(n) pass over the original coefficients and allocates nothing.
 
+The implementation first tests the residual against the relative term
+`b = 5ε (m + |rhs|)`. It still checks both underflow scale sums for finiteness:
+an overflowing sum retains `Range`, even when the relative test would admit.
+For finite scales, the computed absolute allowance is nonnegative, so IEEE
+monotonicity gives `fl(b + allowance) >= b`. A row admitted by `b` is therefore
+admitted by the complete bound, with identical decisions and solution bits.
+Only a row outside `b` evaluates the original absolute allowance and complete
+test, preserving its multiplication order and subnormal rounding.
+
+This short circuit also preserves the complete bound's range check. Each
+finite scale is less than `2^1024`; rounding `2^-1071 * matrix_scale` gives at
+most `2^-47`, and multiplying by `solution_scale` gives at most `2^977`.
+The finite sum `m + |rhs|` is less than `2^1024`, so `b <= 2^975`; their rounded
+sum is at most `2^978`, far below overflow. If a scale sum or the relative
+term is nonfinite the original full bound is also nonfinite. These bounds
+justify evaluation order, not a change to the allowance or acceptance cap.
+`Tridiagonal.obstacle_allowance_monotone`, `obstacle_relative_continuation`
+and `obstacle_relative_contact` prove the rounded-bound implication, assuming
+the relative term is representable and the absolute allowance is nonnegative;
+they do not certify the floating-point residual or replace the range argument.
+Ordinary accepted rows consequently avoid constructing subnormal allowances.
+The unit witnesses cover ordinary continuation/contact rows, both sides of
+the exact `16η` subnormal residual boundary, and overflowing scale sums.
+
 Tests compare the sweep against enumeration of every contact set, solved
 densely, on 4,000 random M-matrix systems of orders 1–9: each orientation whose
 contact set is one-sided is admitted and matches, and every two-sided case is

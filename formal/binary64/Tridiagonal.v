@@ -193,3 +193,27 @@ Theorem residual_backward_error ax b rho :
   Rabs (ax - b) <= rho ->
   exists perturbed_rhs, ax = perturbed_rhs /\ Rabs (perturbed_rhs - b) <= rho.
 Proof. intro H. exists ax. split; [reflexivity | exact H]. Qed.
+
+
+(** A row that meets the relative allowance also meets the complete rounded
+    allowance. Finite representability of the latter is established separately
+    by the kernel's scale checks and the bounds in docs/tridiagonal.md. *)
+Lemma obstacle_allowance_monotone b allowance :
+  0 <= allowance -> rn b = b -> b <= rn (b + allowance).
+Proof.
+  intros A B. rewrite <- B at 1. apply sign_rounded_monotone. lra.
+Qed.
+
+Theorem obstacle_relative_continuation residual b allowance :
+  0 <= allowance -> rn b = b -> -b <= residual <= b ->
+  -rn (b + allowance) <= residual <= rn (b + allowance).
+Proof.
+  intros A B R. pose proof (obstacle_allowance_monotone b allowance A B). lra.
+Qed.
+
+Theorem obstacle_relative_contact residual b allowance :
+  0 <= allowance -> rn b = b -> -b <= residual ->
+  -rn (b + allowance) <= residual.
+Proof.
+  intros A B R. pose proof (obstacle_allowance_monotone b allowance A B). lra.
+Qed.

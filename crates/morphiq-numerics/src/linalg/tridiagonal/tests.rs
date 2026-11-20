@@ -1146,3 +1146,82 @@ fn obstacle_arguments_are_checked_before_any_output_is_written() {
     // reads it: (3 - 1.5) / 2.
     assert_eq!(out, [0.75, 1.5]);
 }
+
+#[test]
+fn ordinary_obstacle_checks_do_not_evaluate_the_underflow_allowance() {
+    let matrix = UnpivotedTridiagonal::new(&[-0.25], &[2.0; 2], &[-0.25]).unwrap();
+    let mut pivots = [0.0; 2];
+    let mut upper = [0.0];
+    let factors = matrix.factor_into(&mut pivots, &mut upper).unwrap();
+    let mut out = [0.0; 2];
+    COMPLEMENTARITY_UNDERFLOW_CALLS.with(|calls| calls.set(0));
+    for obstacle in [[0.5; 2], [2.0; 2]] {
+        factors
+            .solve_obstacle_into(&[1.75; 2], &obstacle, &mut out)
+            .unwrap();
+        assert_eq!(
+            out,
+            if obstacle[0] == 0.5 {
+                [1.0; 2]
+            } else {
+                [2.0; 2]
+            }
+        );
+    }
+    assert_eq!(COMPLEMENTARITY_UNDERFLOW_CALLS.with(|calls| calls.get()), 0);
+}
+
+#[test]
+fn obstacle_checks_keep_the_underflow_allowance_at_subnormal_residuals() {
+    let matrix = UnpivotedTridiagonal::new(&[], &[1.0], &[]).unwrap();
+    let mut pivots = [0.0];
+    let factors = matrix.factor_into(&mut pivots, &mut []).unwrap();
+    // With x = 0, the relative term rounds to zero. The absolute allowance
+    // is 16 eta: both sides of that exact boundary must still be distinguished.
+    for (obstacle, sign) in [(0.0, 1.0), (-1.0, -1.0)] {
+        for units in [1, 16, 17] {
+            COMPLEMENTARITY_UNDERFLOW_CALLS.with(|calls| calls.set(0));
+            let result = factors.factors.check_complementarity(
+                &[sign * f64::from_bits(units)],
+                &[obstacle],
+                &[0.0],
+            );
+            assert_eq!(
+                result,
+                if units <= 16 {
+                    Ok(())
+                } else {
+                    Err(Error::NotComplementary(0))
+                }
+            );
+            assert_eq!(COMPLEMENTARITY_UNDERFLOW_CALLS.with(|calls| calls.get()), 1);
+        }
+    }
+}
+
+#[test]
+fn obstacle_checks_preserve_range_refusal_when_scale_sums_overflow() {
+    let mut pivots = [0.0; 2];
+    let mut upper = [0.0];
+    let factors = UnpivotedTridiagonal::new(&[f64::MAX], &[f64::MAX; 2], &[0.0])
+        .unwrap()
+        .factor_into(&mut pivots, &mut upper)
+        .unwrap();
+    assert_eq!(
+        factors
+            .factors
+            .check_complementarity(&[0.0; 2], &[-1.0; 2], &[0.0; 2]),
+        Err(Error::Range)
+    );
+    let factors = UnpivotedTridiagonal::new(&[0.0], &[f64::MIN_POSITIVE; 2], &[0.0])
+        .unwrap()
+        .factor_into(&mut pivots, &mut upper)
+        .unwrap();
+    let rhs = f64::MIN_POSITIVE * f64::MAX;
+    assert_eq!(
+        factors
+            .factors
+            .check_complementarity(&[rhs; 2], &[0.0; 2], &[f64::MAX; 2]),
+        Err(Error::Range)
+    );
+}

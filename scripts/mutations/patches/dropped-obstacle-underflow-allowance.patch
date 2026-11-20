@@ -1,0 +1,11 @@
+--- a/crates/morphiq-numerics/src/linalg/tridiagonal.rs
++++ b/crates/morphiq-numerics/src/linalg/tridiagonal.rs
+@@ -73,7 +73,7 @@
+ fn complementarity_underflow(matrix_scale: f64, solution_scale: f64) -> f64 {
+     #[cfg(test)]
+     COMPLEMENTARITY_UNDERFLOW_CALLS.with(|calls| calls.set(calls.get() + 1));
+-    8.0 * f64::from_bits(1) * matrix_scale * solution_scale
++    0.0 * matrix_scale * solution_scale
+ }
+ 
+ // Bitwise accumulation permits vectorization without moving admission after
