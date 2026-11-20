@@ -364,7 +364,9 @@ pub(crate) fn add_f64<K: Simd>(k: K, x: Dw<K>, y: K::F) -> Dw<K> {
 }
 
 /// `DoubleWord::mul`, preserving every scalar rounding. Callers establish
-/// `two_prod`'s domain for the leading product and normal-or-zero cross products.
+/// `two_prod`'s domain for the leading product and the applicable cross-product
+/// bound: normal-or-zero for the original bound, or the proved gradual-
+/// underflow extension used by trig (TrigMultiply.v).
 #[inline(always)]
 pub(crate) fn mul_dw<K: Simd>(k: K, a: Dw<K>, b: Dw<K>) -> Dw<K> {
     let (p, e) = two_prod(k, a.0, b.0);

@@ -1,9 +1,9 @@
 # Batched functions and lane evaluation
 
-`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice, log2_slice, log10_slice, asin_slice, asinh_slice, atan2_slice}` (and the bivariate normal's slice forms, below) apply
+`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice, log2_slice, log10_slice, sin_slice, cos_slice, sincos_slice, tan_slice, asin_slice, asinh_slice, atan2_slice}` (and the bivariate normal's slice forms, below) apply
 [`exp`](exp.md), [`exp2`](exp2.md), [`expm1`](expm1.md), [`ln` and `ln_1p`](ln.md) to every element of a slice. The
 lane kernels are `crates/morphiq-numerics/src/lanes/`, `exp/lanes.rs`, `exp2/lanes.rs`, `expm1/lanes.rs` and
-`ln/lanes.rs` and `log2/lanes.rs`; the SIMD backends are the `morphiq-numerics-arch` crate
+`ln/lanes.rs`, `log2/lanes.rs` and `trig/lanes.rs`; the SIMD backends are the `morphiq-numerics-arch` crate
 ([arch.md](arch.md)).
 
 `morphiq_numerics::normal::erfcx_slice` uses the same backends and cascade.
@@ -578,3 +578,42 @@ reciprocal stage (0.0077%). Exercising the double-word fallbacks directly,
 761 of 550,857 (0.1381%). These latter rates describe the fallback itself,
 not the fraction of public calls reaching Q128 after the earlier stages.
 Lane decisions are identical to those scalar decisions.
+
+
+## Trigonometric slices
+
+`sin_slice`, `cos_slice`, `sincos_slice` and `tan_slice` preserve their scalar
+contracts and bits. The `trig/lanes.rs` kernels reuse the scalar integer
+Payne–Hanek reduction and Q256 split per active lane. Special values and
+small-input screens use the scalar entries. Inactive lanes evaluate the
+ordinary argument 0.5, so no invalid argument reaches reduction or indexing.
+
+The polynomial, table normalization and double-word reconstruction preserve
+`trig::fast`'s operation order. The table index remains the rounded integer
+in `[0, 50]`; the lane loads use the same generated table. The leading products
+satisfy `two_prod`'s domain. Cross-product underflow uses the bound established
+by `TrigMultiply.v`, rather than assuming all cross products are normal.
+Hardware FMA is used only for the exact product error, as in §2.
+
+Tangent selects its numerator, denominator and sign in the scalar quadrant
+order. The scalar and lane division share the operand-validation boundary
+(normalized finite words, nonzero divisor, and the proved exponent span).
+Only admitted operands reach the lane division; rejected lanes divide 1 by 1
+and are masked out. DWDivDW2's two divisions and every multiplication and
+normalization use the scalar operation order, including exact-zero admission.
+The decision screens leading magnitudes below `2^-900` or non-finite values
+before constructing the ulp. `RoundingDecisionDomain.v` proves that the scalar
+tangent decision cannot accept a result below that magnitude; the sine/cosine
+bounds also keep accepted leading words in this range.
+
+A sine/cosine packet shares one reduction and reconstruction for both outputs.
+Its widest-first cascade covers SIMD remainders with narrower backends and
+leaves only a final single element to scalar `sincos`. Undecided lanes retain
+the scalar accurate fallback. There are no heap allocations.
+
+Intermediate-word tests compare the unselected sine/cosine pair, selected
+words, tangent admission and rounding decisions before fallback. Independent
+fixtures cover the public slices, and the `trig_slices` digest section covers
+all input binades, varying lengths and mixed exceptional lanes. Native timing
+and fallback-frequency qualification are separate from these correctness
+checks; no speedup is implied by enabling the lane implementation.

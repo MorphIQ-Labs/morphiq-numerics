@@ -194,6 +194,17 @@ fn valid(x: DoubleWord) -> Result<(), CheckError> {
     }
 }
 
+/// The common scalar/lane division boundary. Keep the validation order so
+/// the public checked operation retains its error classification.
+fn division_inputs(x: DoubleWord, y: DoubleWord) -> Result<(), CheckError> {
+    valid(x)?;
+    valid(y)?;
+    if y.hi == 0.0 {
+        return Err(DivisionByZero);
+    }
+    quotient_range(&[x.hi, x.lo, y.hi, y.lo])
+}
+
 fn valid_f64(y: f64) -> Result<(), CheckError> {
     if y.is_finite() {
         Ok(())
@@ -388,13 +399,13 @@ impl DoubleWord {
     ///
     /// As [`checked_div_f64`](Self::checked_div_f64).
     pub fn checked_div(self, other: Self) -> Result<Self, CheckError> {
-        valid(self)?;
-        valid(other)?;
-        // A double-word number is zero exactly when its leading word is.
-        if other.hi == 0.0 {
-            return Err(DivisionByZero);
-        }
-        quotient_range(&[self.hi, self.lo, other.hi, other.lo])?;
+        division_inputs(self, other)?;
         admit(self.div(other), self.hi == 0.0)
+    }
+
+    /// Validate raw lane words before performing the vector division.
+    #[cfg(feature = "simd")]
+    pub(crate) fn division_lane_inputs(xh: f64, xl: f64, yh: f64, yl: f64) -> bool {
+        division_inputs(Self { hi: xh, lo: xl }, Self { hi: yh, lo: yl }).is_ok()
     }
 }

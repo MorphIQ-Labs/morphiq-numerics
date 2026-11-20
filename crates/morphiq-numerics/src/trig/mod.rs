@@ -7,6 +7,9 @@
 mod reduction;
 mod tables;
 
+#[cfg(feature = "simd")]
+pub(crate) mod lanes;
+
 use crate::double_word::DoubleWord;
 use crate::eft::two_prod;
 use crate::ln::decide_with;
