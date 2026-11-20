@@ -343,8 +343,30 @@ pub(crate) fn tan_accurate_crosscheck(x: f64) -> (Q256, Q256, bool, Q256) {
     (num, den, negate, tan_accurate(&reduced))
 }
 
-/// Stored table words and their DoubleWord::sum construction, for the
-/// generated Coq table's extracted comparison.
+/// The Q256 split and table reduction in `fast`, retaining intermediate words.
+#[cfg(test)]
+pub(crate) fn input_crosscheck(r: Q256) -> [u64; 9] {
+    let h = r.to_f64();
+    let l = r.add(Q256::from_f64(-h)).to_f64();
+    let negative = h < 0.0;
+    let (ah, al) = if negative { (-h, -l) } else { (h, l) };
+    let i = (ah * 64.0 + SHIFTER) - SHIFTER;
+    let x = ah - i * 0.015_625;
+    let t = DoubleWord::sum(x, al);
+    [
+        h.to_bits(),
+        l.to_bits(),
+        u64::from(negative),
+        ah.to_bits(),
+        al.to_bits(),
+        i.to_bits(),
+        x.to_bits(),
+        t.hi().to_bits(),
+        t.lo().to_bits(),
+    ]
+}
+
+/// Stored table words and their DoubleWord::sum construction.
 #[cfg(test)]
 pub(crate) fn table_crosscheck(i: usize) -> [u64; 8] {
     let [(sh, sl), (ch, cl)] = TABLE[i];
