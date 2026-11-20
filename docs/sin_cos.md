@@ -235,9 +235,19 @@ large branch's proved domain.
      and their double-word construction against Rust. Polynomial evaluation
      and table-interval reconstruction are separate proof obligations.
    - They are combined with the proved `mul` and `add`/`sub` [DW].
-   - The relative errors use each term's ratio to the result. Those are enclosed
-     in interval arithmetic over every table interval (*generated*). The
-     largest `S/sin(a+t)` is 2.0.
+   - The relative errors use each term's ratio to the result. The generator
+     encloses these ratios over every table interval.
+     `TrigReconstructionRatios.v` independently proves the certificate's
+     sine and cosine term budgets from `a = 0` or `1/64 <= a <= 50/64` and
+     `|t| <= 0.0078126`, including row zero without division by its sine.
+     `TrigSplitAnalytic.v` propagates the `2^-105` split error to a `2^-104`
+     relative effect on sine and cosine for `|r| <= 0.785399`.
+     `TrigReconstructionCertificate.v` connects these allowances to the
+     existing Gappa certificates. `TrigReconstructionModel.v` composes the
+     analytic references and bounded arithmetic-error factors to the stated
+     `2^-62` bounds. The sine model requires a nonzero reference remainder;
+     the cosine model includes zero. Binding every arithmetic factor to
+     the executable double-word reconstruction remains a separate obligation.
    - `sin` is within `2^−62` (proves `2^−64.98`) and `cos` within `2^−62`
      (proves `2^−71.99`) (*certified*: `fast_sin.g`, `fast_cos.g`).
 
