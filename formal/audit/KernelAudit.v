@@ -1230,3 +1230,18 @@ Print Assumptions TrigZeroResidual.trig_sin_residual_zero.
 Print Assumptions TrigZeroResidual.trig_cos_residual_zero.
 Print Assumptions TrigResidual.trig_sin_residual_correct.
 Print Assumptions TrigResidual.trig_cos_residual_correct.
+
+Require TrigQSplit TrigInput TrigInputContract.
+Print Assumptions TrigQSplit.trig_q_grid.
+Print Assumptions TrigQSplit.trig_q_exponent.
+Print Assumptions TrigQSplit.trig_q_add_grid.
+Print Assumptions TrigQSplit.trig_q_split_correct.
+Print Assumptions TrigInput.trig_residual_split.
+Print Assumptions TrigInput.trig_times_64.
+Print Assumptions TrigInput.trig_index_value.
+Print Assumptions TrigInput.trig_scaled_index.
+Print Assumptions TrigInput.trig_sub_table.
+Print Assumptions TrigInput.trig_table_residual_correct.
+Print Assumptions TrigInputContract.trig_negative_correct.
+Print Assumptions TrigInputContract.trig_flip_correct.
+Print Assumptions TrigInputContract.trig_input_correct.

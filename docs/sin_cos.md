@@ -189,8 +189,16 @@ large branch's proved domain.
      normalized double-words with the stated `2^-65` relative bound.
      The extracted residual check includes intermediate square words and
      both output words. These theorems take the reduction/grid properties
-     as premises; the reduction-to-residual connection remains a separate
-     composition obligation.
+     as premises. `TrigQSplit.v`, `TrigInput.v` and `TrigInputContract.v`
+     discharge them for a valid Q256 remainder with magnitude between
+     `2^-64` and `0.785399`. The actual split differs from that remainder by
+     at most `2^-104` relatively. The proof follows limb addition to retain
+     the `2^-320` grid through cancellation, checks the nearest-even table
+     index in `0..=50`, proves exact table subtraction, and derives the
+     normalized TwoSum residual and its low-word bound. Both remainder
+     signs are covered. The extracted check compares the split, sign,
+     index, subtraction and residual words. Public entry composition must
+     establish the Q256 remainder domain and connect table reconstruction.
    - **Below `|t| = 2^−60`,** `t` is `r_lo` alone, since `r_hi` equals the table
      point, and `t⁴` may underflow. A tail is then only known to lie within
      `[0, 3]` times its value, and the bounds still hold (*certified*:
@@ -202,8 +210,9 @@ large branch's proved domain.
      `TrigZeroResidual.v` proves exact zero outputs at a zero residual.
      `TrigResidual.v` combines zero, tiny and regular cases into finite,
      normalized residual contracts, with the input magnitude, normalization
-     and grid premises stated explicitly. Table reconstruction and its
-     connection to the Q256 reduction are separate composed proofs.
+     and grid premises supplied by `TrigInputContract.v` on its stated Q256
+     domain. Table reconstruction and public entry composition remain
+     separate proof obligations.
    - `t` is 0 or at least `2^−317` in magnitude, since it's a difference on
      `Q256`'s grid. Before emitting or checking certificates,
      `generators/trig_certificates.py` consumes `trig_reduction.derive()` and

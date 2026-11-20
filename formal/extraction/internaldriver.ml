@@ -90,6 +90,10 @@ let compute op args =
            let (((qn, qe), ql), rounded) = x_trig_tan_accurate (z_of_u64 (hex x)) (n = "1") in
            show (qn, qe, ql) ^ " " ^ show_bits rounded
        | _ -> failwith "trig_tan_accurate takes a magnitude and sign")
+  | "trig_input" ->
+      let ((n, e, l), rest) = value args in
+      if rest <> [] then failwith "trig_input takes one Q256 value";
+      String.concat " " (List.map show_bits (x_trig_input n e l))
   | "trig_residual" ->
       (match args with
        | [h; l] -> String.concat " " (List.map show_bits (x_trig_residual (z_of_u64 (hex h)) (z_of_u64 (hex l))))
