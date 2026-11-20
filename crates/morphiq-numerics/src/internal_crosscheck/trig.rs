@@ -74,6 +74,17 @@ pub(super) fn write(out: &mut String) {
             emit_residual(out, -head, -0.0);
         }
     }
+    // Dense significands in the binades where the cosine tail crosses zero,
+    // subnormal and normal rounding regions. Inputs are seeded, not outputs.
+    let mut tiny_rng = SplitMix64::new(0x7472_6967_7469_6e79);
+    for exponent in 753..=770_u64 {
+        for _ in 0..32 {
+            let fraction = tiny_rng.next_u64() & ((1_u64 << 52) - 1);
+            let head = f64::from_bits((exponent << 52) | fraction);
+            emit_residual(out, head, 0.0);
+            emit_residual(out, -head, -0.0);
+        }
+    }
     for head in [0.0, -0.0, 0.007_812_6, -0.007_812_6] {
         emit_residual(out, head, 0.0);
     }
