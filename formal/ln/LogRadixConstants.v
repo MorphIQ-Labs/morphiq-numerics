@@ -3,9 +3,24 @@
     CoqInterval independently proves the residual bounds below. *)
 From Coq Require Import Reals ZArith Lia.
 From Q Require Q128 QSpec.
-From Flocq Require Import Core.
+From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.
+From Binary64 Require Import IEEE64 Encodings.
 From Interval Require Import Tactic.
 Open Scope R_scope.
+Definition inv_ln2_hi : f64 := b64_of_bits 4609176140021203710.
+Lemma inv_ln2_hi_val : B inv_ln2_hi = 6497320848556798 / 2 ^ 52.
+Proof. exact (bits_val 4609176140021203710 false 6497320848556798 52 eq_refl). Qed.
+Lemma inv_ln2_hi_finite : finite inv_ln2_hi.
+Proof. exact (bits_finite 4609176140021203710 _ _ _ eq_refl). Qed.
+Definition inv_ln2_lo : f64 := b64_of_bits 4357082904033627428.
+Lemma inv_ln2_lo_val : B inv_ln2_lo = 6605663993728292 / 2 ^ 108.
+Proof. exact (bits_val 4357082904033627428 false 6605663993728292 108 eq_refl). Qed.
+Lemma inv_ln2_lo_finite : finite inv_ln2_lo.
+Proof. exact (bits_finite 4357082904033627428 _ _ _ eq_refl). Qed.
+Lemma inv_ln2_dw_residual :
+ Rabs ((B inv_ln2_hi + B inv_ln2_lo) * ln 2 - 1) <= / 2 ^ 109.
+Proof. rewrite inv_ln2_hi_val, inv_ln2_lo_val.
+ interval with (i_prec 200). Qed.
 Definition inv_ln2_q := Q128.new false 245461841629398282873184673143046618761 (-127).
 Lemma inv_ln2_q_normalized : QSpec.normalized 128 (Q128.m inv_ln2_q).
 Proof. vm_compute. split; congruence. Qed.
@@ -16,6 +31,20 @@ Proof. unfold inv_ln2_q. rewrite Q128.new_val by (unfold Q128.W; lia).
  unfold Rdiv. f_equal. f_equal. ring. Qed.
 Lemma inv_ln2_q_residual : Rabs (Q128.qval inv_ln2_q * ln 2 - 1) <= / 2 ^ 127.
 Proof. rewrite inv_ln2_q_val. interval with (i_prec 220). Qed.
+Definition inv_ln10_hi : f64 := b64_of_bits 4601495173785380110.
+Lemma inv_ln10_hi_val : B inv_ln10_hi = 7823553867474190 / 2 ^ 54.
+Proof. exact (bits_val 4601495173785380110 false 7823553867474190 54 eq_refl). Qed.
+Lemma inv_ln10_hi_finite : finite inv_ln10_hi.
+Proof. exact (bits_finite 4601495173785380110 _ _ _ eq_refl). Qed.
+Definition inv_ln10_lo : f64 := b64_of_bits 4353102142499388115.
+Lemma inv_ln10_lo_val : B inv_ln10_lo = 7128502086859475 / 2 ^ 109.
+Proof. exact (bits_val 4353102142499388115 false 7128502086859475 109 eq_refl). Qed.
+Lemma inv_ln10_lo_finite : finite inv_ln10_lo.
+Proof. exact (bits_finite 4353102142499388115 _ _ _ eq_refl). Qed.
+Lemma inv_ln10_dw_residual :
+ Rabs ((B inv_ln10_hi + B inv_ln10_lo) * ln 10 - 1) <= / 2 ^ 109.
+Proof. rewrite inv_ln10_hi_val, inv_ln10_lo_val.
+ interval with (i_prec 200). Qed.
 Definition inv_ln10_q := Q128.new false 295565508485482415723106918041277160498 (-129).
 Lemma inv_ln10_q_normalized : QSpec.normalized 128 (Q128.m inv_ln10_q).
 Proof. vm_compute. split; congruence. Qed.

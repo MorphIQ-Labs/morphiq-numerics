@@ -154,13 +154,35 @@ def log_coq_constants(d):
         '    CoqInterval independently proves the residual bounds below. *)',
         'From Coq Require Import Reals ZArith Lia.',
         'From Q Require Q128 QSpec.',
-        'From Flocq Require Import Core.',
+        'From Flocq Require Import Core IEEE754.Binary IEEE754.Bits.',
+        'From Binary64 Require Import IEEE64 Encodings.',
         'From Interval Require Import Tactic.',
         'Open Scope R_scope.',
     ]
     for base in (2, 10):
         c = d[f'inv_ln{base}']
         m, e = c['m'], c['e']
+        for part in ('hi', 'lo'):
+            bits = to_bits(c[part])
+            mantissa = (bits & ((1 << 52) - 1)) + (1 << 52)
+            denominator = 1075 - ((bits >> 52) & 2047)
+            assert bits >> 63 == 0
+            word = f'inv_ln{base}_{part}'
+            lines += [
+                f'Definition {word} : f64 := b64_of_bits {bits}.',
+                f'Lemma {word}_val : B {word} = {mantissa} / 2 ^ {denominator}.',
+                f'Proof. exact (bits_val {bits} false {mantissa} {denominator} eq_refl). Qed.',
+                f'Lemma {word}_finite : finite {word}.',
+                f'Proof. exact (bits_finite {bits} _ _ _ eq_refl). Qed.',
+            ]
+        # A common independently certified enclosure is sufficient for the
+        # 2^-63 fast-path budget; no measured residual becomes a premise.
+        lines += [
+            f'Lemma inv_ln{base}_dw_residual :',
+            f' Rabs ((B inv_ln{base}_hi + B inv_ln{base}_lo) * ln {base} - 1) <= / 2 ^ 109.',
+            f'Proof. rewrite inv_ln{base}_hi_val, inv_ln{base}_lo_val.',
+            ' interval with (i_prec 200). Qed.',
+        ]
         name = f'inv_ln{base}_q'
         lines += [
             f'Definition {name} := Q128.new false {m} ({e}).',
