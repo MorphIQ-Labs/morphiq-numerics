@@ -1419,3 +1419,15 @@ Print Assumptions TrigTanFastValue.trig_tan_eps_value.
 Print Assumptions TrigTanFastValue.trig_tan_reference_floor.
 Print Assumptions TrigTanFastValue.trig_tan_fast64_correct.
 Print Assumptions TrigTanFastValue.trig_tan_fast_decision_correct.
+
+Require TrigTanScreenConstants TrigTanScreen.
+Print Assumptions TrigTanScreenConstants.trig_tan_is_x_finite.
+Print Assumptions TrigTanScreenConstants.trig_tan_is_x_value.
+Print Assumptions TrigTanScreenConstants.trig_tan_is_x_next_value.
+Print Assumptions TrigTanScreenConstants.trig_tan_is_x_bounds.
+Print Assumptions TrigTanScreenConstants.trig_tan_is_x_error.
+Print Assumptions TrigTanScreenConstants.trig_tan_is_x_next_error.
+Print Assumptions TrigTanScreen.trig_tan_loss_monotone.
+Print Assumptions TrigTanScreen.trig_tan_tiny_round.
+Print Assumptions TrigTanScreen.trig_tan_upper_round.
+Print Assumptions TrigTanScreen.trig_tan_screen_round.

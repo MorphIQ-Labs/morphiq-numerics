@@ -454,6 +454,12 @@ interval, and `generators/tan_reference.py` bisects for its first edge inside
 `[2^−27, 2^−26)` (*generated*). Arguments in the second stretch take the
 general path, which returns `x` there too.
 
+`TrigTanScreenConstants.v` certifies the exact threshold encoding and the
+strict half-ULP inequalities at it and the immediately following binary64
+value. `TrigTanScreen.v` proves correct rounding throughout the identity
+screen, including subnormals and both signs, using Taylor bounds for the
+smallest inputs and monotonicity of `tan(x) - x` through the endpoint.
+
 **Reduction.** `tan` has period `π`, so with §3's `|x| = k·π/2 + r`, `tan |x|` is
 `tan r` for even `k` and `−cot r = −cos r/sin r` for odd `k`. `tan` is odd, so
 the sign comes from `x`. `sin r` and `cos r` are §4's and §5's, each relative to
@@ -477,8 +483,8 @@ derives the decision's magnitude domain from the reference value's separation
 from zero. The decision itself establishes pair normalization. The extracted
 fast quotient and decision are compared with Rust across binades, quadrant and
 screen boundaries, reduction witnesses and independent fixture arguments, with
-both decision outcomes covered. This fast-path theorem does not establish the
-public tangent small-input screen or its full entry composition.
+both decision outcomes covered. The small-input screen is proved separately
+above; composition of the complete public tangent entry remains separate work.
 
 **Decision 4: `Q256::recip`, by Newton's iteration.**
 - For `|c| >= 2^-1022` with finite `RN(c)`, `y_0 = RN(1/RN(c))`
