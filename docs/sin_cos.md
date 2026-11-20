@@ -81,6 +81,25 @@ by `k mod 4`, with `sin`'s sign from `x`.
   `x = 6381956970095103·2^797`. That is the classic worst case, derived here
   rather than cited.
 
+**Certified separation.** `TrigSeparation.v` proves a determinant-one
+rational-bracket lemma: if the two denominators sum to at least `2^53`,
+every smaller positive denominator has distance at least the smaller of the
+two endpoint residuals. The proof expands the numerator/denominator pair
+in the integer basis supplied by the determinant; it does not assume a
+continued-fraction search is correct. `TrigSeparationData.v` checks exact
+integer witnesses against the certified 1,408-bit `2/π` enclosure for every
+exponent from −53 through 972. The final exponent covers twice the largest
+binary64 input, needed for half-integer quadrant boundaries.
+
+`TrigClosest.v` connects those checks to every finite binary64 `x ≥ π/4`:
+`|x·(2/π) − k| ≥ 2^−62` and `|x·(2/π) − (k+1/2)| ≥ 2^−63` for every integer
+`k`. These conservative bounds suffice for the selected truncation budget;
+the exact generated minimum above is not a premise of either theorem.
+`trig_truncation_relative` proves that an absolute truncation error below
+`2^−262` implies a relative error below `2^−200`. That theorem is an interface
+to the window analysis; it does not establish the executable window's error
+or the final reconstructed `Q256` remainder.
+
 **Payne–Hanek** ([PH]), in integer arithmetic.
 - Bits of `2/π` of weight above `2^(1−E)` add only multiples of 4 to `x·(2/π)`,
   so they are skipped.
@@ -196,6 +215,8 @@ use, so its pair is theirs bit for bit.
 |---|---|
 | `generators/trig_reduction.py` | the closest approach, `F`, `2/π` to 1,408 bits and `π/2` in `Q256` (`src/trig/reduction.rs`) |
 | `formal/trig/TrigConstants.v` | generated limb encodings, certified `2/π` table bits and `π/2` rounding/relative bounds |
+| `generators/trig_separation.py`, `formal/trig/TrigSeparationData.v` | reproducible rational witnesses and their exact integer checks for 1,026 exponents |
+| `formal/trig/TrigSeparation.v`, `formal/trig/TrigClosest.v` | bracket sufficiency, binary64 separation from integers and half-integers, conditional relative truncation budget |
 | `generators/trig_poly.sollya` (Sollya 8.0) | `Ps`, `Pc` and their bounds, in `generators/trig_poly.out` |
 | `generators/trig_constants.py` | `src/trig/tables.rs`: the table, the polynomials, the series factors and degrees; the enclosed ratios |
 | `generators/trig_certificates.py` | writes every certificate in `formal/trig` (61) |
