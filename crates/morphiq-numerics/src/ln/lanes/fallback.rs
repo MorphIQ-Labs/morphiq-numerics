@@ -23,9 +23,9 @@ pub(super) fn polynomial<K: Simd>(k: K, z: Dw<K>) -> Dw<K> {
     add_f64(k, add_dw(k, z, b), v)
 }
 
-/// The shared reduced `ln y` and full `ln x` fast values.
+/// The shared reduced `ln y` fast value and integer exponent.
 #[inline(always)]
-fn reduced<K: Simd>(k: K, x: K::F) -> Dw<K> {
+pub(crate) fn ln_y<K: Simd>(k: K, x: K::F) -> (Dw<K>, K::F) {
     let (y, e) = reduce(k, x);
     let words = k.store(y);
     let (mut r, mut nh, mut nl) = (
@@ -46,6 +46,13 @@ fn reduced<K: Simd>(k: K, x: K::F) -> Dw<K> {
     let p = polynomial(k, z);
     let n = two_sum(k, k.load(nh), k.load(nl));
     let ly = add_dw(k, n, p);
+    (ly, e)
+}
+
+/// The full `ln x` fast value, preserving scalar reconstruction order.
+#[inline(always)]
+fn reduced<K: Simd>(k: K, x: K::F) -> Dw<K> {
+    let (ly, e) = ln_y(k, x);
     let el = two_sum(k, k.mul(e, k.splat(LN2_HI)), k.mul(e, k.splat(LN2_LO)));
     add_dw(k, el, ly)
 }

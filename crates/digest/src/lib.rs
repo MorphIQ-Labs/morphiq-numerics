@@ -17,8 +17,8 @@ use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::elementary::{
     asin, asin_slice, asinh, asinh_slice, atan2, atan2_slice, cos, exp, exp_slice, exp2,
-    exp2_slice, expm1, expm1_slice, ln, ln_1p, ln_1p_slice, ln_slice, log2, log10, sin, sincos,
-    sqrt, tan,
+    exp2_slice, expm1, expm1_slice, ln, ln_1p, ln_1p_slice, ln_slice, log2, log2_slice, log10,
+    log10_slice, sin, sincos, sqrt, tan,
 };
 use morphiq_numerics::interval::{FiniteInterval, IntervalError};
 use morphiq_numerics::linalg::tridiagonal::{DominantTridiagonal, Error as TridiagonalError};
@@ -1164,8 +1164,33 @@ pub fn corpus_digest() -> [u8; 32] {
     fast_section(&mut r);
     double_word_exp_section(&mut r);
     moments_section(&mut r);
+    radix_log_slice_section(&mut r);
 
     r.0.finalize().into()
+}
+
+fn radix_log_slice_section(r: &mut Recorder) {
+    let mut words = Words::new(0x7261_6469_785f_6c6e);
+    let edges = [
+        0x7ff8_0000_0000_0042,
+        0xfff8_0000_0000_0042,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0,
+        1 << 63,
+        0xbff0_0000_0000_0000,
+        1,
+        0x0010_0000_0000_0000,
+        0x3ff0_0000_0000_0000,
+        0x3ff0_0000_0000_0001,
+        0x3fef_ffff_ffff_ffff,
+        0x4024_0000_0000_0000,
+        0x7fef_ffff_ffff_ffff,
+    ];
+    r.label("log2_slice");
+    batched_section(r, &mut words, log2_slice, &edges, (0.0, 4.0));
+    r.label("log10_slice");
+    batched_section(r, &mut words, log10_slice, &edges, (0.0, 4.0));
 }
 
 fn tridiagonal_error(r: &mut Recorder, error: TridiagonalError) {

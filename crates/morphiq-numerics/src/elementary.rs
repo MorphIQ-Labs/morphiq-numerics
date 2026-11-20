@@ -17,7 +17,7 @@
 //! [`atan2`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/atan2.md).
 //!
 //! [`exp_slice`], [`exp2_slice`], [`expm1_slice`], [`ln_slice`], [`ln_1p_slice`],
-//! [`asin_slice`], [`asinh_slice`] and [`atan2_slice`] apply a function to every
+//! [`log2_slice`], [`log10_slice`], [`asin_slice`], [`asinh_slice`] and [`atan2_slice`] apply a function to every
 //! element of a slice and return its bits exactly. With the `simd` feature they
 //! evaluate several elements at once in SIMD lanes
 //! ([`lanes`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/lanes.md)),
@@ -104,6 +104,24 @@ batched!(
     exp2_slice,
     exp2,
     crate::exp2::lanes::Exp2
+);
+
+batched!(
+    /// [`log2`] of every element of `x`, written to `out`, bit for bit.
+    /// With `simd`, the fast path runs in lanes; screened or undecided lanes
+    /// call [`log2`] with its unchanged numerical contract.
+    log2_slice,
+    log2,
+    crate::log2::lanes::Radix<false>
+);
+
+batched!(
+    /// [`log10`] of every element of `x`, written to `out`, bit for bit.
+    /// With `simd`, the fast path runs in lanes; screened or undecided lanes
+    /// call [`log10`] with its unchanged numerical contract.
+    log10_slice,
+    log10,
+    crate::log2::lanes::Radix<true>
 );
 
 batched!(

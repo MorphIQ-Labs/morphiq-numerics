@@ -20,7 +20,7 @@ use crate::ulp::ulp;
 use tables::{LN2_HI, LN2_LO, LN2_Q128, NEG_LN_R_BITS, NEG_LN_R_Q128, POLY, R_BITS, RECIPROCALS};
 
 /// The rounding test's `EPS = ε₁·(1 + 2^−50)`, `ε₁ = 2^−63` (§5).
-const EPS: f64 = f64::from_bits(0x3c00_0000_0000_0004);
+pub(crate) const EPS: f64 = f64::from_bits(0x3c00_0000_0000_0004);
 /// The binary64 fraction field.
 const FRACTION: u64 = (1 << 52) - 1;
 /// `2^54`, which scales a subnormal argument to a normal one (§3).
