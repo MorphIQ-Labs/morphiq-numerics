@@ -332,6 +332,15 @@ path; none of the 1,200 precise arguments does.
   from the last's bound). `src/q256/tests.rs` checks `|c·y − 1| ≤ 2^−252`
   exactly.
 
+`formal/trig/TrigReciprocal.v::q_reciprocal_full_contract` proves the
+`2^-252` relative bound for the actual three-step transcription on this full
+domain, with either sign. It derives the finite conversion's rounding relation,
+bounds the possibly subnormal seed, and reuses the signed Newton theorem in
+`ErfcxAccurateNewton`. The exact-integer tests cover all 2,046 normal-input
+binades, full Q256 significands and the finite-conversion boundary. The
+extracted `asin_recip` operation is shared by the asin and trig cross-check
+corpora and is compared with the actual Rust `Q256::recip` output.
+
 **Accurate path.** `N.mul(D.recip())` from §5's values is within `2^−196`
 (*certified*: `accurate_tan.g`).
 

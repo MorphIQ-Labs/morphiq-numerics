@@ -246,3 +246,44 @@ fn recip_is_within_its_bound_when_the_seed_is_subnormal() {
         check(c.mul_pow2(1));
     }
 }
+
+#[test]
+fn recip_is_within_its_bound_across_every_normal_input_binade() {
+    let check = |c: Q256| {
+        assert!(c.to_f64().is_finite());
+        assert_ne!(
+            Exact::of_q256(c).abs().cmp(&Exact::pow2(-1022)),
+            Ordering::Less
+        );
+        let y = c.recip();
+        assert_eq!(y.m[3] >> 63, 1);
+        assert_eq!(y.negative, c.negative);
+        let error = Exact::of_q256(c)
+            .mul(&Exact::of_q256(y))
+            .sub(&Exact::pow2(0))
+            .abs();
+        assert_ne!(error.cmp(&Exact::pow2(-252)), Ordering::Greater, "1/{c:?}");
+    };
+    let mut rng = SplitMix64::new(0x5132_3536_6675_6c6c);
+    // Exact powers, their full-precision successors, and full significands
+    // at every exponent in the documented input domain, with both signs.
+    for top in -1022..=1023 {
+        let upper = if top == 1023 {
+            // One Q256 unit below the binary64 overflow midpoint:
+            // (2^256 - 2^202 - 1) * 2^768 rounds to f64::MAX.
+            [u64::MAX, u64::MAX, u64::MAX, u64::MAX - (1 << 10)]
+        } else {
+            [u64::MAX; 4]
+        };
+        let mut random = limbs(&mut rng);
+        // Keep this additional random case below the overflow midpoint.
+        if top == 1023 {
+            random[3] &= !(1 << 62);
+        }
+        for m in [[0, 0, 0, 1 << 63], [1, 0, 0, 1 << 63], upper, random] {
+            for negative in [false, true] {
+                check(Q256::new(negative, m, top - 255));
+            }
+        }
+    }
+}
