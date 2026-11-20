@@ -1197,3 +1197,15 @@ Print Assumptions TrigTail.trig_tail_evaluation.
 Print Assumptions TrigTail.trig_sin_tail_certificate.
 Print Assumptions TrigTail.trig_cos_tail_certificate.
 Print Assumptions TrigTail.trig_tail_regular.
+
+Require TrigResidualCertificate TrigSinResidual TrigCosSquare TrigCosResidual.
+Print Assumptions TrigResidualCertificate.trig_sin_residual_certificate.
+Print Assumptions TrigResidualCertificate.trig_cos_residual_certificate.
+Print Assumptions TrigResidualCertificate.trig_sin_residual_model.
+Print Assumptions TrigResidualCertificate.trig_cos_residual_model.
+Print Assumptions TrigSinResidual.trig_sin_residual_regular.
+Print Assumptions TrigCosSquare.trig_half_exact.
+Print Assumptions TrigCosSquare.trig_cos_square_correct.
+Print Assumptions TrigCosResidual.trig_sub_model.
+Print Assumptions TrigCosResidual.trig_cross_model.
+Print Assumptions TrigCosResidual.trig_cos_residual_regular.
