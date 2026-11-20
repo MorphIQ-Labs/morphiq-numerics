@@ -63,7 +63,66 @@ fn emit_input(out: &mut String, r: Q256) {
     }
 }
 
+fn emit_mul(out: &mut String, xh: f64, xl: f64, yh: f64, yl: f64) {
+    use crate::double_word::DoubleWord;
+    let x = DoubleWord::sum(xh, xl);
+    let y = DoubleWord::sum(yh, yl);
+    let z = x.mul(y);
+    writeln!(
+        out,
+        "trig_mul {:016x} {:016x} {:016x} {:016x} : {:016x} {:016x}",
+        x.hi().to_bits(),
+        x.lo().to_bits(),
+        y.hi().to_bits(),
+        y.lo().to_bits(),
+        z.hi().to_bits(),
+        z.lo().to_bits()
+    )
+    .unwrap();
+}
+
+fn write_multiply(out: &mut String) {
+    // Actual table/residual products, including r = 1/64 + 2^-255:
+    // S.hi * CM.lo is then nonzero and subnormal. Both residual signs,
+    // table row zero, and fine low words are retained.
+    for i in [0, 1, 25, 50] {
+        let table = crate::trig::table_crosscheck(i).map(f64::from_bits);
+        for exponent in [-320, -300, -270, -260, -255, -250, -200, -100, -60, -7] {
+            let head = f64::from_bits(((exponent + 1023) as u64) << 52);
+            for sign in [1.0, -1.0] {
+                let t = crate::double_word::DoubleWord::sum(sign * head, 0.0);
+                let residual = crate::trig::residual_crosscheck(t).map(f64::from_bits);
+                for a in [4, 6] {
+                    for b in [4, 6] {
+                        emit_mul(out, table[a], table[a + 1], residual[b], residual[b + 1]);
+                    }
+                }
+            }
+        }
+    }
+    // The theorem's head-product floor, normal/subnormal cross products,
+    // both signs, exact zeros and halfway normalization boundaries.
+    for exponent in [-900, -899, -640, -450, -1, 0, 508] {
+        let head = f64::from_bits(((exponent + 1023) as u64) << 52);
+        let half_ulp = f64::from_bits(((exponent - 53 + 1023) as u64) << 52);
+        for low in [0.0, half_ulp, -half_ulp] {
+            for tiny in [0, 1, (1_u64 << 52) - 1, 1_u64 << 52, 970_u64 << 52] {
+                let tiny = f64::from_bits(tiny);
+                for sign in [1.0, -1.0] {
+                    emit_mul(out, sign * head, low, 1.0, tiny);
+                    emit_mul(out, 1.0, tiny, sign * head, low);
+                }
+            }
+        }
+    }
+    for zero in [0.0, -0.0] {
+        emit_mul(out, zero, zero, 1.0, f64::from_bits(1));
+        emit_mul(out, 1.0, f64::from_bits(1), zero, zero);
+    }
+}
+
 pub(super) fn write(out: &mut String) {
+    write_multiply(out);
     // Table points, halfway index ties and their binary64 neighbours. The
     // fine Q256 offsets exercise a nonzero low word when the head is exact.
     for k in 0..=100 {
