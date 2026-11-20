@@ -66,6 +66,18 @@ let show_opt = function None -> "none" | Some z -> show_bits z
 
 let compute op args =
   match op with
+  | "trig_select" ->
+      (match args with
+       | [k; n; c] ->
+           let (use_cos, negate) = x_trig_select (z_of_int (int_of_string k)) (n = "1") (c = "1") in
+           (if use_cos then "1" else "0") ^ " " ^ (if negate then "1" else "0")
+       | _ -> failwith "trig_select takes a quadrant, sign and function")
+  | "trig_accurate" ->
+      (match args with
+       | [x; n; c] ->
+           let (((qn, qe), ql), rounded) = x_trig_accurate (z_of_u64 (hex x)) (n = "1") (c = "1") in
+           show (qn, qe, ql) ^ " " ^ show_bits rounded
+       | _ -> failwith "trig_accurate takes a magnitude, sign and function")
   | "trig_series" ->
       let ((n, e, l), _) = value args in
       let (((sn, se), sl), ((cn, ce), cl)) = x_trig_series n e l in

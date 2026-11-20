@@ -223,6 +223,20 @@ large branch's proved domain.
   cross-check compares this same transcription with actual Rust series
   outputs on signed full-precision reduction remainders.
 
+`formal/trig/TrigQuadrant.v` proves the actual quadrant/sign selection and
+composes it with the reduction and series bounds. `TrigRounding.v` proves the
+accurate value converts to finite binary64 with one nearest-even rounding and
+error at most `(1/2 + 2^−145)` ULP of the exact sine or cosine, within the
+published `(1/2 + 2^−144)` allowance. The shared
+`formal/binary64/RelativeUlp.v` theorem measures ULP at the exact result,
+including binade crossings, zero and subnormal results. This accurate-path
+bound does not by itself establish the public entry's screens or fast decision,
+or the separate worst-case qualification for correct rounding.
+
+The internal extraction corpus exercises all 16 quadrant/sign/function choices,
+forced accurate results and their final binary64 conversions, including
+reduction-boundary neighbors, tiny arguments, large arguments and seeded inputs.
+
 ## 6. Rounding test and claims
 
 **Decision 3: `ε₁ = 2^−62`** in [ln] §5's test, with `EPS = 2^−62·(1 + 2^−50)`.
