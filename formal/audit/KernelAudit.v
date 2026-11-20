@@ -1044,3 +1044,12 @@ Print Assumptions LogRadixAccurate.reconstruct2_bound.
 Print Assumptions LogRadixAccurate.reduced_ln_bound.
 Print Assumptions LogRadixAccurate.log2_acc_bound.
 Print Assumptions LogRadixAccurate.log10_acc_bound.
+Require LogRadixRounding.
+Print Assumptions LogRadixRounding.radix_log_range.
+Print Assumptions LogRadixRounding.radix_accurate_round.
+Print Assumptions LogRadixRounding.log2_accurate_round.
+Print Assumptions LogRadixRounding.log10_accurate_round.
+Print Assumptions LogRadixRounding.log2_accurate_correct.
+Print Assumptions LogRadixRounding.log10_accurate_bounded.
+Print Assumptions LogRadixRounding.log2_accurate_representable.
+Print Assumptions LogRadixRounding.log10_accurate_representable.

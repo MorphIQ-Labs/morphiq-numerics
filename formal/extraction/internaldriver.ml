@@ -359,10 +359,14 @@ let compute op args =
            let (words, result) = f (z_of_u64 (hex x)) in
            String.concat " " (List.map show_bits words @ [show_opt result])
        | _ -> failwith "logarithm fast value takes one word")
-  | "ln_entry" | "ln1p_entry" ->
+  | "ln_entry" | "ln1p_entry" | "log2_accurate_result" | "log10_accurate_result" ->
       (match args with
        | [x] ->
-           let f = if op = "ln_entry" then x_ln_entry else x_ln1p_entry in
+           let f = match op with
+             | "ln_entry" -> x_ln_entry
+             | "log2_accurate_result" -> x_log2_accurate_result
+             | "log10_accurate_result" -> x_log10_accurate_result
+             | _ -> x_ln1p_entry in
            show_bits (f (z_of_u64 (hex x)))
        | _ -> failwith "logarithm entry takes one word")
   | "expm1_small" ->

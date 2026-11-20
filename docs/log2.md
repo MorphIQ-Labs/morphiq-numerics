@@ -101,6 +101,7 @@ Both paths err by less than half an ulp of `n`, so both return `n` exactly.
 | `generators/radix_constants.py` | `1/ln 2` and `1/ln 10` as double-words and in `Q128`, with their errors (`src/log2/tables.rs`) |
 | `formal/ln/LogRadixConstants.v` | generated Q128 encodings, normalized significands and independent CoqInterval proofs of both reciprocal-log residuals |
 | `formal/ln/LogRadixAccurate.v` | executable Q128 scaling and exponent reconstruction, with the shared `ln` accurate theorem discharging the input error bounds |
+| `formal/ln/LogRadixRounding.v` | finite, single-round binary64 conversion of both accurate paths; `log2` correct rounding under [LM]'s explicit midpoint-distance hypothesis; exact representable results for either radix |
 | `generators/radix_certificates.py` | writes the four certificates below; the ratio bound is enclosed with `mpmath.iv` |
 | `formal/log2/fast_log2.g`, `accurate_log2.g` | `log2`'s paths: `2^−63` and `2^−122` |
 | `formal/log2/fast_log10.g`, `accurate_log10.g` | `log10`'s paths: `2^−63` and `2^−122` |
@@ -127,10 +128,24 @@ The theorem names above enter the kernel axiom audit and source binding. The
 extracted accurate paths are compared with the Rust Q128 sign, exponent and
 significand, before binary64 rounding, on independent reference-fixture inputs,
 all representable powers of two, table-boundary neighbors and exponent extremes.
-Those comparisons test correspondence; they do not replace the real-number
-error proofs. The fast-path certificate linkage, rounding/entry composition
-and matching SIMD proof obligations are not established by these accurate-path
-theorems.
+`LogRadixRounding.v` connects those unrounded bounds to the actual
+`Q128::to_f64` conversion. For positive finite `x != 1`, either exact radix
+logarithm has magnitude between `2^-57` and `1600`; the approximation and its
+rounded output are therefore finite and nonzero. `log2_accurate_correct`
+establishes correct rounding with [LM] Property 4's `2^-109` mantissa-distance
+hypothesis explicit in its signature. For `log10`, `log10_accurate_bounded`
+establishes one rounding of a value within `2^-122` relatively of the exact
+logarithm, without introducing a hard-case hypothesis. The representable-result
+theorems establish exact return values for either radix without that hypothesis.
+
+The extraction corpus compares both the Q128 intermediates and their final
+binary64 encodings with Rust. Separate forced-accurate-path tests compare final
+results with the independent oracle fixture, including inputs the public entry
+normally handles on the fast path. Those comparisons test correspondence and
+sampled accuracy; they do not replace the real-number error proofs. Fast-path
+certificate linkage, public-entry composition, the explicit final ULP-bound
+translation for `log10`, and matching SIMD proof obligations are not established
+by these accurate-path theorems.
 
 The binding `formal/log2/binding.sha256` covers this document, the constants,
 the certificates and the source.
@@ -141,6 +156,8 @@ the certificates and the source.
   reported, not waived.
 - `src/log2/tests.rs`:
   - every unrounded result within its bound, against the 192-bit values;
+  - both accurate paths after binary64 conversion against the independent
+    rounded fixture, including hard cases and exact powers;
   - each fast path against its accurate path on 2^20 arguments. Measured, both
     send `2^−9.4` of them to the accurate path, against the analytic `2^−9`.
 - The determinism digest's `log2` and `log10` sections on every target.

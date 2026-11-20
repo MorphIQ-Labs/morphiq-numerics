@@ -48,6 +48,41 @@ fn every_unrounded_log10_is_within_its_certified_bound() {
     check("log10", log10_fast, log10_accurate);
 }
 
+fn check_accurate_rounding(function: &str, accurate: fn(&Reduced) -> Q128) {
+    // The generated fixture places its rounded arrays after the same-named
+    // arrays of 192-bit values in `precise`.
+    let key = std::format!("\"{function}\": [");
+    let rounded = &FIXTURE[FIXTURE.rfind(&key).unwrap()..];
+    let cases = entries(rounded, &[function]);
+    assert_eq!(cases.len(), if function == "log2" { 4029 } else { 4034 });
+    for case in cases {
+        let x = word(case, "x");
+        if !x.is_finite() || x <= 0.0 {
+            continue;
+        }
+        let expected = word(case, function);
+        let got = accurate(&Reduced::of(x)).to_f64();
+        assert_eq!(
+            got.to_bits(),
+            expected.to_bits(),
+            "accurate {function}({x:e}), input {:016x}",
+            x.to_bits()
+        );
+    }
+}
+
+#[test]
+fn log2_accurate_rounding_matches_the_independent_fixture() {
+    check_accurate_rounding("log2", log2_accurate);
+}
+
+#[test]
+fn log10_accurate_rounding_matches_the_independent_fixture() {
+    // This fixture observation does not claim whole-domain correct rounding:
+    // log10 retains its documented bounded accurate-path contract.
+    check_accurate_rounding("log10", log10_accurate);
+}
+
 /// The analytic miss rate with `ε₁ = 2^−63`, as for `ln`: at most `2^−9`.
 const ANALYTIC_MISS_RATE: f64 = 1.0 / 512.0;
 
