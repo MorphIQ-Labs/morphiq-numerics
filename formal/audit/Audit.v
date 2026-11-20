@@ -115,3 +115,6 @@ Print Assumptions Tridiagonal.sign_rounded_pivot_step.
 Print Assumptions Tridiagonal.sign_exact_pivots_positive.
 Print Assumptions Tridiagonal.sign_finite_pivots_positive.
 Print Assumptions Tridiagonal.sign_continuants_positive.
+
+From Binary64 Require Import RelativeUlp.
+Print Assumptions RelativeUlp.relative_ulp_error.

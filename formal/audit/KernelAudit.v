@@ -1142,3 +1142,12 @@ Print Assumptions TrigAccurate.trig_sin_lipschitz.
 Print Assumptions TrigAccurate.trig_cos_lipschitz.
 Print Assumptions TrigAccurate.trig_series_composed.
 Print Assumptions TrigAccurate.trig_reduced_series_correct.
+
+Require TrigQuadrant TrigRounding.
+Print Assumptions TrigQuadrant.trig_analytic_quadrant.
+Print Assumptions TrigQuadrant.trig_nearest_nonnegative.
+Print Assumptions TrigQuadrant.trig_selected_bound.
+Print Assumptions TrigQuadrant.trig_selection_analytic.
+Print Assumptions TrigQuadrant.trig_accurate_value_correct.
+Print Assumptions TrigRounding.trig_accurate_round.
+Print Assumptions TrigRounding.trig_accurate_ulp.
