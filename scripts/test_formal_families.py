@@ -66,6 +66,22 @@ class FamilyPlanTests(unittest.TestCase):
         self.assertEqual(set(unit["closure"]), {"binary64/Base", "gappa/BvnKernel", "extraction/BvnCrosscheck"})
         self.assertEqual([e["module"] for e in unit["extractions"]], ["BvnCrosscheck"])
 
+    def test_trig_constant_proof_is_owned_selected_and_audited(self):
+        self.write(self.root / "formal/trig/TrigConstants.v", "constant proof")
+        self.write(self.src / "gappa/TrigConstants.v", "constant proof")
+        self.graph["gappa/TrigConstants"] = set()
+        self.graph["gappa/KernelAudit"].add("gappa/TrigConstants")
+        audit = self.src / "gappa/KernelAudit.v"
+        audit.write_text(audit.read_text() + "Require TrigConstants.\n"
+                         "Print Assumptions TrigConstants.bits.\n")
+        plan = self.plan()
+        self.assertEqual(ff.select(plan, ["formal/trig/TrigConstants.v"]), ["trig"])
+        self.assertEqual(plan["families"]["trig"]["closure"], ["gappa/TrigConstants"])
+        ff.apply_family(plan, "trig", self.src)
+        self.assertEqual(ff.audit_entries(audit.read_text()), ["TrigConstants.bits"])
+        self.assertTrue((self.src / "gappa/TrigConstants.v").exists())
+        self.assertFalse((self.src / "gappa/LnKernel.v").exists())
+
     def test_change_selects_every_dependent_family_and_extraction(self):
         plan = self.plan()
         self.assertEqual(ff.select(plan, ["formal/ln/LnKernel.v"]), ["fast", "internal-crosscheck", "ln"])
