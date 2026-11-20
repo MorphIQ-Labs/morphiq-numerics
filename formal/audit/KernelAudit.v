@@ -1396,3 +1396,6 @@ Print Assumptions CheckedDivision.division_word_bound.
 Print Assumptions CheckedDivision.checked_divide_sound.
 Print Assumptions CheckedDivision.checked_admit_zero.
 Print Assumptions CheckedDivision.checked_divide_zero.
+
+From Binary64 Require RoundingTest.
+Print Assumptions RoundingTest.decide_with_word_bounded_ok.
