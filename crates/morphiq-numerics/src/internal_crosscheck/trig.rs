@@ -5,6 +5,15 @@ use crate::random::SplitMix64;
 use crate::test_exact::{entries, word};
 use std::fmt::Write as _;
 
+fn emit_series(out: &mut String, bits: u64) {
+    let (_, remainder) = crate::trig::reduce(f64::from_bits(bits));
+    // Exercise both signs of the actual full-precision reduction, including zero.
+    for r in [remainder, remainder.neg()] {
+        let (s, c) = crate::trig::accurate_sin_cos(r);
+        writeln!(out, "trig_series {} : {} {}", q256(r), q256(s), q256(c)).unwrap();
+    }
+}
+
 fn emit(out: &mut String, bits: u64) {
     let x = f64::from_bits(bits);
     assert!(x.is_finite() && !x.is_sign_negative());
@@ -20,13 +29,17 @@ fn emit(out: &mut String, bits: u64) {
 pub(super) fn write(out: &mut String) {
     const FIXTURE: &str = include_str!("../../../reference/fixtures/sin_cos.json");
     for case in entries(FIXTURE, &["reduction"]) {
-        emit(out, word(case, "x").to_bits());
+        let bits = word(case, "x").to_bits();
+        emit(out, bits);
+        emit_series(out, bits);
     }
     for bits in [0, 1, (1_u64 << 52) - 1, 0x7fef_ffff_ffff_ffff] {
         emit(out, bits);
+        emit_series(out, bits);
     }
     for bits in 0x3fe9_21fb_5444_2d10..=0x3fe9_21fb_5444_2d20 {
         emit(out, bits);
+        emit_series(out, bits);
     }
     // Significand extremes at every binade.
     for exponent in 1..2047_u64 {
@@ -46,12 +59,16 @@ pub(super) fn write(out: &mut String) {
     // The nearest-integer witness and its adjacent binary64 inputs.
     for bits in 0x7506_ac5b_262c_a1fe..=0x7506_ac5b_262c_a200 {
         emit(out, bits);
+        emit_series(out, bits);
     }
     let mut rng = SplitMix64::new(0x7472_6967_7265_6475);
-    for _ in 0..4096 {
+    for i in 0..4096 {
         let bits = rng.next_u64() & 0x7fff_ffff_ffff_ffff;
         if bits < 0x7ff0_0000_0000_0000 {
             emit(out, bits);
+            if i < 256 {
+                emit_series(out, bits);
+            }
         }
     }
 }
