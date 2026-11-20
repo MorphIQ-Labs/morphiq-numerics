@@ -43,6 +43,7 @@ mod atan2;
 mod bivariate;
 mod log_radix;
 mod normal;
+mod trig;
 
 fn q128(q: Q128) -> String {
     let (n, m, e) = q.parts();
@@ -262,6 +263,7 @@ fn internal_crosscheck_corpus() {
     atan2::write(&mut out);
     bivariate::write(&mut out);
     log_radix::write(&mut out);
+    trig::write(&mut out);
     q256_exponent_corpus(&mut out);
     erfcx_accurate_tail_corpus(&mut out);
     erfcx_accurate_exponential_corpus(&mut out);
