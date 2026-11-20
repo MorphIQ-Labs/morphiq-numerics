@@ -37,6 +37,7 @@ contracts:
 | Reduce the splitter's shift from 27 to 26 | Exact integer multiplication differs from the two components |
 | Subtract ln's rounding uncertainty | A midpoint-crossing interval is incorrectly accepted |
 | Skip the obstacle sweep's complementarity check | A two-sided contact set is reported solved |
+| Drop the obstacle underflow allowance | An admitted subnormal residual is refused |
 
 Compilation failure, timeout, signal termination, zero or ignored tests, a
 different failing test and an unrelated panic do not count as kills. The named
