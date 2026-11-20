@@ -1,4 +1,4 @@
-d626211df317d3b7cf6eb4685ad228a1dcec1c1e5e2b08353e510f5e90af34cb  docs/log2.md
+7fb6e333cf9464a23a8aba38910d2b53a64b49ea3c8dbb779ca0cf8bb80bfe94  docs/log2.md
 5617861c3421b34945b2b385e1b506dd4dc74762704d177799e402b35425a964  crates/morphiq-numerics/src/log2/tables.rs
 4ce6d8574839152c254380ec9e7536f4fbceb912fcfbcb0bef7b0356ca499403  crates/morphiq-numerics/src/log2/mod.rs
 15b49f50f8f0792bde3825bc3f0f08086adb4c3cc7d2f433775b02a2cff8b93e  formal/log2/accurate_log10.g
@@ -12,3 +12,4 @@ df6c46a4c55ab62e37782e1fb8e721e8164fb73d42455ce803661241222167cf  crates/morphiq
 92cc945b4f24568cac26b7dc96bb53e9eb17f179d83c0f39f33993815d4f361b  formal/ln/LogRadixRounding.v
 1db918752ab55edc8afc542048613ab8792404516ec0c687cf5f48e6e7d858af  crates/morphiq-numerics/src/log2/tests.rs
 35a5cedfeae3a2b355cbe5d60a18cf4aa25a6f3fbfe073481d80844e6f1120c2  crates/morphiq-numerics/src/test_exact.rs
+c905e67a021da40cef710f319c9c6c14780e51aad0494b20a3b56432b7c72cf2  formal/ln/LogRadixUlp.v

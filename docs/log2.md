@@ -102,6 +102,7 @@ Both paths err by less than half an ulp of `n`, so both return `n` exactly.
 | `formal/ln/LogRadixConstants.v` | generated Q128 encodings, normalized significands and independent CoqInterval proofs of both reciprocal-log residuals |
 | `formal/ln/LogRadixAccurate.v` | executable Q128 scaling and exponent reconstruction, with the shared `ln` accurate theorem discharging the input error bounds |
 | `formal/ln/LogRadixRounding.v` | finite, single-round binary64 conversion of both accurate paths; `log2` correct rounding under [LM]'s explicit midpoint-distance hypothesis; exact representable results for either radix |
+| `formal/ln/LogRadixUlp.v` | final `log10` error within `(1/2 + 2^-69)` ULP of the exact result, including binade crossings |
 | `generators/radix_certificates.py` | writes the four certificates below; the ratio bound is enclosed with `mpmath.iv` |
 | `formal/log2/fast_log2.g`, `accurate_log2.g` | `log2`'s paths: `2^−63` and `2^−122` |
 | `formal/log2/fast_log10.g`, `accurate_log10.g` | `log10`'s paths: `2^−63` and `2^−122` |
@@ -137,14 +138,19 @@ hypothesis explicit in its signature. For `log10`, `log10_accurate_bounded`
 establishes one rounding of a value within `2^-122` relatively of the exact
 logarithm, without introducing a hard-case hypothesis. The representable-result
 theorems establish exact return values for either radix without that hypothesis.
+`LogRadixUlp.log10_accurate_ulp` translates the relative reconstruction bound
+into the final `(1/2 + 2^-69)` ULP bound, where ULP is measured at the exact real
+result. If the approximation crosses the upper edge of that result's binade,
+it still rounds to the edge exactly; the proof therefore does not double the
+rounding allowance when the spacing changes. Negative results follow by the
+symmetry of round-to-nearest-even.
 
 The extraction corpus compares both the Q128 intermediates and their final
 binary64 encodings with Rust. Separate forced-accurate-path tests compare final
 results with the independent oracle fixture, including inputs the public entry
 normally handles on the fast path. Those comparisons test correspondence and
 sampled accuracy; they do not replace the real-number error proofs. Fast-path
-certificate linkage, public-entry composition, the explicit final ULP-bound
-translation for `log10`, and matching SIMD proof obligations are not established
+certificate linkage, public-entry composition, and matching SIMD proof obligations are not established
 by these accurate-path theorems.
 
 The binding `formal/log2/binding.sha256` covers this document, the constants,

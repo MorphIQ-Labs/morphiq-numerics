@@ -1053,3 +1053,6 @@ Print Assumptions LogRadixRounding.log2_accurate_correct.
 Print Assumptions LogRadixRounding.log10_accurate_bounded.
 Print Assumptions LogRadixRounding.log2_accurate_representable.
 Print Assumptions LogRadixRounding.log10_accurate_representable.
+Require LogRadixUlp.
+Print Assumptions LogRadixUlp.radix_round_error.
+Print Assumptions LogRadixUlp.log10_accurate_ulp.
