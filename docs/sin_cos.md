@@ -292,8 +292,27 @@ and `cos r`. The integer-index conversion reuses the proved binary64 decoder
 from `AsinSegment.v`. The extracted full-path comparison covers both signs,
 table points and halfway-index ties, nearby inputs, fine Q256 low bits and
 actual Payne–Hanek remainders across the normal input binades. Additional zero
-and smaller cases check transcription agreement only. Public entry screens,
-rounding-test composition and matching SIMD remain separate obligations.
+and smaller cases check transcription agreement only.
+
+`TrigFast.trig_fast_composed` also accounts for the actual `2^-199` relative
+Payne–Hanek reduction error. The Q256 split and reduction together fit a
+`(3/2)·2^-105` relative argument envelope; `TrigSplitAnalytic.v` proves that
+this still fits the existing `2^-104` sine/cosine analytic allowance. The
+reconstruction certificates, total `2^-62` bound and runtime `EPS` are unchanged.
+`TrigFastDomain.v` derives the kernel domain for finite nonnegative binary64
+inputs at least `2^-63`, using the proved integer-separation bound for large
+arguments and exact small reduction. `TrigFastSelection.v` then establishes
+the selected result's finite, normalized double-word and `2^-62` error against
+the original signed argument, for both functions and every quadrant.
+
+`TrigFastDecision.v` binds the actual `EPS` bits and rounding test: every accepted
+result in this domain is correctly rounded. When it rejects, the actual finish
+path uses the accurate result and retains the proved `(1/2 + 2^-145)` ULP bound,
+inside the published `(1/2 + 2^-144)` contract. The extracted comparison checks
+the selected words, decision and final result, including both acceptance and
+fallback for sine and cosine. These finish-path theorems do not yet compose
+the public small-input screens, NaNs/infinities, the Lefèvre–Muller domains,
+tangent's fast division or matching SIMD.
 
 ## 5. Accurate path
 

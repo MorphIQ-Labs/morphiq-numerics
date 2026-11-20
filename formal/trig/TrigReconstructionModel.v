@@ -26,7 +26,7 @@ Qed.
 
 Theorem trig_sin_reconstruction_model_correct a t r es ec esn ecm m1 m2 a1 a2 :
  (a=0 \/ /64<=a<=50/64) -> Rabs t<=0.0078126 ->
- Rabs r<=0.785399 -> r<>0 -> Rabs(a+t-r)<=bpow radix2 (-105)*Rabs r ->
+ Rabs r<=0.785399 -> r<>0 -> Rabs(a+t-r)<=(3/2)*bpow radix2 (-105)*Rabs r ->
  Rabs es<=953/2^117 -> Rabs ec<=953/2^117 ->
  Rabs esn<=/2^65 -> Rabs ecm<=/2^65 ->
  Rabs m1<=9/2^106 -> Rabs m2<=9/2^106 ->
@@ -65,7 +65,7 @@ Qed.
 
 Theorem trig_cos_reconstruction_model_correct a t r es ec esn ecm m1 m2 a1 a2 :
  0<=a<=50/64 -> Rabs t<=0.0078126 ->
- Rabs r<=0.785399 -> Rabs(a+t-r)<=bpow radix2 (-105)*Rabs r ->
+ Rabs r<=0.785399 -> Rabs(a+t-r)<=(3/2)*bpow radix2 (-105)*Rabs r ->
  Rabs es<=953/2^117 -> Rabs ec<=953/2^117 ->
  Rabs esn<=/2^65 -> Rabs ecm<=/2^65 ->
  Rabs m1<=9/2^106 -> Rabs m2<=9/2^106 ->

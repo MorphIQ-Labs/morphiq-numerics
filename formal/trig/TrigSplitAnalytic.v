@@ -7,7 +7,7 @@ Require Import TrigAccurate TrigError.
 Open Scope R_scope.
 
 Theorem trig_split_analytic_error r z : Rabs r<=0.785399 ->
- Rabs(z-r)<=bpow radix2 (-105)*Rabs r ->
+ Rabs(z-r)<=(3/2)*bpow radix2 (-105)*Rabs r ->
  Rabs(sin z-sin r)<=bpow radix2 (-104)*Rabs(sin r) /\
  Rabs(cos z-cos r)<=bpow radix2 (-104)*Rabs(cos r).
 Proof.
@@ -22,7 +22,7 @@ Proof.
 Qed.
 
 Theorem trig_split_analytic_factors r z : Rabs r<=0.785399 ->
- Rabs(z-r)<=bpow radix2 (-105)*Rabs r ->
+ Rabs(z-r)<=(3/2)*bpow radix2 (-105)*Rabs r ->
  (exists es, Rabs es<=bpow radix2 (-104) /\ sin z=sin r*(1+es)) /\
  (exists ec, Rabs ec<=bpow radix2 (-104) /\ cos z=cos r*(1+ec)).
 Proof.
@@ -31,7 +31,7 @@ Proof.
 Qed.
 
 Lemma trig_split_sine_nonzero r z : Rabs r<=0.785399 -> r<>0 ->
- Rabs(z-r)<=bpow radix2 (-105)*Rabs r -> sin z<>0.
+ Rabs(z-r)<=(3/2)*bpow radix2 (-105)*Rabs r -> sin z<>0.
 Proof.
  intros R Nonzero Split Zero.
  destruct (trig_small_bounds r ltac:(lra)) as [Sin _].

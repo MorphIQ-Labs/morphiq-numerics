@@ -343,6 +343,18 @@ pub(crate) fn tan_accurate_crosscheck(x: f64) -> (Q256, Q256, bool, Q256) {
     (num, den, negate, tan_accurate(&reduced))
 }
 
+/// Actual selected fast words, rounding decision and finish result.
+#[cfg(test)]
+pub(crate) fn finish_crosscheck(x: f64, cosine: bool) -> (DoubleWord, Option<f64>, f64) {
+    let reduced = Reduced::of(x);
+    let function = if cosine { Function::Cos } else { Function::Sin };
+    let (use_cos, negate) = reduced.select(function);
+    let (s, c) = fast(&reduced.r);
+    let y = if use_cos { c } else { s };
+    let y = if negate { y.neg() } else { y };
+    (y, decide_with(y, EPS), reduced.finish(function))
+}
+
 /// The complete scalar fast path, including the signed Q256 input and output.
 #[cfg(test)]
 pub(crate) fn fast_crosscheck(r: Q256) -> [u64; 4] {
