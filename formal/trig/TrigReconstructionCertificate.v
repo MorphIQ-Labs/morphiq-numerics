@@ -19,7 +19,7 @@ Lemma trig_sin_reconstruction_certificate ka kb es ec esn ecm m1 m2 a1 a2 er :
  Rabs ka<=trig_sin_ka_bound -> Rabs kb<=trig_sin_kb_bound ->
  Rabs es<=953/2^117 -> Rabs ec<=953/2^117 ->
  Rabs esn<=/2^65 -> Rabs ecm<=/2^65 ->
- Rabs m1<=5/2^106 -> Rabs m2<=5/2^106 ->
+ Rabs m1<=9/2^106 -> Rabs m2<=9/2^106 ->
  Rabs a1<=776/2^114 -> Rabs a2<=776/2^114 -> Rabs er<=/2^104 ->
  Rabs(trig_sin_reconstruction_factor ka kb es ec esn ecm m1 m2 a1 a2 er-1)<=/2^62.
 Proof.
@@ -37,7 +37,7 @@ Lemma trig_cos_reconstruction_certificate ka kb es ec esn ecm m1 m2 a1 a2 er :
  Rabs ka<=trig_cos_ka_bound -> Rabs kb<=trig_cos_kb_bound ->
  Rabs es<=953/2^117 -> Rabs ec<=953/2^117 ->
  Rabs esn<=/2^65 -> Rabs ecm<=/2^65 ->
- Rabs m1<=5/2^106 -> Rabs m2<=5/2^106 ->
+ Rabs m1<=9/2^106 -> Rabs m2<=9/2^106 ->
  Rabs a1<=776/2^114 -> Rabs a2<=776/2^114 -> Rabs er<=/2^104 ->
  Rabs(trig_cos_reconstruction_factor ka kb es ec esn ecm m1 m2 a1 a2 er-1)<=/2^62.
 Proof.

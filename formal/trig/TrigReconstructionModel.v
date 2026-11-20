@@ -29,7 +29,7 @@ Theorem trig_sin_reconstruction_model_correct a t r es ec esn ecm m1 m2 a1 a2 :
  Rabs r<=0.785399 -> r<>0 -> Rabs(a+t-r)<=bpow radix2 (-105)*Rabs r ->
  Rabs es<=953/2^117 -> Rabs ec<=953/2^117 ->
  Rabs esn<=/2^65 -> Rabs ecm<=/2^65 ->
- Rabs m1<=5/2^106 -> Rabs m2<=5/2^106 ->
+ Rabs m1<=9/2^106 -> Rabs m2<=9/2^106 ->
  Rabs a1<=776/2^114 -> Rabs a2<=776/2^114 ->
  Rabs(trig_sin_reconstruction_model a t es ec esn ecm m1 m2 a1 a2-sin r)<=/2^62*Rabs(sin r).
 Proof.
@@ -68,7 +68,7 @@ Theorem trig_cos_reconstruction_model_correct a t r es ec esn ecm m1 m2 a1 a2 :
  Rabs r<=0.785399 -> Rabs(a+t-r)<=bpow radix2 (-105)*Rabs r ->
  Rabs es<=953/2^117 -> Rabs ec<=953/2^117 ->
  Rabs esn<=/2^65 -> Rabs ecm<=/2^65 ->
- Rabs m1<=5/2^106 -> Rabs m2<=5/2^106 ->
+ Rabs m1<=9/2^106 -> Rabs m2<=9/2^106 ->
  Rabs a1<=776/2^114 -> Rabs a2<=776/2^114 ->
  Rabs(trig_cos_reconstruction_model a t es ec esn ecm m1 m2 a1 a2-cos r)<=/2^62*Rabs(cos r).
 Proof.

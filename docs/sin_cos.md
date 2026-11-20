@@ -234,7 +234,27 @@ large branch's proved domain.
      normalized double-words. The extraction corpus checks all 51 stored rows
      and their double-word construction against Rust. Polynomial evaluation
      and table-interval reconstruction are separate proof obligations.
-   - They are combined with the proved `mul` and `add`/`sub` [DW].
+   - They are combined with double-word `mul` and `add`/`sub` [DW].
+     The trig multiplication allowance is `9u²`, proved by
+     `TrigMultiply.trig_mul_ieee`, including gradual underflow in either
+     cross product. Its inputs are finite normalized double-words, each word
+     at most `2^508` in magnitude, with a high-word product equal to zero or
+     at least `2^-900` in magnitude. It proves finite, normalized outputs and
+     the absolute bound `|computed - exact| <= 9u² |exact|`, including exact
+     zero products. These premises must still be derived at every call site.
+
+     For `p = |x_hi y_hi| >= 2^-900`, the binary64 half-subnormal rounding
+     allowance satisfies `2^-1075 <= u³ p`. Each rounded cross product has
+     error at most `1.1u² p`; their sum and the correction sum contribute
+     at most `2.2u² p` and `3.3u² p`. The omitted low-word product is at most
+     `u² p`, giving `8.7u² p` in total. The exact full product has magnitude
+     at least `0.99p`, and `8.7/0.99 < 9`. The correction is smaller than the
+     rounded head, so Fast2Sum is exact and establishes normalization.
+     The generator uses this allowance in both reconstruction certificates;
+     their public `2^-62` relative bound is unchanged. The usual [DW]
+     `5u²` theorem retains its normal-or-zero cross-product premises.
+     The extraction corpus includes actual table/residual products, zero,
+     both signs, and the high-product and cross-product boundary regions.
    - The relative errors use each term's ratio to the result. The generator
      encloses these ratios over every table interval.
      `TrigReconstructionRatios.v` independently proves the certificate's
@@ -248,8 +268,7 @@ large branch's proved domain.
      `2^-62` bounds. The sine model requires a nonzero reference remainder;
      the cosine model includes zero. Binding every arithmetic factor to
      the executable double-word reconstruction remains a separate obligation.
-   - `sin` is within `2^−62` (proves `2^−64.98`) and `cos` within `2^−62`
-     (proves `2^−71.99`) (*certified*: `fast_sin.g`, `fast_cos.g`).
+   - `sin` and `cos` are each within `2^−62` (*certified*: `fast_sin.g`, `fast_cos.g`).
 
 ## 5. Accurate path
 

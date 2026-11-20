@@ -1260,3 +1260,13 @@ Print Assumptions TrigReconstructionCertificate.trig_cos_reconstruction_certific
 Print Assumptions TrigReconstructionModel.trig_reconstruction_ratio_bound.
 Print Assumptions TrigReconstructionModel.trig_sin_reconstruction_model_correct.
 Print Assumptions TrigReconstructionModel.trig_cos_reconstruction_model_correct.
+
+Require TrigMultiply.
+Print Assumptions TrigMultiply.trig_dw_low.
+Print Assumptions TrigMultiply.trig_mul_eta.
+Print Assumptions TrigMultiply.trig_two_prod_value.
+Print Assumptions TrigMultiply.trig_mul_zero.
+Print Assumptions TrigMultiply.trig_mul_cross.
+Print Assumptions TrigMultiply.trig_mul_nonzero.
+Print Assumptions TrigMultiply.trig_mul_correct.
+Print Assumptions TrigMultiply.trig_mul_ieee.
