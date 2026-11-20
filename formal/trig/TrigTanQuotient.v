@@ -7,20 +7,7 @@ From Interval Require Import Tactic.
 Require Import AsinKernel TrigReciprocal StageGappa.
 Open Scope R_scope.
 
-Lemma trig_relative_factor y v eps : 0<=eps -> Rabs(y-v)<=eps*Rabs v ->
-  exists d, Rabs d<=eps /\ y=v*(1+d).
-Proof.
-  intros P Error. destruct (Req_dec v 0) as [Zero|Nonzero].
-  - subst v. rewrite Rminus_0_r,Rabs_R0,Rmult_0_r in Error.
-    assert (Y:y=0) by (apply Rabs_le_inv in Error; lra).
-    exists 0. rewrite Rabs_R0,Y. split; [exact P|ring].
-  - exists ((y-v)/v). split.
-    + unfold Rdiv. rewrite Rabs_mult,Rabs_Rinv by exact Nonzero.
-      apply (Rmult_le_reg_r (Rabs v)); [apply Rabs_pos_lt; exact Nonzero|].
-      rewrite Rmult_assoc,Rinv_l,Rmult_1_r by (apply Rabs_no_R0; exact Nonzero).
-      exact Error.
-    + field; exact Nonzero.
-Qed.
+Require Export TrigError.
 
 Lemma trig_quotient_error a b r m :
   Rabs a<=bpow radix2 (-198) -> Rabs b<=bpow radix2 (-198) ->

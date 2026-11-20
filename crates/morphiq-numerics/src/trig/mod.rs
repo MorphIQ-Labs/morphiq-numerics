@@ -362,6 +362,18 @@ pub(crate) fn table_crosscheck(i: usize) -> [u64; 8] {
     ]
 }
 
+/// The scalar tail expression in `fast`, with intermediate words retained.
+/// Extraction checks include the tiny branch, where a tail may underflow.
+#[cfg(test)]
+pub(crate) fn tail_crosscheck(t: f64) -> [u64; 5] {
+    let (u, _) = two_prod(t, t);
+    let [s0, s1, s2] = POLY_S;
+    let [c0, c1, c2] = POLY_C;
+    let ps = s0 + u * (s1 + u * s2);
+    let pc = c0 + u * (c1 + u * c2);
+    [u, ps, pc, (t * u) * ps, (u * u) * pc].map(f64::to_bits)
+}
+
 #[cfg(test)]
 mod tests;
 
