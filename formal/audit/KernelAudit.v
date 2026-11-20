@@ -1077,3 +1077,10 @@ Print Assumptions LogRadixEntry.log10_entry_representable.
 Print Assumptions LogRadixEntry.radix_entry_specials.
 Print Assumptions LogRadixEntry.radix_entry_nan.
 Print Assumptions LogRadixEntry.radix_entry_negative.
+
+Require TrigConstants.
+Print Assumptions TrigConstants.trig_two_over_pi_encoding.
+Print Assumptions TrigConstants.trig_two_over_pi_bits.
+Print Assumptions TrigConstants.trig_half_pi_encoding.
+Print Assumptions TrigConstants.trig_half_pi_rounding.
+Print Assumptions TrigConstants.trig_half_pi_relative.
