@@ -162,19 +162,65 @@ impl BigInt {
     }
 }
 
-/// The objects of the array at `path` in a fixture, each as its raw text: the
-/// generators write flat objects, so no array element contains a bracket.
+/// Delimiters outside JSON strings, including strings with escaped quotes.
+fn delimiters(text: &str) -> impl Iterator<Item = (usize, char)> + '_ {
+    let (mut quoted, mut escaped) = (false, false);
+    text.char_indices().filter(move |&(_, c)| {
+        if escaped {
+            escaped = false;
+            return false;
+        }
+        if quoted && c == '\\' {
+            escaped = true;
+            return false;
+        }
+        if c == '"' {
+            quoted = !quoted;
+            return false;
+        }
+        !quoted
+    })
+}
+
+/// The objects of the array at `path` in a fixture, each as its raw text.
+/// Generators write flat objects; punctuation in string values is data.
 pub(crate) fn entries<'a>(fixture: &'a str, path: &[&str]) -> Vec<&'a str> {
     let mut at = 0;
     for key in path {
         at += fixture[at..].find(&std::format!("\"{key}\":")).unwrap();
     }
-    let start = at + fixture[at..].find('[').unwrap() + 1;
-    let end = start + fixture[start..].find(']').unwrap();
-    fixture[start..end]
-        .split('}')
-        .filter(|object| object.contains('{'))
+    let start = at
+        + delimiters(&fixture[at..])
+            .find(|&(_, c)| c == '[')
+            .unwrap()
+            .0
+        + 1;
+    let end = start
+        + delimiters(&fixture[start..])
+            .find(|&(_, c)| c == ']')
+            .unwrap()
+            .0;
+    let array = &fixture[start..end];
+    let mut object_start = 0;
+    delimiters(array)
+        .filter(|&(_, c)| c == '}')
+        .map(|(end, _)| {
+            let object = &array[object_start..end];
+            object_start = end + 1;
+            object
+        })
         .collect()
+}
+
+#[test]
+fn fixture_labels_cannot_terminate_arrays_or_objects() {
+    let fixture = r#"{"cases":[{"label":"[LM] } \\\"quoted\\\"", "x":"3ff0000000000000"},
+        {"label":"last", "x":"4000000000000000"}]}"#;
+    let cases = entries(fixture, &["cases"]);
+    assert_eq!(cases.len(), 2);
+    assert_eq!(word(cases[0], "x"), 1.0);
+    assert_eq!(word(cases[1], "x"), 2.0);
+    assert!(entries(r#"{"cases":[]}"#, &["cases"]).is_empty());
 }
 
 /// A field of an object `entries` returned, as its raw text without quotes.

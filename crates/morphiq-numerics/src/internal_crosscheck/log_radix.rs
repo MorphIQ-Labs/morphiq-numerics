@@ -1,5 +1,5 @@
-//! Unrounded radix-log paths: oracle fixtures, exact powers, reduction-table
-//! boundaries and exponent extremes. These compare actual Rust Q128 results
+//! Radix-log paths before and after rounding: oracle fixtures, exact powers,
+//! reduction-table boundaries and exponent extremes. These compare Rust results
 //! with the extracted reconstruction; they are not independent error oracles.
 use super::{String, q128};
 use crate::test_exact::{entries, word};
@@ -11,6 +11,18 @@ fn emit(out: &mut String, bits: u64) {
     let (radix2, radix10) = crate::log2::crosscheck_accurate(x);
     writeln!(out, "log2_accurate {bits:016x} : {}", q128(radix2)).unwrap();
     writeln!(out, "log10_accurate {bits:016x} : {}", q128(radix10)).unwrap();
+    writeln!(
+        out,
+        "log2_accurate_result {bits:016x} : {:016x}",
+        radix2.to_f64().to_bits()
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "log10_accurate_result {bits:016x} : {:016x}",
+        radix10.to_f64().to_bits()
+    )
+    .unwrap();
 }
 
 pub(super) fn write(out: &mut String) {
