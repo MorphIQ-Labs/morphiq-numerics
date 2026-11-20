@@ -213,6 +213,15 @@ fn admit(z: DoubleWord, exact_zero: bool) -> Result<DoubleWord, CheckError> {
 }
 
 impl DoubleWord {
+    #[cfg(test)]
+    pub(crate) fn crosscheck_quotient_range(words: [f64; 4]) -> (bool, [i32; 4]) {
+        assert!(words.iter().all(|w| w.is_finite()));
+        (
+            quotient_range(&words).is_ok(),
+            words.map(|w| if w == 0.0 { 0 } else { exponent(w) }),
+        )
+    }
+
     /// [`sum`](Self::sum) when `|a|, |b| ≤ 2^1020`: then the result is the
     /// exact sum (`two_sum_ieee`).
     ///
