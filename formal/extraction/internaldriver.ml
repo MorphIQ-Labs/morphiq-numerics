@@ -115,6 +115,13 @@ let compute op args =
            String.concat " " ((if accepted then "1" else "0") ::
              List.map (fun e -> string_of_int (int_of_z e)) exponents)
        | _ -> failwith "quotient_range takes four binary64 words")
+  | "trig_tan_fast" ->
+      (match args with
+       | [x; n] ->
+           let quotient, decision = x_trig_tan_fast (z_of_u64 (hex x)) (n = "1") in
+           (match quotient with Some (h, l) -> show_bits h ^ " " ^ show_bits l | None -> "none") ^
+           " " ^ (match decision with Some y -> show_bits y | None -> "none")
+       | _ -> failwith "trig_tan_fast takes a magnitude and sign")
   | "trig_entry" ->
       (match args with
        | [x] -> String.concat " " (List.map show_bits (x_trig_entry (z_of_u64 (hex x))))

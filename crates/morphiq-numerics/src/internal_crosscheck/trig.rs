@@ -490,6 +490,7 @@ fn write_finish(out: &mut String) {
     inputs.sort_unstable();
     inputs.dedup();
     let mut decisions = [[false; 2]; 2];
+    let mut tan_decisions = [false; 2];
     let mut selections = [[[false; 2]; 2]; 4];
     for bits in inputs {
         assert!((minimum..0x7ff0_0000_0000_0000).contains(&bits));
@@ -497,6 +498,20 @@ fn write_finish(out: &mut String) {
             let signed = bits | (u64::from(negative) << 63);
             let x = f64::from_bits(signed);
             let (k, _) = crate::trig::reduce(x.abs());
+            let (quotient, decision) = crate::trig::tan_fast_crosscheck(x);
+            tan_decisions[usize::from(decision.is_some())] = true;
+            write!(out, "trig_tan_fast {bits:016x} {} : ", u8::from(negative)).unwrap();
+            if let Some(q) = quotient {
+                write!(out, "{:016x} {:016x}", q.hi().to_bits(), q.lo().to_bits()).unwrap();
+            } else {
+                write!(out, "none").unwrap();
+            }
+            if let Some(value) = decision {
+                writeln!(out, " {:016x}", value.to_bits()).unwrap();
+            } else {
+                writeln!(out, " none").unwrap();
+            }
+
             for cosine in [false, true] {
                 let (y, decision, result) = crate::trig::finish_crosscheck(x, cosine);
                 decisions[usize::from(cosine)][usize::from(decision.is_some())] = true;
@@ -520,6 +535,7 @@ fn write_finish(out: &mut String) {
         }
     }
     assert!(decisions.into_iter().flatten().all(|hit| hit));
+    assert!(tan_decisions.into_iter().all(|hit| hit));
     assert!(selections.into_iter().flatten().flatten().all(|hit| hit));
 }
 

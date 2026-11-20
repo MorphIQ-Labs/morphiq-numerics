@@ -343,6 +343,13 @@ pub(crate) fn tan_accurate_crosscheck(x: f64) -> (Q256, Q256, bool, Q256) {
     (num, den, negate, tan_accurate(&reduced))
 }
 
+/// Actual checked tangent quotient and its rounding decision.
+#[cfg(test)]
+pub(crate) fn tan_fast_crosscheck(x: f64) -> (Option<DoubleWord>, Option<f64>) {
+    let value = tan_fast(&Reduced::of(x));
+    (value, value.and_then(|y| decide_with(y, EPS_TAN)))
+}
+
 /// Actual selected fast words, rounding decision and finish result.
 #[cfg(test)]
 pub(crate) fn finish_crosscheck(x: f64, cosine: bool) -> (DoubleWord, Option<f64>, f64) {

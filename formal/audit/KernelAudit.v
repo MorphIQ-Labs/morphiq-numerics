@@ -1399,3 +1399,23 @@ Print Assumptions CheckedDivision.checked_divide_zero.
 
 From Binary64 Require RoundingTest.
 Print Assumptions RoundingTest.decide_with_word_bounded_ok.
+
+From Binary64 Require RoundingDecisionDomain.
+Require TrigFastQuotient TrigTanFast TrigTanFastValue.
+Print Assumptions RoundingDecisionDomain.decision_abs_finite.
+Print Assumptions RoundingDecisionDomain.decision_small_ulp.
+Print Assumptions RoundingDecisionDomain.decision_half_small.
+Print Assumptions RoundingDecisionDomain.decision_tiny_leading_word.
+Print Assumptions RoundingDecisionDomain.decision_reference_domain.
+Print Assumptions RoundingDecisionDomain.decision_quotient_ok.
+Print Assumptions TrigFastQuotient.trig_fast_division_budget.
+Print Assumptions TrigFastQuotient.trig_fast_quotient_budget.
+Print Assumptions TrigFastQuotient.trig_checked_quotient_error.
+Print Assumptions TrigTanFast.trig_signed_division_correct.
+Print Assumptions TrigTanFast.trig_tan_fast_selected_correct.
+Print Assumptions TrigTanFast.trig_tan_fast_composed.
+Print Assumptions TrigTanFastValue.trig_tan_eps_finite.
+Print Assumptions TrigTanFastValue.trig_tan_eps_value.
+Print Assumptions TrigTanFastValue.trig_tan_reference_floor.
+Print Assumptions TrigTanFastValue.trig_tan_fast64_correct.
+Print Assumptions TrigTanFastValue.trig_tan_fast_decision_correct.
