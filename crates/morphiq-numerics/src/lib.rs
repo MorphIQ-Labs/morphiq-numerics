@@ -14,8 +14,9 @@
 //! - [`elementary`]: `exp`, `expm1`, `exp2`, `ln`, `ln_1p`, `log2`, `log10`,
 //!   `sin`, `cos`, `sincos`, `tan`, `sqrt`, `asin`, `asinh` and `atan2`, each
 //!   with its stated correct-rounding domain or error bound; slice functions
-//!   for `exp`, `exp2`, `expm1`, `ln`, `ln_1p`, `asin`, `asinh` and `atan2`
-//!   preserve scalar bits, using SIMD lanes with the `simd` feature;
+//!   for `exp`, `exp2`, `expm1`, `ln`, `ln_1p`, `log2`, `log10`, `sin`, `cos`,
+//!   `sincos`, `tan`, `asin`, `asinh` and `atan2` preserve scalar bits, using
+//!   SIMD lanes with the `simd` feature;
 //! - [`log_space`]: `log_sum_exp` and `log_diff_exp`, logarithms of sums and
 //!   differences of exponentials, within proved error bounds, with `−∞` as
 //!   exact zero mass; `log_sum_exp_pairs`, which returns `log_sum_exp`'s
