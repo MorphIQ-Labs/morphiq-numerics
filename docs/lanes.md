@@ -1,9 +1,9 @@
 # Batched functions and lane evaluation
 
-`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice, asin_slice, asinh_slice, atan2_slice}` (and the bivariate normal's slice forms, below) apply
+`morphiq_numerics::elementary::{exp_slice, exp2_slice, expm1_slice, ln_slice, ln_1p_slice, log2_slice, log10_slice, asin_slice, asinh_slice, atan2_slice}` (and the bivariate normal's slice forms, below) apply
 [`exp`](exp.md), [`exp2`](exp2.md), [`expm1`](expm1.md), [`ln` and `ln_1p`](ln.md) to every element of a slice. The
 lane kernels are `crates/morphiq-numerics/src/lanes/`, `exp/lanes.rs`, `exp2/lanes.rs`, `expm1/lanes.rs` and
-`ln/lanes.rs`; the SIMD backends are the `morphiq-numerics-arch` crate
+`ln/lanes.rs` and `log2/lanes.rs`; the SIMD backends are the `morphiq-numerics-arch` crate
 ([arch.md](arch.md)).
 
 `morphiq_numerics::normal::erfcx_slice` uses the same backends and cascade.
@@ -24,8 +24,9 @@ results are compared lane by lane with the scalar kernels.
 every target, with or without the `simd` feature. It panics if `x` and `out`
 have different lengths, as `reduce::dot` does. So the batched functions add
 no claim of their own: each inherits its scalar function's (correct rounding
-for `exp`, `exp2` and `ln`; correct rounding where its rounding test decides, and
-`(1/2 + 2^−70)` ulp otherwise for `ln_1p`, or `(1/2 + 2^−65)` ulp otherwise for `expm1`).
+for `exp`, `exp2`, `ln` and `log2`; correct rounding where its rounding test decides, and
+`(1/2 + 2^−70)` ulp otherwise for `ln_1p`, `(1/2 + 2^−69)` ulp otherwise for `log10`,
+or `(1/2 + 2^−65)` ulp otherwise for `expm1`).
 
 - **Without `simd`** each loops its scalar function.
 - **With `simd`** each runs in lanes ([arch.md](arch.md)). Every lane performs
@@ -293,6 +294,22 @@ including accepted and rejected cases. Separate tests repeat actual
 undecided arguments across lanes and mix them with decided and special
 arguments. The scalar fallback and public-entry proofs are in `docs/ln.md`;
 intermediate-word tests and the cross-target digest check lane equivalence.
+
+### `log2` and `log10`
+
+Both radix kernels reuse the shared `ln` reduction, table reconstruction and
+polynomial. `log10` scales the full fast `ln x`; `log2` scales `ln y` and adds
+the exact integer exponent only where it is nonzero. The reciprocal pairs
+use the scalar `DoubleWord::sum` sequence, and the shared lane multiplication
+preserves every subsequent rounding. The scalar proof establishes the product
+underflow conditions from grids `2^-623` and `2^-109` ([log2.md](log2.md)).
+
+NaNs, negative inputs, signed zeros, infinity and one are screened before
+reduction. Their inactive lanes receive `2`, keeping the evaluated logarithm
+nonzero; the original inputs go to the scalar entry for their specified result.
+The same relative rounding test decides ordinary lanes, and undecided lanes
+use the scalar entry. The public slices use the existing backend cascade and
+scalar remainder. No accuracy flag or separate numerical contract is introduced.
 
 ## `asin`
 

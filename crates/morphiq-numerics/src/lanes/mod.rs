@@ -363,6 +363,14 @@ pub(crate) fn add_f64<K: Simd>(k: K, x: Dw<K>, y: K::F) -> Dw<K> {
     fast_two_sum(k, sh, k.add(x.1, sl))
 }
 
+/// `DoubleWord::mul`, preserving every scalar rounding. Callers establish
+/// `two_prod`'s domain for the leading product and normal-or-zero cross products.
+#[inline(always)]
+pub(crate) fn mul_dw<K: Simd>(k: K, a: Dw<K>, b: Dw<K>) -> Dw<K> {
+    let (p, e) = two_prod(k, a.0, b.0);
+    fast_two_sum(k, p, k.add(e, k.add(k.mul(a.0, b.1), k.mul(a.1, b.0))))
+}
+
 /// `ln::decide_with` where `2^-969 <= |hi| < infinity`, so the ulp and
 /// its half are normal. The logarithm and small-expm1 kernels prove this
 /// range for every active lane; inactive lanes are masked by their caller.

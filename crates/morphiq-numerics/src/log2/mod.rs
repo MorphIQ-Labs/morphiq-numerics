@@ -8,6 +8,9 @@
 
 mod tables;
 
+#[cfg(feature = "simd")]
+pub(crate) mod lanes;
+
 use crate::double_word::DoubleWord;
 use crate::ln::{Reduced, decide};
 use crate::q128::Q128;

@@ -25,8 +25,7 @@ fn constant<K: Simd>(k: K, x: (f64, f64)) -> Dw<K> {
 
 #[inline(always)]
 pub(super) fn mul<K: Simd>(k: K, a: Dw<K>, b: Dw<K>) -> Dw<K> {
-    let (p, e) = two_prod(k, a.0, b.0);
-    fast_two_sum(k, p, k.add(e, k.add(k.mul(a.0, b.1), k.mul(a.1, b.0))))
+    crate::lanes::mul_dw(k, a, b)
 }
 
 #[inline(always)]

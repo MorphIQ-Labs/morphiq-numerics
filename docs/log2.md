@@ -174,8 +174,18 @@ to discharge the rounding test's guards. `LogRadixEntry.v` combines that
 decision with the accurate fallback and special-value screens, preserves NaN
 inputs, and establishes exact representable results without a midpoint-distance
 premise. Its regular `log2` theorem keeps [LM]'s premise explicit; its regular
-`log10` theorem gives the final ULP bound on either return path. Matching SIMD
-proof obligations remain separate from these scalar-entry theorems.
+`log10` theorem gives the final ULP bound on either return path.
+
+`elementary::log2_slice` and `log10_slice` preserve their scalar functions'
+bits. With `simd`, `src/log2/lanes.rs` reuses the shared logarithm lane reduction
+and polynomial. It scales the same double-word values by the same normalized
+reciprocal pairs; `log2` adds the integer exponent only where it is nonzero.
+Special inputs are replaced by `2` before vector evaluation and completed by
+the scalar entry. Undecided lanes also use that entry. Every evaluated product
+therefore meets the grid and magnitude conditions above; the backend's exact
+FMA product error may replace Dekker only under the shared [lane contract](lanes.md).
+Word-by-word and decision comparisons check this scalar/lane correspondence;
+the real-number bounds remain the scalar theorems, with unchanged qualifications.
 
 The binding `formal/log2/binding.sha256` covers this document, the constants,
 the certificates and the source.
@@ -190,4 +200,9 @@ the certificates and the source.
     rounded fixture, including hard cases and exact powers;
   - each fast path against its accurate path on 2^20 arguments. Measured, both
     send `2^−9.4` of them to the accurate path, against the analytic `2^−9`.
-- The determinism digest's `log2` and `log10` sections on every target.
+- `src/log2/lanes/tests.rs`: both fast words and acceptance decisions, including
+  accepted, rejected and screened lanes, on each available backend. The shared
+  lane suite checks final results, backend cascades and slice remainders.
+- `crates/reference/tests/log2_log10.rs` also checks both slice APIs against
+  the independent fixtures and scalar bits, including short slices and offsets.
+- The determinism digest's scalar and slice `log2` and `log10` sections on every target.
