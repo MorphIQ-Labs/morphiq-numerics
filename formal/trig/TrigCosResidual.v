@@ -44,8 +44,8 @@ Qed.
 
 (** The low word's Q256-derived grid excludes underflow in this multiplication.
     Zero is handled explicitly and does not require a normal-product premise. *)
-Lemma trig_cross_model th tl : finite th -> finite tl ->
- /2^60<=Rabs(B th)<=0.0078126 -> Rabs(B tl)<=/4 -> on_grid (-320) (B tl) ->
+Lemma trig_cross_model_wide th tl : finite th -> finite tl ->
+ /2^320<=Rabs(B th)<=0.0078126 -> Rabs(B tl)<=/4 -> on_grid (-320) (B tl) ->
  finite(fmul th tl) /\ Rabs(B(fmul th tl))<=/4 /\
  exists e, Rabs e<=/2^53 /\ B(fmul th tl)=B th*B tl*(1+e).
 Proof.
@@ -56,18 +56,28 @@ Proof.
  apply trig_relative_factor; [interval|]. rewrite Value.
  destruct (Req_dec (B th*B tl) 0) as [Zero|Nonzero].
  - rewrite Zero,round_0,Rminus_0_r,Rabs_R0,Rmult_0_r; first [lra|exact _].
- - assert (ThGrid:on_grid (-112) (B th)).
-   { apply (grid_fmt_bound (FLT_exp emin prec) (-60) (B th));
+ - assert (ThGrid:on_grid (-372) (B th)).
+   { apply (grid_fmt_bound (FLT_exp emin prec) (-320) (B th));
        [intro e; unfold FLT_exp,emin,prec; lia|apply B_fmt|].
-     right. replace (bpow radix2 (-60)) with (/2^60) by (bpow_num; field). exact (proj1 Range). }
-   assert (ProductGrid:on_grid (-432) (B th*B tl)).
-   { change (-432)%Z with ((-112)+(-320))%Z. apply grid_mult; assumption. }
+     right. replace (bpow radix2 (-320)) with (/2^320) by (bpow_num; field). exact (proj1 Range). }
+   assert (ProductGrid:on_grid (-692) (B th*B tl)).
+   { change (-692)%Z with ((-372)+(-320))%Z. apply grid_mult; assumption. }
    assert (Normal:bpow radix2 (-1022)<=Rabs(B th*B tl)).
-   { eapply Rle_trans; [apply (bpow_le radix2 (-1022) (-432)); lia|].
+   { eapply Rle_trans; [apply (bpow_le radix2 (-1022) (-692)); lia|].
      apply grid_nonzero; assumption. }
    pose proof (rnd_rel (B th*B tl) Normal) as Error.
    replace (bpow radix2 (-53)) with (/2^53) in Error by (bpow_num; field).
    exact Error.
+Qed.
+
+Lemma trig_cross_model th tl : finite th -> finite tl ->
+ /2^60<=Rabs(B th)<=0.0078126 -> Rabs(B tl)<=/4 -> on_grid (-320) (B tl) ->
+ finite(fmul th tl) /\ Rabs(B(fmul th tl))<=/4 /\
+ exists e, Rabs e<=/2^53 /\ B(fmul th tl)=B th*B tl*(1+e).
+Proof.
+ intros Th Tl [Lower Upper] Low GridLow.
+ apply trig_cross_model_wide; try assumption.
+ split; [eapply Rle_trans; [|exact Lower]; interval|exact Upper].
 Qed.
 
 Lemma trig_round_unit v : Rabs v<=1 -> Rabs(rndF v)<=1.
