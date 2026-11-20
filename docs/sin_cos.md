@@ -241,7 +241,15 @@ large branch's proved domain.
      at most `2^508` in magnitude, with a high-word product equal to zero or
      at least `2^-900` in magnitude. It proves finite, normalized outputs and
      the absolute bound `|computed - exact| <= 9u² |exact|`, including exact
-     zero products. These premises must still be derived at every call site.
+     zero products. `TrigOperandBounds.v` derives these premises for the reconstruction:
+     each table head is zero or has magnitude at least `2^-8`, each residual
+     head is zero or has magnitude at least `2^-645`, and every word has
+     magnitude at most 4. The residual result follows from its normalized
+     input floor `2^-320`, the proved relative error and analytic lower bounds
+     on `|sin t|` and `|cos t - 1|`. Table row zero and zero residuals are
+     included. `TrigProducts.v` then proves finite normalized results and
+     `9u²` error factors for all four actual table/residual multiplications.
+     Extraction compares their eight output words across all 51 table rows.
 
      For `p = |x_hi y_hi| >= 2^-900`, the binary64 half-subnormal rounding
      allowance satisfies `2^-1075 <= u³ p`. Each rounded cross product has
@@ -266,8 +274,9 @@ large branch's proved domain.
      existing Gappa certificates. `TrigReconstructionModel.v` composes the
      analytic references and bounded arithmetic-error factors to the stated
      `2^-62` bounds. The sine model requires a nonzero reference remainder;
-     the cosine model includes zero. Binding every arithmetic factor to
-     the executable double-word reconstruction remains a separate obligation.
+     the cosine model includes zero. The multiplication factors are derived
+     by `TrigProducts.v`; binding the addition/subtraction factors and
+     composing the executable reconstruction remain separate obligations.
    - `sin` and `cos` are each within `2^−62` (*certified*: `fast_sin.g`, `fast_cos.g`).
 
 ## 5. Accurate path
