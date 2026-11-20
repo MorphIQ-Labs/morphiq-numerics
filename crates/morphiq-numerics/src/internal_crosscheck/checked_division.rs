@@ -13,6 +13,18 @@ fn emit(out: &mut String, bits: [u64; 4]) {
         write!(out, " {e}").unwrap();
     }
     writeln!(out).unwrap();
+    emit_div(out, bits);
+}
+
+fn emit_div(out: &mut String, bits: [u64; 4]) {
+    write!(out, "checked_div").unwrap();
+    for b in bits {
+        write!(out, " {b:016x}").unwrap();
+    }
+    match DoubleWord::crosscheck_division(bits.map(f64::from_bits)) {
+        Some((h, l)) => writeln!(out, " : {h:016x} {l:016x}").unwrap(),
+        None => writeln!(out, " : none").unwrap(),
+    }
 }
 
 pub(super) fn write(out: &mut String) {
@@ -45,6 +57,32 @@ pub(super) fn write(out: &mut String) {
                 let high = (1023 + h.saturating_sub(1)) << 52;
                 emit(out, [low, high, low | (1_u64 << 63), high | (1_u64 << 63)]);
             }
+        }
+    }
+    // Valid normalized operands with nonzero low words and varied signs.
+    for field in 623_u64..=1423 {
+        let x = (field << 52) | 0x0005_5555_5555_5555;
+        let xl = (field - 60) << 52;
+        let y = ((2046 - field) << 52) | 0x000a_aaaa_aaaa_aaaa;
+        let yl = (2046 - field - 60) << 52;
+        for sign in [0, 1_u64 << 63] {
+            emit_div(out, [x | sign, xl, y, yl | sign]);
+            emit_div(out, [x, xl | sign, y | sign, yl]);
+            emit_div(out, [0, 1_u64 << 63, y | sign, yl]);
+            emit_div(out, [x, xl, 0, 1_u64 << 63]);
+        }
+    }
+    // Invalid operands, infinities, and both quiet and signalling NaNs.
+    for special in [
+        f64::INFINITY.to_bits(),
+        f64::NEG_INFINITY.to_bits(),
+        0x7ff8_1234_5678_9abc,
+        0x7ff0_1234_5678_9abc,
+    ] {
+        for slot in 0..4 {
+            let mut words = [1.0_f64.to_bits(), 0, 1.0_f64.to_bits(), 0];
+            words[slot] = special;
+            emit_div(out, words);
         }
     }
     let mut rng = SplitMix64::new(0xd171_5100_2026_1120);

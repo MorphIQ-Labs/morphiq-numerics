@@ -1385,3 +1385,14 @@ Print Assumptions CheckedQuotientRange.checked_word_exponent_bounds.
 Print Assumptions CheckedQuotientRange.quotient_extents_nonnegative.
 Print Assumptions CheckedQuotientRange.quotient_extents_contains.
 Print Assumptions CheckedQuotientRange.checked_quotient_range_sound.
+
+From Binary64 Require CheckedDivision IEEE64Div.
+Print Assumptions IEEE64Div.div64_bounded.
+Print Assumptions CheckedDivision.checked_float_eq_spec.
+Print Assumptions CheckedDivision.checked_valid_finite.
+Print Assumptions CheckedDivision.checked_valid_normalized.
+Print Assumptions CheckedDivision.checked_admit_value.
+Print Assumptions CheckedDivision.division_word_bound.
+Print Assumptions CheckedDivision.checked_divide_sound.
+Print Assumptions CheckedDivision.checked_admit_zero.
+Print Assumptions CheckedDivision.checked_divide_zero.

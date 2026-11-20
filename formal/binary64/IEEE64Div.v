@@ -95,13 +95,15 @@ Proof.
   rewrite Etl, Ed, Edt, Edh in Ez. repeat split; assumption.
 Qed.
 
-Lemma div64_ok L H xh xl yh yl :
+Lemma div64_bounded L H xh xl yh yl :
   (0 <= L)%Z -> (0 <= H)%Z -> (2 * L + 2 * H <= 917)%Z ->
   finite xh -> finite xl -> finite yh -> finite yl ->
   bnd 1 H (B xh) -> bnd 1 H (B xl) -> bnd 1 H (B yh) -> bnd 1 H (B yl) ->
   bpow radix2 (- L) <= Rabs (B yh) ->
   finite (fst (div64 xh xl yh yl)) /\ finite (snd (div64 xh xl yh yl))
-  /\ (B (fst (div64 xh xl yh yl)), B (snd (div64 xh xl yh yl))) = div (B xh) (B xl) (B yh) (B yl).
+  /\ (B (fst (div64 xh xl yh yl)), B (snd (div64 xh xl yh yl))) = div (B xh) (B xl) (B yh) (B yl)
+  /\ bnd 172 (2*H+2*L) (B (fst (div64 xh xl yh yl)))
+  /\ bnd 344 (2*H+2*L) (B (snd (div64 xh xl yh yl))).
 Proof.
   intros HL HH HLH Fxh Fxl Fyh Fyl Bxh Bxl Byh Byl Ly.
   assert (Y0 : B yh <> 0) by (intros E; rewrite E, Rabs_R0 in Ly; pose proof (bpow_gt_0 radix2 (- L)); lra).
@@ -131,8 +133,21 @@ Proof.
   destruct S as [Ftl [Etl Btl]].
   assert (Bth' : bnd 86 (2 * H + 2 * L) (B th)) by (apply (bnd_up 86 (H + L)); [lia | lia | exact (w 86%Z Bth)]).
   destruct (fast_two_sum64_ok 86 (2 * H + 2 * L) th _ Fth Ftl Bth' Btl
-              ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia)) as [Fzh [Fzl [Ez _]]].
+              ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia)) as [Fzh [Fzl [Ez [Bzh Bzl]]]].
   rewrite Etl, Ed, Edl, Epih in Ez. repeat split; assumption.
+Qed.
+
+Lemma div64_ok L H xh xl yh yl :
+  (0 <= L)%Z -> (0 <= H)%Z -> (2 * L + 2 * H <= 917)%Z ->
+  finite xh -> finite xl -> finite yh -> finite yl ->
+  bnd 1 H (B xh) -> bnd 1 H (B xl) -> bnd 1 H (B yh) -> bnd 1 H (B yl) ->
+  bpow radix2 (- L) <= Rabs (B yh) ->
+  finite (fst (div64 xh xl yh yl)) /\ finite (snd (div64 xh xl yh yl))
+  /\ (B (fst (div64 xh xl yh yl)), B (snd (div64 xh xl yh yl))) = div (B xh) (B xl) (B yh) (B yl).
+Proof.
+ intros HL HH Span Fxh Fxl Fyh Fyl Bxh Bxl Byh Byl Ly.
+ destruct (div64_bounded L H xh xl yh yl HL HH Span Fxh Fxl Fyh Fyl Bxh Bxl Byh Byl Ly)
+   as [Fh [Fl [Eq _]]]. repeat split; assumption.
 Qed.
 
 (** The bounds, for IEEE inputs on the division domain: no operation

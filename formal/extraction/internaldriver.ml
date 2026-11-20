@@ -100,6 +100,14 @@ let compute op args =
        | [xh; xl; yh; yl] -> String.concat " " (List.map show_bits
            (x_trig_mul (z_of_u64 (hex xh)) (z_of_u64 (hex xl)) (z_of_u64 (hex yh)) (z_of_u64 (hex yl))))
        | _ -> failwith "trig_mul takes four double-word components")
+  | "checked_div" ->
+      (match args with
+       | [xh; xl; yh; yl] ->
+           (match x_checked_div (z_of_u64 (hex xh)) (z_of_u64 (hex xl))
+              (z_of_u64 (hex yh)) (z_of_u64 (hex yl)) with
+            | Some (h, l) -> show_bits h ^ " " ^ show_bits l
+            | None -> "none")
+       | _ -> failwith "checked_div takes four binary64 words")
   | "quotient_range" ->
       (match args with
        | [_; _; _; _] ->
