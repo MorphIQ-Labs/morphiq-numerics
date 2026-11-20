@@ -343,6 +343,13 @@ pub(crate) fn tan_accurate_crosscheck(x: f64) -> (Q256, Q256, bool, Q256) {
     (num, den, negate, tan_accurate(&reduced))
 }
 
+/// The complete scalar fast path, including the signed Q256 input and output.
+#[cfg(test)]
+pub(crate) fn fast_crosscheck(r: Q256) -> [u64; 4] {
+    let (s, c) = fast(&r);
+    [s.hi(), s.lo(), c.hi(), c.lo()].map(f64::to_bits)
+}
+
 /// The Q256 split and table reduction in `fast`, retaining intermediate words.
 #[cfg(test)]
 pub(crate) fn input_crosscheck(r: Q256) -> [u64; 9] {

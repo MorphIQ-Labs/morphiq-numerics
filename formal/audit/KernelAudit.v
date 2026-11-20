@@ -1281,3 +1281,33 @@ Print Assumptions TrigOperandBounds.trig_residual_reference_floors.
 Print Assumptions TrigOperandBounds.trig_residual_operands_ready.
 Print Assumptions TrigProducts.trig_ready_product_correct.
 Print Assumptions TrigProducts.trig_reconstruction_products_correct.
+
+Require TrigAdd TrigCancellation TrigInner TrigOuter TrigReconstruction TrigFast.
+Print Assumptions TrigAdd.trig_add_zero_words.
+Print Assumptions TrigAdd.trig_add_zero.
+Print Assumptions TrigAdd.trig_add_ieee.
+Print Assumptions TrigAdd.trig_sub_ieee.
+Print Assumptions TrigCancellation.trig_head_reference.
+Print Assumptions TrigCancellation.trig_dw_word_upper.
+Print Assumptions TrigCancellation.trig_product_reference.
+Print Assumptions TrigCancellation.trig_head_dominance.
+Print Assumptions TrigCancellation.trig_dominant_cancellation.
+Print Assumptions TrigCancellation.trig_zero_cancellation.
+Print Assumptions TrigCancellation.trig_small_sin_lower.
+Print Assumptions TrigCancellation.trig_residual_square_upper.
+Print Assumptions TrigCancellation.trig_sine_product_dominance.
+Print Assumptions TrigCancellation.trig_cosine_product_dominance.
+Print Assumptions TrigCancellation.trig_reference_from_error.
+Print Assumptions TrigCancellation.trig_reference_magnitudes.
+Print Assumptions TrigInner.trig_inner_word_bounds.
+Print Assumptions TrigInner.trig_sine_inner_correct.
+Print Assumptions TrigInner.trig_cosine_inner_correct.
+Print Assumptions TrigOuter.trig_sine_head_floor.
+Print Assumptions TrigOuter.trig_cosine_head_floor.
+Print Assumptions TrigOuter.trig_outer_cancellation.
+Print Assumptions TrigOuter.trig_outer_add_correct.
+Print Assumptions TrigReconstruction.trig_reconstruct_correct.
+Print Assumptions TrigFast.trig_sign_abs.
+Print Assumptions TrigFast.trig_flip_normalized.
+Print Assumptions TrigFast.trig_flip_sine_error.
+Print Assumptions TrigFast.trig_fast_correct.

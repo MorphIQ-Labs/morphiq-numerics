@@ -198,7 +198,7 @@ large branch's proved domain.
      normalized TwoSum residual and its low-word bound. Both remainder
      signs are covered. The extracted check compares the split, sign,
      index, subtraction and residual words. Public entry composition must
-     establish the Q256 remainder domain and connect table reconstruction.
+     establish the Q256 remainder domain required by the full fast theorem.
    - **Below `|t| = 2^−60`,** `t` is `r_lo` alone, since `r_hi` equals the table
      point, and `t⁴` may underflow. A tail is then only known to lie within
      `[0, 3]` times its value, and the bounds still hold (*certified*:
@@ -211,8 +211,8 @@ large branch's proved domain.
      `TrigResidual.v` combines zero, tiny and regular cases into finite,
      normalized residual contracts, with the input magnitude, normalization
      and grid premises supplied by `TrigInputContract.v` on its stated Q256
-     domain. Table reconstruction and public entry composition remain
-     separate proof obligations.
+     domain. `TrigFast.v` connects these residual contracts to table
+     reconstruction; public entry composition remains a separate obligation.
    - `t` is 0 or at least `2^−317` in magnitude, since it's a difference on
      `Q256`'s grid. Before emitting or checking certificates,
      `generators/trig_certificates.py` consumes `trig_reduction.derive()` and
@@ -232,8 +232,8 @@ large branch's proved domain.
      widening used by the Gappa certificates. `TrigTable.v` then proves that
      the actual TwoSum operation preserves these values and bounds in finite,
      normalized double-words. The extraction corpus checks all 51 stored rows
-     and their double-word construction against Rust. Polynomial evaluation
-     and table-interval reconstruction are separate proof obligations.
+     and their double-word construction against Rust. `TrigReconstruction.v`
+     composes them with the residuals and the actual IEEE reconstruction.
    - They are combined with double-word `mul` and `add`/`sub` [DW].
      The trig multiplication allowance is `9u²`, proved by
      `TrigMultiply.trig_mul_ieee`, including gradual underflow in either
@@ -274,10 +274,26 @@ large branch's proved domain.
      existing Gappa certificates. `TrigReconstructionModel.v` composes the
      analytic references and bounded arithmetic-error factors to the stated
      `2^-62` bounds. The sine model requires a nonzero reference remainder;
-     the cosine model includes zero. The multiplication factors are derived
-     by `TrigProducts.v`; binding the addition/subtraction factors and
-     composing the executable reconstruction remain separate obligations.
+     the cosine model includes zero. `TrigProducts.v` derives the multiplication
+     factors. `TrigAdd.v` proves the existing `776·2^-114` addition allowance
+     together with normalization under bounded cancellation, including exact
+     zero. `TrigCancellation.v` derives the head-word cancellation bounds
+     from the analytic product sizes and their proved errors; `TrigInner.v`
+     and `TrigOuter.v` apply them to the actual additions and subtraction.
+     `TrigReconstruction.v` composes all these operations with the analytic
+     model, with no arithmetic-error-factor premises remaining.
    - `sin` and `cos` are each within `2^−62` (*certified*: `fast_sin.g`, `fast_cos.g`).
+
+`TrigFast.v` connects the signed Q256 split, index conversion, residuals,
+reconstruction and sine sign restoration. For a valid Q256 remainder with
+`2^-64 <= |r| <= 0.785399`, its actual fast transcription returns finite,
+normalized sine and cosine double-words within `2^-62` relatively of `sin r`
+and `cos r`. The integer-index conversion reuses the proved binary64 decoder
+from `AsinSegment.v`. The extracted full-path comparison covers both signs,
+table points and halfway-index ties, nearby inputs, fine Q256 low bits and
+actual Payne–Hanek remainders across the normal input binades. Additional zero
+and smaller cases check transcription agreement only. Public entry screens,
+rounding-test composition and matching SIMD remain separate obligations.
 
 ## 5. Accurate path
 
