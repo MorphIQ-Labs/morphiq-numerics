@@ -9,7 +9,8 @@ oracle graph has exact package/version exceptions in
 ## Contracts
 
 `elementary` covers all 14 scalar elementary functions, `sincos` equivalence,
-and all eight slice wrappers, with scalar and `simd,std` builds. The oracle
+and all fourteen slice wrappers, including the paired sine/cosine output,
+with scalar and `simd,std` builds. The oracle
 compares exact binary64 bits for correctly rounded results, including signed
 zero, subnormals and infinities. NaNs are checked by classification; slice and
 `sincos` equivalence compare their exact bits as well.
