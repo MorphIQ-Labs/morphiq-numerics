@@ -342,7 +342,16 @@ extracted `asin_recip` operation is shared by the asin and trig cross-check
 corpora and is compared with the actual Rust `Q256::recip` output.
 
 **Accurate path.** `N.mul(D.recip())` from §5's values is within `2^−196`
-(*certified*: `accurate_tan.g`).
+(*certified*: `accurate_tan.g`). The composed executable proof is
+`formal/trig/TrigTanAccurate.v::trig_tan_accurate_value_correct`:
+`TrigTanDomain.v` establishes the selected denominator's reciprocal domain,
+including remainders near poles, and `TrigTanQuotient.v` propagates the series,
+reciprocal and multiplication errors. The proof includes the actual odd/even
+quadrant choice and original argument sign. `TrigTanRounding.v` proves finite
+conversion and a final `(1/2 + 2^-143)` ULP bound measured at the exact result,
+including subnormals and crossed binades, within the published
+`(1/2 + 2^-142)` budget. These accurate-path theorems are distinct from the
+fast-path decision and the worst-case qualification for correct rounding.
 
 **Decision 5: `ε₁ = 2^−60`** in [ln] §5's test, with
 `EPS = 2^−60·(1 + 2^−50)`. `tan x` is transcendental for rational `x ≠ 0`
