@@ -87,7 +87,13 @@ by `k mod 4`, with `sin`'s sign from `x`.
 - The window down to weight `2^−(E+F)`, `F = 315`, is multiplied exactly by `m`.
   The truncation errs by less than `2^(53−F)`, which is `2^−200` relative to the
   closest approach. That is how `F` is chosen.
-- `2/π` is stored to 1,408 bits (*generated*).
+- `2/π` is stored to 1,408 bits. `formal/trig/TrigConstants.v` proves that
+  the integer assembled from those limbs is exactly `floor((2/π)·2^1408)`.
+  CoqInterval encloses `2/π` strictly between the adjacent grid points.
+  The same module proves that the four `HALF_PI` limbs, in their specified
+  order, approximate `π/2` within half a `Q256` significand unit and within
+  `2^−255` relatively. These are constant proofs; the closest-approach and
+  reduction-algorithm claims retain the evidence boundaries stated here.
 - The product's integer part gives `k mod 4`. Its 315-bit fraction `f` is
   rounded to the nearest multiple, so `f ∈ [−1/2, 1/2)`, and `r = f·π/2` in
   `Q256`.
@@ -189,10 +195,11 @@ use, so its pair is theirs bit for bit.
 | Artifact | Establishes |
 |---|---|
 | `generators/trig_reduction.py` | the closest approach, `F`, `2/π` to 1,408 bits and `π/2` in `Q256` (`src/trig/reduction.rs`) |
+| `formal/trig/TrigConstants.v` | generated limb encodings, certified `2/π` table bits and `π/2` rounding/relative bounds |
 | `generators/trig_poly.sollya` (Sollya 8.0) | `Ps`, `Pc` and their bounds, in `generators/trig_poly.out` |
 | `generators/trig_constants.py` | `src/trig/tables.rs`: the table, the polynomials, the series factors and degrees; the enclosed ratios |
 | `generators/trig_certificates.py` | writes every certificate in `formal/trig` (61) |
-| `formal/trig/*` (Gappa 1.4.1, at 400 bits) | §4's tails, compositions and fast results; §5's levels and accurate results; §8's reciprocal and `tan` results |
+| `formal/trig/*.g` (Gappa 1.4.1, at 400 bits) | §4's tails, compositions and fast results; §5's levels and accurate results; §8's reciprocal and `tan` results |
 | `generators/sin_cos_reference.py` | the fixture: [LM] Tables 8 and 10, the small-argument thresholds, arguments near `k·π/2`, random arguments in every binade, 1,200 values to 256 bits, and 607 reductions |
 | `generators/tan_reference.py` | `tan`'s fixture: [LM] Table 12, the small-argument threshold, arguments near `k·π/2`, random arguments in every binade, and 1,200 values to 256 bits |
 
