@@ -30,7 +30,7 @@ R_MIN_EXP = -62  # required reduced-argument floor, enforced before generation
 T_MIN = f'1b{R_MIN_EXP - 255 - 3}'
 T_SPLIT = '1b-60'  # above it nothing underflows; below it t = r_lo (section 4)
 DW_ADD = '776b-114'  # add and sub: 3u^2/(1 - 4u), widened (docs/double-word.md)
-DW_MUL = '5b-106'    # mul: 5u^2 (docs/double-word.md)
+DW_MUL = '9b-106'    # gradual-underflow mul: TrigMultiply.trig_mul_ieee
 TAIL = '1b-50'
 SIN_T = '1b-65'
 COS_T = '1b-65'
@@ -209,7 +209,7 @@ def fast(d):
 # sin(a + t) (ks + ka + kb = 1; bounds enclosed by generators/trig_constants.py):
 #   S, C: the table's double-words, relative error eS, eC (generated)
 #   SN, CM: sin t, cos t - 1 (formal/trig/sin_t.g, cos_t.g)
-#   m1, m2: mul, 5u^2; a1, a2: add, 3u^2/(1 - 4u)
+#   m1, m2: mul, 9u^2 (TrigMultiply.v); a1, a2: add, 3u^2/(1 - 4u)
 #   er: r's double-word against Q256's r, as an effect on sin(a + t)
 
 ks = 1 - ka - kb;
