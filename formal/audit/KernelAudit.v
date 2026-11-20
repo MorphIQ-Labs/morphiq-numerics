@@ -1158,3 +1158,18 @@ Print Assumptions TrigReciprocal.reciprocal_seed_float.
 Print Assumptions TrigReciprocal.q_reciprocal_seed.
 Print Assumptions TrigReciprocal.q_reciprocal_transcription.
 Print Assumptions TrigReciprocal.q_reciprocal_full_contract.
+
+Require TrigTanQuotient TrigTanDomain TrigTanAccurate TrigTanRounding.
+Print Assumptions TrigTanQuotient.trig_relative_factor.
+Print Assumptions TrigTanQuotient.trig_quotient_error.
+Print Assumptions TrigTanQuotient.trig_q_quotient_error.
+Print Assumptions TrigTanDomain.trig_nearest_remainder_range.
+Print Assumptions TrigTanDomain.trig_odd_nearest_large.
+Print Assumptions TrigTanDomain.trig_tan_denominator_bound.
+Print Assumptions TrigTanDomain.trig_tan_recip_domain.
+Print Assumptions TrigTanAccurate.trig_tan_analytic.
+Print Assumptions TrigTanAccurate.trig_tan_selected_error.
+Print Assumptions TrigTanAccurate.trig_tan_accurate_value_correct.
+Print Assumptions TrigTanRounding.trig_tan_magnitude.
+Print Assumptions TrigTanRounding.trig_tan_round.
+Print Assumptions TrigTanRounding.trig_tan_accurate_ulp.

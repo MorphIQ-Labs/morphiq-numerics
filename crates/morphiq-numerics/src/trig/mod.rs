@@ -333,6 +333,16 @@ pub(crate) fn accurate_crosscheck(x: f64, cosine: bool) -> (u32, bool, bool, Q25
     (reduced.k, use_cos, negate, y)
 }
 
+/// Expose the actual tangent operands and forced accurate result for the
+/// extracted-model comparison, independently of the public fast-path decision.
+#[cfg(test)]
+pub(crate) fn tan_accurate_crosscheck(x: f64) -> (Q256, Q256, bool, Q256) {
+    let reduced = Reduced::of(x);
+    let (s, c) = accurate(reduced.r);
+    let (num, den, negate) = tan_parts(&reduced, s, c);
+    (num, den, negate, tan_accurate(&reduced))
+}
+
 #[cfg(test)]
 mod tests;
 
