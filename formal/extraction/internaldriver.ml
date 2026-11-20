@@ -100,6 +100,12 @@ let compute op args =
        | [xh; xl; yh; yl] -> String.concat " " (List.map show_bits
            (x_trig_mul (z_of_u64 (hex xh)) (z_of_u64 (hex xl)) (z_of_u64 (hex yh)) (z_of_u64 (hex yl))))
        | _ -> failwith "trig_mul takes four double-word components")
+  | "trig_finish" ->
+      (match args with
+       | [x; n; c] ->
+           let (((h, l), decision), result) = x_trig_finish (z_of_u64 (hex x)) (n = "1") (c = "1") in
+           show_bits h ^ " " ^ show_bits l ^ " " ^ show_opt decision ^ " " ^ show_bits result
+       | _ -> failwith "trig_finish takes a magnitude, sign and function")
   | "trig_fastq" ->
       let ((n, e, l), rest) = value args in
       if rest <> [] then failwith "trig_fastq takes one Q256 value";

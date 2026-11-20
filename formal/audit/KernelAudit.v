@@ -1311,3 +1311,20 @@ Print Assumptions TrigFast.trig_sign_abs.
 Print Assumptions TrigFast.trig_flip_normalized.
 Print Assumptions TrigFast.trig_flip_sine_error.
 Print Assumptions TrigFast.trig_fast_correct.
+
+Require TrigFastDomain TrigFastSelection TrigFastDecision.
+Print Assumptions TrigFast.trig_split_reduction.
+Print Assumptions TrigFast.trig_sign_distance.
+Print Assumptions TrigFast.trig_fast_composed.
+Print Assumptions TrigFastDomain.trig_exact_remainder_floor.
+Print Assumptions TrigFastDomain.trig_exact_remainder_upper.
+Print Assumptions TrigFastDomain.trig_reduce_fast_domain.
+Print Assumptions TrigFastSelection.trig_fast_flip_correct.
+Print Assumptions TrigFastSelection.trig_fast_selected_correct.
+Print Assumptions TrigFastSelection.trig_fast_selected_floor.
+Print Assumptions TrigFastSelection.trig_fast64_correct.
+Print Assumptions TrigFastDecision.trig_eps_finite.
+Print Assumptions TrigFastDecision.trig_eps_value.
+Print Assumptions TrigFastDecision.trig_decision_correct.
+Print Assumptions TrigFastDecision.trig_fast_decision_correct.
+Print Assumptions TrigFastDecision.trig_finish_ulp.

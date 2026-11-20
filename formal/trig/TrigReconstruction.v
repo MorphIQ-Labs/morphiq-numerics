@@ -20,7 +20,7 @@ Theorem trig_reconstruct_correct i th tl r :
  Rabs(B tl)<=/2^53*Rabs(B th) -> B th=rndF(B th+B tl) ->
  on_grid (-320) (B tl) -> Rabs(B th+B tl)<=0.0078126 ->
  Rabs r<=0.785399 -> r<>0 ->
- Rabs(IZR(Z.of_nat i)/64+(B th+B tl)-r)<=bpow radix2 (-105)*Rabs r ->
+ Rabs(IZR(Z.of_nat i)/64+(B th+B tl)-r)<=(3/2)*bpow radix2 (-105)*Rabs r ->
  let '((sh,sl),(ch,cl)):=trig_reconstruct i th tl in
  finite sh /\ finite sl /\ B sh=rndF(B sh+B sl) /\
  finite ch /\ finite cl /\ B ch=rndF(B ch+B cl) /\

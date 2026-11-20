@@ -320,6 +320,7 @@ pub(super) fn write(out: &mut String) {
         emit_series(out, bits);
     }
     write_selected(out);
+    write_finish(out);
     write_reciprocals(out);
     let mut rng = SplitMix64::new(0x7472_6967_7265_6475);
     for i in 0..4096 {
@@ -453,4 +454,70 @@ fn write_reciprocals(out: &mut String) {
             }
         }
     }
+}
+
+// The actual finish path after the small-input screens. Its proved domain
+// starts at 2^-63, below every public sine/cosine fast-entry threshold.
+fn write_finish(out: &mut String) {
+    let minimum = 960_u64 << 52;
+    let mut inputs = std::vec![minimum, minimum + 1];
+    for exponent in 960..2047_u64 {
+        for fraction in [0, 1, (1_u64 << 52) - 1] {
+            inputs.push((exponent << 52) | fraction);
+        }
+    }
+    for center in [
+        0x3e57_1374_4912_3ef6, // sine screen
+        0x3e60_0000_0000_0000, // cosine screen
+        0x3fe9_21fb_5444_2d18, // pi/4
+        0x3ff9_21fb_5444_2d18, // pi/2
+        0x4009_21fb_5444_2d18, // pi
+        0x4012_d97c_7f33_21d2, // 3*pi/2
+        0x7506_ac5b_262c_a1ff, // nearest-integer reduction witness
+    ] {
+        inputs.extend(center - 2..=center + 2);
+    }
+    const FIXTURE: &str = include_str!("../../../reference/fixtures/sin_cos.json");
+    for section in ["precise", "cases", "reduction"] {
+        for case in entries(FIXTURE, &[section]) {
+            let bits = word(case, "x").to_bits() & 0x7fff_ffff_ffff_ffff;
+            if (minimum..0x7ff0_0000_0000_0000).contains(&bits) {
+                inputs.push(bits);
+            }
+        }
+    }
+    inputs.sort_unstable();
+    inputs.dedup();
+    let mut decisions = [[false; 2]; 2];
+    let mut selections = [[[false; 2]; 2]; 4];
+    for bits in inputs {
+        assert!((minimum..0x7ff0_0000_0000_0000).contains(&bits));
+        for negative in [false, true] {
+            let signed = bits | (u64::from(negative) << 63);
+            let x = f64::from_bits(signed);
+            let (k, _) = crate::trig::reduce(x.abs());
+            for cosine in [false, true] {
+                let (y, decision, result) = crate::trig::finish_crosscheck(x, cosine);
+                decisions[usize::from(cosine)][usize::from(decision.is_some())] = true;
+                selections[k as usize][usize::from(negative)][usize::from(cosine)] = true;
+                write!(
+                    out,
+                    "trig_finish {bits:016x} {} {} : {:016x} {:016x} ",
+                    u8::from(negative),
+                    u8::from(cosine),
+                    y.hi().to_bits(),
+                    y.lo().to_bits()
+                )
+                .unwrap();
+                if let Some(value) = decision {
+                    write!(out, "{:016x}", value.to_bits()).unwrap();
+                } else {
+                    write!(out, "none").unwrap();
+                }
+                writeln!(out, " {:016x}", result.to_bits()).unwrap();
+            }
+        }
+    }
+    assert!(decisions.into_iter().flatten().all(|hit| hit));
+    assert!(selections.into_iter().flatten().flatten().all(|hit| hit));
 }
