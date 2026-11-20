@@ -331,8 +331,8 @@ encodings and independent fixture arguments.
 entries. `TrigSinLM` and `TrigCosLM` retain [LM]'s midpoint-distance results as
 explicit hypotheses on the stated argument domains, using mantissa distances
 `2^-126` and `2^-142`. The small-input screen proofs and accepted fast decisions
-need no such hypothesis. These entry theorems do not cover tangent's fast
-division or SIMD.
+need no such hypothesis. These sine/cosine entry theorems do not cover
+tangent's public entry or SIMD; the separate fast tangent proof is in §8.
 
 ## 5. Accurate path
 
@@ -466,6 +466,19 @@ quadrant's order. The division is within `15u² + 56u³` [DW], so the quotient i
 within `2^−60` (*certified*: `formal/trig/fast_tan.g`). `checked_div` refuses
 operands outside its theorem's domain, and those arguments go to the accurate
 path; none of the 1,200 precise arguments does.
+
+`TrigFastQuotient.v` and `TrigTanFast.v` prove the selected checked quotient's
+`2^-60` error bound, including the actual quadrant and argument-sign handling.
+`TrigTanFastValue.v` composes it with binary64 reduction for magnitudes at least
+`2^-63`, below the public small-input cutoff, and proves every accepted
+`EPS_TAN` rounding decision correctly rounded. `CheckedDivision.v` supplies
+the checked operation's domain and finite-word bounds; `RoundingDecisionDomain.v`
+derives the decision's magnitude domain from the reference value's separation
+from zero. The decision itself establishes pair normalization. The extracted
+fast quotient and decision are compared with Rust across binades, quadrant and
+screen boundaries, reduction witnesses and independent fixture arguments, with
+both decision outcomes covered. This fast-path theorem does not establish the
+public tangent small-input screen or its full entry composition.
 
 **Decision 4: `Q256::recip`, by Newton's iteration.**
 - For `|c| >= 2^-1022` with finite `RN(c)`, `y_0 = RN(1/RN(c))`
