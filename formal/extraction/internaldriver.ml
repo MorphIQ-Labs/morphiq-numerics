@@ -100,6 +100,13 @@ let compute op args =
        | [xh; xl; yh; yl] -> String.concat " " (List.map show_bits
            (x_trig_mul (z_of_u64 (hex xh)) (z_of_u64 (hex xl)) (z_of_u64 (hex yh)) (z_of_u64 (hex yl))))
        | _ -> failwith "trig_mul takes four double-word components")
+  | "quotient_range" ->
+      (match args with
+       | [_; _; _; _] ->
+           let accepted, exponents = x_quotient_range (List.map (fun x -> z_of_u64 (hex x)) args) in
+           String.concat " " ((if accepted then "1" else "0") ::
+             List.map (fun e -> string_of_int (int_of_z e)) exponents)
+       | _ -> failwith "quotient_range takes four binary64 words")
   | "trig_entry" ->
       (match args with
        | [x] -> String.concat " " (List.map show_bits (x_trig_entry (z_of_u64 (hex x))))

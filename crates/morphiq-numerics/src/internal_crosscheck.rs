@@ -41,6 +41,7 @@ mod asin;
 mod asinh;
 mod atan2;
 mod bivariate;
+mod checked_division;
 mod log_radix;
 mod normal;
 mod trig;
@@ -264,6 +265,7 @@ fn internal_crosscheck_corpus() {
     bivariate::write(&mut out);
     log_radix::write(&mut out);
     trig::write(&mut out);
+    checked_division::write(&mut out);
     q256_exponent_corpus(&mut out);
     erfcx_accurate_tail_corpus(&mut out);
     erfcx_accurate_exponential_corpus(&mut out);

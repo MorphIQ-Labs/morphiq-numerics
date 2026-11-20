@@ -1378,3 +1378,10 @@ Print Assumptions TrigCorrectRounding.trig_public_finish_correct.
 Print Assumptions TrigCorrectRounding.trig_sin_entry_correct.
 Print Assumptions TrigCorrectRounding.trig_cos_entry_correct.
 Print Assumptions TrigCorrectRounding.trig_public_finish_decided.
+
+From Binary64 Require CheckedQuotientRange.
+Print Assumptions CheckedQuotientRange.checked_word_exponent_mag.
+Print Assumptions CheckedQuotientRange.checked_word_exponent_bounds.
+Print Assumptions CheckedQuotientRange.quotient_extents_nonnegative.
+Print Assumptions CheckedQuotientRange.quotient_extents_contains.
+Print Assumptions CheckedQuotientRange.checked_quotient_range_sound.
