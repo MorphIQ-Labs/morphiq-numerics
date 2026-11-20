@@ -25,6 +25,7 @@ use crate::exp2::lanes::Exp2;
 use crate::expm1::lanes::Expm1;
 use crate::internal_crosscheck::reduction_argument;
 use crate::ln::lanes::{Ln, Ln1p};
+use crate::log2::lanes::Radix;
 use crate::random::SplitMix64;
 
 /// The random sections' size.
@@ -204,6 +205,32 @@ pub(crate) fn ln_corpus() -> Vec<f64> {
         v.push(1.0 + (unit(&mut rng) - 0.5) * f64::from_bits(0x3eb0_0000_0000_0000));
         // Subnormals.
         v.push(f64::from_bits(rng.next_u64() % (1 << 52)));
+    }
+    v
+}
+
+pub(crate) fn radix_log_corpus() -> Vec<f64> {
+    let mut v = fixture_values(include_str!("../../../reference/fixtures/log2_log10.json"));
+    v.extend(specials());
+    for exponent in 1..2047_u64 {
+        let power = exponent << 52;
+        v.extend([power - 1, power, power + 1].map(f64::from_bits));
+    }
+    for bit in 0..52 {
+        let power = 1_u64 << bit;
+        v.extend([power - 1, power, power + 1].map(f64::from_bits));
+    }
+    for exponent in [1, 1022, 1023, 1024, 2046_u64] {
+        for index in 0..128_u64 {
+            let boundary = (exponent << 52) + (index << 45);
+            v.extend([boundary - 1, boundary, boundary + 1].map(f64::from_bits));
+        }
+    }
+    let mut rng = SplitMix64::new(0x7261_6469_785f_6c6e);
+    for _ in 0..cases() {
+        v.push(f64::from_bits(rng.next_u64()));
+        v.push(f64::from_bits(1 + rng.next_u64() % 0x7fef_ffff_ffff_ffff));
+        v.push(1.0 + (unit(&mut rng) - 0.5) * f64::from_bits(0x3eb0_0000_0000_0000));
     }
     v
 }
@@ -524,6 +551,8 @@ fn every_lanes_cascade_returns_the_scalar_bits() {
     check_cascades::<Expm1>("expm1", &short(expm1_corpus()));
     check_cascades::<Ln>("ln", &short(ln_corpus()));
     check_cascades::<Ln1p>("ln_1p", &short(ln_1p_corpus()));
+    check_cascades::<Radix<false>>("log2", &short(radix_log_corpus()));
+    check_cascades::<Radix<true>>("log10", &short(radix_log_corpus()));
     check_cascades::<Asin>("asin", &short(asin_corpus()));
     check_cascades::<Asinh>("asinh", &short(asinh_corpus()));
 }
@@ -563,6 +592,13 @@ fn ln_1p_lanes_return_ln_1ps_bits_on_every_backend() {
     check_all::<Ln1p>("ln_1p", &ln_1p_corpus());
 }
 
+#[test]
+fn radix_log_lanes_return_scalar_bits_on_every_backend() {
+    let xs = radix_log_corpus();
+    check_all::<Radix<false>>("log2", &xs);
+    check_all::<Radix<true>>("log10", &xs);
+}
+
 /// The public entry points, on the dispatched backend, for every length up
 /// to 17 and a long slice.
 #[test]
@@ -574,7 +610,7 @@ fn batched_entry_points_return_the_scalar_bits() {
         Vec<f64>,
     );
     let short = |v: Vec<f64>| -> Vec<f64> { v.into_iter().step_by(7).take(4_000).collect() };
-    let entries: [Entry; 7] = [
+    let entries: [Entry; 9] = [
         (
             "asinh_slice",
             crate::elementary::asinh_slice,
@@ -610,6 +646,18 @@ fn batched_entry_points_return_the_scalar_bits() {
             crate::elementary::ln_slice,
             crate::ln::ln,
             short(ln_corpus()),
+        ),
+        (
+            "log2_slice",
+            crate::elementary::log2_slice,
+            crate::log2::log2,
+            short(radix_log_corpus()),
+        ),
+        (
+            "log10_slice",
+            crate::elementary::log10_slice,
+            crate::log2::log10,
+            short(radix_log_corpus()),
         ),
         (
             "ln_1p_slice",
