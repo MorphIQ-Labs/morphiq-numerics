@@ -66,11 +66,11 @@ Definition x_trig_tan_parts bits negative :=
 Definition x_trig_tan_accurate bits negative :=
   let q:=TrigTanAccurate.trig_tan_accurate64 bits negative in
   (q256_out q,bits_of_b64 (Q256.to_f64 q)).
-Require TrigEntry.
+Require TrigEntry TrigTanEntry.
 Definition x_trig_entry bits :=
  let x:=b64_of_bits bits in
  let '(s,c):=TrigEntry.trig_sincos_entry x in
- map bits_of_b64 [TrigEntry.trig_sin_entry x;TrigEntry.trig_cos_entry x;s;c].
+ map bits_of_b64 [TrigEntry.trig_sin_entry x;TrigEntry.trig_cos_entry x;s;c;TrigTanEntry.trig_tan_entry x].
 
 Require TrigFastSelection TrigFastDecision.
 Definition x_trig_finish bits negative cosine :=

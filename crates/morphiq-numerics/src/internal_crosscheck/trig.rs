@@ -556,6 +556,7 @@ fn write_entries(out: &mut String) {
         }
     }
     for center in [
+        0x3e4d_12ed_0af1_a27e, // tangent identity cutoff
         0x3e46_a09e_667f_3bcc,
         0x3e53_988e_1409_212e,
         0x3e57_1374_4912_3ef6,
@@ -576,6 +577,12 @@ fn write_entries(out: &mut String) {
             inputs.push(word(case, "x").to_bits() & 0x7fff_ffff_ffff_ffff);
         }
     }
+    const TAN_FIXTURE: &str = include_str!("../../../reference/fixtures/tan.json");
+    for section in ["precise", "cases"] {
+        for case in entries(TAN_FIXTURE, &[section]) {
+            inputs.push(word(case, "x").to_bits() & 0x7fff_ffff_ffff_ffff);
+        }
+    }
     inputs.sort_unstable();
     inputs.dedup();
     for magnitude in inputs {
@@ -587,11 +594,12 @@ fn write_entries(out: &mut String) {
             let (ss, cc) = crate::trig::sincos(x);
             writeln!(
                 out,
-                "trig_entry {bits:016x} : {:016x} {:016x} {:016x} {:016x}",
+                "trig_entry {bits:016x} : {:016x} {:016x} {:016x} {:016x} {:016x}",
                 s.to_bits(),
                 c.to_bits(),
                 ss.to_bits(),
-                cc.to_bits()
+                cc.to_bits(),
+                crate::trig::tan(x).to_bits()
             )
             .unwrap();
         }
