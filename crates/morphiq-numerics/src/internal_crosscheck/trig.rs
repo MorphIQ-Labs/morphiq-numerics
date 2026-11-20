@@ -26,7 +26,39 @@ fn emit(out: &mut String, bits: u64) {
     .unwrap();
 }
 
+fn emit_tail(out: &mut String, bits: u64) {
+    for sign in [0, 1_u64 << 63] {
+        let bits = bits | sign;
+        write!(out, "trig_tail {bits:016x} :").unwrap();
+        for result in crate::trig::tail_crosscheck(f64::from_bits(bits)) {
+            write!(out, " {result:016x}").unwrap();
+        }
+        writeln!(out).unwrap();
+    }
+}
+
 pub(super) fn write(out: &mut String) {
+    // Both signs, zero/subnormals, every residual binade, and both branch edges.
+    for bits in [0, 1, (1_u64 << 52) - 1] {
+        emit_tail(out, bits);
+    }
+    let upper = 0.007_812_6_f64.to_bits();
+    for exponent in 1..=1016_u64 {
+        for fraction in [0, 1, (1_u64 << 52) - 2, (1_u64 << 52) - 1] {
+            let bits = (exponent << 52) | fraction;
+            if bits <= upper {
+                emit_tail(out, bits);
+            }
+        }
+    }
+    for edge in [(963_u64 << 52), upper] {
+        for bits in edge - 2..=edge + 2 {
+            if bits <= upper {
+                emit_tail(out, bits);
+            }
+        }
+    }
+
     for i in 0..51 {
         write!(out, "trig_table {i} :").unwrap();
         for bits in crate::trig::table_crosscheck(i) {
