@@ -1084,3 +1084,13 @@ Print Assumptions TrigConstants.trig_two_over_pi_bits.
 Print Assumptions TrigConstants.trig_half_pi_encoding.
 Print Assumptions TrigConstants.trig_half_pi_rounding.
 Print Assumptions TrigConstants.trig_half_pi_relative.
+
+Require TrigSeparation TrigSeparationData TrigClosest.
+Print Assumptions TrigSeparation.farey_gap.
+Print Assumptions TrigSeparation.separation_check_sound.
+Print Assumptions TrigSeparationData.trig_separation_count.
+Print Assumptions TrigSeparationData.trig_separation_checked.
+Print Assumptions TrigClosest.trig_integer_separation.
+Print Assumptions TrigClosest.trig_binary64_separation.
+Print Assumptions TrigClosest.trig_binary64_half_separation.
+Print Assumptions TrigClosest.trig_truncation_relative.
