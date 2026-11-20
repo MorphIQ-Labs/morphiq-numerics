@@ -517,7 +517,12 @@ code bit for bit on the internal cross-check corpus, with cases at the test's
 threshold so both outcomes occur. `decide_with_bounded_ok` extends the
 unscaled test through the largest finite binade, provided
 `EPS·|y_hi| ≤ 2^1020`; `decide_with_ok` retains its original `|y_hi| ≤ 2^1000`
-interface. The real rounding-cell proof has no upper-magnitude premise.
+interface. `decide_with_word_bounded_ok` instead permits an unnormalized
+input pair with `|y_lo| ≤ 2^1020`, retaining the leading-word domain
+`2^-900 ≤ |y_hi| < 2^1024`, product bound and relative-error premises.
+An accepted test places the pair's sum inside the leading word's rounding
+cell, establishing normalization before applying the same Ziv argument.
+The real rounding-cell proof has no upper-magnitude premise.
 
 **Scaling:** `y_hi · 2^k` is exact for `k ≥ −1021`. For `k = 1024`, where `Y < 1`
 near overflow, it's applied as `(y_hi · 2^(k−1)) · 2`.
