@@ -45,7 +45,7 @@ Theorem trig_input_correct r : valid r ->
   Rabs(B th)<=0.0078126 /\ Rabs(B th+B tl)<=0.0078126 /\
   (B th=0 \/ bpow radix2 (-320)<=Rabs(B th)) /\
   Rabs(B tl)<=bpow radix2 (-53)*Rabs(B th) /\ on_grid (-320) (B tl) /\
-  Rabs(B i/64+(B th+B tl)-trig_sign n (qval r))<=bpow radix2 (-104)*Rabs(qval r).
+  Rabs(B i/64+(B th+B tl)-trig_sign n (qval r))<=bpow radix2 (-105)*Rabs(qval r).
 Proof.
   intros V Range. pose proof (trig_q_split_correct r V Range) as Split.
   unfold trig_input. destruct (trig_q_split r) as [h l] eqn:SplitWords.

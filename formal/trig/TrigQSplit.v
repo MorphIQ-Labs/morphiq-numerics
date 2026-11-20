@@ -94,7 +94,7 @@ Theorem trig_q_split_correct r : valid r ->
   bpow radix2 (-65)<=Rabs(B h)<=0.7854 /\
   Rabs(B l)<=bpow radix2 (-53) /\
   on_grid (-320) (B h) /\ on_grid (-320) (B l) /\
-  Rabs(B h+B l-qval r)<=bpow radix2 (-104)*Rabs(qval r).
+  Rabs(B h+B l-qval r)<=bpow radix2 (-105)*Rabs(qval r).
 Proof.
   intros V [Lower Upper]. unfold trig_q_split; cbn zeta.
   set (h:=Q256.to_f64 r).
@@ -164,11 +164,11 @@ Proof.
     assert (A:Rabs(B(Q256.to_f64 d))<=(1+bpow radix2 (-53))*Rabs(qval d)) by nra.
     eapply Rle_trans;[exact A|]. eapply Rle_trans;[apply Rmult_le_compat_l;[exact P|exact Dsize]|].
     rewrite <-Rmult_assoc. eapply Rle_trans;[apply Rmult_le_compat_l;[apply Rmult_le_pos;assumption|exact Upper]|exact Budget]. }
-  assert (Error:Rabs(B h+B(Q256.to_f64 d)-qval r)<=bpow radix2 (-104)*Rabs(qval r)).
+  assert (Error:Rabs(B h+B(Q256.to_f64 d)-qval r)<=bpow radix2 (-105)*Rabs(qval r)).
   { replace (B h+B(Q256.to_f64 d)-qval r) with
       ((B(Q256.to_f64 d)-qval d)+(qval d-(qval r-B h))) by ring.
     eapply Rle_trans;[apply Rabs_triang|].
-    assert (Budget:bpow radix2 (-53)*(bpow radix2 (-53)+bpow radix2 (-253))+bpow radix2 (-253)<=bpow radix2 (-104)) by interval.
+    assert (Budget:bpow radix2 (-53)*(bpow radix2 (-53)+bpow radix2 (-253))+bpow radix2 (-253)<=bpow radix2 (-105)) by interval.
     assert (A:bpow radix2 (-53)*Rabs(qval d)<=bpow radix2 (-53)*(bpow radix2 (-53)+bpow radix2 (-253))*Rabs(qval r)).
     { rewrite Rmult_assoc;apply Rmult_le_compat_l;[apply bpow_ge_0|exact Dsize]. }
     eapply Rle_trans with ((bpow radix2 (-53)*(bpow radix2 (-53)+bpow radix2 (-253))+bpow radix2 (-253))*Rabs(qval r));

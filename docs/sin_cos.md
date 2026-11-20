@@ -192,7 +192,7 @@ large branch's proved domain.
      as premises. `TrigQSplit.v`, `TrigInput.v` and `TrigInputContract.v`
      discharge them for a valid Q256 remainder with magnitude between
      `2^-64` and `0.785399`. The actual split differs from that remainder by
-     at most `2^-104` relatively. The proof follows limb addition to retain
+     at most `2^-105` relatively. The proof follows limb addition to retain
      the `2^-320` grid through cancellation, checks the nearest-even table
      index in `0..=50`, proves exact table subtraction, and derives the
      normalized TwoSum residual and its low-word bound. Both remainder
