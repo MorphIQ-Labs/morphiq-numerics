@@ -90,6 +90,10 @@ let compute op args =
            let (((qn, qe), ql), rounded) = x_trig_tan_accurate (z_of_u64 (hex x)) (n = "1") in
            show (qn, qe, ql) ^ " " ^ show_bits rounded
        | _ -> failwith "trig_tan_accurate takes a magnitude and sign")
+  | "trig_table" ->
+      (match args with
+       | [i] -> String.concat " " (List.map show_bits (x_trig_table (z_of_int (int_of_string i))))
+       | _ -> failwith "trig_table takes an index")
   | "trig_series" ->
       let ((n, e, l), _) = value args in
       let (((sn, se), sl), ((cn, ce), cl)) = x_trig_series n e l in

@@ -1173,3 +1173,9 @@ Print Assumptions TrigTanAccurate.trig_tan_accurate_value_correct.
 Print Assumptions TrigTanRounding.trig_tan_magnitude.
 Print Assumptions TrigTanRounding.trig_tan_round.
 Print Assumptions TrigTanRounding.trig_tan_accurate_ulp.
+
+Require TrigTables TrigTable.
+Print Assumptions TrigTables.trig_table_length.
+Print Assumptions TrigTables.trig_table_ok.
+Print Assumptions TrigTable.trig_table_sum_ok.
+Print Assumptions TrigTable.trig_table_dw_ok.
