@@ -214,6 +214,15 @@ fn admit(z: DoubleWord, exact_zero: bool) -> Result<DoubleWord, CheckError> {
 
 impl DoubleWord {
     #[cfg(test)]
+    pub(crate) fn crosscheck_division(words: [f64; 4]) -> Option<(u64, u64)> {
+        let [xh, xl, yh, yl] = words;
+        Self { hi: xh, lo: xl }
+            .checked_div(Self { hi: yh, lo: yl })
+            .ok()
+            .map(|z| (z.hi.to_bits(), z.lo.to_bits()))
+    }
+
+    #[cfg(test)]
     pub(crate) fn crosscheck_quotient_range(words: [f64; 4]) -> (bool, [i32; 4]) {
         assert!(words.iter().all(|w| w.is_finite()));
         (
