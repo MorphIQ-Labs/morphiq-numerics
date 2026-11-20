@@ -80,6 +80,7 @@ pub(super) fn write(out: &mut String) {
 fn write_selected(out: &mut String) {
     let mut inputs = std::vec![0, 1, (1_u64 << 52) - 1, 1_u64 << 52];
     for center in [
+        0x3e4d_12ed_0af1_a27e, // tan(x) = x cutoff
         0x3fe9_21fb_5444_2d18, // pi/4
         0x3ff9_21fb_5444_2d18, // pi/2
         0x4009_21fb_5444_2d18, // pi
@@ -102,6 +103,24 @@ fn write_selected(out: &mut String) {
         for signed in [bits, bits | (1_u64 << 63)] {
             let x = f64::from_bits(signed);
             let negative = x < 0.0;
+            let (num, den, negate, tan) = crate::trig::tan_accurate_crosscheck(x);
+            writeln!(
+                out,
+                "trig_tan_parts {bits:016x} {} : {} {} {}",
+                u8::from(negative),
+                q256(num),
+                q256(den),
+                u8::from(negate)
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "trig_tan_accurate {bits:016x} {} : {} {:016x}",
+                u8::from(negative),
+                q256(tan),
+                tan.to_f64().to_bits()
+            )
+            .unwrap();
             for cosine in [false, true] {
                 let (k, use_cos, negate, y) = crate::trig::accurate_crosscheck(x, cosine);
                 covered[k as usize][usize::from(negative)][usize::from(cosine)] = true;
