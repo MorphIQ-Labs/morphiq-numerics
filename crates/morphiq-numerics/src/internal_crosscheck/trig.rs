@@ -62,6 +62,7 @@ pub(super) fn write(out: &mut String) {
         emit_series(out, bits);
     }
     write_selected(out);
+    write_reciprocals(out);
     let mut rng = SplitMix64::new(0x7472_6967_7265_6475);
     for i in 0..4096 {
         let bits = rng.next_u64() & 0x7fff_ffff_ffff_ffff;
@@ -126,4 +127,53 @@ fn write_selected(out: &mut String) {
         }
     }
     assert!(covered.into_iter().flatten().flatten().all(|hit| hit));
+}
+
+// Reuse the existing q_recip extraction entry: the shared Rust operation has
+// the same full-domain contract whichever kernel calls it. Every sampled
+// significand is normalized, and no unsupported reciprocal is evaluated.
+fn write_reciprocals(out: &mut String) {
+    use crate::q256::Q256;
+    let emit = |out: &mut String, c: Q256| {
+        assert!(c.to_f64().is_finite());
+        writeln!(out, "asin_recip {} : {}", q256(c), q256(c.recip())).unwrap();
+    };
+    // Input minimum, the trig/asin denominator scales, ordinary binades,
+    // normal/subnormal seed transition and finite-conversion limit.
+    for top in [
+        -1022, -1021, -1000, -65, -64, -63, -28, -1, 0, 1, 500, 1020, 1021, 1022, 1023,
+    ] {
+        let upper = if top == 1023 {
+            [u64::MAX, u64::MAX, u64::MAX, u64::MAX - (1 << 10)]
+        } else {
+            [u64::MAX; 4]
+        };
+        for m in [
+            [0, 0, 0, 1 << 63],
+            [1, 0, 0, 1 << 63],
+            [0, 0, 0, (1 << 63) | (1 << 10)], // binary64 rounding tie
+            [1, 0, 0, (1 << 63) | (1 << 10)], // just above the tie
+            upper,
+        ] {
+            for negative in [false, true] {
+                emit(out, Q256::new(negative, m, top - 255));
+            }
+        }
+    }
+    let mut rng = SplitMix64::new(0x7472_6967_7265_6369);
+    for _ in 0..64 {
+        let m = [
+            rng.next_u64(),
+            rng.next_u64(),
+            rng.next_u64(),
+            rng.next_u64() | (1 << 63),
+        ];
+        let top = i32::try_from(rng.next_u64() % 2046).unwrap() - 1022;
+        for negative in [false, true] {
+            let c = Q256::new(negative, m, top - 255);
+            if c.to_f64().is_finite() {
+                emit(out, c);
+            }
+        }
+    }
 }
