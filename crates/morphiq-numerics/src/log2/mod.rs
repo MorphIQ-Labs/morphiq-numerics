@@ -117,4 +117,10 @@ pub(crate) fn crosscheck_accurate(x: f64) -> (Q128, Q128) {
 }
 
 #[cfg(test)]
+pub(crate) fn crosscheck_fast(x: f64) -> [(DoubleWord, Option<f64>); 2] {
+    let reduced = Reduced::of(x);
+    [log2_fast(&reduced), log10_fast(&reduced)].map(|value| (value, decide(value)))
+}
+
+#[cfg(test)]
 mod tests;

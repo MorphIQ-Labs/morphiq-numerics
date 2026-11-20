@@ -1056,3 +1056,24 @@ Print Assumptions LogRadixRounding.log10_accurate_representable.
 Require LogRadixUlp.
 Print Assumptions LogRadixUlp.radix_round_error.
 Print Assumptions LogRadixUlp.log10_accurate_ulp.
+
+Require LogRadixFast LogRadixGrid LogRadixScale LogRadixFastBound LogRadixReconstruct LogRadixDecision LogRadixEntry.
+Print Assumptions LogRadixConstants.inv_ln2_dw_residual.
+Print Assumptions LogRadixConstants.inv_ln10_dw_residual.
+Print Assumptions LogRadixFast.inv_ln2_dw_ok.
+Print Assumptions LogRadixFast.inv_ln10_dw_ok.
+Print Assumptions LogRadixGrid.radix_ln_y_grid.
+Print Assumptions LogRadixGrid.radix_ln_fast_grid.
+Print Assumptions LogRadixScale.radix_scale_ieee.
+Print Assumptions LogRadixFastBound.radix_scale_accuracy.
+Print Assumptions LogRadixFastBound.log10_fast_value_bounded.
+Print Assumptions LogRadixReconstruct.log2_fast_value_bounded.
+Print Assumptions LogRadixDecision.log2_fast_correct.
+Print Assumptions LogRadixDecision.log10_fast_correct.
+Print Assumptions LogRadixEntry.log2_entry_regular.
+Print Assumptions LogRadixEntry.log10_entry_regular.
+Print Assumptions LogRadixEntry.log2_entry_representable.
+Print Assumptions LogRadixEntry.log10_entry_representable.
+Print Assumptions LogRadixEntry.radix_entry_specials.
+Print Assumptions LogRadixEntry.radix_entry_nan.
+Print Assumptions LogRadixEntry.radix_entry_negative.
