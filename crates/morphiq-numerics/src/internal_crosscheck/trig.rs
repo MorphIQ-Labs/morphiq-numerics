@@ -1,6 +1,7 @@
 //! Actual Payne–Hanek reduction results, including every binary64 binade.
 //! These establish transcription agreement; error bounds are proved separately.
 use super::{String, q256};
+use crate::q256::Q256;
 use crate::random::SplitMix64;
 use crate::test_exact::{entries, word};
 use std::fmt::Write as _;
@@ -52,7 +53,44 @@ fn emit_residual(out: &mut String, head: f64, low: f64) {
     writeln!(out).unwrap();
 }
 
+fn emit_input(out: &mut String, r: Q256) {
+    for signed in [r, r.neg()] {
+        write!(out, "trig_input {} :", q256(signed)).unwrap();
+        for result in crate::trig::input_crosscheck(signed) {
+            write!(out, " {result:016x}").unwrap();
+        }
+        writeln!(out).unwrap();
+    }
+}
+
 pub(super) fn write(out: &mut String) {
+    // Table points, halfway index ties and their binary64 neighbours. The
+    // fine Q256 offsets exercise a nonzero low word when the head is exact.
+    for k in 0..=100 {
+        let point = f64::from(k) * 0.007_812_5;
+        let bits = point.to_bits();
+        for nearby in bits.saturating_sub(2)..=bits + 2 {
+            emit_input(out, Q256::from_f64(f64::from_bits(nearby)));
+        }
+        for exponent in [-60, -64, -100, -200, -255] {
+            let delta = Q256::from_f64(f64::from_bits(((exponent + 1023) as u64) << 52));
+            let base = Q256::from_f64(point);
+            emit_input(out, base.add(delta));
+            emit_input(out, base.add(delta.neg()));
+        }
+    }
+    // Every input binade in the proved split domain, with retained Q256
+    // low bits and with near-rounding-boundary significands.
+    for exponent in -319..=-256 {
+        for limbs in [[1, 0, 0, 1 << 63], [u64::MAX; 4]] {
+            emit_input(out, Q256::new(false, limbs, exponent));
+        }
+    }
+    // Actual Payne–Hanek inputs cover all normal binary64 exponent fields.
+    for exponent in 1023..2047_u64 {
+        let (_, r) = crate::trig::reduce(f64::from_bits((exponent << 52) | 0x0005_a37c_19d2_ef04));
+        emit_input(out, r);
+    }
     // Regular residuals with normalized low words of either sign, including
     // half-ulp ties; tiny residuals have a zero low word at the table point.
     for exponent in 963..=1016_u64 {
