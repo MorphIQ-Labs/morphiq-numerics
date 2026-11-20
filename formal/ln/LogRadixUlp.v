@@ -3,7 +3,7 @@
     approximation just across it still rounds to that boundary exactly. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz.
 From Flocq Require Import Core.
-From Binary64 Require Import Binary64Add IEEE64 RoundingGaps.
+From Binary64 Require Import Binary64Add IEEE64 RoundingGaps RelativeUlp.
 From Q Require Q128.
 From Interval Require Import Tactic.
 Require Import Ln1pLemmas LogRadixAccurate LogRadixRounding.
@@ -14,43 +14,13 @@ Lemma radix_round_error_positive v w : bpow radix2 (-57) <= v ->
   Rabs (rndF w - v) <= (/ 2 + / 2 ^ 69) * ulp radix2 (FLT_exp emin prec) v.
 Proof.
   intros V E.
-  assert (Pv : 0 < v) by (pose proof (bpow_gt_0 radix2 (-57)); lra).
-  assert (Pe : 0 <= / 2 ^ 122 < / 2 ^ 54) by (split; interval).
-  assert (We : - (/ 2 ^ 122 * v) <= w - v <= / 2 ^ 122 * v) by (apply Rabs_le_inv; exact E).
-  assert (Pw : 0 < w) by (assert (/ 2 ^ 122 < 1) by interval; nra).
-  set (e := mag radix2 v).
-  assert (Ge : (-56 <= e)%Z).
-  { unfold e. apply mag_ge_bpow. rewrite Rabs_pos_eq by lra. exact V. }
-  assert (Top : v < bpow radix2 e).
-  { unfold e. pose proof (bpow_mag_gt radix2 v); rewrite Rabs_pos_eq in H by lra; exact H. }
-  assert (U : ulp radix2 (FLT_exp emin prec) v = bpow radix2 (e - 53)).
-  { rewrite ulp_neq_0 by lra. unfold cexp, FLT_exp, emin, prec. fold e.
-    rewrite Z.max_l by lia. reflexivity. }
-  assert (Budget : / 2 ^ 122 * v <= / 2 ^ 69 * bpow radix2 (e - 53)).
-  { apply Rle_trans with ((/ 2 ^ 122) * bpow radix2 e).
-    - apply Rmult_le_compat_l; lra.
-    - right. replace (/ 2 ^ 122) with (bpow radix2 (-122)) by (bpow_num; field).
-      replace (/ 2 ^ 69) with (bpow radix2 (-69)) by (bpow_num; field).
-      rewrite <- !bpow_plus. f_equal. lia. }
-  rewrite U.
-  destruct (Rlt_le_dec w (bpow radix2 e)) as [Inside | Across].
-  - assert (Mw : (mag radix2 w <= e)%Z).
-    { apply mag_le_bpow; [lra | rewrite Rabs_pos_eq by lra; exact Inside]. }
-    assert (Uw : ulp radix2 (FLT_exp emin prec) w <= bpow radix2 (e - 53)).
-    { rewrite ulp_neq_0 by lra. apply bpow_le. unfold cexp, FLT_exp, emin, prec. lia. }
-    pose proof (@error_le_half_ulp radix2 (FLT_exp emin prec) ltac:(exact _) ne w) as Round.
-    change (Rabs (rndF w - w) <= / 2 * ulp radix2 (FLT_exp emin prec) w) in Round.
-    replace (rndF w - v) with ((rndF w - w) + (w - v)) by ring.
-    eapply Rle_trans; [apply Rabs_triang | nra].
-  - assert (Rounded : rndF w = bpow radix2 e).
-    { apply round_relative_close; [apply fmt_pow; lia | apply Rgt_not_eq, bpow_gt_0 | ].
-      rewrite Rabs_pos_eq by lra.
-      rewrite (Rabs_pos_eq (bpow radix2 e)) by apply bpow_ge_0.
-      apply Rle_lt_trans with ((/ 2 ^ 122) * v); [lra | ].
-      assert (0 < bpow radix2 e) by apply bpow_gt_0.
-      unfold Rdiv; nra. }
-    rewrite Rounded, Rabs_pos_eq by lra.
-    pose proof (bpow_gt_0 radix2 (e - 53)). nra.
+  assert (Pv:0<=v) by (pose proof (bpow_gt_0 radix2 (-57)); lra).
+  pose proof (relative_ulp_error (/2^122) v w ltac:(split; interval)
+    ltac:(rewrite (Rabs_pos_eq v Pv); exact E)) as Bound.
+  assert (Scale:(/2^122)*bpow radix2 53=/2^69).
+  { replace (/2^122) with (bpow radix2 (-122)) by (rewrite pow_IZR; reflexivity).
+    rewrite <-bpow_plus. rewrite pow_IZR; reflexivity. }
+  rewrite Scale in Bound. exact Bound.
 Qed.
 
 Lemma radix_round_error v w : bpow radix2 (-57) <= Rabs v ->

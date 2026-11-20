@@ -155,7 +155,8 @@ hypothesis explicit in its signature. For `log10`, `log10_accurate_bounded`
 establishes one rounding of a value within `2^-122` relatively of the exact
 logarithm, without introducing a hard-case hypothesis. The representable-result
 theorems establish exact return values for either radix without that hypothesis.
-`LogRadixUlp.log10_accurate_ulp` translates the relative reconstruction bound
+`LogRadixUlp.log10_accurate_ulp` reuses
+`Binary64.RelativeUlp.relative_ulp_error` to translate the relative reconstruction bound
 into the final `(1/2 + 2^-69)` ULP bound, where ULP is measured at the exact real
 result. If the approximation crosses the upper edge of that result's binade,
 it still rounds to the edge exactly; the proof therefore does not double the
