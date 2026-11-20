@@ -100,6 +100,10 @@ let compute op args =
        | [xh; xl; yh; yl] -> String.concat " " (List.map show_bits
            (x_trig_mul (z_of_u64 (hex xh)) (z_of_u64 (hex xl)) (z_of_u64 (hex yh)) (z_of_u64 (hex yl))))
        | _ -> failwith "trig_mul takes four double-word components")
+  | "trig_entry" ->
+      (match args with
+       | [x] -> String.concat " " (List.map show_bits (x_trig_entry (z_of_u64 (hex x))))
+       | _ -> failwith "trig_entry takes one binary64 input")
   | "trig_finish" ->
       (match args with
        | [x; n; c] ->

@@ -310,9 +310,29 @@ result in this domain is correctly rounded. When it rejects, the actual finish
 path uses the accurate result and retains the proved `(1/2 + 2^-145)` ULP bound,
 inside the published `(1/2 + 2^-144)` contract. The extracted comparison checks
 the selected words, decision and final result, including both acceptance and
-fallback for sine and cosine. These finish-path theorems do not yet compose
-the public small-input screens, NaNs/infinities, the Lefèvre–Muller domains,
-tangent's fast division or matching SIMD.
+fallback for sine and cosine.
+
+`TrigScreenConstants.v` independently certifies the generated small-input
+thresholds and their immediately following binary64 values. `TrigSinScreen.v`
+proves the identity screen throughout its domain, including subnormals and
+both signs. `TrigCosScreen.v` proves each of the five cosine rounding cells,
+the discrete next-float gaps, and the actual comparisons, integer cast,
+multiplication and subtraction used to select and return the result.
+
+`TrigEntry.v` composes those screens with the finish path for every finite
+binary64 input and preserves the `(1/2 + 2^-145)` ULP bound. It also proves
+signed-zero behavior, NaN results for non-finite inputs, and the equality of
+`sincos(x)` with the two scalar entries. Its negative flag follows the runtime
+`x < 0` comparison. The public-entry extraction checks all four returned words
+across both signs, every binade, small-input step boundaries, exceptional
+encodings and independent fixture arguments.
+
+`TrigCorrectRounding.v` connects the correctly-rounded domains to the public
+entries. `TrigSinLM` and `TrigCosLM` retain [LM]'s midpoint-distance results as
+explicit hypotheses on the stated argument domains, using mantissa distances
+`2^-126` and `2^-142`. The small-input screen proofs and accepted fast decisions
+need no such hypothesis. These entry theorems do not cover tangent's fast
+division or SIMD.
 
 ## 5. Accurate path
 

@@ -321,6 +321,7 @@ pub(super) fn write(out: &mut String) {
     }
     write_selected(out);
     write_finish(out);
+    write_entries(out);
     write_reciprocals(out);
     let mut rng = SplitMix64::new(0x7472_6967_7265_6475);
     for i in 0..4096 {
@@ -520,4 +521,63 @@ fn write_finish(out: &mut String) {
     }
     assert!(decisions.into_iter().flatten().all(|hit| hit));
     assert!(selections.into_iter().flatten().flatten().all(|hit| hit));
+}
+
+// Public entries, including every binary64 binade, both signs, small-input
+// step boundaries, exceptional encodings and independent fixture arguments.
+fn write_entries(out: &mut String) {
+    let mut inputs = std::vec![
+        0,
+        1,
+        0x7ff0_0000_0000_0000, // infinity
+        0x7ff0_0000_0000_0001, // signaling NaN
+        0x7ff8_0000_0000_0000, // canonical quiet NaN
+        0x7fff_ffff_ffff_ffff, // NaN payload
+    ];
+    for exponent in 0..2047_u64 {
+        for fraction in [0, 1, (1_u64 << 52) - 1] {
+            inputs.push((exponent << 52) | fraction);
+        }
+    }
+    for center in [
+        0x3e46_a09e_667f_3bcc,
+        0x3e53_988e_1409_212e,
+        0x3e57_1374_4912_3ef6,
+        0x3e59_4c58_3ada_5b52,
+        0x3e5d_eeea_1168_3f49,
+        0x3e60_0000_0000_0000,
+        0x3e70_0000_0000_0000, // lower sine LM domain
+        0x3fe9_21fb_5444_2d18,
+        0x3ff9_21fb_5444_2d18,
+        0x4009_21fb_5444_2d18,
+        0x7506_ac5b_262c_a1ff,
+    ] {
+        inputs.extend(center - 2..=center + 2);
+    }
+    const FIXTURE: &str = include_str!("../../../reference/fixtures/sin_cos.json");
+    for section in ["precise", "cases", "reduction"] {
+        for case in entries(FIXTURE, &[section]) {
+            inputs.push(word(case, "x").to_bits() & 0x7fff_ffff_ffff_ffff);
+        }
+    }
+    inputs.sort_unstable();
+    inputs.dedup();
+    for magnitude in inputs {
+        for sign in [0, 1_u64 << 63] {
+            let bits = magnitude | sign;
+            let x = f64::from_bits(bits);
+            let s = crate::trig::sin(x);
+            let c = crate::trig::cos(x);
+            let (ss, cc) = crate::trig::sincos(x);
+            writeln!(
+                out,
+                "trig_entry {bits:016x} : {:016x} {:016x} {:016x} {:016x}",
+                s.to_bits(),
+                c.to_bits(),
+                ss.to_bits(),
+                cc.to_bits()
+            )
+            .unwrap();
+        }
+    }
 }
