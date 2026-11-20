@@ -352,18 +352,24 @@ let compute op args =
              (List.map show_bits nr @ [string_of_int (int_of_z j); string_of_int (int_of_z k)]
               @ List.map show_bits a @ [show_opt ra] @ List.map show_bits b @ [show_opt rb])
        | _ -> failwith "stage takes one word")
-  | "ln_fast" | "ln1p_fast" ->
+  | "ln_fast" | "ln1p_fast" | "log2_fast" | "log10_fast" ->
       (match args with
        | [x] ->
-           let f = if op = "ln_fast" then x_ln_fast else x_ln1p_fast in
+           let f = match op with
+             | "ln_fast" -> x_ln_fast
+             | "log2_fast" -> x_log2_fast
+             | "log10_fast" -> x_log10_fast
+             | _ -> x_ln1p_fast in
            let (words, result) = f (z_of_u64 (hex x)) in
            String.concat " " (List.map show_bits words @ [show_opt result])
        | _ -> failwith "logarithm fast value takes one word")
-  | "ln_entry" | "ln1p_entry" | "log2_accurate_result" | "log10_accurate_result" ->
+  | "ln_entry" | "ln1p_entry" | "log2_entry" | "log10_entry" | "log2_accurate_result" | "log10_accurate_result" ->
       (match args with
        | [x] ->
            let f = match op with
              | "ln_entry" -> x_ln_entry
+             | "log2_entry" -> x_log2_entry
+             | "log10_entry" -> x_log10_entry
              | "log2_accurate_result" -> x_log2_accurate_result
              | "log10_accurate_result" -> x_log10_accurate_result
              | _ -> x_ln1p_entry in

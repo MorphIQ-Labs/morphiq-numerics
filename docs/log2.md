@@ -99,7 +99,10 @@ Both paths err by less than half an ulp of `n`, so both return `n` exactly.
 | Artifact | Establishes |
 |---|---|
 | `generators/radix_constants.py` | `1/ln 2` and `1/ln 10` as double-words and in `Q128`, with their errors (`src/log2/tables.rs`) |
-| `formal/ln/LogRadixConstants.v` | generated Q128 encodings, normalized significands and independent CoqInterval proofs of both reciprocal-log residuals |
+| `formal/ln/LogRadixConstants.v` | generated binary64 and Q128 encodings, normalized significands and independent CoqInterval proofs of both reciprocal-log residuals |
+| `formal/ln/LogRadixFast.v`, `LogRadixGrid.v`, `LogRadixScale.v` | executable fast-path operations, fixed-grid bounds excluding underflow in radix scaling, and the actual double-word multiplication error including zero products |
+| `formal/ln/LogRadixFastBound.v`, `LogRadixReconstruct.v` | composed `2^-63` relative bounds for both fast values, including exponent cancellation for `log2` |
+| `formal/ln/LogRadixDecision.v`, `LogRadixEntry.v` | successful fast decisions round the exact logarithm correctly; public screens, decisions and accurate fallbacks compose to each function's contract, with [LM]'s midpoint-distance premise explicit for `log2` |
 | `formal/ln/LogRadixAccurate.v` | executable Q128 scaling and exponent reconstruction, with the shared `ln` accurate theorem discharging the input error bounds |
 | `formal/ln/LogRadixRounding.v` | finite, single-round binary64 conversion of both accurate paths; `log2` correct rounding under [LM]'s explicit midpoint-distance hypothesis; exact representable results for either radix |
 | `formal/ln/LogRadixUlp.v` | final `log10` error within `(1/2 + 2^-69)` ULP of the exact result, including binade crossings |
@@ -125,6 +128,20 @@ at most `0.51`; a nonzero integer exponent limits cancellation enough to keep
 the final Q128 addition within `2^-122`. No tighter sampled constant estimate
 is needed for this reconstruction proof.
 
+The fast-path composition uses the executable shared `ln` evaluations and
+independently checked double-word reciprocal residuals bounded by `2^-109`.
+Their inputs and intermediate results lie on the binary grid `2^-623`, and
+both words of either normalized reciprocal lie on `2^-109`. The nonzero
+products therefore have magnitude at least `2^-732`, which discharges both
+the exact-product and cross-product underflow conditions. The multiplication
+proof covers zero logarithms explicitly as well as nonzero products.
+`radix_scale_accuracy` combines the shared `2^-64` logarithm error with these
+constants and multiplication to give `9 * 2^-67` relative error. For `log2`,
+the reduced logarithm's magnitude is at most `0.51`; the integer exponent
+therefore bounds cancellation, and the final addition stays within `2^-63`.
+These proofs establish the fast bounds directly, without assuming the tighter
+constant estimates used by the separately checked Gappa certificates.
+
 The theorem names above enter the kernel axiom audit and source binding. The
 extracted accurate paths are compared with the Rust Q128 sign, exponent and
 significand, before binary64 rounding, on independent reference-fixture inputs,
@@ -145,13 +162,20 @@ it still rounds to the edge exactly; the proof therefore does not double the
 rounding allowance when the spacing changes. Negative results follow by the
 symmetry of round-to-nearest-even.
 
-The extraction corpus compares both the Q128 intermediates and their final
-binary64 encodings with Rust. Separate forced-accurate-path tests compare final
+The extraction corpus compares the fast double-word components and decision
+results, the Q128 intermediates and their final binary64 encodings, and both
+public entries with Rust. It includes entry-only special-value inputs as well
+as the finite positive reduction corpus. Separate forced-accurate-path tests compare final
 results with the independent oracle fixture, including inputs the public entry
 normally handles on the fast path. Those comparisons test correspondence and
-sampled accuracy; they do not replace the real-number error proofs. Fast-path
-certificate linkage, public-entry composition, and matching SIMD proof obligations are not established
-by these accurate-path theorems.
+sampled accuracy; they do not replace the real-number error proofs.
+`LogRadixDecision.v` uses the radix logarithm's `2^-57` lower magnitude bound
+to discharge the rounding test's guards. `LogRadixEntry.v` combines that
+decision with the accurate fallback and special-value screens, preserves NaN
+inputs, and establishes exact representable results without a midpoint-distance
+premise. Its regular `log2` theorem keeps [LM]'s premise explicit; its regular
+`log10` theorem gives the final ULP bound on either return path. Matching SIMD
+proof obligations remain separate from these scalar-entry theorems.
 
 The binding `formal/log2/binding.sha256` covers this document, the constants,
 the certificates and the source.
