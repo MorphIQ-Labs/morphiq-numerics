@@ -374,6 +374,31 @@ pub(crate) fn tail_crosscheck(t: f64) -> [u64; 5] {
     [u, ps, pc, (t * u) * ps, (u * u) * pc].map(f64::to_bits)
 }
 
+/// The residual assembly in `fast`, retaining the product and square words.
+#[cfg(test)]
+pub(crate) fn residual_crosscheck(t: DoubleWord) -> [u64; 8] {
+    let (th, tl) = (t.hi(), t.lo());
+    let (uh, ul) = two_prod(th, th);
+    let [s0, s1, s2] = POLY_S;
+    let [c0, c1, c2] = POLY_C;
+    let ps = s0 + uh * (s1 + uh * s2);
+    let pc = c0 + uh * (c1 + uh * c2);
+    let square = DoubleWord::sum(-0.5 * uh, -0.5 * ul);
+    let sn = t.add_f64((th * uh) * ps);
+    let cm = square.add_f64((uh * uh) * pc - th * tl);
+    [
+        uh,
+        ul,
+        square.hi(),
+        square.lo(),
+        sn.hi(),
+        sn.lo(),
+        cm.hi(),
+        cm.lo(),
+    ]
+    .map(f64::to_bits)
+}
+
 #[cfg(test)]
 mod tests;
 

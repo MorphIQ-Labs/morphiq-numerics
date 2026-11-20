@@ -37,7 +37,47 @@ fn emit_tail(out: &mut String, bits: u64) {
     }
 }
 
+fn emit_residual(out: &mut String, head: f64, low: f64) {
+    let t = crate::double_word::DoubleWord::sum(head, low);
+    write!(
+        out,
+        "trig_residual {:016x} {:016x} :",
+        t.hi().to_bits(),
+        t.lo().to_bits()
+    )
+    .unwrap();
+    for result in crate::trig::residual_crosscheck(t) {
+        write!(out, " {result:016x}").unwrap();
+    }
+    writeln!(out).unwrap();
+}
+
 pub(super) fn write(out: &mut String) {
+    // Regular residuals with normalized low words of either sign, including
+    // half-ulp ties; tiny residuals have a zero low word at the table point.
+    for exponent in 963..=1016_u64 {
+        for fraction in [0, 1, (1_u64 << 52) - 2, (1_u64 << 52) - 1] {
+            let head = f64::from_bits((exponent << 52) | fraction);
+            if head <= 0.007_812_6 {
+                let half_ulp = f64::from_bits((exponent - 53) << 52);
+                for low in [0.0, half_ulp, -half_ulp, 0.5 * half_ulp, -0.5 * half_ulp] {
+                    emit_residual(out, head, low);
+                    emit_residual(out, -head, -low);
+                }
+            }
+        }
+    }
+    for exponent in 703..963_u64 {
+        for fraction in [0, (1_u64 << 52) - 1] {
+            let head = f64::from_bits((exponent << 52) | fraction);
+            emit_residual(out, head, 0.0);
+            emit_residual(out, -head, -0.0);
+        }
+    }
+    for head in [0.0, -0.0, 0.007_812_6, -0.007_812_6] {
+        emit_residual(out, head, 0.0);
+    }
+
     // Both signs, zero/subnormals, every residual binade, and both branch edges.
     for bits in [0, 1, (1_u64 << 52) - 1] {
         emit_tail(out, bits);
