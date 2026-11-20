@@ -63,6 +63,25 @@ fn emit_input(out: &mut String, r: Q256) {
     }
 }
 
+// The full kernel consumes reduced remainders. The next binary64 after
+// QUARTER_PI encloses pi/4 and stays inside the proved 0.785399 upper bound.
+// Split/index-only cases above that range belong to emit_input alone.
+fn emit_fast_input(out: &mut String, r: Q256) {
+    let max = Q256::from_f64(f64::from_bits(0x3fe9_21fb_5444_2d19));
+    assert!(
+        r.cmp_abs(max).is_le(),
+        "full fast-path corpus input is outside the reduced domain: {}",
+        q256(r)
+    );
+    for signed in [r, r.neg()] {
+        write!(out, "trig_fastq {} :", q256(signed)).unwrap();
+        for result in crate::trig::fast_crosscheck(signed) {
+            write!(out, " {result:016x}").unwrap();
+        }
+        writeln!(out).unwrap();
+    }
+}
+
 fn emit_mul(out: &mut String, xh: f64, xl: f64, yh: f64, yl: f64) {
     use crate::double_word::DoubleWord;
     let x = DoubleWord::sum(xh, xl);
@@ -166,26 +185,41 @@ pub(super) fn write(out: &mut String) {
         let point = f64::from(k) * 0.007_812_5;
         let bits = point.to_bits();
         for nearby in bits.saturating_sub(2)..=bits + 2 {
-            emit_input(out, Q256::from_f64(f64::from_bits(nearby)));
+            let r = Q256::from_f64(f64::from_bits(nearby));
+            emit_input(out, r);
+            emit_fast_input(out, r);
         }
         for exponent in [-60, -64, -100, -200, -255] {
             let delta = Q256::from_f64(f64::from_bits(((exponent + 1023) as u64) << 52));
             let base = Q256::from_f64(point);
-            emit_input(out, base.add(delta));
-            emit_input(out, base.add(delta.neg()));
+            for r in [base.add(delta), base.add(delta.neg())] {
+                emit_input(out, r);
+                emit_fast_input(out, r);
+            }
         }
     }
-    // Every input binade in the proved split domain, with retained Q256
-    // low bits and with near-rounding-boundary significands.
-    for exponent in -319..=-256 {
+    // Shared binades, retaining low bits and near-rounding-boundary significands.
+    for exponent in -319..=-257 {
         for limbs in [[1, 0, 0, 1 << 63], [u64::MAX; 4]] {
-            emit_input(out, Q256::new(false, limbs, exponent));
+            let r = Q256::new(false, limbs, exponent);
+            emit_input(out, r);
+            emit_fast_input(out, r);
         }
+    }
+    // The final binade has different stage domains. Retain the near-one
+    // split/index witness, and use a three-quarter significand for the full
+    // kernel, whose table is sized for reduced remainders up to pi/4.
+    for limbs in [[1, 0, 0, 1 << 63], [u64::MAX; 4]] {
+        emit_input(out, Q256::new(false, limbs, -256));
+    }
+    for limbs in [[1, 0, 0, 1 << 63], [u64::MAX, u64::MAX, u64::MAX, 3 << 62]] {
+        emit_fast_input(out, Q256::new(false, limbs, -256));
     }
     // Actual Payne–Hanek inputs cover all normal binary64 exponent fields.
     for exponent in 1023..2047_u64 {
         let (_, r) = crate::trig::reduce(f64::from_bits((exponent << 52) | 0x0005_a37c_19d2_ef04));
         emit_input(out, r);
+        emit_fast_input(out, r);
     }
     // Regular residuals with normalized low words of either sign, including
     // half-ulp ties; tiny residuals have a zero low word at the table point.

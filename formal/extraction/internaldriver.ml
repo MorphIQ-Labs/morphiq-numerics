@@ -100,6 +100,10 @@ let compute op args =
        | [xh; xl; yh; yl] -> String.concat " " (List.map show_bits
            (x_trig_mul (z_of_u64 (hex xh)) (z_of_u64 (hex xl)) (z_of_u64 (hex yh)) (z_of_u64 (hex yl))))
        | _ -> failwith "trig_mul takes four double-word components")
+  | "trig_fastq" ->
+      let ((n, e, l), rest) = value args in
+      if rest <> [] then failwith "trig_fastq takes one Q256 value";
+      String.concat " " (List.map show_bits (x_trig_fastq n e l))
   | "trig_input" ->
       let ((n, e, l), rest) = value args in
       if rest <> [] then failwith "trig_input takes one Q256 value";
