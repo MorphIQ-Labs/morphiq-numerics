@@ -12,7 +12,6 @@ With --check, fails if the committed certificates differ from a fresh
 generation. Needs mpmath (generators/requirements.txt).
 """
 from fractions import Fraction
-import math
 import pathlib
 import sys
 
@@ -51,9 +50,7 @@ def frac(v):
 
 
 def up(v):
-    v = abs(frac(v)) * Fraction(101, 100)
-    e = -math.floor(math.log2(v)) + 9
-    return f'{math.ceil(v * 2**e)}b-{e}'
+    return trig_constants.certificate_upper_bound(v)
 
 
 def value(literal):
