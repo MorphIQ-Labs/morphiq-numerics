@@ -1270,3 +1270,14 @@ Print Assumptions TrigMultiply.trig_mul_cross.
 Print Assumptions TrigMultiply.trig_mul_nonzero.
 Print Assumptions TrigMultiply.trig_mul_correct.
 Print Assumptions TrigMultiply.trig_mul_ieee.
+
+Require TrigOperandBounds TrigProducts.
+Print Assumptions TrigOperandBounds.trig_dw_head_magnitude.
+Print Assumptions TrigOperandBounds.trig_small_sin_magnitude.
+Print Assumptions TrigOperandBounds.trig_small_cos_magnitude.
+Print Assumptions TrigOperandBounds.trig_operand_from_reference.
+Print Assumptions TrigOperandBounds.trig_table_operands_ready.
+Print Assumptions TrigOperandBounds.trig_residual_reference_floors.
+Print Assumptions TrigOperandBounds.trig_residual_operands_ready.
+Print Assumptions TrigProducts.trig_ready_product_correct.
+Print Assumptions TrigProducts.trig_reconstruction_products_correct.

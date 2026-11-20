@@ -81,6 +81,42 @@ fn emit_mul(out: &mut String, xh: f64, xl: f64, yh: f64, yl: f64) {
     .unwrap();
 }
 
+fn write_products(out: &mut String) {
+    use crate::double_word::DoubleWord;
+    let mut inputs = std::vec![(0.0, 0.0), (-0.0, -0.0)];
+    for exponent in [-320, -300, -270, -260, -255, -250, -200, -100, -60, -7] {
+        let head = f64::from_bits(((exponent + 1023) as u64) << 52);
+        let low = if exponent < -60 {
+            0.0
+        } else {
+            f64::from_bits(((exponent - 54 + 1023) as u64) << 52)
+        };
+        inputs.extend([(head, low), (-head, -low)]);
+    }
+    for i in 0..51 {
+        let table = crate::trig::table_crosscheck(i).map(f64::from_bits);
+        let s = DoubleWord::sum(table[4], table[5]);
+        let c = DoubleWord::sum(table[6], table[7]);
+        for &(h, l) in &inputs {
+            let t = DoubleWord::sum(h, l);
+            let residual = crate::trig::residual_crosscheck(t).map(f64::from_bits);
+            let sn = DoubleWord::sum(residual[4], residual[5]);
+            let cm = DoubleWord::sum(residual[6], residual[7]);
+            write!(
+                out,
+                "trig_products {i} {:016x} {:016x} :",
+                t.hi().to_bits(),
+                t.lo().to_bits()
+            )
+            .unwrap();
+            for p in [s.mul(cm), c.mul(sn), c.mul(cm), s.mul(sn)] {
+                write!(out, " {:016x} {:016x}", p.hi().to_bits(), p.lo().to_bits()).unwrap();
+            }
+            writeln!(out).unwrap();
+        }
+    }
+}
+
 fn write_multiply(out: &mut String) {
     // Actual table/residual products, including r = 1/64 + 2^-255:
     // S.hi * CM.lo is then nonzero and subnormal. Both residual signs,
@@ -123,6 +159,7 @@ fn write_multiply(out: &mut String) {
 
 pub(super) fn write(out: &mut String) {
     write_multiply(out);
+    write_products(out);
     // Table points, halfway index ties and their binary64 neighbours. The
     // fine Q256 offsets exercise a nonzero low word when the head is exact.
     for k in 0..=100 {
