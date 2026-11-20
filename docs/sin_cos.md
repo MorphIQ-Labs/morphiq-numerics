@@ -189,12 +189,21 @@ large branch's proved domain.
      normalized double-words with the stated `2^-65` relative bound.
      The extracted residual check includes intermediate square words and
      both output words. These theorems take the reduction/grid properties
-     as premises; the reduction-to-residual connection and tiny branch are
-     separate composition obligations.
+     as premises; the reduction-to-residual connection remains a separate
+     composition obligation.
    - **Below `|t| = 2^−60`,** `t` is `r_lo` alone, since `r_hi` equals the table
      point, and `t⁴` may underflow. A tail is then only known to lie within
      `[0, 3]` times its value, and the bounds still hold (*certified*:
      `sin_t_tiny.g`, `cos_t_tiny.g`).
+     `TrigTinyTail.v` proves this factor for the actual rounded tails down to
+     `|t_hi| = 2^-320`. It accounts for both cosine-tail roundings together,
+     including zero and subnormal results. `TrigTinyResidual.v` derives the
+     tiny certificates' premises and proves the same `2^-65` assembly bounds;
+     `TrigZeroResidual.v` proves exact zero outputs at a zero residual.
+     `TrigResidual.v` combines zero, tiny and regular cases into finite,
+     normalized residual contracts, with the input magnitude, normalization
+     and grid premises stated explicitly. Table reconstruction and its
+     connection to the Q256 reduction are separate composed proofs.
    - `t` is 0 or at least `2^−317` in magnitude, since it's a difference on
      `Q256`'s grid. Before emitting or checking certificates,
      `generators/trig_certificates.py` consumes `trig_reduction.derive()` and

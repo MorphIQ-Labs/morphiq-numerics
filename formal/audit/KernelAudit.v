@@ -1209,3 +1209,24 @@ Print Assumptions TrigCosSquare.trig_cos_square_correct.
 Print Assumptions TrigCosResidual.trig_sub_model.
 Print Assumptions TrigCosResidual.trig_cross_model.
 Print Assumptions TrigCosResidual.trig_cos_residual_regular.
+
+Require TrigTinyTail TrigTinyCertificate TrigTinyResidual TrigZeroResidual TrigResidual.
+Print Assumptions TrigCosSquare.trig_half_exact_wide.
+Print Assumptions TrigCosSquare.trig_cos_square_on_grid.
+Print Assumptions TrigCosSquare.trig_cos_square_correct_wide.
+Print Assumptions TrigCosResidual.trig_cross_model_wide.
+Print Assumptions TrigTinyTail.trig_horner_near.
+Print Assumptions TrigTinyTail.trig_evaluated_polynomial_ranges.
+Print Assumptions TrigTinyTail.trig_positive_float_floor.
+Print Assumptions TrigTinyTail.trig_cos_two_roundings.
+Print Assumptions TrigTinyTail.trig_tail_tiny.
+Print Assumptions TrigTinyCertificate.trig_sin_tiny_certificate.
+Print Assumptions TrigTinyCertificate.trig_cos_tiny_certificate.
+Print Assumptions TrigTinyCertificate.trig_sin_tiny_model.
+Print Assumptions TrigTinyCertificate.trig_cos_tiny_model.
+Print Assumptions TrigTinyResidual.trig_sin_residual_tiny.
+Print Assumptions TrigTinyResidual.trig_cos_residual_tiny.
+Print Assumptions TrigZeroResidual.trig_sin_residual_zero.
+Print Assumptions TrigZeroResidual.trig_cos_residual_zero.
+Print Assumptions TrigResidual.trig_sin_residual_correct.
+Print Assumptions TrigResidual.trig_cos_residual_correct.

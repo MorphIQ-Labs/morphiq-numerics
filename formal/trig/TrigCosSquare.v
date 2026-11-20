@@ -17,7 +17,7 @@ Qed.
 Lemma trig_neg_half_finite : finite trig_neg_half.
 Proof. exact (bits_finite 0xbfe0000000000000 _ _ _ eq_refl). Qed.
 
-Lemma trig_half_exact a : finite a -> Rabs(B a)<=1 -> on_grid (-224) (B a) ->
+Lemma trig_half_exact_wide a : finite a -> Rabs(B a)<=1 -> on_grid (-744) (B a) ->
  finite(fmul trig_neg_half a) /\ B(fmul trig_neg_half a)=-(B a/2).
 Proof.
  intros A Bound Grid.
@@ -28,23 +28,28 @@ Proof.
  rewrite round_generic.
  - bpow_num; field.
  - exact _.
- - apply generic_format_opp. apply (scaled_fmt_grid (B a) (-224) (-1));
+ - apply generic_format_opp. apply (scaled_fmt_grid (B a) (-744) (-1));
      [apply B_fmt|exact Grid|lia].
+Qed.
+
+Lemma trig_half_exact a : finite a -> Rabs(B a)<=1 -> on_grid (-224) (B a) ->
+ finite(fmul trig_neg_half a) /\ B(fmul trig_neg_half a)=-(B a/2).
+Proof.
+ intros A Bound Grid. apply trig_half_exact_wide; try assumption.
+ apply (grid_le (-224) (-744) (B a)); [lia|exact Grid].
 Qed.
 
 Definition trig_cos_square th :=
  let '(uh,ul):=two_prod64 th th in
  two_sum64 (fmul trig_neg_half uh) (fmul trig_neg_half ul).
 
-Theorem trig_cos_square_correct th : finite th -> /2^60<=Rabs(B th)<=0.0078126 ->
+Theorem trig_cos_square_on_grid th : finite th -> Rabs(B th)<=0.0078126 ->
+ on_grid (-372) (B th) -> in_two_prod_domain (B th) (B th) ->
  let '(h,l):=trig_cos_square th in
  finite h /\ finite l /\ B h=rndF(B h+B l) /\ B h+B l=-(B th*B th/2).
 Proof.
- intros Th Range. pose proof (proj2 Range) as Upper.
+ intros Th Upper ThGrid Domain.
  assert (One:Rabs(B th)<=bpow radix2 0) by (change (bpow radix2 0) with 1; lra).
- assert (Domain:in_two_prod_domain (B th) (B th)).
- { right. rewrite Rabs_mult. destruct Range as [Lower _]. bpow_num.
-   assert (Positive:0</2^60) by interval. nra. }
  pose proof (two_prod_ieee 0 0 th th Th Th One One ltac:(lia) ltac:(lia) ltac:(lia) Domain) as Product.
  unfold trig_cos_square. destruct (two_prod64 th th) as [uh ul] eqn:Parts.
  cbn zeta iota in Product |- *. destruct Product as [Uh [Ul [UhValue Exact]]].
@@ -57,17 +62,13 @@ Proof.
  { replace (B ul) with (B th*B th-B uh) by lra.
    pose proof (Rabs_triang (B th*B th) (-B uh)) as Triangle.
    rewrite Rabs_Ropp in Triangle. unfold Rminus; lra. }
- assert (ThGrid:on_grid (-112) (B th)).
- { apply (grid_fmt_bound (FLT_exp emin prec) (-60) (B th));
-     [intro e; unfold FLT_exp,emin,prec; lia|apply B_fmt|].
-   right. replace (bpow radix2 (-60)) with (/2^60) by (bpow_num; field). exact (proj1 Range). }
- assert (ProductGrid:on_grid (-224) (B th*B th)).
- { change (-224)%Z with ((-112)+(-112))%Z. apply grid_mult; exact ThGrid. }
- assert (UhGrid:on_grid (-224) (B uh)) by (rewrite UhValue; apply grid_round; auto with typeclass_instances).
- assert (UlGrid:on_grid (-224) (B ul)).
+ assert (ProductGrid:on_grid (-744) (B th*B th)).
+ { change (-744)%Z with ((-372)+(-372))%Z. apply grid_mult; exact ThGrid. }
+ assert (UhGrid:on_grid (-744) (B uh)) by (rewrite UhValue; apply grid_round; auto with typeclass_instances).
+ assert (UlGrid:on_grid (-744) (B ul)).
  { replace (B ul) with (B th*B th-B uh) by lra. apply grid_minus; assumption. }
- destruct (trig_half_exact uh Uh ltac:(lra) UhGrid) as [HalfUh Hu].
- destruct (trig_half_exact ul Ul ltac:(lra) UlGrid) as [HalfUl Hl].
+ destruct (trig_half_exact_wide uh Uh ltac:(lra) UhGrid) as [HalfUh Hu].
+ destruct (trig_half_exact_wide ul Ul ltac:(lra) UlGrid) as [HalfUl Hl].
  assert (HuBound:Rabs(B(fmul trig_neg_half uh))<=bpow radix2 1020).
  { rewrite Hu. bpow_num; interval. }
  assert (HlBound:Rabs(B(fmul trig_neg_half ul))<=bpow radix2 1020).
@@ -79,4 +80,27 @@ Proof.
  repeat split; try assumption.
  - rewrite Value; exact Rounded.
  - rewrite Value,Hu,Hl. lra.
+Qed.
+
+Theorem trig_cos_square_correct_wide th : finite th -> /2^320<=Rabs(B th)<=0.0078126 ->
+ let '(h,l):=trig_cos_square th in
+ finite h /\ finite l /\ B h=rndF(B h+B l) /\ B h+B l=-(B th*B th/2).
+Proof.
+ intros Th Range. pose proof (proj2 Range) as Upper.
+ assert (Domain:in_two_prod_domain (B th) (B th)).
+ { right. rewrite Rabs_mult. destruct Range as [Lower _]. bpow_num.
+   assert (Positive:0</2^320) by interval. nra. }
+ assert (ThGrid:on_grid (-372) (B th)).
+ { apply (grid_fmt_bound (FLT_exp emin prec) (-320) (B th));
+     [intro e; unfold FLT_exp,emin,prec; lia|apply B_fmt|].
+   right. replace (bpow radix2 (-320)) with (/2^320) by (bpow_num; field). exact (proj1 Range). }
+ apply trig_cos_square_on_grid; assumption.
+Qed.
+
+Theorem trig_cos_square_correct th : finite th -> /2^60<=Rabs(B th)<=0.0078126 ->
+ let '(h,l):=trig_cos_square th in
+ finite h /\ finite l /\ B h=rndF(B h+B l) /\ B h+B l=-(B th*B th/2).
+Proof.
+ intros Th [Lower Upper]. apply trig_cos_square_correct_wide; [exact Th|].
+ split; [eapply Rle_trans; [|exact Lower]; interval|exact Upper].
 Qed.
