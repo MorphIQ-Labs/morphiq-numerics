@@ -27,6 +27,13 @@ fn emit(out: &mut String, bits: u64) {
 }
 
 pub(super) fn write(out: &mut String) {
+    for i in 0..51 {
+        write!(out, "trig_table {i} :").unwrap();
+        for bits in crate::trig::table_crosscheck(i) {
+            write!(out, " {bits:016x}").unwrap();
+        }
+        writeln!(out).unwrap();
+    }
     const FIXTURE: &str = include_str!("../../../reference/fixtures/sin_cos.json");
     for case in entries(FIXTURE, &["reduction"]) {
         let bits = word(case, "x").to_bits();
