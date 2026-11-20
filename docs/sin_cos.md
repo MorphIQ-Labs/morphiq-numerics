@@ -177,6 +177,20 @@ large branch's proved domain.
    - The results are assembled as double-words: `sin t` within `2^−65` (proves
      `2^−66.06`) and `cos t − 1` within `2^−65` (proves `2^−66.83`)
      (*certified*: `sin_t.g`, `cos_t.g`).
+     `TrigResidualCertificate.v` derives each certificate's analytic input
+     from `TrigPolynomial.v`. `TrigSinResidual.v` and `TrigCosResidual.v`
+     prove the executable double-word assembly on the regular domain
+     `2^-60 <= |t_hi| <= 0.0078126`, with `|t_lo| <= 2^-53 |t_hi|` and
+     `|t_hi + t_lo| <= 0.0078126`. Sine takes a normalized input;
+     cosine additionally requires the low word on the `2^-320` grid to
+     establish its cross-product rounding model, handling zero separately.
+     `TrigCosSquare.v` proves the square's error-free product and exact
+     negative-half scaling of both words. Both outputs are finite,
+     normalized double-words with the stated `2^-65` relative bound.
+     The extracted residual check includes intermediate square words and
+     both output words. These theorems take the reduction/grid properties
+     as premises; the reduction-to-residual connection and tiny branch are
+     separate composition obligations.
    - **Below `|t| = 2^−60`,** `t` is `r_lo` alone, since `r_hi` equals the table
      point, and `t⁴` may underflow. A tail is then only known to lie within
      `[0, 3]` times its value, and the bounds still hold (*certified*:
