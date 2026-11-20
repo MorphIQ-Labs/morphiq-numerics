@@ -1431,3 +1431,17 @@ Print Assumptions TrigTanScreen.trig_tan_loss_monotone.
 Print Assumptions TrigTanScreen.trig_tan_tiny_round.
 Print Assumptions TrigTanScreen.trig_tan_upper_round.
 Print Assumptions TrigTanScreen.trig_tan_screen_round.
+
+Require TrigTanEntry TrigTanCorrectRounding.
+Print Assumptions TrigTanEntry.trig_tan_identity_correct.
+Print Assumptions TrigTanEntry.trig_tan_decision_correct.
+Print Assumptions TrigTanEntry.trig_tan_round_error.
+Print Assumptions TrigTanEntry.trig_tan_finish_ulp.
+Print Assumptions TrigTanEntry.trig_tan_public_finish_ulp.
+Print Assumptions TrigTanEntry.trig_tan_entry_ulp.
+Print Assumptions TrigTanEntry.trig_tan_entry_nonfinite.
+Print Assumptions TrigTanEntry.trig_tan_entry_zeros.
+Print Assumptions TrigTanEntry.trig_tan_entry_decided.
+Print Assumptions TrigTanCorrectRounding.trig_tan_public_reference_floor.
+Print Assumptions TrigTanCorrectRounding.trig_tan_public_finish_correct.
+Print Assumptions TrigTanCorrectRounding.trig_tan_entry_correct.

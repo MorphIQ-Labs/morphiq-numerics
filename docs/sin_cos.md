@@ -323,7 +323,7 @@ multiplication and subtraction used to select and return the result.
 binary64 input and preserves the `(1/2 + 2^-145)` ULP bound. It also proves
 signed-zero behavior, NaN results for non-finite inputs, and the equality of
 `sincos(x)` with the two scalar entries. Its negative flag follows the runtime
-`x < 0` comparison. The public-entry extraction checks all four returned words
+`x < 0` comparison. The public-entry extraction checks the five sine/cosine/sincos/tangent words
 across both signs, every binade, small-input step boundaries, exceptional
 encodings and independent fixture arguments.
 
@@ -331,8 +331,8 @@ encodings and independent fixture arguments.
 entries. `TrigSinLM` and `TrigCosLM` retain [LM]'s midpoint-distance results as
 explicit hypotheses on the stated argument domains, using mantissa distances
 `2^-126` and `2^-142`. The small-input screen proofs and accepted fast decisions
-need no such hypothesis. These sine/cosine entry theorems do not cover
-tangent's public entry or SIMD; the separate fast tangent proof is in §8.
+need no such hypothesis. The tangent entry is proved separately in §8. These scalar entry theorems
+do not establish SIMD composition.
 
 ## 5. Accurate path
 
@@ -484,7 +484,19 @@ from zero. The decision itself establishes pair normalization. The extracted
 fast quotient and decision are compared with Rust across binades, quadrant and
 screen boundaries, reduction witnesses and independent fixture arguments, with
 both decision outcomes covered. The small-input screen is proved separately
-above; composition of the complete public tangent entry remains separate work.
+above. `TrigTanEntry.v` composes the actual finite guard, identity screen,
+checked fast quotient, rounding decision and accurate fallback. Every finite
+input returns a finite result within `(1/2 + 2^-143)` ULP; signed zeros are
+preserved and non-finite inputs return NaN. The extraction compares the public
+Rust entry bit for bit, including cutoff neighbors and the independent tangent
+fixtures.
+
+`TrigTanCorrectRounding.v` connects the public entry to correct rounding.
+`TrigTanLM` retains [LM] page 18's mantissa-distance bound `2^-122` on
+`2^-25 <= |x| <= atan(2)` as an explicit hypothesis. The screen and accepted
+fast decisions need no such hypothesis. The general fallback theorem accepts
+any established midpoint distance greater than `2^-195` (at most `1/2`);
+it does not claim a worst-case result outside the published domain.
 
 **Decision 4: `Q256::recip`, by Newton's iteration.**
 - For `|c| >= 2^-1022` with finite `RN(c)`, `y_0 = RN(1/RN(c))`
