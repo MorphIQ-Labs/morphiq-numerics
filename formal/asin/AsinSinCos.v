@@ -1,5 +1,5 @@
 (** The accurate path's [q_sin_cos] against [sin] and [cos], at the exact [Q256]
-    argument: both within [2^-196], relatively, for [0 <= r <= 0.7854]. *)
+    argument: both within [2^-200], relatively, for [0 <= r <= 0.7854]. *)
 From Coq Require Import Reals ZArith Lia Lra Psatz List.
 From Flocq Require Import Core.
 From Interval Require Import Tactic.
@@ -46,10 +46,10 @@ Proof.
   lra.
 Qed.
 
-Theorem q_sin_cos_error r : Q256Real.valid r -> 0 <= qval r <= 0.7854 ->
+Theorem q_sin_cos_error_strong r : Q256Real.valid r -> 0 <= qval r <= 0.7854 ->
   Q256Real.valid (fst (q_sin_cos r)) /\ Q256Real.valid (snd (q_sin_cos r)) /\
-  Rabs (qval (fst (q_sin_cos r)) - sin (qval r)) <= bpow radix2 (-196) * sin (qval r) /\
-  Rabs (qval (snd (q_sin_cos r)) - cos (qval r)) <= bpow radix2 (-196) * cos (qval r).
+  Rabs (qval (fst (q_sin_cos r)) - sin (qval r)) <= bpow radix2 (-200) * sin (qval r) /\
+  Rabs (qval (snd (q_sin_cos r)) - cos (qval r)) <= bpow radix2 (-200) * cos (qval r).
 Proof.
   intros Vr Hr. unfold q_sin_cos. cbn [fst snd].
   set (rv := qval r) in *.
@@ -76,15 +76,14 @@ Proof.
   pose proof (pow22_small (rv * rv) ltac:(lra)) as P22. pose proof (pow24_small (rv * rv) ltac:(lra)) as P24.
   pose proof prodf_sin_small as Q22. pose proof prodf_cos_small as Q24.
   set (E := bpow radix2 (-200)).
-  assert (Hnum : bpow radix2 (-196) = 16 * E /\ 0 < E /\ U <= E / 1000000000000000 /\ / 2 ^ 15 * / 2 ^ 186 <= E / 2 /\ / 2 ^ 15 * / 2 ^ 202 <= E / 100000).
+  assert (Hnum : 0 < E /\ U <= E / 1000000000000000 /\ / 2 ^ 15 * / 2 ^ 186 <= E / 2 /\ / 2 ^ 15 * / 2 ^ 202 <= E / 100000).
   { unfold E, U. repeat split.
-    - replace (-196)%Z with (-200 + 4)%Z by reflexivity. rewrite bpow_plus. change (bpow radix2 4) with 16. ring.
     - apply bpow_gt_0.
     - bpow_num. interval with (i_prec 300).
     - bpow_num. interval with (i_prec 300).
     - bpow_num. interval with (i_prec 300). }
-  destruct Hnum as [HE16 [HEp [HUE [H15 H17]]]].
-  rewrite HE16.
+  destruct Hnum as [HEp [HUE [H15 H17]]].
+  change (bpow radix2 (-200)) with E.
   assert (Hrv : 0 <= rv <= 0.7854) by exact Hr.
   (* sine *)
   destruct (mul_relative r (q_series s asin_sin_steps) Vr Vh) as [Vsn [d2 [D2 E2]]].
@@ -116,8 +115,8 @@ Proof.
     rewrite Rabs_mult, (Rabs_pos_eq rv) by lra. rewrite (Rabs_pos_eq (rv * A - sin rv)) by lra.
     destruct HTs as [_ HT2].
     assert (rv * Rabs ((hv - A) * (1 + d2) + A * d2) <= rv * (6 * U)) by (apply Rmult_le_compat_l; [lra | exact HX1]).
-    assert (rv * (6 * U) <= rv * (E / 2)) by (apply Rmult_le_compat_l; [lra | lra]).
-    assert (rv * E <= 16 * E * sin rv) by nra.
+    assert (rv * (6 * U) <= rv * (E / 100)) by (apply Rmult_le_compat_l; [lra | lra]).
+    assert (rv * (E / 2 + E / 100) <= E * sin rv) by nra.
     nra.
   - (* cosine *)
     set (hc := qval (q_series s asin_cos_steps)) in *.
@@ -130,7 +129,21 @@ Proof.
     assert (HT : cos rv - A' <= E / 100000).
     { apply Rle_trans with (1 := T2). pose proof (prodf_cos_pos 24) as Pp.
       apply Rle_trans with (/ 2 ^ 15 * / 2 ^ 202); [apply Rmult_le_compat; [exact Hp24 | lra | exact P24 | exact Q24] | exact H17]. }
-    assert (Habs : Rabs (hc - cos rv) <= E).
+    assert (Habs : Rabs (hc - cos rv) <= E/2).
     { apply Rabs_le_inv in HhA'. apply Rabs_le. split; nra. }
-    apply Rle_trans with E; [exact Habs | nra].
+    apply Rle_trans with (E/2); [exact Habs | nra].
+Qed.
+
+(** The existing asin interface retains its previously established allowance. *)
+Theorem q_sin_cos_error r : Q256Real.valid r -> 0 <= qval r <= 0.7854 ->
+  Q256Real.valid (fst (q_sin_cos r)) /\ Q256Real.valid (snd (q_sin_cos r)) /\
+  Rabs (qval (fst (q_sin_cos r)) - sin (qval r)) <= bpow radix2 (-196) * sin (qval r) /\
+  Rabs (qval (snd (q_sin_cos r)) - cos (qval r)) <= bpow radix2 (-196) * cos (qval r).
+Proof.
+  intros V R. destruct (q_sin_cos_error_strong r V R) as [S [C [Es Ec]]].
+  pose proof (sin_taylor_pos (qval r) ltac:(lra)) as [Sl _].
+  pose proof (cos_taylor (qval r) ltac:(apply Rabs_le; lra)) as [Cl _].
+  split; [exact S|]. split; [exact C|]. split.
+  - apply Rle_trans with (1:=Es). apply Rmult_le_compat_r; [nra|apply bpow_le; lia].
+  - apply Rle_trans with (1:=Ec). apply Rmult_le_compat_r; [nra|apply bpow_le; lia].
 Qed.

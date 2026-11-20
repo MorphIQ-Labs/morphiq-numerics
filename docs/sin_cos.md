@@ -211,6 +211,17 @@ large branch's proved domain.
 - End to end, with the truncation, the product and the reduction's `2^−199`
   through the mean value theorem, each result is within `2^−198` of the true
   value relatively (*certified*: `accurate_sin.g`, `accurate_cos.g`).
+  `formal/asin/AsinSinCos.v::q_sin_cos_error_strong` proves the shared
+  executable series has relative error at most `2^−200` before reduction
+  error. `formal/trig/TrigAccurate.v` extends it to both signs, including
+  zero, and composes it with `TrigReduction.trig_reduce_correct` to prove
+  the `2^−198` bound for the reduced sine and cosine before quadrant
+  selection and final binary64 rounding. The composition uses
+  `|sin r| ≥ 0.89|r|`, `cos r ≥ 0.69` on `|r| ≤ 0.7854` and the
+  one-Lipschitz bounds of sine and cosine. The shared generated factors are
+  bound through `AsinTables.v` and `generators/asin_constants.py`; the internal
+  cross-check compares this same transcription with actual Rust series
+  outputs on signed full-precision reduction remainders.
 
 ## 6. Rounding test and claims
 
