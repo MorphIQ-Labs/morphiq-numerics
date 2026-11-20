@@ -1160,7 +1160,7 @@ Print Assumptions TrigReciprocal.q_reciprocal_transcription.
 Print Assumptions TrigReciprocal.q_reciprocal_full_contract.
 
 Require TrigTanQuotient TrigTanDomain TrigTanAccurate TrigTanRounding.
-Print Assumptions TrigTanQuotient.trig_relative_factor.
+Print Assumptions TrigError.trig_relative_factor.
 Print Assumptions TrigTanQuotient.trig_quotient_error.
 Print Assumptions TrigTanQuotient.trig_q_quotient_error.
 Print Assumptions TrigTanDomain.trig_nearest_remainder_range.
@@ -1179,3 +1179,21 @@ Print Assumptions TrigTables.trig_table_length.
 Print Assumptions TrigTables.trig_table_ok.
 Print Assumptions TrigTable.trig_table_sum_ok.
 Print Assumptions TrigTable.trig_table_dw_ok.
+
+Require TrigError TrigPolynomial.
+Print Assumptions TrigError.trig_scaled_enclosure.
+Print Assumptions TrigPolynomial.sin_tail_polynomial_bound.
+Print Assumptions TrigPolynomial.cos_tail_polynomial_bound.
+Print Assumptions TrigPolynomial.sin_tail_enclosure.
+Print Assumptions TrigPolynomial.cos_tail_enclosure.
+Print Assumptions TrigPolynomial.trig_sin_polynomial_error.
+Print Assumptions TrigPolynomial.trig_cos_polynomial_error.
+Print Assumptions TrigPolynomial.trig_sin_polynomial_model.
+Print Assumptions TrigPolynomial.trig_cos_polynomial_model.
+
+Require TrigTail.
+Print Assumptions TrigTail.trig_horner_eval.
+Print Assumptions TrigTail.trig_tail_evaluation.
+Print Assumptions TrigTail.trig_sin_tail_certificate.
+Print Assumptions TrigTail.trig_cos_tail_certificate.
+Print Assumptions TrigTail.trig_tail_regular.

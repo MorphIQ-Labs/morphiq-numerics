@@ -158,8 +158,22 @@ large branch's proved domain.
      `fpminimax`. Each is fitted to its tail's series and bounded against it,
      plus the remainder, since the tails have removable singularities. Both are
      within `2^−54` relatively (*generated*: `generators/trig_poly.sollya`).
+     `formal/trig/TrigPolynomial.v` independently proves the analytic tail
+     models used by the certificates, with their outward-rounded allowance
+     `518·2^-63`, for every real `|t| <= 0.0078126`, including zero and both
+     signs. Coq's alternating-series enclosures and CoqInterval bounds on the
+     stored coefficients establish this allowance without assuming a sampled
+     error or the Sollya result.
    - The tails are evaluated in binary64, within `2^−50` (*certified*:
      `formal/trig/sin_tail.g`, `cos_tail.g`).
+     `TrigTail.v` connects these certificates to an executable IEEE64
+     transcription of each rounded multiplication and addition for
+     `2^-60 <= |t_hi| <= 0.0078126`. Its finite-evaluation theorem also covers
+     smaller residuals, but the relative-error theorem does not extend below
+     `2^-60`. The extracted `trig_tail` operation is checked against a Rust
+     transcription of the same scalar expressions, including tiny residuals
+     and intermediate words; the complete double-word fast path has separate
+     composition obligations.
    - The results are assembled as double-words: `sin t` within `2^−65` (proves
      `2^−66.06`) and `cos t − 1` within `2^−65` (proves `2^−66.83`)
      (*certified*: `sin_t.g`, `cos_t.g`).
