@@ -16,9 +16,9 @@ use morphiq_numerics::bivariate_normal::{
 use morphiq_numerics::double_word::{CheckError, DoubleWord, Hypothesis};
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::elementary::{
-    asin, asin_slice, asinh, asinh_slice, atan2, atan2_slice, cos, exp, exp_slice, exp2,
+    asin, asin_slice, asinh, asinh_slice, atan2, atan2_slice, cos, cos_slice, exp, exp_slice, exp2,
     exp2_slice, expm1, expm1_slice, ln, ln_1p, ln_1p_slice, ln_slice, log2, log2_slice, log10,
-    log10_slice, sin, sincos, sqrt, tan,
+    log10_slice, sin, sin_slice, sincos, sincos_slice, sqrt, tan, tan_slice,
 };
 use morphiq_numerics::interval::{FiniteInterval, IntervalError};
 use morphiq_numerics::linalg::tridiagonal::{DominantTridiagonal, Error as TridiagonalError};
@@ -1165,8 +1165,62 @@ pub fn corpus_digest() -> [u8; 32] {
     double_word_exp_section(&mut r);
     moments_section(&mut r);
     radix_log_slice_section(&mut r);
+    trig_slice_section(&mut r);
 
     r.0.finalize().into()
+}
+
+fn trig_slice_section(r: &mut Recorder) {
+    r.label("trig_slices");
+    let mut words = Words::new(0x7472_6967_5f73_6c63);
+    let edges = [
+        0,
+        1 << 63,
+        1,
+        0x7ff8_0000_0000_0042,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0x3e4d_12ed_0af1_a27e,
+        0x3e4d_12ed_0af1_a27f,
+        0x3e57_1374_4912_3ef6,
+        0x3e57_1374_4912_3ef7,
+        0x3e60_0000_0000_0000,
+        0x3fe9_21fb_5444_2d18,
+        0x3ff9_21fb_5444_2d18,
+        0x7506_ac5b_262c_a1ff,
+        0x7fef_ffff_ffff_ffff,
+    ];
+    let (mut x, mut out, mut other) = ([0.0; 17], [0.0; 17], [0.0; 17]);
+    let mut i = 0;
+    for exponent in 0..2047_u64 {
+        let len = usize::try_from(exponent % 17 + 1).unwrap();
+        for v in &mut x[..len] {
+            *v = batched_input(
+                &mut words,
+                &edges,
+                i,
+                -core::f64::consts::TAU,
+                core::f64::consts::TAU,
+            );
+            i += 1;
+        }
+        // At least one input in every binade; the remaining lanes mix edges,
+        // arbitrary words and representative arguments with varying lengths.
+        x[0] = f64::from_bits((exponent << 52) | (words.next_word() & ((1 << 52) - 1)));
+        if len > 1 {
+            x[1] = -x[0];
+        }
+        for batch in [sin_slice, cos_slice, tan_slice] {
+            batch(&x[..len], &mut out[..len]);
+            for &value in &out[..len] {
+                r.f64(value);
+            }
+        }
+        sincos_slice(&x[..len], &mut out[..len], &mut other[..len]);
+        for (&s, &c) in out[..len].iter().zip(&other[..len]) {
+            r.pair((s, c));
+        }
+    }
 }
 
 fn radix_log_slice_section(r: &mut Recorder) {

@@ -17,7 +17,8 @@
 //! [`atan2`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/atan2.md).
 //!
 //! [`exp_slice`], [`exp2_slice`], [`expm1_slice`], [`ln_slice`], [`ln_1p_slice`],
-//! [`log2_slice`], [`log10_slice`], [`asin_slice`], [`asinh_slice`] and [`atan2_slice`] apply a function to every
+//! [`log2_slice`], [`log10_slice`], [`sin_slice`], [`cos_slice`],
+//! [`sincos_slice`], [`tan_slice`], [`asin_slice`], [`asinh_slice`] and [`atan2_slice`] apply a function to every
 //! element of a slice and return its bits exactly. With the `simd` feature they
 //! evaluate several elements at once in SIMD lanes
 //! ([`lanes`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/lanes.md)),
@@ -57,6 +58,53 @@ macro_rules! batched {
             }
         }
     };
+}
+
+batched!(
+    /// [`sin`] of every input, bit for bit. With `simd`, the reduced
+    /// polynomial and reconstruction run in lanes; exact Q256 reduction
+    /// and accurate fallbacks retain the scalar implementation.
+    sin_slice,
+    sin,
+    crate::trig::lanes::Trig<{ crate::trig::lanes::SIN }>
+);
+batched!(
+    /// [`cos`] of every input, bit for bit, with the same numerical contract.
+    cos_slice,
+    cos,
+    crate::trig::lanes::Trig<{ crate::trig::lanes::COS }>
+);
+batched!(
+    /// [`tan`] of every input, bit for bit. With `simd`, the reduced
+    /// polynomial, reconstruction and admitted division run in lanes.
+    tan_slice,
+    tan,
+    crate::trig::lanes::Trig<{ crate::trig::lanes::TAN }>
+);
+
+/// [`sincos`] of every input, written to `sine` and `cosine`, bit for bit.
+/// With `simd`, each whole packet shares its reduction and reconstruction.
+///
+/// # Panics
+///
+/// If the three slices have different lengths.
+pub fn sincos_slice(x: &[f64], sine: &mut [f64], cosine: &mut [f64]) {
+    assert_eq!(
+        x.len(),
+        sine.len(),
+        "sincos_slice: slices of different lengths"
+    );
+    assert_eq!(
+        x.len(),
+        cosine.len(),
+        "sincos_slice: slices of different lengths"
+    );
+    #[cfg(feature = "simd")]
+    crate::trig::lanes::sincos(x, sine, cosine);
+    #[cfg(not(feature = "simd"))]
+    for ((&x, s), c) in x.iter().zip(sine).zip(cosine) {
+        (*s, *c) = sincos(x);
+    }
 }
 
 batched!(

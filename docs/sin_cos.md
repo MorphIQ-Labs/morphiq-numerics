@@ -332,7 +332,10 @@ entries. `TrigSinLM` and `TrigCosLM` retain [LM]'s midpoint-distance results as
 explicit hypotheses on the stated argument domains, using mantissa distances
 `2^-126` and `2^-142`. The small-input screen proofs and accepted fast decisions
 need no such hypothesis. The tangent entry is proved separately in §8. These scalar entry theorems
-do not establish SIMD composition.
+retain their numerical qualifications under the matching lane evaluation
+described in [lanes.md](lanes.md#trigonometric-slices). Lane equivalence is
+checked by intermediate-word tests, independent fixtures and the cross-target
+digest, rather than a separate Coq model of SIMD instructions.
 
 ## 5. Accurate path
 
