@@ -97,8 +97,22 @@ binary64 input, needed for half-integer quadrant boundaries.
 the exact generated minimum above is not a premise of either theorem.
 `trig_truncation_relative` proves that an absolute truncation error below
 `2^−262` implies a relative error below `2^−200`. That theorem is an interface
-to the window analysis; it does not establish the executable window's error
-or the final reconstructed `Q256` remainder.
+to the window analysis.
+
+`TrigWindow.v` transcribes the table-word extraction and checks all 1,025
+supported exponents: the five limbs equal the integer prefix modulo `2^317`,
+and every executed table access and shift is in range. The proved limb
+multiply/carry routine establishes the exact six-limb product for every
+binary64 significand and the absence of `u128` overflow.
+`TrigWindowError.v` proves that the full prefix's absolute error is below
+`2^−262`, that discarded high bits add only multiples of four, and that
+truncation preserves a nearest-integer decision satisfying its stated interval.
+The executable reduction transcription is compared with the actual Rust
+quadrant and `Q256` remainder on the reduction fixtures, every binade's
+significand extremes, carry boundaries at all 64 table-word alignments,
+threshold neighbors and seeded finite inputs. This checks transcription
+agreement; the limb decision's interval and the final reconstructed `Q256`
+error bound remain separate proof obligations.
 
 **Payne–Hanek** ([PH]), in integer arithmetic.
 - Bits of `2/π` of weight above `2^(1−E)` add only multiples of 4 to `x·(2/π)`,
@@ -217,6 +231,7 @@ use, so its pair is theirs bit for bit.
 | `formal/trig/TrigConstants.v` | generated limb encodings, certified `2/π` table bits and `π/2` rounding/relative bounds |
 | `generators/trig_separation.py`, `formal/trig/TrigSeparationData.v` | reproducible rational witnesses and their exact integer checks for 1,026 exponents |
 | `formal/trig/TrigSeparation.v`, `formal/trig/TrigClosest.v` | bracket sufficiency, binary64 separation from integers and half-integers, conditional relative truncation budget |
+| `formal/trig/TrigWindow.v`, `formal/trig/TrigWindowError.v` | exact bit window and product, access/shift and carry bounds, prefix truncation and quadrant congruence |
 | `generators/trig_poly.sollya` (Sollya 8.0) | `Ps`, `Pc` and their bounds, in `generators/trig_poly.out` |
 | `generators/trig_constants.py` | `src/trig/tables.rs`: the table, the polynomials, the series factors and degrees; the enclosed ratios |
 | `generators/trig_certificates.py` | writes every certificate in `formal/trig` (61) |
