@@ -111,8 +111,17 @@ The executable reduction transcription is compared with the actual Rust
 quadrant and `Q256` remainder on the reduction fixtures, every binade's
 significand extremes, carry boundaries at all 64 table-word alignments,
 threshold neighbors and seeded finite inputs. This checks transcription
-agreement; the limb decision's interval and the final reconstructed `Q256`
-error bound remain separate proof obligations.
+agreement. `TrigFraction.v` proves the quadrant extraction, half-bit decision
+and masked two's-complement magnitude. `TrigCentered.v` lifts them back to the
+full input scale and establishes the nearest integer and nonzero fraction.
+`TrigReconstruct.v` composes the proved `Q256::from_limbs` truncation, certified
+`π/2` and `Q256` multiplication bounds. `TrigReduction.v` connects the actual
+binary64 field decoding and the small-argument cutoff: for every finite
+nonnegative input, `trig_reduce_correct` establishes the quadrant modulo four,
+a valid `Q256` remainder with magnitude at most `π/4`, and relative error at
+most `2^−199` against `x − k·π/2`. The two adjacent binary64 encodings around
+`π/4` are certified; an input above the stored cutoff therefore lies in the
+large branch's proved domain.
 
 **Payne–Hanek** ([PH]), in integer arithmetic.
 - Bits of `2/π` of weight above `2^(1−E)` add only multiples of 4 to `x·(2/π)`,
@@ -125,14 +134,14 @@ error bound remain separate proof obligations.
   CoqInterval encloses `2/π` strictly between the adjacent grid points.
   The same module proves that the four `HALF_PI` limbs, in their specified
   order, approximate `π/2` within half a `Q256` significand unit and within
-  `2^−255` relatively. These are constant proofs; the closest-approach and
-  reduction-algorithm claims retain the evidence boundaries stated here.
+  `2^−255` relatively. The constant proofs feed the separation, window and reconstruction
+  theorems above.
 - The product's integer part gives `k mod 4`. Its 315-bit fraction `f` is
   rounded to the nearest multiple, so `f ∈ [−1/2, 1/2)`, and `r = f·π/2` in
   `Q256`.
-- `r` is within `2^−199` of the exact `r`, relatively. That is checked on 607
-  arguments, including the closest approach and the largest binary64, against
-  references computed at 2,400 bits.
+- `r` is within `2^−199` of the exact `r`, relatively, by the composed Coq
+  reduction theorem. Independent 2,400-bit references also check 607 arguments,
+  including the closest approach and the largest binary64.
 - Below `π/4`, `r = x` exactly.
 
 ## 4. Fast path
@@ -232,6 +241,8 @@ use, so its pair is theirs bit for bit.
 | `generators/trig_separation.py`, `formal/trig/TrigSeparationData.v` | reproducible rational witnesses and their exact integer checks for 1,026 exponents |
 | `formal/trig/TrigSeparation.v`, `formal/trig/TrigClosest.v` | bracket sufficiency, binary64 separation from integers and half-integers, conditional relative truncation budget |
 | `formal/trig/TrigWindow.v`, `formal/trig/TrigWindowError.v` | exact bit window and product, access/shift and carry bounds, prefix truncation and quadrant congruence |
+| `formal/trig/TrigFraction.v`, `formal/trig/TrigCentered.v` | limb quadrant/fraction decisions, signed magnitude and nearest integer at the full scale |
+| `formal/trig/TrigReconstruct.v`, `formal/trig/TrigReduction.v` | Q256 conversion and product bounds, actual binary64 decoding/cutoff, full reduction error and remainder range |
 | `generators/trig_poly.sollya` (Sollya 8.0) | `Ps`, `Pc` and their bounds, in `generators/trig_poly.out` |
 | `generators/trig_constants.py` | `src/trig/tables.rs`: the table, the polynomials, the series factors and degrees; the enclosed ratios |
 | `generators/trig_certificates.py` | writes every certificate in `formal/trig` (61) |

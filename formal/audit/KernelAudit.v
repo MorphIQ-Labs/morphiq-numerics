@@ -1105,3 +1105,28 @@ Print Assumptions TrigWindowError.trig_prefix_error.
 Print Assumptions TrigWindowError.trig_prefix_relative.
 Print Assumptions TrigWindowError.trig_window_congruence.
 Print Assumptions TrigWindowError.trig_prefix_nearest.
+
+Require TrigFraction TrigCentered TrigReconstruct TrigReduction.
+Print Assumptions TrigFraction.trig_fraction_value.
+Print Assumptions TrigFraction.trig_quadrant_value.
+Print Assumptions TrigFraction.trig_negative_value.
+Print Assumptions TrigFraction.trig_complement_value.
+Print Assumptions TrigFraction.trig_select_exact.
+Print Assumptions TrigFraction.trig_reduce_large_parts.
+Print Assumptions TrigCentered.trig_centered_exact.
+Print Assumptions TrigCentered.trig_centered_real.
+Print Assumptions TrigCentered.trig_centered_interval.
+Print Assumptions TrigCentered.trig_centered_nearest.
+Print Assumptions TrigCentered.trig_centered_nonzero.
+Print Assumptions TrigCentered.trig_centered_input.
+Print Assumptions TrigReconstruct.trig_from_limbs_error.
+Print Assumptions TrigReconstruct.trig_half_pi_q_error.
+Print Assumptions TrigReconstruct.trig_q_fraction_error.
+Print Assumptions TrigReconstruct.trig_reconstruction_error.
+Print Assumptions TrigReconstruct.trig_remainder_error.
+Print Assumptions TrigReconstruct.trig_remainder_range.
+Print Assumptions TrigReconstruct.trig_remainder_nonzero.
+Print Assumptions TrigReduction.trig_decode.
+Print Assumptions TrigReduction.trig_reduce_large_correct.
+Print Assumptions TrigReduction.trig_quarter_bounds.
+Print Assumptions TrigReduction.trig_reduce_correct.
