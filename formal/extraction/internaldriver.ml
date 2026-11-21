@@ -78,6 +78,18 @@ let compute op args =
            let (((qn, qe), ql), rounded) = x_trig_accurate (z_of_u64 (hex x)) (n = "1") (c = "1") in
            show (qn, qe, ql) ^ " " ^ show_bits rounded
        | _ -> failwith "trig_accurate takes a magnitude, sign and function")
+  | "trig_tan_parts" ->
+      (match args with
+       | [x; n] ->
+           let ((((nn, ne), nl), ((dn, de), dl)), negate) = x_trig_tan_parts (z_of_u64 (hex x)) (n = "1") in
+           show (nn, ne, nl) ^ " " ^ show (dn, de, dl) ^ " " ^ (if negate then "1" else "0")
+       | _ -> failwith "trig_tan_parts takes a magnitude and sign")
+  | "trig_tan_accurate" ->
+      (match args with
+       | [x; n] ->
+           let (((qn, qe), ql), rounded) = x_trig_tan_accurate (z_of_u64 (hex x)) (n = "1") in
+           show (qn, qe, ql) ^ " " ^ show_bits rounded
+       | _ -> failwith "trig_tan_accurate takes a magnitude and sign")
   | "trig_series" ->
       let ((n, e, l), _) = value args in
       let (((sn, se), sl), ((cn, ce), cl)) = x_trig_series n e l in
