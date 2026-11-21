@@ -105,6 +105,9 @@ Print Assumptions Tridiagonal.residual_backward_error.
 Print Assumptions Tridiagonal.tridiagonal_error_bound.
 Print Assumptions Tridiagonal.tridiagonal_zero_kernel.
 Print Assumptions Tridiagonal.rounded_error_bound.
+Print Assumptions Tridiagonal.obstacle_allowance_monotone.
+Print Assumptions Tridiagonal.obstacle_relative_continuation.
+Print Assumptions Tridiagonal.obstacle_relative_contact.
 
 Print Assumptions Tridiagonal.sign_rounded_zero.
 Print Assumptions Tridiagonal.sign_rounded_monotone.

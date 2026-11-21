@@ -90,6 +90,60 @@ let compute op args =
            let (((qn, qe), ql), rounded) = x_trig_tan_accurate (z_of_u64 (hex x)) (n = "1") in
            show (qn, qe, ql) ^ " " ^ show_bits rounded
        | _ -> failwith "trig_tan_accurate takes a magnitude and sign")
+  | "trig_products" ->
+      (match args with
+       | [i; h; l] -> String.concat " " (List.map show_bits
+           (x_trig_products (z_of_int (int_of_string i)) (z_of_u64 (hex h)) (z_of_u64 (hex l))))
+       | _ -> failwith "trig_products takes a table index and two residual words")
+  | "trig_mul" ->
+      (match args with
+       | [xh; xl; yh; yl] -> String.concat " " (List.map show_bits
+           (x_trig_mul (z_of_u64 (hex xh)) (z_of_u64 (hex xl)) (z_of_u64 (hex yh)) (z_of_u64 (hex yl))))
+       | _ -> failwith "trig_mul takes four double-word components")
+  | "checked_div" ->
+      (match args with
+       | [xh; xl; yh; yl] ->
+           (match x_checked_div (z_of_u64 (hex xh)) (z_of_u64 (hex xl))
+              (z_of_u64 (hex yh)) (z_of_u64 (hex yl)) with
+            | Some (h, l) -> show_bits h ^ " " ^ show_bits l
+            | None -> "none")
+       | _ -> failwith "checked_div takes four binary64 words")
+  | "quotient_range" ->
+      (match args with
+       | [_; _; _; _] ->
+           let accepted, exponents = x_quotient_range (List.map (fun x -> z_of_u64 (hex x)) args) in
+           String.concat " " ((if accepted then "1" else "0") ::
+             List.map (fun e -> string_of_int (int_of_z e)) exponents)
+       | _ -> failwith "quotient_range takes four binary64 words")
+  | "trig_tan_fast" ->
+      (match args with
+       | [x; n] ->
+           let quotient, decision = x_trig_tan_fast (z_of_u64 (hex x)) (n = "1") in
+           (match quotient with Some (h, l) -> show_bits h ^ " " ^ show_bits l | None -> "none") ^
+           " " ^ (match decision with Some y -> show_bits y | None -> "none")
+       | _ -> failwith "trig_tan_fast takes a magnitude and sign")
+  | "trig_entry" ->
+      (match args with
+       | [x] -> String.concat " " (List.map show_bits (x_trig_entry (z_of_u64 (hex x))))
+       | _ -> failwith "trig_entry takes one binary64 input")
+  | "trig_finish" ->
+      (match args with
+       | [x; n; c] ->
+           let (((h, l), decision), result) = x_trig_finish (z_of_u64 (hex x)) (n = "1") (c = "1") in
+           show_bits h ^ " " ^ show_bits l ^ " " ^ show_opt decision ^ " " ^ show_bits result
+       | _ -> failwith "trig_finish takes a magnitude, sign and function")
+  | "trig_fastq" ->
+      let ((n, e, l), rest) = value args in
+      if rest <> [] then failwith "trig_fastq takes one Q256 value";
+      String.concat " " (List.map show_bits (x_trig_fastq n e l))
+  | "trig_input" ->
+      let ((n, e, l), rest) = value args in
+      if rest <> [] then failwith "trig_input takes one Q256 value";
+      String.concat " " (List.map show_bits (x_trig_input n e l))
+  | "trig_residual" ->
+      (match args with
+       | [h; l] -> String.concat " " (List.map show_bits (x_trig_residual (z_of_u64 (hex h)) (z_of_u64 (hex l))))
+       | _ -> failwith "trig_residual takes two residual words")
   | "trig_tail" ->
       (match args with
        | [x] -> String.concat " " (List.map show_bits (x_trig_tail (z_of_u64 (hex x))))

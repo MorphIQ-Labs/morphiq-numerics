@@ -66,6 +66,54 @@ Definition x_trig_tan_parts bits negative :=
 Definition x_trig_tan_accurate bits negative :=
   let q:=TrigTanAccurate.trig_tan_accurate64 bits negative in
   (q256_out q,bits_of_b64 (Q256.to_f64 q)).
+Require TrigEntry TrigTanEntry.
+Definition x_trig_entry bits :=
+ let x:=b64_of_bits bits in
+ let '(s,c):=TrigEntry.trig_sincos_entry x in
+ map bits_of_b64 [TrigEntry.trig_sin_entry x;TrigEntry.trig_cos_entry x;s;c;TrigTanEntry.trig_tan_entry x].
+
+Require TrigFastSelection TrigFastDecision.
+Definition x_trig_finish bits negative cosine :=
+ let '(h,l):=TrigFastSelection.trig_fast64 bits negative cosine in
+ (bits_of_b64 h,bits_of_b64 l,
+  option_map bits_of_b64 (TrigFastDecision.trig_fast_decision bits negative cosine),
+  bits_of_b64 (TrigFastDecision.trig_finish bits negative cosine)).
+
+Require TrigFast.
+Definition x_trig_fastq n e limbs :=
+ let '((sh,sl),(ch,cl)):=TrigFast.trig_fast (q256_in n e limbs) in
+ map bits_of_b64 [sh;sl;ch;cl].
+
+Require TrigQSplit TrigInput TrigInputContract.
+Definition x_trig_input n e limbs :=
+  let r:=q256_in n e limbs in
+  let '(h,l):=TrigQSplit.trig_q_split r in
+  let '(negative,(i,(th,tl))):=TrigInputContract.trig_input r in
+  let ah:=TrigInputContract.trig_flip negative h in
+  let al:=TrigInputContract.trig_flip negative l in
+  let x:=IEEE64.fsub ah (IEEE64.fmul i TrigInput.trig_inv64) in
+  [bits_of_b64 h;bits_of_b64 l;if negative then 1%Z else 0%Z;
+   bits_of_b64 ah;bits_of_b64 al;bits_of_b64 i;bits_of_b64 x;bits_of_b64 th;bits_of_b64 tl].
+
+Require TrigProducts.
+Definition x_trig_products i h l :=
+ let '(scm,csn,ccm,ssn):=TrigProducts.trig_reconstruction_products (Z.to_nat i) (b64_of_bits h) (b64_of_bits l) in
+ map bits_of_b64 [fst scm;snd scm;fst csn;snd csn;fst ccm;snd ccm;fst ssn;snd ssn].
+
+Require TrigMultiply.
+Definition x_trig_mul xh xl yh yl :=
+  let '(h,l):=IEEE64Mul.mul64 (b64_of_bits xh) (b64_of_bits xl) (b64_of_bits yh) (b64_of_bits yl) in
+  [bits_of_b64 h;bits_of_b64 l].
+
+Require TrigSinResidual TrigCosSquare TrigCosResidual.
+Definition x_trig_residual h l :=
+  let th:=b64_of_bits h in let tl:=b64_of_bits l in
+  let '(uh,ul):=IEEE64Mul.two_prod64 th th in
+  let '(qh,ql):=TrigCosSquare.trig_cos_square th in
+  let '(sh,sl):=TrigSinResidual.trig_sin_residual th tl in
+  let '(ch,cl):=TrigCosResidual.trig_cos_residual th tl in
+  map bits_of_b64 [uh;ul;qh;ql;sh;sl;ch;cl].
+
 Require TrigTail.
 Definition x_trig_tail bits :=
   let '(u,ps,pc,st,ct):=TrigTail.trig_tail_eval (b64_of_bits bits) in
@@ -487,5 +535,26 @@ Definition x_fast_erfcx x := bits_of_b64 (FastErfcx.fast_erfcx_entry64 (b64_of_b
 Definition x_fast_normal x := bits_of_b64 (FastCdfFar.fast_cdf_saturated_split64 (b64_of_bits x)).
 Definition x_fast_log_cdf x := bits_of_b64 (FastLogCdf.fast_logcdf_entry64 (b64_of_bits x)).
 
-Extraction "internalcrosscheck.ml" x_trig_tail x_trig_table x_trig_tan_parts x_trig_tan_accurate x_trig_select x_trig_accurate x_trig_series x_trig_reduce x_log2_fast x_log10_fast x_log2_entry x_log10_entry x_log2_accurate_result x_log10_accurate_result x_log2_accurate x_log10_accurate x_fast_random x_fast_ln x_fast_log_cdf x_fast_exp x_fast_exp_coarse x_fast_erfcx x_fast_normal x_atan2_entry x_atan2_fast x_atan2_accurate x_asinh_entry x_asinh_fast x_asinh_exp x_asinh_accurate x_asin_entry x_asin_reduced x_asin_series x_asin_fast x_asin_accurate x_asin_sincos x_asin_recip x_normal_entry_pdf x_normal_entry_cdf x_normal_entry_ccdf x_normal_entry_center x_normal_entry_log x_normal_log_positive x_normal_log_negative x_normal_outer_cdf x_normal_outer_center_positive x_normal_outer_center_negative x_normal_tail_fast x_normal_fast_scaled_argument x_normal_erfcx_fast_scaled x_normal_log_central x_normal_center_central x_normal_cdf_central x_normal_center_fast x_normal_center_shape x_normal_center_tail x_normal_center_small x_normal_density_fast x_normal_density_first x_normal_tail_first_cdf x_normal_tail_first_center x_normal_center_first_cdf x_normal_center_first_center x_normal_accurate_outer_cdf x_normal_accurate_outer_center x_normal_accurate_log_positive x_normal_accurate_log_central x_normal_accurate_log_negative x_normal_log_complement x_normal_logarithm x_normal_erfcx_positive x_normal_accurate_tail x_normal_erfcx_extended_table x_normal_erfcx_small_table x_normal_scaled_argument x_normal_accurate_tail_asym x_normal_erfcx_asym x_normal_accurate_gaussian x_normal_accurate_density x_normal_accurate_center x_normal_accurate_central_cdf x_normal_gaussian x_erfcx_entry x_erfcx_accurate_negative x_erfcx_accurate_taylor x_erfcx_accurate_exp x_erfcx_accurate_tail x_erfcx_table_fast x_erfcx_tail_scaled_fast x_erfcx_tail_subnormal_fast x_erfcx_middle_fast x_erfcx_tail_unscaled_fast x_erfcx_reflection_fast x_erfcx_reflection_value x_erfcx_reflection_square x_erfcx_reflection_exp x_erfcx_table_value x_erfcx_table_reduce x_erfcx_table_leading x_erfcx_table_split x_erfcx_tail x_erfcx_tail_correction x_erfcx_quotient x_erfcx_scaled_quotient x_erfcx_middle x_erfcx_product x_erfcx_reciprocal_correction x_erfcx_reciprocal_square x_erfcx_reciprocal x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64 x_normal_log_first x_normal_finite_density x_normal_finite_tail x_normal_log_far_tail
+From Binary64 Require Import CheckedQuotientRange.
+Definition x_quotient_range (bits:list Z) : bool * list Z :=
+ let words:=map b64_of_bits bits in
+ (checked_quotient_range words,map checked_word_exponent words).
+
+From Binary64 Require Import CheckedDivision.
+Definition x_checked_div xh xl yh yl : option(Z*Z) :=
+ match checked_divide (b64_of_bits xh) (b64_of_bits xl) (b64_of_bits yh) (b64_of_bits yl) with
+ | Some(h,l)=>Some(bits_of_b64 h,bits_of_b64 l)
+ | None=>None
+ end.
+
+Require TrigTanFastValue.
+Definition x_trig_tan_fast bits negative : option(Z*Z) * option Z :=
+ match TrigTanFastValue.trig_tan_fast64 bits negative with
+ | Some(h,l)=>(Some(bits_of_b64 h,bits_of_b64 l),
+    match decide_with h l TrigTanFastValue.trig_tan_eps with
+    | Some y=>Some(bits_of_b64 y)|None=>None end)
+ | None=>(None,None)
+ end.
+
+Extraction "internalcrosscheck.ml" x_trig_tan_fast x_checked_div x_quotient_range x_trig_entry x_trig_finish x_trig_fastq x_trig_products x_trig_mul x_trig_input x_trig_residual x_trig_tail x_trig_table x_trig_tan_parts x_trig_tan_accurate x_trig_select x_trig_accurate x_trig_series x_trig_reduce x_log2_fast x_log10_fast x_log2_entry x_log10_entry x_log2_accurate_result x_log10_accurate_result x_log2_accurate x_log10_accurate x_fast_random x_fast_ln x_fast_log_cdf x_fast_exp x_fast_exp_coarse x_fast_erfcx x_fast_normal x_atan2_entry x_atan2_fast x_atan2_accurate x_asinh_entry x_asinh_fast x_asinh_exp x_asinh_accurate x_asin_entry x_asin_reduced x_asin_series x_asin_fast x_asin_accurate x_asin_sincos x_asin_recip x_normal_entry_pdf x_normal_entry_cdf x_normal_entry_ccdf x_normal_entry_center x_normal_entry_log x_normal_log_positive x_normal_log_negative x_normal_outer_cdf x_normal_outer_center_positive x_normal_outer_center_negative x_normal_tail_fast x_normal_fast_scaled_argument x_normal_erfcx_fast_scaled x_normal_log_central x_normal_center_central x_normal_cdf_central x_normal_center_fast x_normal_center_shape x_normal_center_tail x_normal_center_small x_normal_density_fast x_normal_density_first x_normal_tail_first_cdf x_normal_tail_first_center x_normal_center_first_cdf x_normal_center_first_center x_normal_accurate_outer_cdf x_normal_accurate_outer_center x_normal_accurate_log_positive x_normal_accurate_log_central x_normal_accurate_log_negative x_normal_log_complement x_normal_logarithm x_normal_erfcx_positive x_normal_accurate_tail x_normal_erfcx_extended_table x_normal_erfcx_small_table x_normal_scaled_argument x_normal_accurate_tail_asym x_normal_erfcx_asym x_normal_accurate_gaussian x_normal_accurate_density x_normal_accurate_center x_normal_accurate_central_cdf x_normal_gaussian x_erfcx_entry x_erfcx_accurate_negative x_erfcx_accurate_taylor x_erfcx_accurate_exp x_erfcx_accurate_tail x_erfcx_table_fast x_erfcx_tail_scaled_fast x_erfcx_tail_subnormal_fast x_erfcx_middle_fast x_erfcx_tail_unscaled_fast x_erfcx_reflection_fast x_erfcx_reflection_value x_erfcx_reflection_square x_erfcx_reflection_exp x_erfcx_table_value x_erfcx_table_reduce x_erfcx_table_leading x_erfcx_table_split x_erfcx_tail x_erfcx_tail_correction x_erfcx_quotient x_erfcx_scaled_quotient x_erfcx_middle x_erfcx_product x_erfcx_reciprocal_correction x_erfcx_reciprocal_square x_erfcx_reciprocal x_ln_fast x_ln1p_fast x_ln_entry x_ln1p_entry x_expm1_entry x_expm1_small x_expm1_general x_exp2_fast x_exp2_entry x_exp2_fallback x_exp2_stages x_expm1_stages x_ln1p_screens x_ln1p_h x_ln1p_b x_ln_accurate x_ln_1p_accurate x_stage x_ln_reduce x_small x_accurate x_fast x_reduce x_decide_with x_decide_scaled x_q128_mul x_q128_add x_q128_to_f64 x_q128_from_f64 x_normal_log_first x_normal_finite_density x_normal_finite_tail x_normal_log_far_tail
   x_q256_mul x_q256_add x_q256_to_f64 x_q256_from_f64 x_q256_from_limbs x_q256_top x_q256_mul_pow2.

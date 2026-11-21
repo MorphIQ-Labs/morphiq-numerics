@@ -177,10 +177,42 @@ large branch's proved domain.
    - The results are assembled as double-words: `sin t` within `2^−65` (proves
      `2^−66.06`) and `cos t − 1` within `2^−65` (proves `2^−66.83`)
      (*certified*: `sin_t.g`, `cos_t.g`).
+     `TrigResidualCertificate.v` derives each certificate's analytic input
+     from `TrigPolynomial.v`. `TrigSinResidual.v` and `TrigCosResidual.v`
+     prove the executable double-word assembly on the regular domain
+     `2^-60 <= |t_hi| <= 0.0078126`, with `|t_lo| <= 2^-53 |t_hi|` and
+     `|t_hi + t_lo| <= 0.0078126`. Sine takes a normalized input;
+     cosine additionally requires the low word on the `2^-320` grid to
+     establish its cross-product rounding model, handling zero separately.
+     `TrigCosSquare.v` proves the square's error-free product and exact
+     negative-half scaling of both words. Both outputs are finite,
+     normalized double-words with the stated `2^-65` relative bound.
+     The extracted residual check includes intermediate square words and
+     both output words. These theorems take the reduction/grid properties
+     as premises. `TrigQSplit.v`, `TrigInput.v` and `TrigInputContract.v`
+     discharge them for a valid Q256 remainder with magnitude between
+     `2^-64` and `0.785399`. The actual split differs from that remainder by
+     at most `2^-105` relatively. The proof follows limb addition to retain
+     the `2^-320` grid through cancellation, checks the nearest-even table
+     index in `0..=50`, proves exact table subtraction, and derives the
+     normalized TwoSum residual and its low-word bound. Both remainder
+     signs are covered. The extracted check compares the split, sign,
+     index, subtraction and residual words. Public entry composition must
+     establish the Q256 remainder domain required by the full fast theorem.
    - **Below `|t| = 2^−60`,** `t` is `r_lo` alone, since `r_hi` equals the table
      point, and `t⁴` may underflow. A tail is then only known to lie within
      `[0, 3]` times its value, and the bounds still hold (*certified*:
      `sin_t_tiny.g`, `cos_t_tiny.g`).
+     `TrigTinyTail.v` proves this factor for the actual rounded tails down to
+     `|t_hi| = 2^-320`. It accounts for both cosine-tail roundings together,
+     including zero and subnormal results. `TrigTinyResidual.v` derives the
+     tiny certificates' premises and proves the same `2^-65` assembly bounds;
+     `TrigZeroResidual.v` proves exact zero outputs at a zero residual.
+     `TrigResidual.v` combines zero, tiny and regular cases into finite,
+     normalized residual contracts, with the input magnitude, normalization
+     and grid premises supplied by `TrigInputContract.v` on its stated Q256
+     domain. `TrigFast.v` connects these residual contracts to table
+     reconstruction; public entry composition remains a separate obligation.
    - `t` is 0 or at least `2^−317` in magnitude, since it's a difference on
      `Q256`'s grid. Before emitting or checking certificates,
      `generators/trig_certificates.py` consumes `trig_reduction.derive()` and
@@ -200,14 +232,110 @@ large branch's proved domain.
      widening used by the Gappa certificates. `TrigTable.v` then proves that
      the actual TwoSum operation preserves these values and bounds in finite,
      normalized double-words. The extraction corpus checks all 51 stored rows
-     and their double-word construction against Rust. Polynomial evaluation
-     and table-interval reconstruction are separate proof obligations.
-   - They are combined with the proved `mul` and `add`/`sub` [DW].
-   - The relative errors use each term's ratio to the result. Those are enclosed
-     in interval arithmetic over every table interval (*generated*). The
-     largest `S/sin(a+t)` is 2.0.
-   - `sin` is within `2^−62` (proves `2^−64.98`) and `cos` within `2^−62`
-     (proves `2^−71.99`) (*certified*: `fast_sin.g`, `fast_cos.g`).
+     and their double-word construction against Rust. `TrigReconstruction.v`
+     composes them with the residuals and the actual IEEE reconstruction.
+   - They are combined with double-word `mul` and `add`/`sub` [DW].
+     The trig multiplication allowance is `9u²`, proved by
+     `TrigMultiply.trig_mul_ieee`, including gradual underflow in either
+     cross product. Its inputs are finite normalized double-words, each word
+     at most `2^508` in magnitude, with a high-word product equal to zero or
+     at least `2^-900` in magnitude. It proves finite, normalized outputs and
+     the absolute bound `|computed - exact| <= 9u² |exact|`, including exact
+     zero products. `TrigOperandBounds.v` derives these premises for the reconstruction:
+     each table head is zero or has magnitude at least `2^-8`, each residual
+     head is zero or has magnitude at least `2^-645`, and every word has
+     magnitude at most 4. The residual result follows from its normalized
+     input floor `2^-320`, the proved relative error and analytic lower bounds
+     on `|sin t|` and `|cos t - 1|`. Table row zero and zero residuals are
+     included. `TrigProducts.v` then proves finite normalized results and
+     `9u²` error factors for all four actual table/residual multiplications.
+     Extraction compares their eight output words across all 51 table rows.
+
+     For `p = |x_hi y_hi| >= 2^-900`, the binary64 half-subnormal rounding
+     allowance satisfies `2^-1075 <= u³ p`. Each rounded cross product has
+     error at most `1.1u² p`; their sum and the correction sum contribute
+     at most `2.2u² p` and `3.3u² p`. The omitted low-word product is at most
+     `u² p`, giving `8.7u² p` in total. The exact full product has magnitude
+     at least `0.99p`, and `8.7/0.99 < 9`. The correction is smaller than the
+     rounded head, so Fast2Sum is exact and establishes normalization.
+     The generator uses this allowance in both reconstruction certificates;
+     their public `2^-62` relative bound is unchanged. The usual [DW]
+     `5u²` theorem retains its normal-or-zero cross-product premises.
+     The extraction corpus includes actual table/residual products, zero,
+     both signs, and the high-product and cross-product boundary regions.
+   - The relative errors use each term's ratio to the result. The generator
+     encloses these ratios over every table interval.
+     `TrigReconstructionRatios.v` independently proves the certificate's
+     sine and cosine term budgets from `a = 0` or `1/64 <= a <= 50/64` and
+     `|t| <= 0.0078126`, including row zero without division by its sine.
+     `TrigSplitAnalytic.v` propagates the `2^-105` split error to a `2^-104`
+     relative effect on sine and cosine for `|r| <= 0.785399`.
+     `TrigReconstructionCertificate.v` connects these allowances to the
+     existing Gappa certificates. `TrigReconstructionModel.v` composes the
+     analytic references and bounded arithmetic-error factors to the stated
+     `2^-62` bounds. The sine model requires a nonzero reference remainder;
+     the cosine model includes zero. `TrigProducts.v` derives the multiplication
+     factors. `TrigAdd.v` proves the existing `776·2^-114` addition allowance
+     together with normalization under bounded cancellation, including exact
+     zero. `TrigCancellation.v` derives the head-word cancellation bounds
+     from the analytic product sizes and their proved errors; `TrigInner.v`
+     and `TrigOuter.v` apply them to the actual additions and subtraction.
+     `TrigReconstruction.v` composes all these operations with the analytic
+     model, with no arithmetic-error-factor premises remaining.
+   - `sin` and `cos` are each within `2^−62` (*certified*: `fast_sin.g`, `fast_cos.g`).
+
+`TrigFast.v` connects the signed Q256 split, index conversion, residuals,
+reconstruction and sine sign restoration. For a valid Q256 remainder with
+`2^-64 <= |r| <= 0.785399`, its actual fast transcription returns finite,
+normalized sine and cosine double-words within `2^-62` relatively of `sin r`
+and `cos r`. The integer-index conversion reuses the proved binary64 decoder
+from `AsinSegment.v`. The extracted full-path comparison covers both signs,
+table points and halfway-index ties, nearby inputs, fine Q256 low bits and
+actual Payne–Hanek remainders across the normal input binades. Additional zero
+and smaller cases check transcription agreement only.
+
+`TrigFast.trig_fast_composed` also accounts for the actual `2^-199` relative
+Payne–Hanek reduction error. The Q256 split and reduction together fit a
+`(3/2)·2^-105` relative argument envelope; `TrigSplitAnalytic.v` proves that
+this still fits the existing `2^-104` sine/cosine analytic allowance. The
+reconstruction certificates, total `2^-62` bound and runtime `EPS` are unchanged.
+`TrigFastDomain.v` derives the kernel domain for finite nonnegative binary64
+inputs at least `2^-63`, using the proved integer-separation bound for large
+arguments and exact small reduction. `TrigFastSelection.v` then establishes
+the selected result's finite, normalized double-word and `2^-62` error against
+the original signed argument, for both functions and every quadrant.
+
+`TrigFastDecision.v` binds the actual `EPS` bits and rounding test: every accepted
+result in this domain is correctly rounded. When it rejects, the actual finish
+path uses the accurate result and retains the proved `(1/2 + 2^-145)` ULP bound,
+inside the published `(1/2 + 2^-144)` contract. The extracted comparison checks
+the selected words, decision and final result, including both acceptance and
+fallback for sine and cosine.
+
+`TrigScreenConstants.v` independently certifies the generated small-input
+thresholds and their immediately following binary64 values. `TrigSinScreen.v`
+proves the identity screen throughout its domain, including subnormals and
+both signs. `TrigCosScreen.v` proves each of the five cosine rounding cells,
+the discrete next-float gaps, and the actual comparisons, integer cast,
+multiplication and subtraction used to select and return the result.
+
+`TrigEntry.v` composes those screens with the finish path for every finite
+binary64 input and preserves the `(1/2 + 2^-145)` ULP bound. It also proves
+signed-zero behavior, NaN results for non-finite inputs, and the equality of
+`sincos(x)` with the two scalar entries. Its negative flag follows the runtime
+`x < 0` comparison. The public-entry extraction checks the five sine/cosine/sincos/tangent words
+across both signs, every binade, small-input step boundaries, exceptional
+encodings and independent fixture arguments.
+
+`TrigCorrectRounding.v` connects the correctly-rounded domains to the public
+entries. `TrigSinLM` and `TrigCosLM` retain [LM]'s midpoint-distance results as
+explicit hypotheses on the stated argument domains, using mantissa distances
+`2^-126` and `2^-142`. The small-input screen proofs and accepted fast decisions
+need no such hypothesis. The tangent entry is proved separately in §8. These scalar entry theorems
+retain their numerical qualifications under the matching lane evaluation
+described in [lanes.md](lanes.md#trigonometric-slices). Lane equivalence is
+checked by intermediate-word tests, independent fixtures and the cross-target
+digest, rather than a separate Coq model of SIMD instructions.
 
 ## 5. Accurate path
 
@@ -329,6 +457,12 @@ interval, and `generators/tan_reference.py` bisects for its first edge inside
 `[2^−27, 2^−26)` (*generated*). Arguments in the second stretch take the
 general path, which returns `x` there too.
 
+`TrigTanScreenConstants.v` certifies the exact threshold encoding and the
+strict half-ULP inequalities at it and the immediately following binary64
+value. `TrigTanScreen.v` proves correct rounding throughout the identity
+screen, including subnormals and both signs, using Taylor bounds for the
+smallest inputs and monotonicity of `tan(x) - x` through the endpoint.
+
 **Reduction.** `tan` has period `π`, so with §3's `|x| = k·π/2 + r`, `tan |x|` is
 `tan r` for even `k` and `−cot r = −cos r/sin r` for odd `k`. `tan` is odd, so
 the sign comes from `x`. `sin r` and `cos r` are §4's and §5's, each relative to
@@ -341,6 +475,31 @@ quadrant's order. The division is within `15u² + 56u³` [DW], so the quotient i
 within `2^−60` (*certified*: `formal/trig/fast_tan.g`). `checked_div` refuses
 operands outside its theorem's domain, and those arguments go to the accurate
 path; none of the 1,200 precise arguments does.
+
+`TrigFastQuotient.v` and `TrigTanFast.v` prove the selected checked quotient's
+`2^-60` error bound, including the actual quadrant and argument-sign handling.
+`TrigTanFastValue.v` composes it with binary64 reduction for magnitudes at least
+`2^-63`, below the public small-input cutoff, and proves every accepted
+`EPS_TAN` rounding decision correctly rounded. `CheckedDivision.v` supplies
+the checked operation's domain and finite-word bounds; `RoundingDecisionDomain.v`
+derives the decision's magnitude domain from the reference value's separation
+from zero. The decision itself establishes pair normalization. The extracted
+fast quotient and decision are compared with Rust across binades, quadrant and
+screen boundaries, reduction witnesses and independent fixture arguments, with
+both decision outcomes covered. The small-input screen is proved separately
+above. `TrigTanEntry.v` composes the actual finite guard, identity screen,
+checked fast quotient, rounding decision and accurate fallback. Every finite
+input returns a finite result within `(1/2 + 2^-143)` ULP; signed zeros are
+preserved and non-finite inputs return NaN. The extraction compares the public
+Rust entry bit for bit, including cutoff neighbors and the independent tangent
+fixtures.
+
+`TrigTanCorrectRounding.v` connects the public entry to correct rounding.
+`TrigTanLM` retains [LM] page 18's mantissa-distance bound `2^-122` on
+`2^-25 <= |x| <= atan(2)` as an explicit hypothesis. The screen and accepted
+fast decisions need no such hypothesis. The general fallback theorem accepts
+any established midpoint distance greater than `2^-195` (at most `1/2`);
+it does not claim a worst-case result outside the published domain.
 
 **Decision 4: `Q256::recip`, by Newton's iteration.**
 - For `|c| >= 2^-1022` with finite `RN(c)`, `y_0 = RN(1/RN(c))`

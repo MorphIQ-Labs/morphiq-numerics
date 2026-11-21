@@ -194,6 +194,17 @@ fn valid(x: DoubleWord) -> Result<(), CheckError> {
     }
 }
 
+/// The common scalar/lane division boundary. Keep the validation order so
+/// the public checked operation retains its error classification.
+fn division_inputs(x: DoubleWord, y: DoubleWord) -> Result<(), CheckError> {
+    valid(x)?;
+    valid(y)?;
+    if y.hi == 0.0 {
+        return Err(DivisionByZero);
+    }
+    quotient_range(&[x.hi, x.lo, y.hi, y.lo])
+}
+
 fn valid_f64(y: f64) -> Result<(), CheckError> {
     if y.is_finite() {
         Ok(())
@@ -213,6 +224,24 @@ fn admit(z: DoubleWord, exact_zero: bool) -> Result<DoubleWord, CheckError> {
 }
 
 impl DoubleWord {
+    #[cfg(test)]
+    pub(crate) fn crosscheck_division(words: [f64; 4]) -> Option<(u64, u64)> {
+        let [xh, xl, yh, yl] = words;
+        Self { hi: xh, lo: xl }
+            .checked_div(Self { hi: yh, lo: yl })
+            .ok()
+            .map(|z| (z.hi.to_bits(), z.lo.to_bits()))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn crosscheck_quotient_range(words: [f64; 4]) -> (bool, [i32; 4]) {
+        assert!(words.iter().all(|w| w.is_finite()));
+        (
+            quotient_range(&words).is_ok(),
+            words.map(|w| if w == 0.0 { 0 } else { exponent(w) }),
+        )
+    }
+
     /// [`sum`](Self::sum) when `|a|, |b| ≤ 2^1020`: then the result is the
     /// exact sum (`two_sum_ieee`).
     ///
@@ -370,13 +399,13 @@ impl DoubleWord {
     ///
     /// As [`checked_div_f64`](Self::checked_div_f64).
     pub fn checked_div(self, other: Self) -> Result<Self, CheckError> {
-        valid(self)?;
-        valid(other)?;
-        // A double-word number is zero exactly when its leading word is.
-        if other.hi == 0.0 {
-            return Err(DivisionByZero);
-        }
-        quotient_range(&[self.hi, self.lo, other.hi, other.lo])?;
+        division_inputs(self, other)?;
         admit(self.div(other), self.hi == 0.0)
+    }
+
+    /// Validate raw lane words before performing the vector division.
+    #[cfg(feature = "simd")]
+    pub(crate) fn division_lane_inputs(xh: f64, xl: f64, yh: f64, yl: f64) -> bool {
+        division_inputs(Self { hi: xh, lo: xl }, Self { hi: yh, lo: yl }).is_ok()
     }
 }

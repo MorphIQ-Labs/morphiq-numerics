@@ -1197,3 +1197,251 @@ Print Assumptions TrigTail.trig_tail_evaluation.
 Print Assumptions TrigTail.trig_sin_tail_certificate.
 Print Assumptions TrigTail.trig_cos_tail_certificate.
 Print Assumptions TrigTail.trig_tail_regular.
+
+Require TrigResidualCertificate TrigSinResidual TrigCosSquare TrigCosResidual.
+Print Assumptions TrigResidualCertificate.trig_sin_residual_certificate.
+Print Assumptions TrigResidualCertificate.trig_cos_residual_certificate.
+Print Assumptions TrigResidualCertificate.trig_sin_residual_model.
+Print Assumptions TrigResidualCertificate.trig_cos_residual_model.
+Print Assumptions TrigSinResidual.trig_sin_residual_regular.
+Print Assumptions TrigCosSquare.trig_half_exact.
+Print Assumptions TrigCosSquare.trig_cos_square_correct.
+Print Assumptions TrigCosResidual.trig_sub_model.
+Print Assumptions TrigCosResidual.trig_cross_model.
+Print Assumptions TrigCosResidual.trig_cos_residual_regular.
+
+Require TrigTinyTail TrigTinyCertificate TrigTinyResidual TrigZeroResidual TrigResidual.
+Print Assumptions TrigCosSquare.trig_half_exact_wide.
+Print Assumptions TrigCosSquare.trig_cos_square_on_grid.
+Print Assumptions TrigCosSquare.trig_cos_square_correct_wide.
+Print Assumptions TrigCosResidual.trig_cross_model_wide.
+Print Assumptions TrigTinyTail.trig_horner_near.
+Print Assumptions TrigTinyTail.trig_evaluated_polynomial_ranges.
+Print Assumptions TrigTinyTail.trig_positive_float_floor.
+Print Assumptions TrigTinyTail.trig_cos_two_roundings.
+Print Assumptions TrigTinyTail.trig_tail_tiny.
+Print Assumptions TrigTinyCertificate.trig_sin_tiny_certificate.
+Print Assumptions TrigTinyCertificate.trig_cos_tiny_certificate.
+Print Assumptions TrigTinyCertificate.trig_sin_tiny_model.
+Print Assumptions TrigTinyCertificate.trig_cos_tiny_model.
+Print Assumptions TrigTinyResidual.trig_sin_residual_tiny.
+Print Assumptions TrigTinyResidual.trig_cos_residual_tiny.
+Print Assumptions TrigZeroResidual.trig_sin_residual_zero.
+Print Assumptions TrigZeroResidual.trig_cos_residual_zero.
+Print Assumptions TrigResidual.trig_sin_residual_correct.
+Print Assumptions TrigResidual.trig_cos_residual_correct.
+
+Require TrigQSplit TrigInput TrigInputContract.
+Print Assumptions TrigQSplit.trig_q_grid.
+Print Assumptions TrigQSplit.trig_q_exponent.
+Print Assumptions TrigQSplit.trig_q_add_grid.
+Print Assumptions TrigQSplit.trig_q_split_correct.
+Print Assumptions TrigInput.trig_residual_split.
+Print Assumptions TrigInput.trig_times_64.
+Print Assumptions TrigInput.trig_index_value.
+Print Assumptions TrigInput.trig_scaled_index.
+Print Assumptions TrigInput.trig_sub_table.
+Print Assumptions TrigInput.trig_table_residual_correct.
+Print Assumptions TrigInputContract.trig_negative_correct.
+Print Assumptions TrigInputContract.trig_flip_correct.
+Print Assumptions TrigInputContract.trig_input_correct.
+
+Require TrigReconstructionRatios TrigSplitAnalytic TrigReconstructionCertificate TrigReconstructionModel.
+Print Assumptions TrigReconstructionRatios.trig_sin_magnitude.
+Print Assumptions TrigReconstructionRatios.trig_cos_minus_one_magnitude.
+Print Assumptions TrigReconstructionRatios.trig_reconstruction_sin_lower.
+Print Assumptions TrigReconstructionRatios.trig_sin_reconstruction_terms.
+Print Assumptions TrigReconstructionRatios.trig_cos_reconstruction_terms.
+Print Assumptions TrigSplitAnalytic.trig_split_analytic_error.
+Print Assumptions TrigSplitAnalytic.trig_split_analytic_factors.
+Print Assumptions TrigSplitAnalytic.trig_split_sine_nonzero.
+Print Assumptions TrigReconstructionCertificate.trig_sin_reconstruction_certificate.
+Print Assumptions TrigReconstructionCertificate.trig_cos_reconstruction_certificate.
+Print Assumptions TrigReconstructionModel.trig_reconstruction_ratio_bound.
+Print Assumptions TrigReconstructionModel.trig_sin_reconstruction_model_correct.
+Print Assumptions TrigReconstructionModel.trig_cos_reconstruction_model_correct.
+
+Require TrigMultiply.
+Print Assumptions TrigMultiply.trig_dw_low.
+Print Assumptions TrigMultiply.trig_mul_eta.
+Print Assumptions TrigMultiply.trig_two_prod_value.
+Print Assumptions TrigMultiply.trig_mul_zero.
+Print Assumptions TrigMultiply.trig_mul_cross.
+Print Assumptions TrigMultiply.trig_mul_nonzero.
+Print Assumptions TrigMultiply.trig_mul_correct.
+Print Assumptions TrigMultiply.trig_mul_ieee.
+
+Require TrigOperandBounds TrigProducts.
+Print Assumptions TrigOperandBounds.trig_dw_head_magnitude.
+Print Assumptions TrigOperandBounds.trig_small_sin_magnitude.
+Print Assumptions TrigOperandBounds.trig_small_cos_magnitude.
+Print Assumptions TrigOperandBounds.trig_operand_from_reference.
+Print Assumptions TrigOperandBounds.trig_table_operands_ready.
+Print Assumptions TrigOperandBounds.trig_residual_reference_floors.
+Print Assumptions TrigOperandBounds.trig_residual_operands_ready.
+Print Assumptions TrigProducts.trig_ready_product_correct.
+Print Assumptions TrigProducts.trig_reconstruction_products_correct.
+
+Require TrigAdd TrigCancellation TrigInner TrigOuter TrigReconstruction TrigFast.
+Print Assumptions TrigAdd.trig_add_zero_words.
+Print Assumptions TrigAdd.trig_add_zero.
+Print Assumptions TrigAdd.trig_add_ieee.
+Print Assumptions TrigAdd.trig_sub_ieee.
+Print Assumptions TrigCancellation.trig_head_reference.
+Print Assumptions TrigCancellation.trig_dw_word_upper.
+Print Assumptions TrigCancellation.trig_product_reference.
+Print Assumptions TrigCancellation.trig_head_dominance.
+Print Assumptions TrigCancellation.trig_dominant_cancellation.
+Print Assumptions TrigCancellation.trig_zero_cancellation.
+Print Assumptions TrigCancellation.trig_small_sin_lower.
+Print Assumptions TrigCancellation.trig_residual_square_upper.
+Print Assumptions TrigCancellation.trig_sine_product_dominance.
+Print Assumptions TrigCancellation.trig_cosine_product_dominance.
+Print Assumptions TrigCancellation.trig_reference_from_error.
+Print Assumptions TrigCancellation.trig_reference_magnitudes.
+Print Assumptions TrigInner.trig_inner_word_bounds.
+Print Assumptions TrigInner.trig_sine_inner_correct.
+Print Assumptions TrigInner.trig_cosine_inner_correct.
+Print Assumptions TrigOuter.trig_sine_head_floor.
+Print Assumptions TrigOuter.trig_cosine_head_floor.
+Print Assumptions TrigOuter.trig_outer_cancellation.
+Print Assumptions TrigOuter.trig_outer_add_correct.
+Print Assumptions TrigReconstruction.trig_reconstruct_correct.
+Print Assumptions TrigFast.trig_sign_abs.
+Print Assumptions TrigFast.trig_flip_normalized.
+Print Assumptions TrigFast.trig_flip_sine_error.
+Print Assumptions TrigFast.trig_fast_correct.
+
+Require TrigFastDomain TrigFastSelection TrigFastDecision.
+Print Assumptions TrigFast.trig_split_reduction.
+Print Assumptions TrigFast.trig_sign_distance.
+Print Assumptions TrigFast.trig_fast_composed.
+Print Assumptions TrigFastDomain.trig_exact_remainder_floor.
+Print Assumptions TrigFastDomain.trig_exact_remainder_upper.
+Print Assumptions TrigFastDomain.trig_reduce_fast_domain.
+Print Assumptions TrigFastSelection.trig_fast_flip_correct.
+Print Assumptions TrigFastSelection.trig_fast_selected_correct.
+Print Assumptions TrigFastSelection.trig_fast_selected_floor.
+Print Assumptions TrigFastSelection.trig_fast64_correct.
+Print Assumptions TrigFastDecision.trig_eps_finite.
+Print Assumptions TrigFastDecision.trig_eps_value.
+Print Assumptions TrigFastDecision.trig_decision_correct.
+Print Assumptions TrigFastDecision.trig_fast_decision_correct.
+Print Assumptions TrigFastDecision.trig_finish_ulp.
+
+Require TrigScreenConstants TrigSinScreen TrigCosScreen TrigEntry TrigCorrectRounding.
+Print Assumptions TrigScreenConstants.trig_sin_is_x_finite.
+Print Assumptions TrigScreenConstants.trig_sin_is_x_value.
+Print Assumptions TrigScreenConstants.trig_sin_is_x_next_value.
+Print Assumptions TrigScreenConstants.trig_sin_is_x_bounds.
+Print Assumptions TrigScreenConstants.trig_sin_is_x_error.
+Print Assumptions TrigScreenConstants.trig_sin_is_x_next_error.
+Print Assumptions TrigScreenConstants.trig_cos_step_finite.
+Print Assumptions TrigScreenConstants.trig_cos_step_value.
+Print Assumptions TrigScreenConstants.trig_cos_step_next_value.
+Print Assumptions TrigScreenConstants.trig_cos_step_bounds.
+Print Assumptions TrigScreenConstants.trig_cos_step_lower.
+Print Assumptions TrigScreenConstants.trig_cos_step_next_upper.
+Print Assumptions TrigScreenConstants.trig_cos_small_lower.
+Print Assumptions TrigSinScreen.trig_sin_loss_monotone.
+Print Assumptions TrigSinScreen.trig_sin_tiny_round.
+Print Assumptions TrigSinScreen.trig_sin_upper_round.
+Print Assumptions TrigSinScreen.trig_sin_screen_round.
+Print Assumptions TrigCosScreen.trig_cos_decreasing.
+Print Assumptions TrigCosScreen.trig_cos_above_step.
+Print Assumptions TrigCosScreen.trig_cos_result_value.
+Print Assumptions TrigCosScreen.trig_cos_result_finite.
+Print Assumptions TrigCosScreen.trig_cos_result_range.
+Print Assumptions TrigCosScreen.trig_cos_result_gaps.
+Print Assumptions TrigCosScreen.trig_cos_result_round.
+Print Assumptions TrigCosScreen.trig_cos_cell_round.
+Print Assumptions TrigCosScreen.trig_cos_pass_correct.
+Print Assumptions TrigCosScreen.trig_cos_count_cell.
+Print Assumptions TrigCosScreen.trig_cos_eval_result.
+Print Assumptions TrigCosScreen.trig_cos_small_correct.
+Print Assumptions TrigCosScreen.trig_cos_abs_small_correct.
+Print Assumptions TrigEntry.trig_cos_small_limit_finite.
+Print Assumptions TrigEntry.trig_cos_small_limit_value.
+Print Assumptions TrigEntry.trig_abs_finite.
+Print Assumptions TrigEntry.trig_public_argument.
+Print Assumptions TrigEntry.trig_sin_identity_correct.
+Print Assumptions TrigEntry.trig_cos_screen_correct.
+Print Assumptions TrigEntry.trig_public_round_error.
+Print Assumptions TrigEntry.trig_public_finish_ulp.
+Print Assumptions TrigEntry.trig_sin_entry_ulp.
+Print Assumptions TrigEntry.trig_cos_entry_ulp.
+Print Assumptions TrigEntry.trig_sincos_entry_pair.
+Print Assumptions TrigEntry.trig_entry_nonfinite.
+Print Assumptions TrigEntry.trig_entry_zeros.
+Print Assumptions TrigCorrectRounding.trig_public_reference_floor.
+Print Assumptions TrigCorrectRounding.trig_public_finish_correct.
+Print Assumptions TrigCorrectRounding.trig_sin_entry_correct.
+Print Assumptions TrigCorrectRounding.trig_cos_entry_correct.
+Print Assumptions TrigCorrectRounding.trig_public_finish_decided.
+
+From Binary64 Require CheckedQuotientRange.
+Print Assumptions CheckedQuotientRange.checked_word_exponent_mag.
+Print Assumptions CheckedQuotientRange.checked_word_exponent_bounds.
+Print Assumptions CheckedQuotientRange.quotient_extents_nonnegative.
+Print Assumptions CheckedQuotientRange.quotient_extents_contains.
+Print Assumptions CheckedQuotientRange.checked_quotient_range_sound.
+
+From Binary64 Require CheckedDivision IEEE64Div.
+Print Assumptions IEEE64Div.div64_bounded.
+Print Assumptions CheckedDivision.checked_float_eq_spec.
+Print Assumptions CheckedDivision.checked_valid_finite.
+Print Assumptions CheckedDivision.checked_valid_normalized.
+Print Assumptions CheckedDivision.checked_admit_value.
+Print Assumptions CheckedDivision.division_word_bound.
+Print Assumptions CheckedDivision.checked_divide_sound.
+Print Assumptions CheckedDivision.checked_admit_zero.
+Print Assumptions CheckedDivision.checked_divide_zero.
+
+From Binary64 Require RoundingTest.
+Print Assumptions RoundingTest.decide_with_word_bounded_ok.
+
+From Binary64 Require RoundingDecisionDomain.
+Require TrigFastQuotient TrigTanFast TrigTanFastValue.
+Print Assumptions RoundingDecisionDomain.decision_abs_finite.
+Print Assumptions RoundingDecisionDomain.decision_small_ulp.
+Print Assumptions RoundingDecisionDomain.decision_half_small.
+Print Assumptions RoundingDecisionDomain.decision_tiny_leading_word.
+Print Assumptions RoundingDecisionDomain.decision_reference_domain.
+Print Assumptions RoundingDecisionDomain.decision_quotient_ok.
+Print Assumptions TrigFastQuotient.trig_fast_division_budget.
+Print Assumptions TrigFastQuotient.trig_fast_quotient_budget.
+Print Assumptions TrigFastQuotient.trig_checked_quotient_error.
+Print Assumptions TrigTanFast.trig_signed_division_correct.
+Print Assumptions TrigTanFast.trig_tan_fast_selected_correct.
+Print Assumptions TrigTanFast.trig_tan_fast_composed.
+Print Assumptions TrigTanFastValue.trig_tan_eps_finite.
+Print Assumptions TrigTanFastValue.trig_tan_eps_value.
+Print Assumptions TrigTanFastValue.trig_tan_reference_floor.
+Print Assumptions TrigTanFastValue.trig_tan_fast64_correct.
+Print Assumptions TrigTanFastValue.trig_tan_fast_decision_correct.
+
+Require TrigTanScreenConstants TrigTanScreen.
+Print Assumptions TrigTanScreenConstants.trig_tan_is_x_finite.
+Print Assumptions TrigTanScreenConstants.trig_tan_is_x_value.
+Print Assumptions TrigTanScreenConstants.trig_tan_is_x_next_value.
+Print Assumptions TrigTanScreenConstants.trig_tan_is_x_bounds.
+Print Assumptions TrigTanScreenConstants.trig_tan_is_x_error.
+Print Assumptions TrigTanScreenConstants.trig_tan_is_x_next_error.
+Print Assumptions TrigTanScreen.trig_tan_loss_monotone.
+Print Assumptions TrigTanScreen.trig_tan_tiny_round.
+Print Assumptions TrigTanScreen.trig_tan_upper_round.
+Print Assumptions TrigTanScreen.trig_tan_screen_round.
+
+Require TrigTanEntry TrigTanCorrectRounding.
+Print Assumptions TrigTanEntry.trig_tan_identity_correct.
+Print Assumptions TrigTanEntry.trig_tan_decision_correct.
+Print Assumptions TrigTanEntry.trig_tan_round_error.
+Print Assumptions TrigTanEntry.trig_tan_finish_ulp.
+Print Assumptions TrigTanEntry.trig_tan_public_finish_ulp.
+Print Assumptions TrigTanEntry.trig_tan_entry_ulp.
+Print Assumptions TrigTanEntry.trig_tan_entry_nonfinite.
+Print Assumptions TrigTanEntry.trig_tan_entry_zeros.
+Print Assumptions TrigTanEntry.trig_tan_entry_decided.
+Print Assumptions TrigTanCorrectRounding.trig_tan_public_reference_floor.
+Print Assumptions TrigTanCorrectRounding.trig_tan_public_finish_correct.
+Print Assumptions TrigTanCorrectRounding.trig_tan_entry_correct.

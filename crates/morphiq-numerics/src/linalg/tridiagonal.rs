@@ -65,6 +65,17 @@ pub struct DominantTridiagonal<'a> {
     margin: f64,
 }
 
+#[cfg(test)]
+std::thread_local! {
+    static COMPLEMENTARITY_UNDERFLOW_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+fn complementarity_underflow(matrix_scale: f64, solution_scale: f64) -> f64 {
+    #[cfg(test)]
+    COMPLEMENTARITY_UNDERFLOW_CALLS.with(|calls| calls.set(calls.get() + 1));
+    8.0 * f64::from_bits(1) * matrix_scale * solution_scale
+}
+
 // Bitwise accumulation permits vectorization without moving admission after
 // output writes. A nonfinite input still leaves all caller storage unchanged.
 fn all_finite(values: &[f64]) -> bool {
@@ -601,7 +612,6 @@ impl Factors<'_, '_> {
     fn check_complementarity(&self, rhs: &[f64], obstacle: &[f64], x: &[f64]) -> Result<(), Error> {
         let a = self.matrix;
         let n = a.len();
-        let eta = f64::from_bits(1);
         for i in 0..n {
             let (lower, previous, previous_upper) = match i {
                 0 => (0.0, 0.0, 0.0),
@@ -616,17 +626,26 @@ impl Factors<'_, '_> {
             let residual = lower * previous + a.diagonal[i] * x[i] + upper * next - rhs[i];
             let factored = lower.abs() * (previous.abs() + previous_upper.abs() * x[i].abs())
                 + pivot.abs() * (x[i].abs() + normalized.abs() * next.abs());
-            let underflow = 8.0
-                * eta
-                * (1.0 + lower.abs() + pivot.abs())
-                * (1.0 + previous.abs() + x[i].abs() + next.abs());
-            let bound = 5.0 * f64::EPSILON * (factored + rhs[i].abs()) + underflow;
-            if !residual.is_finite() || !bound.is_finite() {
+            let roundoff = 5.0 * f64::EPSILON * (factored + rhs[i].abs());
+            let matrix_scale = 1.0 + lower.abs() + pivot.abs();
+            let solution_scale = 1.0 + previous.abs() + x[i].abs() + next.abs();
+            if !residual.is_finite()
+                || !roundoff.is_finite()
+                || !matrix_scale.is_finite()
+                || !solution_scale.is_finite()
+            {
                 return Err(Error::Range);
             }
             let contact = x[i] == obstacle[i];
-            if residual < -bound || (!contact && residual > bound) {
-                return Err(Error::NotComplementary(i));
+            // The nonnegative allowance can only admit more residuals. With
+            // finite scales, it is at most 2^977; adding it to this finite
+            // roundoff term cannot overflow (docs/tridiagonal.md). Only rows
+            // that need the allowance pay for its subnormal arithmetic.
+            if residual < -roundoff || (!contact && residual > roundoff) {
+                let bound = roundoff + complementarity_underflow(matrix_scale, solution_scale);
+                if residual < -bound || (!contact && residual > bound) {
+                    return Err(Error::NotComplementary(i));
+                }
             }
         }
         Ok(())

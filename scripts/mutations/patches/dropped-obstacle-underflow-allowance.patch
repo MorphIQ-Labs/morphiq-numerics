@@ -1,0 +1,7 @@
+--- a/crates/morphiq-numerics/src/linalg/tridiagonal.rs
++++ b/crates/morphiq-numerics/src/linalg/tridiagonal.rs
+@@ -75,3 +75,3 @@
+     COMPLEMENTARITY_UNDERFLOW_CALLS.with(|calls| calls.set(calls.get() + 1));
+-    8.0 * f64::from_bits(1) * matrix_scale * solution_scale
++    0.0 * matrix_scale * solution_scale
+ }

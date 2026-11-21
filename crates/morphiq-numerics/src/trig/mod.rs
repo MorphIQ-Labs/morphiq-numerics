@@ -7,6 +7,9 @@
 mod reduction;
 mod tables;
 
+#[cfg(feature = "simd")]
+pub(crate) mod lanes;
+
 use crate::double_word::DoubleWord;
 use crate::eft::two_prod;
 use crate::ln::decide_with;
@@ -343,8 +346,56 @@ pub(crate) fn tan_accurate_crosscheck(x: f64) -> (Q256, Q256, bool, Q256) {
     (num, den, negate, tan_accurate(&reduced))
 }
 
-/// Stored table words and their DoubleWord::sum construction, for the
-/// generated Coq table's extracted comparison.
+/// Actual checked tangent quotient and its rounding decision.
+#[cfg(test)]
+pub(crate) fn tan_fast_crosscheck(x: f64) -> (Option<DoubleWord>, Option<f64>) {
+    let value = tan_fast(&Reduced::of(x));
+    (value, value.and_then(|y| decide_with(y, EPS_TAN)))
+}
+
+/// Actual selected fast words, rounding decision and finish result.
+#[cfg(test)]
+pub(crate) fn finish_crosscheck(x: f64, cosine: bool) -> (DoubleWord, Option<f64>, f64) {
+    let reduced = Reduced::of(x);
+    let function = if cosine { Function::Cos } else { Function::Sin };
+    let (use_cos, negate) = reduced.select(function);
+    let (s, c) = fast(&reduced.r);
+    let y = if use_cos { c } else { s };
+    let y = if negate { y.neg() } else { y };
+    (y, decide_with(y, EPS), reduced.finish(function))
+}
+
+/// The complete scalar fast path, including the signed Q256 input and output.
+#[cfg(test)]
+pub(crate) fn fast_crosscheck(r: Q256) -> [u64; 4] {
+    let (s, c) = fast(&r);
+    [s.hi(), s.lo(), c.hi(), c.lo()].map(f64::to_bits)
+}
+
+/// The Q256 split and table reduction in `fast`, retaining intermediate words.
+#[cfg(test)]
+pub(crate) fn input_crosscheck(r: Q256) -> [u64; 9] {
+    let h = r.to_f64();
+    let l = r.add(Q256::from_f64(-h)).to_f64();
+    let negative = h < 0.0;
+    let (ah, al) = if negative { (-h, -l) } else { (h, l) };
+    let i = (ah * 64.0 + SHIFTER) - SHIFTER;
+    let x = ah - i * 0.015_625;
+    let t = DoubleWord::sum(x, al);
+    [
+        h.to_bits(),
+        l.to_bits(),
+        u64::from(negative),
+        ah.to_bits(),
+        al.to_bits(),
+        i.to_bits(),
+        x.to_bits(),
+        t.hi().to_bits(),
+        t.lo().to_bits(),
+    ]
+}
+
+/// Stored table words and their DoubleWord::sum construction.
 #[cfg(test)]
 pub(crate) fn table_crosscheck(i: usize) -> [u64; 8] {
     let [(sh, sl), (ch, cl)] = TABLE[i];
@@ -372,6 +423,31 @@ pub(crate) fn tail_crosscheck(t: f64) -> [u64; 5] {
     let ps = s0 + u * (s1 + u * s2);
     let pc = c0 + u * (c1 + u * c2);
     [u, ps, pc, (t * u) * ps, (u * u) * pc].map(f64::to_bits)
+}
+
+/// The residual assembly in `fast`, retaining the product and square words.
+#[cfg(test)]
+pub(crate) fn residual_crosscheck(t: DoubleWord) -> [u64; 8] {
+    let (th, tl) = (t.hi(), t.lo());
+    let (uh, ul) = two_prod(th, th);
+    let [s0, s1, s2] = POLY_S;
+    let [c0, c1, c2] = POLY_C;
+    let ps = s0 + uh * (s1 + uh * s2);
+    let pc = c0 + uh * (c1 + uh * c2);
+    let square = DoubleWord::sum(-0.5 * uh, -0.5 * ul);
+    let sn = t.add_f64((th * uh) * ps);
+    let cm = square.add_f64((uh * uh) * pc - th * tl);
+    [
+        uh,
+        ul,
+        square.hi(),
+        square.lo(),
+        sn.hi(),
+        sn.lo(),
+        cm.hi(),
+        cm.lo(),
+    ]
+    .map(f64::to_bits)
 }
 
 #[cfg(test)]

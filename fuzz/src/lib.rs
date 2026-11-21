@@ -322,6 +322,11 @@ fn check_cases<const N: usize>(op: Operation, data: &[u8]) {
         Operation::Expm1 => e::expm1_slice(xs, out),
         Operation::Ln => e::ln_slice(xs, out),
         Operation::Ln1p => e::ln_1p_slice(xs, out),
+        Operation::Log2 => e::log2_slice(xs, out),
+        Operation::Log10 => e::log10_slice(xs, out),
+        Operation::Sin => e::sin_slice(xs, out),
+        Operation::Cos => e::cos_slice(xs, out),
+        Operation::Tan => e::tan_slice(xs, out),
         Operation::Asin => e::asin_slice(xs, out),
         Operation::Asinh => e::asinh_slice(xs, out),
         Operation::Atan2 => e::atan2_slice(xs, ys, out),
@@ -329,6 +334,30 @@ fn check_cases<const N: usize>(op: Operation, data: &[u8]) {
     }
     for (i, (&a, &b)) in out.iter().zip(expected.iter()).enumerate() {
         assert_eq!(a.to_bits(), b.to_bits(), "{op:?} slice lane {i}");
+    }
+    if matches!(op, Operation::Sin | Operation::Cos) {
+        let (mut sine, mut cosine) = ([0.0; N], [0.0; N]);
+        e::sincos_slice(xs, &mut sine[..count], &mut cosine[..count]);
+        for (i, &x) in xs.iter().enumerate() {
+            // The selected component already has an MPFR-checked expected
+            // value; independently check the other component's own contract.
+            let (selected, other, other_op) = if matches!(op, Operation::Sin) {
+                (sine[i], cosine[i], Operation::Cos)
+            } else {
+                (cosine[i], sine[i], Operation::Sin)
+            };
+            assert_eq!(
+                selected.to_bits(),
+                expected[i].to_bits(),
+                "sincos slice lane {i}"
+            );
+            check_result(other_op, x, 0.0, other);
+            assert_eq!(
+                other.to_bits(),
+                other_op.evaluate(x, 0.0).to_bits(),
+                "sincos other lane {i}"
+            );
+        }
     }
 }
 

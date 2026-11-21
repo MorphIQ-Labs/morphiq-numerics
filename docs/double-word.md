@@ -338,6 +338,22 @@ with Flocq 3.4.3 and math-comp ssreflect 1.14.0, in an image pinned by digest
   unbounded-model algorithms on the domain above. It uses the granularity
   lemmas of `formal/binary64/Grid.v` for the remainder's quotient. So
   `div_f64_bound` (`3u²`) and `div_bound` (`15u² + 56u³`) hold in binary64.
+- **The checked division exponent scan.**
+  `formal/binary64/CheckedQuotientRange.v` proves that each nonzero finite
+  word's computed exponent brackets its magnitude, and that an accepted
+  scan supplies nonnegative `L, H`, `2L + 2H <= 917`, and the division
+  theorem's range for every word. Signed zeros are excluded from the scan.
+  The extracted scan and exponents are compared with the Rust helpers over
+  every normal binade, all subnormal leading-bit positions, both sides of
+  the range threshold, slot permutations, and reproducible random inputs.
+- **The checked double-word division wrapper.**
+  `formal/binary64/CheckedDivision.v` transcribes its operand-validity,
+  divisor, exponent-range and zero-result screens. Acceptance establishes
+  the hypotheses of `div_ieee`, finite result words, the relative error bound,
+  and word magnitudes at most `2^926`. An accepted zero numerator returns two
+  zero words. The extracted wrapper checks result bits and rejection against
+  the actual Rust call, including nonfinite and invalid operands. Error kinds
+  are erased to rejection in this transcription.
 - **No overflow, in IEEE 754 arithmetic.** `formal/binary64/IEEE64*.v` define
   every algorithm with Flocq's IEEE 754 binary64 operations (`b64_plus`,
   `b64_minus`, `b64_mult`, `b64_div` at round-to-nearest-even), operation for
