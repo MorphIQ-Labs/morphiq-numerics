@@ -1130,3 +1130,15 @@ Print Assumptions TrigReduction.trig_decode.
 Print Assumptions TrigReduction.trig_reduce_large_correct.
 Print Assumptions TrigReduction.trig_quarter_bounds.
 Print Assumptions TrigReduction.trig_reduce_correct.
+
+Require AsinSinCos TrigAccurate.
+Print Assumptions AsinSinCos.q_sin_cos_error_strong.
+Print Assumptions TrigAccurate.trig_square_neg.
+Print Assumptions TrigAccurate.trig_mul_neg_value.
+Print Assumptions TrigAccurate.trig_series_neg.
+Print Assumptions TrigAccurate.trig_series_error.
+Print Assumptions TrigAccurate.trig_small_bounds.
+Print Assumptions TrigAccurate.trig_sin_lipschitz.
+Print Assumptions TrigAccurate.trig_cos_lipschitz.
+Print Assumptions TrigAccurate.trig_series_composed.
+Print Assumptions TrigAccurate.trig_reduced_series_correct.

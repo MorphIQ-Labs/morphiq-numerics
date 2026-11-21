@@ -66,6 +66,10 @@ let show_opt = function None -> "none" | Some z -> show_bits z
 
 let compute op args =
   match op with
+  | "trig_series" ->
+      let ((n, e, l), _) = value args in
+      let (((sn, se), sl), ((cn, ce), cl)) = x_trig_series n e l in
+      show (sn, se, sl) ^ " " ^ show (cn, ce, cl)
   | "trig_reduce" ->
       let (quadrant, ((n, e), l)) = x_trig_reduce (z_of_u64 (hex (List.hd args))) in
       string_of_int (int_of_z quadrant) ^ " " ^ show (n, e, l)

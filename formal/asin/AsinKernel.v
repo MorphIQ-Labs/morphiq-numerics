@@ -6,8 +6,9 @@
 
     These are definitions only: formal/extraction/InternalCrosscheck.v extracts
     them and scripts/check_formal.sh runs them against the Rust code's results
-    on the internal cross-check corpus, bit for bit. Proofs that they meet
-    docs/asin.md's bounds are not written. *)
+    on the internal cross-check corpus, bit for bit. The companion Asin
+    proof modules establish the intermediate bounds and public-entry contract;
+    AsinSinCos also supplies the shared trig series bound. *)
 
 From Coq Require Import ZArith List.
 From Flocq Require Import IEEE754.Binary IEEE754.Bits.
