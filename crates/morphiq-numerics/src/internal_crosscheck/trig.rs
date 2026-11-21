@@ -61,6 +61,7 @@ pub(super) fn write(out: &mut String) {
         emit(out, bits);
         emit_series(out, bits);
     }
+    write_selected(out);
     let mut rng = SplitMix64::new(0x7472_6967_7265_6475);
     for i in 0..4096 {
         let bits = rng.next_u64() & 0x7fff_ffff_ffff_ffff;
@@ -71,4 +72,58 @@ pub(super) fn write(out: &mut String) {
             }
         }
     }
+}
+
+// Selection and final conversion are checked on every quadrant/sign/function,
+// plus threshold neighbors, subnormals, extremes and seeded ordinary inputs.
+fn write_selected(out: &mut String) {
+    let mut inputs = std::vec![0, 1, (1_u64 << 52) - 1, 1_u64 << 52];
+    for center in [
+        0x3fe9_21fb_5444_2d18, // pi/4
+        0x3ff9_21fb_5444_2d18, // pi/2
+        0x4009_21fb_5444_2d18, // pi
+        0x4012_d97c_7f33_21d2, // 3*pi/2
+        0x4019_21fb_5444_2d18, // 2*pi
+        0x7506_ac5b_262c_a1ff, // near an integer multiple of pi/2
+        0x7fef_ffff_ffff_fffe,
+    ] {
+        inputs.extend([center - 1, center, center + 1]);
+    }
+    let mut rng = SplitMix64::new(0x7472_6967_7365_6c65);
+    for _ in 0..64 {
+        let bits = rng.next_u64() & 0x7fff_ffff_ffff_ffff;
+        if bits < 0x7ff0_0000_0000_0000 {
+            inputs.push(bits);
+        }
+    }
+    let mut covered = [[[false; 2]; 2]; 4];
+    for bits in inputs {
+        for signed in [bits, bits | (1_u64 << 63)] {
+            let x = f64::from_bits(signed);
+            let negative = x < 0.0;
+            for cosine in [false, true] {
+                let (k, use_cos, negate, y) = crate::trig::accurate_crosscheck(x, cosine);
+                covered[k as usize][usize::from(negative)][usize::from(cosine)] = true;
+                writeln!(
+                    out,
+                    "trig_select {k} {} {} : {} {}",
+                    u8::from(negative),
+                    u8::from(cosine),
+                    u8::from(use_cos),
+                    u8::from(negate)
+                )
+                .unwrap();
+                writeln!(
+                    out,
+                    "trig_accurate {bits:016x} {} {} : {} {:016x}",
+                    u8::from(negative),
+                    u8::from(cosine),
+                    q256(y),
+                    y.to_f64().to_bits()
+                )
+                .unwrap();
+            }
+        }
+    }
+    assert!(covered.into_iter().flatten().flatten().all(|hit| hit));
 }

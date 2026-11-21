@@ -320,6 +320,19 @@ pub(crate) fn reduce(x: f64) -> (u32, Q256) {
     (k, f.mul(Q256::new(false, HALF_PI, HALF_PI_EXPONENT)))
 }
 
+/// Force the existing accurate operations and expose the actual quadrant
+/// selector to the extracted-model comparison, independently of the fast test.
+#[cfg(test)]
+pub(crate) fn accurate_crosscheck(x: f64, cosine: bool) -> (u32, bool, bool, Q256) {
+    let reduced = Reduced::of(x);
+    let function = if cosine { Function::Cos } else { Function::Sin };
+    let (use_cos, negate) = reduced.select(function);
+    let (s, c) = accurate(reduced.r);
+    let y = if use_cos { c } else { s };
+    let y = if negate { y.neg() } else { y };
+    (reduced.k, use_cos, negate, y)
+}
+
 #[cfg(test)]
 mod tests;
 
