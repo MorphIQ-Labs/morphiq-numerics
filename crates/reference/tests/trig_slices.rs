@@ -59,6 +59,8 @@ fn paired_slices_match_both_independent_oracles() {
 }
 
 #[test]
+// Inspecting output after a panic requires unwinding; aborting targets trap.
+#[cfg(panic = "unwind")]
 fn trig_slices_reject_shapes_before_writing() {
     use std::panic::{AssertUnwindSafe, catch_unwind};
     for slice in [sin_slice, cos_slice, tan_slice] {
