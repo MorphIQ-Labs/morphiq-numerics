@@ -10,6 +10,21 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.30](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.29...v0.0.30) - 2026-11-21
+
+### Added
+
+- *(elementary)* add matching radix logarithm SIMD slices ([#308](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/308))
+
+### Other
+
+- *(formal)* prove the full Q256 reciprocal contract ([#315](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/315))
+- *(formal)* prove trig quadrant selection and accurate rounding ([#314](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/314))
+- *(formal)* prove signed accurate trig series bounds ([#313](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/313))
+- *(formal)* prove trig reduction window and truncation ([#311](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/311))
+- *(formal)* prove scalar radix logarithm fast paths and entries ([#307](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/307))
+- *(formal)* prove accurate radix logarithm rounding ([#306](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/306))
+
 ## [0.0.29](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.28...v0.0.29) - 2026-11-18
 
 ### Performance
