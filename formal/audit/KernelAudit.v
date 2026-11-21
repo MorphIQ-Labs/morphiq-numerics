@@ -1094,3 +1094,14 @@ Print Assumptions TrigClosest.trig_integer_separation.
 Print Assumptions TrigClosest.trig_binary64_separation.
 Print Assumptions TrigClosest.trig_binary64_half_separation.
 Print Assumptions TrigClosest.trig_truncation_relative.
+
+Require TrigWindow TrigWindowError.
+Print Assumptions TrigWindow.trig_window_checked.
+Print Assumptions TrigWindow.trig_window_exact.
+Print Assumptions TrigWindow.trig_product_step_fits.
+Print Assumptions TrigWindow.trig_product_exact.
+Print Assumptions TrigWindowError.trig_prefix_bits.
+Print Assumptions TrigWindowError.trig_prefix_error.
+Print Assumptions TrigWindowError.trig_prefix_relative.
+Print Assumptions TrigWindowError.trig_window_congruence.
+Print Assumptions TrigWindowError.trig_prefix_nearest.

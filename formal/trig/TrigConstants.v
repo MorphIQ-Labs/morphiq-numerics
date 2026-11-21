@@ -6,6 +6,9 @@ From Interval Require Import Tactic.
 Import ListNotations.
 Open Scope R_scope.
 
+Definition trig_fraction_bits : Z := 315%Z.
+Definition trig_half_pi_exponent : Z := -255%Z.
+
 (** Rust's TWO_OVER_PI limbs, most significant first. *)
 Definition trig_two_over_pi_words : list Z := [
   11743562013128004905;
