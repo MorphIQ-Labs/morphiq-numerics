@@ -497,8 +497,14 @@ before attributing a shift to a numerical change. Counter profiles and deliberat
 reduced-work experiments diagnose a mechanism; they cannot replace unchanged-work,
 uninstrumented qualification samples or alter the declared acceptance criterion.
 
-The x86 CDF adapter declares `balanced_stack` for independent scalar and packet
-throughput. Each paired round visits all 256 ABI-aligned stack positions modulo
+The full x86 matrix and the focused CDF adapter declare `balanced_stack` for
+CDF independent scalar and packet throughput, including strong-path controls.
+The full matrix keeps all 500 cells and 430 required comparisons; non-CDF cells,
+dependent latency and cache traversal retain their existing execution policy.
+This policy applies to newly prepared campaigns. Existing frozen runs retain
+their original policy and results; they are not amended or relabelled.
+
+Each paired round visits all 256 ABI-aligned stack positions modulo
 4 KiB, giving each position equal work for each product. The native trampoline
 sets the stack outside the clocks, and every observed position is checked. At
 successive positions the starting product alternates; it also alternates across

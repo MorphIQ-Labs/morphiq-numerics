@@ -19,6 +19,29 @@ HERE = Path(__file__).resolve().parent
 D = C.POINTER(C.c_double)
 
 
+class FullMatrixPolicy(unittest.TestCase):
+    def test_cdf_throughput_balances_stack_without_changing_other_measurements(self):
+        # Generate the actual campaign manifest; no libraries or timings needed.
+        with tempfile.TemporaryDirectory(prefix='full-matrix-test-') as directory:
+            root = Path(directory)
+            shutil.copy2(HERE/'x86/prepare-qualification.py', root/'prepare-qualification.py')
+            shutil.copy2(HERE/'inputs.py', root/'inputs.py')
+            (root/'qualification-builds.json').write_text('[]')
+            subprocess.run([sys.executable, str(root/'prepare-qualification.py')],
+                           check=True, capture_output=True, text=True)
+            cells = json.loads((root/'qualification-manifest.json').read_text())['cells']
+            self.assertEqual(len(cells), 500)
+            self.assertEqual(sum(c['required_parity'] for c in cells), 430)
+            self.assertEqual(len({c['id'] for c in cells}), len(cells))
+            for cell in cells:
+                with self.subTest(cell=cell['id']):
+                    if (cell['primitive'] == 'cdf' and cell['kind'] in ['scalar', 'vector']
+                            and cell.get('cache_slots', 1) == 1):
+                        self.assertTrue(cell.get('balanced_stack', False))
+                    else:
+                        self.assertFalse(cell.get('balanced_stack', False))
+
+
 class HostMetadata(unittest.TestCase):
     def setUp(self):
         self.scratch = tempfile.TemporaryDirectory(prefix='cdf-host-test-')
