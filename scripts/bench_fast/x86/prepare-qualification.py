@@ -82,6 +82,11 @@ for f in ordinary:
   add(f,'auto',52,'ordinary')
   cells[-1]['id']+=f'-cache-{slots}'
   cells[-1]['cache_slots']=slots
+# Match the focused CDF adapter's declared stack distribution. Apply this after
+# cache cells are marked: dependent chains and cache traversal stay uninterrupted.
+for cell in cells:
+ if cell['primitive']=='cdf' and cell['kind'] in ['scalar','vector'] and cell.get('cache_slots',1)==1:
+  cell['balanced_stack']=True
 manifest=dict(status='Frozen inputs and declared cells; no qualification result yet',cells=cells,builds=json.loads((P/'qualification-builds.json').read_text()),protocol=dict(processes=10,blocks=2,paired_rounds_per_process=2,target_ms=600,minimum_ms=250,upper95_t9=1.8331129326536335,maximum_upper_ratio=1.0,absolute_spread_gate='retired'))
 (P/'qualification-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print(len(cells),'cells;',sum(c['required_parity'] for c in cells),'required parity cells;',len(entries),'input banks')

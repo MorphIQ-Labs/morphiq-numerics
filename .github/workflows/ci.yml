@@ -67,7 +67,10 @@ jobs:
       - name: Release lockfile synchronization
         run: python3 -m unittest scripts.test_release_fuzz_lock
       - name: Benchmark campaign lifecycle and cost model
-        run: python3 -m unittest scripts.bench_campaign.test_campaign scripts.bench_fast.normal_pair.test_screen scripts.bench_fast.test_native_harness
+        run: |
+          python3 -m venv target/benchmark-test-venv
+          target/benchmark-test-venv/bin/python -m pip install -r scripts/bench_fast/requirements.txt
+          target/benchmark-test-venv/bin/python -m unittest scripts.bench_campaign.test_campaign scripts.bench_fast.normal_pair.test_screen scripts.bench_fast.test_native_harness
       - name: Classify the complete change and check whitespace
         id: prose
         env:
