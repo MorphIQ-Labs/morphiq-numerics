@@ -1,5 +1,6 @@
 """Harness behavior checks; tiny counts and synthetic samples are not timings."""
 import ctypes as C
+import copy
 import errno
 import hashlib
 import importlib.util
@@ -17,6 +18,38 @@ from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 D = C.POINTER(C.c_double)
+
+
+class ArmObservationContracts(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location('arm_diagnostics', HERE/'arm/diagnostics.py')
+        self.diagnostics = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.diagnostics)
+        self.observations = {
+            'allocations': [dict(cell='slice', allocations=0, output_matches_uninstrumented=True)],
+            'fallback_identity': [dict(bank='screened', equal=True)],
+            'composition': [dict(cell='composition', bound_pass=True,
+                                 bit_identical_to_public_fused=False)],
+            'latency_oracle': [dict(cell='latency', production_failures=[])],
+        }
+
+    def test_bounded_composition_need_not_match_public_cdf_bits(self):
+        # Different evaluation sequences may satisfy the same absolute budget.
+        self.diagnostics.validate_observations(self.observations)
+
+    def test_diagnostics_still_reject_contract_violations(self):
+        for category, change in [
+            ('allocations', dict(allocations=1)),
+            ('allocations', dict(output_matches_uninstrumented=False)),
+            ('fallback_identity', dict(equal=False)),
+            ('composition', dict(bound_pass=False, bit_identical_to_public_fused=True)),
+            ('latency_oracle', dict(production_failures=['c020000000000000'])),
+        ]:
+            with self.subTest(category=category, change=change):
+                observations = copy.deepcopy(self.observations)
+                observations[category][0].update(change)
+                with self.assertRaises(ValueError):
+                    self.diagnostics.validate_observations(observations)
 
 
 class FullMatrixPolicy(unittest.TestCase):

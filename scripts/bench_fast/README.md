@@ -107,6 +107,14 @@ existing certificates, fixtures and CI remain the correctness authority.
 The ARM diagnostics report allocations, fallback identity and compositions
 outside the timed loops. x86 observations cover generated banks and controls;
 use the repository's existing allocation/code-generation checks separately.
+The ARM multi-pass CDF composition is a separate diagnostic calculation using
+public exp/erfcx calls. Its sampled absolute-error check remains required;
+its bit equality with the public CDF is recorded but is not an acceptance
+condition. The public CDF uses a different evaluation sequence and additionally
+guarantees relative lower-tail accuracy. Public scalar/slice identity,
+instrumented/uninstrumented identity, fallback identity and feedback-chain
+oracle checks remain required. Composition observations establish neither a
+whole-domain bound nor consumer qualification.
 
 ## Freeze, measure, decide
 
