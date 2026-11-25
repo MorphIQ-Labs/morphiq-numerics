@@ -59,8 +59,9 @@ def measure(cell,name,count):
  args=[r['ptr'],x.ctypes.data_as(D),y.ctypes.data_as(D),len(x),count]
  if cell['mode']=='cache':
   cache=np.ones(65536,dtype=np.float64);args += [cache.ctypes.data_as(D),len(cache)]
- elapsed=fn(*args);assert elapsed>0
- return elapsed
+ # A short calibration may span no clock tick. The shared calibrator grows
+ # its pilots; run-qualified.py independently enforces timed sample duration.
+ return fn(*args)
 if __name__=='__main__':
  assert not BANKS and not CELLS,'Frozen manifests already exist'
  (P/'banks.json').write_text(json.dumps(make_banks(),indent=2)+'\n');(P/'cells.json').write_text(json.dumps(make_cells(),indent=2)+'\n')

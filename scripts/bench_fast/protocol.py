@@ -15,17 +15,21 @@ def calibrate(measure, record, target_ns=TARGET_NS):
     counts; the fastest pilot determines the target. The confirmation can raise
     counts again. Bounded search fails explicitly instead of silently accepting
     unusable calibration. Later measured durations are checked independently.
+    A short warmup or pilot may span no clock tick; retain it and grow the
+    pilot count. A zero confirmation after long pilots is a timer failure.
     """
     count = 1000
     for attempt in range(10):
         warm = measure(max(1, count//2))
         record('calibration-warmup', max(1, count//2), warm)
+        if warm < 0:
+            raise ValueError('Timer returned negative warmup time')
         pilots = []
         for _ in range(3):
             elapsed = measure(count)
-            if elapsed <= 0:
-                raise ValueError('Timer returned nonpositive elapsed time')
             record('calibration-pilot', count, elapsed)
+            if elapsed < 0:
+                raise ValueError('Timer returned negative elapsed time')
             pilots.append(elapsed)
         fastest = min(pilots)
         if fastest >= 100_000_000:
@@ -35,7 +39,7 @@ def calibrate(measure, record, target_ns=TARGET_NS):
             if elapsed <= 0:
                 raise ValueError('Timer returned nonpositive confirmation')
             return max(count, math.ceil(count*target_ns/elapsed))
-        count = max(count+1, math.ceil(count*100_000_000/fastest))
+        count = count*2 if fastest == 0 else max(count+1, math.ceil(count*100_000_000/fastest))
         if count > 2**63-1:
             raise ValueError('Calibration iteration count overflows timer interface')
     raise RuntimeError('Calibration did not reach stable pilot duration; retain output and investigate')
