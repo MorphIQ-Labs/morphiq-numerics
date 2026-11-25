@@ -1,8 +1,9 @@
-# MPFR elementary fuzzing
+# MPFR numerical fuzzing
 
-This independent, unpublished workspace checks strong and fast elementary APIs against
-MPFR through `rug`. Neither MPFR nor the fuzzer is a dependency of the published
-crates. The root dependency license policy stays permissive-only; the separate
+This independent, unpublished workspace checks strong and fast elementary APIs and
+accelerated fast normal APIs against MPFR through `rug`. Neither MPFR nor the
+fuzzer is a dependency of the published crates. The root dependency license
+policy stays permissive-only; the separate
 oracle graph has exact package/version exceptions in
 [`check_fuzz_licenses.sh`](../scripts/check_fuzz_licenses.sh).
 
@@ -49,8 +50,35 @@ Both exponentials must equal the strong owner's bits outside the accelerated
 domain, and return exactly one at either signed zero. Fast ln's special values
 must equal the strong owner's bits. These comparisons include NaN payloads;
 MPFR independently checks numerical results in addition to these API relations.
-Normal (including fast normal), random, double-word and linear-algebra APIs are
-outside these targets.
+Strong normal, random, double-word and linear-algebra APIs are outside these
+fuzz targets.
+
+The separate `fast_normal` target checks all three fast normal scalars and
+their slice wrappers against [fast.md](../docs/fast.md),
+[fast_cdf.md](../docs/fast_cdf.md) and [fast_log_cdf.md](../docs/fast_log_cdf.md):
+
+| Function | Independent MPFR acceptance on the accelerated domain |
+| --- | --- |
+| `fast::normal::erfcx` | Relative error at most `2^-51` for `-0.5 <= x < 16`, excluding `abs(x) < 2^-33` |
+| `fast::normal::norm_cdf` | Absolute error at most `2^-49`, and also relative error at most `2^-48` for negative inputs, on `-22.5 <= x <= -2^-33` or `2^-33 <= x <= 8` |
+| `fast::normal::log_norm_cdf` | Absolute error at most `2^-51 * abs(ln(Phi(x))) + 2^-48` on the same accelerated domain as CDF |
+
+Accelerated outputs must be finite normal values with the specified sign and
+range. Outside those domains the target requires exact strong-owner bits,
+including signed zero and NaN payloads. **This fallback check establishes
+delegation only; it does not independently validate the strong normal APIs'
+full-domain numerical contracts.** Scalar/slice identity is checked everywhere.
+
+The erfcx reference multiplies directed MPFR enclosures of `exp(x*x)` and
+`erfc(x)`; the binary64 square is exact at the oracle's precision. The CDF
+reference encloses `abs(x)/sqrt(2)`, reverses the endpoints for decreasing
+`erfc`, and halves exactly. Positive inputs use outward-rounded subtraction
+from one. The log-CDF reference applies increasing `ln` with outward rounding
+to that positive CDF interval. All intermediate ranges stay finite and normal
+in MPFR on the accelerated domains. These are mathematical compositions of
+black-box MPFR operations, independent of the library's tables and kernels.
+The same 256-to-8192-bit refinement and directed error comparisons apply;
+both CDF bounds must pass, and no unresolved comparison counts as success.
 
 MPFR evaluates each exact input with rounding down and up, starting at 256 bits
 and doubling through 8192. Both endpoints must round to the same binary64 value
@@ -78,6 +106,12 @@ uncertain interval comparisons, signed zero at ln(1), incorrect fallback bits
 at ±704, and changed NaN payloads. Retained fast inputs cover the adjacent
 encodings at ±704 and one; they are boundary witnesses, not known defects.
 
+Normal negative controls reject tail-relative violations that satisfy the
+absolute CDF budget, wrong signs/ranges, log-CDF budget violations and changed
+fallback payloads. Valid non-CR results inside each bound are accepted. The
+retained `cdf-lower-tail` input encodes `-22.5`, the accelerated CDF endpoint;
+it is a contract-boundary witness, not a known library defect.
+
 ## Run and replay
 
 On Apple Silicon macOS or native x86-64 Linux, with the repository toolchain,
@@ -94,9 +128,9 @@ checks and replay use `--locked`. cargo-fuzz 0.13.2 has no `--locked` option, so
 its build runs offline after the locked checks, and the gate rejects any lockfile
 change. AddressSanitizer and coverage instrumentation are enabled for fuzz runs.
 
-Each run replays the versioned strong elementary inputs and fast elementary
-inputs from `fast.json` and `fast_ln.json`, then mutates each target for the
-requested number of seconds **per target and feature mode** (four campaigns).
+Each run replays the versioned strong elementary inputs and fast inputs from
+`fast.json`, `fast_ln.json` and `fast_log_cdf.json`, then mutates each target for the
+requested number of seconds **per target and feature mode** (six campaigns).
 Expected fixture outputs are not imported. The seed encoder adds both signs of
 every binary64 binade boundary and its adjacent encodings, NaN payloads,
 infinities, subnormal edges, and strong slice lengths 0 through 16. Fast seeds
@@ -104,6 +138,9 @@ include lengths 0 through 65 with both all-regular and mixed packets, ±704 and
 its neighbors, cancellation around one and the fast fixtures' reduction cases.
 This reaches the fixed 16/32/64-length paths and remainders. The fixture sources
 retain the provenance of worst-case and reduction-boundary inputs.
+Fast normal seeds include all accelerated-domain endpoints and adjacent
+encodings, both signs, far tails, and lengths 0 through 65 in regular and mixed
+packets. Existing elementary corpus meanings are unchanged.
 
 The `elementary` corpus format is one selector byte modulo 14, followed by up to sixteen
 pairs of little-endian `u64` input encodings. IDs follow the table's source order
@@ -117,10 +154,14 @@ second word is unused). Keeping targets separate preserves every strong corpus
 input's meaning, including mutated selector bytes above 13. Replay requires an
 explicit target; corpus and regression directories are separated by target.
 
+`fast_normal` uses modulo 3 for erfcx, CDF and log-CDF, respectively, followed
+by up to 65 pairs in that same format (the second word is unused).
+
 Generated seeds, evolving corpora, failure artifacts and logs live under
 `target/fuzz/`. CI runs 60 seconds per target and mode in the existing required Linux and
 macOS test jobs. The weekly/manual workflow runs 1800 seconds per target and mode on both
-hosts (two hours of mutation per host). Artifacts are retained for 14 days, including on failure. A passing
+hosts (three hours of mutation per host, with a four-hour job limit for preparation
+and replay). Artifacts are retained for 14 days, including on failure. A passing
 campaign is sampled evidence, not an exhaustive proof or a performance result.
 
 Replay a failure without nightly instrumentation:

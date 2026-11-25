@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -62,11 +63,16 @@ if os.environ["FUZZ_RUNNER_FAIL_TEST"] == "1" and args[0] == "test":
                 self.assertIn("--no-default-features", tests[1])
                 self.assertEqual(tests[1][tests[1].index("--features") + 1], "simd")
                 replay = [args for args in calls if args[0] == "run"]
-                self.assertGreaterEqual(len(replay), 2)
+                self.assertEqual(len(replay), 6)
+                expected_targets = {"elementary", "fast_elementary", "fast_normal"}
+                self.assertEqual({args[args.index("--") + 1] for args in replay}, expected_targets)
                 for args in replay:
                     self.assertIn("--no-default-features", args)
                 campaigns = [args for args in calls if args[0].startswith("+")]
-                self.assertGreaterEqual(len(campaigns), 2)
+                self.assertEqual(len(campaigns), 6)
+                self.assertEqual({args[3] for args in campaigns}, expected_targets)
+                for args in campaigns:
+                    self.assertIn("-max_len=" + ("257" if args[3] == "elementary" else "1041"), args)
                 self.assertEqual({args[args.index("--features") + 1] for args in campaigns},
                                  {"fuzzing", "fuzzing,simd"})
 
@@ -76,6 +82,32 @@ if os.environ["FUZZ_RUNNER_FAIL_TEST"] == "1" and args[0] == "test":
                 result, calls = self.run_runner(shell, fail_test=True)
                 self.assertEqual(result.returncode, 23, result.stderr)
                 self.assertFalse(any(args[0] == "run" or args[0].startswith("+") for args in calls))
+
+
+class FastNormalSeeds(unittest.TestCase):
+    def test_packets_cover_all_operations_lengths_and_domain_neighbors(self):
+        from scripts.seed_elementary_fuzz import fast_normal_seeds
+
+        inputs = {op: set() for op in range(3)}
+        lengths = {op: set() for op in range(3)}
+        for data in fast_normal_seeds():
+            op = data[0]
+            self.assertEqual((len(data) - 1) % 16, 0)
+            count = (len(data) - 1) // 16
+            self.assertLessEqual(count, 65)
+            lengths[op].add(count)
+            inputs[op].update(struct.unpack_from("<Q", data, i)[0]
+                              for i in range(1, len(data), 16))
+        for op in range(3):
+            self.assertEqual(lengths[op], set(range(66)))
+            for edge in [2**-33, 0.5, 8.0, 16.0, 22.5]:
+                center = struct.unpack("<Q", struct.pack("<d", edge))[0]
+                for delta in [-1, 0, 1]:
+                    for sign in [0, 1 << 63]:
+                        self.assertIn((center + delta) | sign, inputs[op])
+            for word in [0, 1 << 63, 0x7FF0000000000000, 0xFFF0000000000000,
+                         0x7FF0000000000001, 0xFFFABCDE12345678]:
+                self.assertIn(word, inputs[op])
 
 
 if __name__ == "__main__":
