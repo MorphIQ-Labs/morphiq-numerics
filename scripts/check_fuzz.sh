@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Replay versioned elementary inputs, then mutate them with libFuzzer.
+# Replay versioned numerical inputs, then mutate them with libFuzzer.
 # Usage: ./scripts/check_fuzz.sh [seconds-per-target-and-mode, default 60]
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -15,7 +15,7 @@ if [[ "$(cargo fuzz --version)" != "cargo-fuzz $required" ]]; then
   exit 127
 fi
 mkdir -p target/fuzz/logs
-for target in elementary fast_elementary; do
+for target in elementary fast_elementary fast_normal; do
   python3 scripts/seed_elementary_fuzz.py "target/fuzz/seeds-$target" --target "$target"
 done
 # Includes planted wrong results, boundary violations and oracle midpoint tests.
@@ -32,9 +32,9 @@ for mode in scalar simd; do
     fuzz_features=fuzzing,simd
   fi
   cargo test --manifest-path fuzz/Cargo.toml --locked "${features[@]}" --lib
-  for target in elementary fast_elementary; do
+  for target in elementary fast_elementary fast_normal; do
     max_len=257
-    if [[ "$target" == fast_elementary ]]; then max_len=1041; fi
+    if [[ "$target" != elementary ]]; then max_len=1041; fi
     seeds="target/fuzz/seeds-$target"
     regressions="fuzz/regressions/$target"
     cargo run --release --manifest-path fuzz/Cargo.toml --locked "${features[@]}" \

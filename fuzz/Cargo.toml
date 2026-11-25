@@ -40,6 +40,14 @@ bench = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "fast_normal"
+path = "fuzz_targets/fast_normal.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "fast_elementary"
 path = "fuzz_targets/fast_elementary.rs"
 test = false

@@ -1,8 +1,10 @@
-//! Unpublished MPFR oracle for the strong and fast elementary APIs.
+//! Unpublished MPFR oracles for elementary and accelerated fast normal APIs.
 //!
 //! MPFR is used only through its public API; no oracle implementation is copied.
 use morphiq_numerics::{elementary as e, fast::elementary as fast};
 use rug::{Float, float::Round};
+
+pub mod fast_normal;
 
 /// Stable operation IDs in the corpus format (see README.md).
 #[derive(Clone, Copy, Debug)]
@@ -31,6 +33,8 @@ enum Bound {
     Ulps(u32),
     Relative(u32),
     LogAbsolute,
+    Absolute(u32),
+    Mixed { relative: u32, absolute: u32 },
 }
 
 impl Operation {
@@ -152,6 +156,10 @@ fn same_bits(a: f64, b: f64) -> bool {
 fn limits(lo: &Float, hi: &Float, bound: Bound) -> Option<(Float, Float)> {
     let precision = lo.prec();
     match bound {
+        Bound::Absolute(k) => {
+            let limit = Float::with_val(precision, 1) >> k;
+            Some((limit.clone(), limit))
+        }
         Bound::Ulps(k) => {
             let lo_exp = lo.get_exp()?;
             if lo_exp != hi.get_exp()? {
@@ -162,7 +170,7 @@ fn limits(lo: &Float, hi: &Float, bound: Bound) -> Option<(Float, Float)> {
             limit <<= (lo_exp - 53).max(-1074);
             Some((limit.clone(), limit))
         }
-        Bound::Relative(_) | Bound::LogAbsolute => {
+        Bound::Relative(_) | Bound::LogAbsolute | Bound::Mixed { .. } => {
             let a = lo.clone().abs();
             let b = hi.clone().abs();
             let (mut small, mut large) = if a <= b { (a, b) } else { (b, a) };
@@ -171,12 +179,18 @@ fn limits(lo: &Float, hi: &Float, bound: Bound) -> Option<(Float, Float)> {
             }
             let shift = match bound {
                 Bound::Relative(k) => k,
+                Bound::Mixed { relative, .. } => relative,
                 _ => 53,
             };
             small >>= shift;
             large >>= shift;
-            if matches!(bound, Bound::LogAbsolute) {
-                let floor = Float::with_val(precision, 1) >> 65;
+            let floor_shift = match bound {
+                Bound::LogAbsolute => Some(65),
+                Bound::Mixed { absolute, .. } => Some(absolute),
+                _ => None,
+            };
+            if let Some(shift) = floor_shift {
+                let floor = Float::with_val(precision, 1) >> shift;
                 small = Float::with_val_round(precision, &small + &floor, Round::Down).0;
                 large = Float::with_val_round(precision, &large + &floor, Round::Up).0;
             }

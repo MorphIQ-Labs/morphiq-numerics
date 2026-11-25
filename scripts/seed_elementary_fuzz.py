@@ -91,14 +91,46 @@ def fast_seeds():
             yield encode(op, inputs[start:start + 65])
 
 
+def fast_normal_seeds():
+    def encode(op, words):
+        return bytes([op]) + b"".join(struct.pack("<QQ", word, 0) for word in words)
+
+    # Public screens and Gaussian branch regions, including adjacent encodings.
+    boundary = [0, 1 << 63, 1, 0x7FEFFFFFFFFFFFFF, 0x7FF0000000000000,
+                0xFFF0000000000000, 0x7FF0000000000001, 0xFFFABCDE12345678]
+    for value in [2**-33, 0.5, 0.663, 8.0, 16.0, 22.5]:
+        center = struct.unpack("<Q", struct.pack("<d", value))[0]
+        boundary.extend((center + delta) | sign
+                        for delta in [-1, 0, 1] for sign in [0, 1 << 63])
+    common = [a for a, _ in boundary_pairs()]
+    rows = json.loads((FIXTURES / "fast.json").read_text())["cases"]
+    log_rows = json.loads((FIXTURES / "fast_log_cdf.json").read_text())["cases"]
+    regular = [struct.unpack("<Q", struct.pack("<d", x))[0]
+               for x in [-0.5, -0.25, 0.25, 1.0, 7.0]]
+    for op, primitive in enumerate(["erfcx", "cdf", "log_cdf"]):
+        inputs = common + boundary + [int(row["x"], 16) for row in rows
+                                      if row["primitive"] == primitive]
+        if op == 2:
+            inputs += [int(row["x"], 16) for row in log_rows]
+        inputs = list(dict.fromkeys(inputs))
+        yield encode(op, [])
+        for count in range(1, 66):
+            yield encode(op, [regular[i % len(regular)] for i in range(count)])
+            yield encode(op, [boundary[(i + count) % len(boundary)] for i in range(count)])
+        for start in range(0, len(inputs), 65):
+            yield encode(op, inputs[start:start + 65])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
-    parser.add_argument("--target", choices=["elementary", "fast_elementary"], default="elementary")
+    targets = {"elementary": seeds, "fast_elementary": fast_seeds,
+               "fast_normal": fast_normal_seeds}
+    parser.add_argument("--target", choices=targets, default="elementary")
     args = parser.parse_args()
     args.directory.mkdir(parents=True, exist_ok=True)
     count = 0
-    for data in (fast_seeds() if args.target == "fast_elementary" else seeds()):
+    for data in targets[args.target]():
         (args.directory / hashlib.sha256(data).hexdigest()).write_bytes(data)
         count += 1
     print(f"wrote {count} deterministic {args.target} seeds to {args.directory}")
