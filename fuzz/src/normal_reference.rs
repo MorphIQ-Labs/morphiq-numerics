@@ -24,8 +24,8 @@ pub(super) fn erfcx(x: &Float) -> (Float, Float) {
     erfc_lo.erfc_round(Round::Down);
     erfc_hi.erfc_round(Round::Up);
     (
-        Float::with_val_round(p, exp_lo * erfc_lo, Round::Down).0,
-        Float::with_val_round(p, exp_hi * erfc_hi, Round::Up).0,
+        Float::with_val_round(p, &exp_lo * &erfc_lo, Round::Down).0,
+        Float::with_val_round(p, &exp_hi * &erfc_hi, Round::Up).0,
     )
 }
 
@@ -65,11 +65,11 @@ fn erfcx_tail(x: &Float) -> (Float, Float) {
     let mut pi_hi = Float::with_val_round(p, Constant::Pi, Round::Up).0;
     pi_lo.sqrt_round(Round::Down);
     pi_hi.sqrt_round(Round::Up);
-    let scale_lo = Float::with_val_round(p, x * pi_lo, Round::Down).0;
-    let scale_hi = Float::with_val_round(p, x * pi_hi, Round::Up).0;
+    let scale_lo = Float::with_val_round(p, x * &pi_lo, Round::Down).0;
+    let scale_hi = Float::with_val_round(p, x * &pi_hi, Round::Up).0;
     (
-        Float::with_val_round(p, lower / scale_hi, Round::Down).0,
-        Float::with_val_round(p, sum_hi / scale_lo, Round::Up).0,
+        Float::with_val_round(p, &lower / &scale_hi, Round::Down).0,
+        Float::with_val_round(p, &sum_hi / &scale_lo, Round::Up).0,
     )
 }
 
@@ -80,8 +80,8 @@ fn scaled_argument(x: f64, p: u32) -> (Float, Float) {
     sqrt_hi.sqrt_round(Round::Up);
     let magnitude = Float::with_val(p, x.abs());
     (
-        Float::with_val_round(p, &magnitude / sqrt_hi, Round::Down).0,
-        Float::with_val_round(p, magnitude / sqrt_lo, Round::Up).0,
+        Float::with_val_round(p, &magnitude / &sqrt_hi, Round::Down).0,
+        Float::with_val_round(p, &magnitude / &sqrt_lo, Round::Up).0,
     )
 }
 
@@ -102,8 +102,8 @@ pub(super) fn cdf(x: f64, p: u32) -> (Float, Float) {
     } else {
         let one = Float::with_val(p, 1);
         (
-            Float::with_val_round(p, &one - hi, Round::Down).0,
-            Float::with_val_round(p, one - lo, Round::Up).0,
+            Float::with_val_round(p, &one - &hi, Round::Down).0,
+            Float::with_val_round(p, &one - &lo, Round::Up).0,
         )
     }
 }
@@ -123,8 +123,8 @@ pub(super) fn log_cdf(x: f64, p: u32) -> (Float, Float) {
         // The binary64 square is exact at p>=256, including x near MAX.
         let half_square = Float::with_val(p, &input * &input) >> 1;
         return (
-            Float::with_val_round(p, lo - &half_square, Round::Down).0,
-            Float::with_val_round(p, hi - half_square, Round::Up).0,
+            Float::with_val_round(p, &lo - &half_square, Round::Down).0,
+            Float::with_val_round(p, &hi - &half_square, Round::Up).0,
         );
     }
     if x > 0.0 {

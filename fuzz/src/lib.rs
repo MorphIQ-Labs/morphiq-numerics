@@ -180,11 +180,11 @@ fn limits(lo: &Float, hi: &Float, bound: Bound) -> Option<(Float, Float)> {
                 let mut limit = magnitude.clone() >> 53;
                 if let Some(k) = relative_extra {
                     let extra = magnitude >> k;
-                    limit = Float::with_val_round(precision, &limit + extra, round).0;
+                    limit = Float::with_val_round(precision, &limit + &extra, round).0;
                 }
                 for k in [Some(1075), absolute_extra].into_iter().flatten() {
                     let extra = Float::with_val(precision, 1) >> k;
-                    limit = Float::with_val_round(precision, &limit + extra, round).0;
+                    limit = Float::with_val_round(precision, &limit + &extra, round).0;
                 }
                 limit
             };
