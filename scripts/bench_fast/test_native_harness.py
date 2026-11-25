@@ -13,11 +13,68 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 D = C.POINTER(C.c_double)
+
+
+class CalibrationClockResolution(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location('bench_protocol', HERE/'protocol.py')
+        self.protocol = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.protocol)
+        self.records = []
+
+    def record(self, kind, count, elapsed):
+        self.records.append((kind, count, elapsed))
+
+    def test_sub_tick_pilots_are_retained_and_grow_to_target_duration(self):
+        # Independent quantized clock: 100 ns/work item, one-millisecond ticks.
+        # The first several warmups and pilots therefore observe zero ticks.
+        def measure(count):
+            return (count // 10_000) * 1_000_000
+
+        count = self.protocol.calibrate(measure, self.record)
+        self.assertGreaterEqual(measure(count), self.protocol.TARGET_NS)
+        self.assertIn(('calibration-warmup', 500, 0), self.records)
+        self.assertIn(('calibration-pilot', 1000, 0), self.records)
+        pilots = [count for kind, count, _ in self.records if kind == 'calibration-pilot']
+        self.assertEqual(pilots, sorted(pilots))
+        self.assertEqual(self.records[-1][0], 'calibration-confirmation')
+
+    def test_stopped_clock_fails_after_bounded_work_with_all_readings_retained(self):
+        with self.assertRaises(RuntimeError):
+            self.protocol.calibrate(lambda count: 0, self.record)
+        self.assertEqual(len(self.records), 40)  # Ten warmups and three pilots each.
+        self.assertTrue(all(elapsed == 0 for _, _, elapsed in self.records))
+
+    def test_negative_readings_and_zero_confirmation_fail_and_are_retained(self):
+        for readings in [[-1], [0, -1], [1, 100_000_000, 100_000_000, 100_000_000, 0]]:
+            with self.subTest(readings=readings):
+                self.records = []
+                timer = iter(readings)
+                with self.assertRaises(ValueError):
+                    self.protocol.calibrate(lambda count: next(timer), self.record)
+                self.assertEqual([elapsed for _, _, elapsed in self.records], readings)
+
+    def test_arm_adapter_returns_zero_to_the_calibrator(self):
+        # Exercise the real adapter without native libraries or wall-clock timing.
+        native = types.SimpleNamespace(**{name: mock.Mock(return_value=0) for name in [
+            'measure_chain1', 'measure_chain2', 'measure_cache1',
+            'measure_cache_packet', 'measure_packet']})
+        external = types.SimpleNamespace(D=D, NATIVE=native,
+                                         entries={'product': dict(kind='vector', ptr=None)})
+        spec = importlib.util.spec_from_file_location('arm_matrix', HERE/'arm/matrix.py')
+        matrix = importlib.util.module_from_spec(spec)
+        with mock.patch.dict(sys.modules, arm_external=external):
+            spec.loader.exec_module(matrix)
+        matrix.BANKS = {'empty': []}
+        self.assertEqual(matrix.measure(dict(bank='empty', length=0, mode='throughput'),
+                                        'product', 500), 0)
+        self.assertEqual(native.measure_packet.call_args.args[-2:], (0, 500))
 
 
 class ArmObservationContracts(unittest.TestCase):

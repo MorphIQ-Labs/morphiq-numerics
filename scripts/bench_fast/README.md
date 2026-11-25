@@ -147,6 +147,12 @@ yet been given a declared placement.
 
 Calibration uses only the current host, not counts from a previous run. It
 retains every pilot, targets 600 ms per timed sample, and only increases counts.
+Short warmups or pilots can return zero when they span no clock tick (including
+empty slices on macOS). Calibration records those observations and doubles the
+pilot count when its fastest pilot is zero, within the existing ten-attempt
+limit. Negative readings, a zero confirmation after sufficiently long pilots,
+or failure to reach the pilot-duration floor still stop calibration. This does
+not admit zero-duration performance samples or change the timer implementation.
 Every accepted timed sample must be at least 250 ms. Each cell has ten independent
 processes, two paired rounds per process, alternating comparison order and
 warmups. Keep all measurements, including failures. Do not trim outliers or
