@@ -51,6 +51,10 @@ impl Operation {
 
     fn enclosure(self, x: f64, precision: u32) -> (Float, Float) {
         assert!(self.accelerated(x));
+        assert!(
+            precision >= 256,
+            "oracle must represent the input square exactly"
+        );
         if matches!(self, Self::Erfcx) {
             let input = Float::with_val(precision, x);
             // The binary64 square has at most 106 significant bits, so this
@@ -327,6 +331,12 @@ mod tests {
             within_bound(edge.next_up(), &exact, &exact, bound),
             Some(false)
         );
+        let lo = Float::with_val(256, -8);
+        let hi = Float::with_val(256, -8.0 + f64::from_bits((1023 - 45) << 52));
+        let midpoint = -8.0 + f64::from_bits((1023 - 46) << 52);
+        for bound in [Bound::Absolute(48), bound] {
+            assert_eq!(within_bound(midpoint, &lo, &hi, bound), None);
+        }
     }
 
     #[test]
