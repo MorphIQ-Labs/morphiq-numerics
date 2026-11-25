@@ -121,11 +121,41 @@ def fast_normal_seeds():
             yield encode(op, inputs[start:start + 65])
 
 
+def strong_normal_seeds():
+    def encode(op, words):
+        return bytes([op]) + b"".join(struct.pack("<QQ", word, 0) for word in words)
+
+    # Contract thresholds from docs/normal.md and docs/erfcx.md, plus oracle
+    # formula joins. Inputs only; neither expected values nor runtime tables.
+    centers = [0x3FE0000000000000, 0x4020000000000000, 0x4030000000000000,
+               0x403AA0F4D2E063CF, 0x4040000000000000, 0x4044000000000000,
+               0x4050000000000000, 0x402095B059D67C4D, 0x40433E21DC3F3BD8,
+               0x5FF6A09E667F3BCD, 0x7FC20DD750429B6E,
+               0x3C9C5BF891B4EF69, 0x3C8C5BF891B4EF6B]
+    boundary = [0, 1 << 63, 1, 0x7FEFFFFFFFFFFFFF, 0x7FF0000000000000,
+                0xFFF0000000000000, 0x7FF0000000000001, 0xFFFABCDE12345678]
+    boundary += [(center + delta) | sign for center in centers
+                 for delta in range(-3, 4) for sign in [0, 1 << 63]]
+    common = [a for a, _ in boundary_pairs()]
+    for op in range(3):
+        name = "erfcx" if op == 0 else "normal"
+        rows = json.loads((FIXTURES / f"{name}.json").read_text())["cases"]
+        inputs = list(dict.fromkeys(common + boundary + [int(row["x"], 16) for row in rows]))
+        yield encode(op, [])
+        regular = [struct.unpack("<Q", struct.pack("<d", x))[0]
+                   for x in [-26.0, -8.0, -0.5, 0.25, 1.0, 16.0, 64.0]]
+        for count in range(1, 66):
+            yield encode(op, [regular[i % len(regular)] for i in range(count)])
+            yield encode(op, [boundary[(i + count) % len(boundary)] for i in range(count)])
+        for start in range(0, len(inputs), 65):
+            yield encode(op, inputs[start:start + 65])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
     targets = {"elementary": seeds, "fast_elementary": fast_seeds,
-               "fast_normal": fast_normal_seeds}
+               "fast_normal": fast_normal_seeds, "strong_normal": strong_normal_seeds}
     parser.add_argument("--target", choices=targets, default="elementary")
     args = parser.parse_args()
     args.directory.mkdir(parents=True, exist_ok=True)

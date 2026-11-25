@@ -2,7 +2,7 @@
 //! Outside those domains this target checks exact strong-owner delegation only.
 use super::{Bound, within_bound};
 use morphiq_numerics::{fast::normal as fast, normal};
-use rug::{Float, float::Round};
+use rug::Float;
 
 #[derive(Clone, Copy, Debug)]
 enum Operation {
@@ -55,53 +55,11 @@ impl Operation {
             precision >= 256,
             "oracle must represent the input square exactly"
         );
-        if matches!(self, Self::Erfcx) {
-            let input = Float::with_val(precision, x);
-            // The binary64 square has at most 106 significant bits, so this
-            // multiplication is exact at every oracle precision (>= 256).
-            let square = Float::with_val(precision, &input * &input);
-            let mut lower_exp = square.clone();
-            let mut upper_exp = square;
-            lower_exp.exp_round(Round::Down);
-            upper_exp.exp_round(Round::Up);
-            let mut lower_erfc = input.clone();
-            let mut upper_erfc = input;
-            lower_erfc.erfc_round(Round::Down);
-            upper_erfc.erfc_round(Round::Up);
-            // Both factors are positive; monotone multiplication encloses
-            // exp(x*x) * erfc(x), without using a library approximation.
-            return (
-                Float::with_val_round(precision, &lower_exp * &lower_erfc, Round::Down).0,
-                Float::with_val_round(precision, &upper_exp * &upper_erfc, Round::Up).0,
-            );
+        match self {
+            Self::Erfcx => super::normal_reference::erfcx(&Float::with_val(precision, x)),
+            Self::Cdf => super::normal_reference::cdf(x, precision),
+            Self::LogCdf => super::normal_reference::log_cdf(x, precision),
         }
-        let mut sqrt_lo = Float::with_val(precision, 2);
-        let mut sqrt_hi = sqrt_lo.clone();
-        sqrt_lo.sqrt_round(Round::Down);
-        sqrt_hi.sqrt_round(Round::Up);
-        let magnitude = Float::with_val(precision, x.abs());
-        let arg_lo = Float::with_val_round(precision, &magnitude / &sqrt_hi, Round::Down).0;
-        let arg_hi = Float::with_val_round(precision, &magnitude / &sqrt_lo, Round::Up).0;
-        // erfc is decreasing, so reverse the argument endpoints.
-        let mut lo = arg_hi;
-        let mut hi = arg_lo;
-        lo.erfc_round(Round::Down);
-        hi.erfc_round(Round::Up);
-        lo >>= 1;
-        hi >>= 1;
-        if x > 0.0 {
-            let one = Float::with_val(precision, 1);
-            (lo, hi) = (
-                Float::with_val_round(precision, &one - &hi, Round::Down).0,
-                Float::with_val_round(precision, &one - &lo, Round::Up).0,
-            );
-        }
-        if matches!(self, Self::LogCdf) {
-            // ln is increasing; the CDF enclosure is strictly positive.
-            lo.ln_round(Round::Down);
-            hi.ln_round(Round::Up);
-        }
-        (lo, hi)
     }
 
     fn bounds(self, x: f64) -> &'static [Bound] {
@@ -190,6 +148,7 @@ pub fn check_input(data: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rug::float::Round;
 
     #[test]
     fn bounded_contracts_accept_valid_non_cr_results() {

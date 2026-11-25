@@ -1,7 +1,8 @@
 # MPFR numerical fuzzing
 
-This independent, unpublished workspace checks strong and fast elementary APIs and
-accelerated fast normal APIs against MPFR through `rug`. Neither MPFR nor the
+This independent, unpublished workspace checks strong and fast elementary APIs,
+three strong normal APIs and accelerated fast normal APIs against MPFR through
+`rug`. Neither MPFR nor the
 fuzzer is a dependency of the published crates. The root dependency license
 policy stays permissive-only; the separate
 oracle graph has exact package/version exceptions in
@@ -50,8 +51,7 @@ Both exponentials must equal the strong owner's bits outside the accelerated
 domain, and return exactly one at either signed zero. Fast ln's special values
 must equal the strong owner's bits. These comparisons include NaN payloads;
 MPFR independently checks numerical results in addition to these API relations.
-Strong normal, random, double-word and linear-algebra APIs are outside these
-fuzz targets.
+Random, double-word and linear-algebra APIs are outside these fuzz targets.
 
 The separate `fast_normal` target checks all three fast normal scalars and
 their slice wrappers against [fast.md](../docs/fast.md),
@@ -69,12 +69,74 @@ including signed zero and NaN payloads. **This fallback check establishes
 delegation only; it does not independently validate the strong normal APIs'
 full-domain numerical contracts.** Scalar/slice identity is checked everywhere.
 
-The erfcx reference multiplies directed MPFR enclosures of `exp(x*x)` and
+The separate `strong_normal` target independently checks `normal::erfcx`,
+`normal::norm_cdf` and `normal::log_norm_cdf` over all binary64 inputs and checks
+their slice wrappers bit for bit. It imports no expected library outputs. For
+finite, nonsaturating results, the acceptance bound is
+`abs(actual - exact) <= abs(exact) * (2^-53 + r) + 2^-1075 + a`:
+
+| Function and domain | `r` | `a` |
+| --- | --- | --- |
+| erfcx, `x < -1/2`, above overflow | `2^-122` | `0` |
+| erfcx, `-1/2 <= x < 16` | `0` | `2^-123` |
+| erfcx, `x >= 16` | `2^-223` | `0` |
+| CDF, `abs(x) <= 1/2` | `2^-245` | `0` |
+| CDF, `x < -1/2` | `2^-114` | `0` |
+| CDF, `x > 1/2` | `2^-111` | `0` |
+| log-CDF, `abs(x) <= 1/2` | `2^-228` | `0` |
+| log-CDF, `abs(x) > 1/2` | `2^-111` | `0` |
+
+These are the published per-domain public-result bounds in
+[erfcx.md](../docs/erfcx.md) and [normal.md](../docs/normal.md). Every term is
+added with directed MPFR rounding, including the half-minimum-subnormal term
+that cannot be represented in binary64. This does not substitute a blanket
+correct-rounding assertion for a bounded contract. Signs, ranges, NaN encodings,
+exact zero-input identities, overflow, and saturation rounding are checked
+separately. Finite erfcx results must remain strictly positive even at `f64::MAX`.
+The other strong normal APIs (PDF, CCDF, centered CDF and log-PDF), normal pairs,
+and other public modules still require their own independent fuzz coverage.
+
+### Normal oracle across extreme tails
+
+Strong and fast targets share the same independent reference module.
+For moderate erfcx inputs it encloses `exp(x*x) * erfc(x)` with directed MPFR
+operations. For `x >= 64`, that direct formula would eventually exceed MPFR's
+exponent range. Instead, the oracle uses the mathematical signed remainder of
+[DLMF 7.12.1](https://dlmf.nist.gov/7.12#i):
+
+```text
+erfcx(x) = J / (x sqrt(pi))
+J = integral_0^infinity exp(-u) exp(-u²/(4x²)) du
+S_n = sum_{k=0}^n (-1)^k (2k-1)!! / (2x²)^k
+S_63 <= J <= S_64
+```
+
+Taylor's signed remainder integrated against `exp(-u)` establishes the two
+inequalities. All recurrence operations, sums, pi, square root and division
+round outwards. No runtime coefficient table or approximation is imported.
+The 64-term work limit is fixed; if the resulting enclosure and up to 8192 bits
+cannot decide the bound, the oracle fails explicitly. Overlap tests compare
+this integral enclosure to 1024-bit direct MPFR evaluations from 64 through 256.
+
+For negative log-CDF below -8, the oracle encloses
+`-x²/2 + ln(erfcx(abs(x)/sqrt(2))/2)`. It never forms an underflowed probability;
+the binary64 square is exact at every selected precision and fits MPFR even at
+the largest finite input. Positive log-CDF uses `ln_1p(-Phi(-x))` with directed
+rounding, retaining the tiny logarithm after the CDF rounds to one.
+
+Conservative screens follow from the definitions independently of the library's
+threshold bits: `erfcx(-a) > exp(a²) > 2^1024` at `a >= 32`; Mills' inequality
+`Phi(-a) < exp(-a²/2)/(a sqrt(2pi)) < 2^-1100` at `a >= 40`. Since
+`-ln(1-q) < 2q` for these tiny positive `q`, CDF and positive log-CDF saturation
+are determined without exceeding MPFR's exponent range. Inputs near the actual
+overflow and underflow boundaries still go through the independent enclosures.
+
+On the fast accelerated domain, the erfcx reference multiplies directed MPFR enclosures of `exp(x*x)` and
 `erfc(x)`; the binary64 square is exact at the oracle's precision. The CDF
 reference encloses `abs(x)/sqrt(2)`, reverses the endpoints for decreasing
 `erfc`, and halves exactly. Positive inputs use outward-rounded subtraction
-from one. The log-CDF reference applies increasing `ln` with outward rounding
-to that positive CDF interval. All intermediate ranges stay finite and normal
+from one. The log-CDF reference uses `ln` for nonpositive inputs and `ln_1p` of the negative tail
+for positive inputs, with outward rounding. All intermediate ranges stay finite and normal
 in MPFR on the accelerated domains. These are mathematical compositions of
 black-box MPFR operations, independent of the library's tables and kernels.
 The same 256-to-8192-bit refinement and directed error comparisons apply;
@@ -106,11 +168,18 @@ uncertain interval comparisons, signed zero at ln(1), incorrect fallback bits
 at ±704, and changed NaN payloads. Retained fast inputs cover the adjacent
 encodings at ±704 and one; they are boundary witnesses, not known defects.
 
-Normal negative controls reject tail-relative violations that satisfy the
+Fast normal negative controls reject tail-relative violations that satisfy the
 absolute CDF budget, wrong signs/ranges, log-CDF budget violations and changed
 fallback payloads. Valid non-CR results inside each bound are accepted. The
 retained `cdf-lower-tail` input encodes `-22.5`, the accelerated CDF endpoint;
 it is a contract-boundary witness, not a known library defect.
+
+Strong normal negative controls reject premature overflow, lost subnormal
+values, rounded-away positive log tails, incorrect saturation and changed NaN
+payloads. Synthetic boundary tests preserve every term of the compound error
+allowance and accept valid non-CR results. The retained `tail-boundaries` packet
+contains exact binary64 inputs spanning finite log tails, overflow, and
+underflow; it is a coverage witness, not a known library defect.
 
 ## Run and replay
 
@@ -129,8 +198,9 @@ its build runs offline after the locked checks, and the gate rejects any lockfil
 change. AddressSanitizer and coverage instrumentation are enabled for fuzz runs.
 
 Each run replays the versioned strong elementary inputs and fast inputs from
-`fast.json`, `fast_ln.json` and `fast_log_cdf.json`, then mutates each target for the
-requested number of seconds **per target and feature mode** (six campaigns).
+`fast.json`, `fast_ln.json` and `fast_log_cdf.json`, plus strong normal inputs
+from `erfcx.json` and `normal.json`, then mutates each target for the
+requested number of seconds **per target and feature mode** (eight campaigns).
 Expected fixture outputs are not imported. The seed encoder adds both signs of
 every binary64 binade boundary and its adjacent encodings, NaN payloads,
 infinities, subnormal edges, and strong slice lengths 0 through 16. Fast seeds
@@ -140,7 +210,9 @@ This reaches the fixed 16/32/64-length paths and remainders. The fixture sources
 retain the provenance of worst-case and reduction-boundary inputs.
 Fast normal seeds include all accelerated-domain endpoints and adjacent
 encodings, both signs, far tails, and lengths 0 through 65 in regular and mixed
-packets. Existing elementary corpus meanings are unchanged.
+packets. Strong normal seeds add the documented overflow, underflow and
+saturation boundaries with three neighbors on either side and lengths 0 through
+65. Existing elementary and fast corpus meanings are unchanged.
 
 The `elementary` corpus format is one selector byte modulo 14, followed by up to sixteen
 pairs of little-endian `u64` input encodings. IDs follow the table's source order
@@ -154,13 +226,13 @@ second word is unused). Keeping targets separate preserves every strong corpus
 input's meaning, including mutated selector bytes above 13. Replay requires an
 explicit target; corpus and regression directories are separated by target.
 
-`fast_normal` uses modulo 3 for erfcx, CDF and log-CDF, respectively, followed
+`fast_normal` and `strong_normal` each use their own selector namespace: modulo 3 for erfcx, CDF and log-CDF, respectively, followed
 by up to 65 pairs in that same format (the second word is unused).
 
 Generated seeds, evolving corpora, failure artifacts and logs live under
 `target/fuzz/`. CI runs 60 seconds per target and mode in the existing required Linux and
 macOS test jobs. The weekly/manual workflow runs 1800 seconds per target and mode on both
-hosts (three hours of mutation per host, with a four-hour job limit for preparation
+hosts (four hours of mutation per host, with a five-hour job limit for preparation
 and replay). Artifacts are retained for 14 days, including on failure. A passing
 campaign is sampled evidence, not an exhaustive proof or a performance result.
 

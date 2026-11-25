@@ -25,6 +25,7 @@ fn main() {
     let check = match target.to_str() {
         Some("elementary") => morphiq_numerics_fuzz::check_input,
         Some("fast_elementary") => morphiq_numerics_fuzz::check_fast_input,
+        Some("strong_normal") => morphiq_numerics_fuzz::strong_normal::check_input,
         Some("fast_normal") => morphiq_numerics_fuzz::fast_normal::check_input,
         _ => panic!("unknown fuzz target: {target:?}"),
     };

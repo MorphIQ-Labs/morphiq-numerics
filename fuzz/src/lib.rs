@@ -1,10 +1,12 @@
-//! Unpublished MPFR oracles for elementary and accelerated fast normal APIs.
+//! Unpublished MPFR oracles for elementary and normal APIs.
 //!
 //! MPFR is used only through its public API; no oracle implementation is copied.
 use morphiq_numerics::{elementary as e, fast::elementary as fast};
 use rug::{Float, float::Round};
 
 pub mod fast_normal;
+mod normal_reference;
+pub mod strong_normal;
 
 /// Stable operation IDs in the corpus format (see README.md).
 #[derive(Clone, Copy, Debug)]
@@ -34,7 +36,15 @@ enum Bound {
     Relative(u32),
     LogAbsolute,
     Absolute(u32),
-    Mixed { relative: u32, absolute: u32 },
+    Mixed {
+        relative: u32,
+        absolute: u32,
+    },
+    /// |f| * (2^-53 + optional 2^-k) + 2^-1075 + optional 2^-j.
+    Normal {
+        relative_extra: Option<u32>,
+        absolute_extra: Option<u32>,
+    },
 }
 
 impl Operation {
@@ -156,6 +166,30 @@ fn same_bits(a: f64, b: f64) -> bool {
 fn limits(lo: &Float, hi: &Float, bound: Bound) -> Option<(Float, Float)> {
     let precision = lo.prec();
     match bound {
+        Bound::Normal {
+            relative_extra,
+            absolute_extra,
+        } => {
+            let a = lo.clone().abs();
+            let b = hi.clone().abs();
+            let (mut small, large) = if a <= b { (a, b) } else { (b, a) };
+            if lo <= &0 && hi >= &0 {
+                small = Float::with_val(precision, 0);
+            }
+            let allowance = |magnitude: Float, round| {
+                let mut limit = magnitude.clone() >> 53;
+                if let Some(k) = relative_extra {
+                    let extra = magnitude >> k;
+                    limit = Float::with_val_round(precision, &limit + &extra, round).0;
+                }
+                for k in [Some(1075), absolute_extra].into_iter().flatten() {
+                    let extra = Float::with_val(precision, 1) >> k;
+                    limit = Float::with_val_round(precision, &limit + &extra, round).0;
+                }
+                limit
+            };
+            Some((allowance(small, Round::Down), allowance(large, Round::Up)))
+        }
         Bound::Absolute(k) => {
             let limit = Float::with_val(precision, 1) >> k;
             Some((limit.clone(), limit))

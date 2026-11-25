@@ -54,3 +54,11 @@ test = false
 doc = false
 bench = false
 required-features = ["fuzzing"]
+
+[[bin]]
+name = "strong_normal"
+path = "fuzz_targets/strong_normal.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]
