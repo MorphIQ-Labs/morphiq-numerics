@@ -219,6 +219,35 @@ mod tests {
     }
 
     #[test]
+    fn logarithmic_formulas_enclose_direct_mpfr_where_both_are_representable() {
+        // Direct erfc at the signed argument is independent of the oracle's
+        // erfcx/log1p transformations. 2048 bits retain the positive tail even
+        // at x=40, well beyond binary64 probability underflow.
+        for x in [
+            -256.0,
+            -100.0,
+            -40.0,
+            -8.0_f64.next_up(),
+            -8.0,
+            -1.0,
+            1.0,
+            8.0,
+            38.5,
+            40.0,
+        ] {
+            let mut sqrt_two = Float::with_val(2048, 2);
+            sqrt_two.sqrt_mut();
+            let input = Float::with_val(2048, -x);
+            let mut direct = Float::with_val(2048, &input / &sqrt_two);
+            direct.erfc_mut();
+            direct >>= 1;
+            direct.ln_mut();
+            let (lo, hi) = normal_reference::log_cdf(x, 256);
+            assert!(lo < direct && direct < hi, "log-CDF overlap at {x}");
+        }
+    }
+
+    #[test]
     fn extreme_enclosures_refine_without_mpfr_underflow_or_overflow() {
         for (op, x) in [
             (Operation::Erfcx, f64::MAX),
