@@ -107,6 +107,14 @@ existing certificates, fixtures and CI remain the correctness authority.
 The ARM diagnostics report allocations, fallback identity and compositions
 outside the timed loops. x86 observations cover generated banks and controls;
 use the repository's existing allocation/code-generation checks separately.
+The ARM multi-pass CDF composition is a separate diagnostic calculation using
+public exp/erfcx calls. Its sampled absolute-error check remains required;
+its bit equality with the public CDF is recorded but is not an acceptance
+condition. The public CDF uses a different evaluation sequence and additionally
+guarantees relative lower-tail accuracy. Public scalar/slice identity,
+instrumented/uninstrumented identity, fallback identity and feedback-chain
+oracle checks remain required. Composition observations establish neither a
+whole-domain bound nor consumer qualification.
 
 ## Freeze, measure, decide
 
@@ -139,6 +147,12 @@ yet been given a declared placement.
 
 Calibration uses only the current host, not counts from a previous run. It
 retains every pilot, targets 600 ms per timed sample, and only increases counts.
+Short warmups or pilots can return zero when they span no clock tick (including
+empty slices on macOS). Calibration records those observations and doubles the
+pilot count when its fastest pilot is zero, within the existing ten-attempt
+limit. Negative readings, a zero confirmation after sufficiently long pilots,
+or failure to reach the pilot-duration floor still stop calibration. This does
+not admit zero-duration performance samples or change the timer implementation.
 Every accepted timed sample must be at least 250 ms. Each cell has ten independent
 processes, two paired rounds per process, alternating comparison order and
 warmups. Keep all measurements, including failures. Do not trim outliers or
