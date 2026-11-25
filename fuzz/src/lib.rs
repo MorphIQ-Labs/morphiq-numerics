@@ -6,6 +6,7 @@ use rug::{Float, float::Round};
 
 pub mod fast_normal;
 mod normal_reference;
+pub mod normal_sweep;
 pub mod strong_normal;
 
 /// Stable operation IDs in the corpus format (see README.md).
