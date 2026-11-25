@@ -15,7 +15,7 @@ if [[ "$(cargo fuzz --version)" != "cargo-fuzz $required" ]]; then
   exit 127
 fi
 mkdir -p target/fuzz/logs
-for target in elementary fast_elementary fast_normal; do
+for target in elementary fast_elementary fast_normal strong_normal; do
   python3 scripts/seed_elementary_fuzz.py "target/fuzz/seeds-$target" --target "$target"
 done
 # Includes planted wrong results, boundary violations and oracle midpoint tests.
@@ -32,7 +32,7 @@ for mode in scalar simd; do
     fuzz_features=fuzzing,simd
   fi
   cargo test --manifest-path fuzz/Cargo.toml --locked "${features[@]}" --lib
-  for target in elementary fast_elementary fast_normal; do
+  for target in elementary fast_elementary fast_normal strong_normal; do
     max_len=257
     if [[ "$target" != elementary ]]; then max_len=1041; fi
     seeds="target/fuzz/seeds-$target"

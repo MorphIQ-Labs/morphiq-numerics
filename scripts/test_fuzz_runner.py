@@ -63,13 +63,13 @@ if os.environ["FUZZ_RUNNER_FAIL_TEST"] == "1" and args[0] == "test":
                 self.assertIn("--no-default-features", tests[1])
                 self.assertEqual(tests[1][tests[1].index("--features") + 1], "simd")
                 replay = [args for args in calls if args[0] == "run"]
-                self.assertEqual(len(replay), 6)
-                expected_targets = {"elementary", "fast_elementary", "fast_normal"}
+                self.assertEqual(len(replay), 8)
+                expected_targets = {"elementary", "fast_elementary", "fast_normal", "strong_normal"}
                 self.assertEqual({args[args.index("--") + 1] for args in replay}, expected_targets)
                 for args in replay:
                     self.assertIn("--no-default-features", args)
                 campaigns = [args for args in calls if args[0].startswith("+")]
-                self.assertEqual(len(campaigns), 6)
+                self.assertEqual(len(campaigns), 8)
                 self.assertEqual({args[3] for args in campaigns}, expected_targets)
                 for args in campaigns:
                     self.assertIn("-max_len=" + ("257" if args[3] == "elementary" else "1041"), args)
@@ -106,6 +106,34 @@ class FastNormalSeeds(unittest.TestCase):
                     for sign in [0, 1 << 63]:
                         self.assertIn((center + delta) | sign, inputs[op])
             for word in [0, 1 << 63, 0x7FF0000000000000, 0xFFF0000000000000,
+                         0x7FF0000000000001, 0xFFFABCDE12345678]:
+                self.assertIn(word, inputs[op])
+
+
+class StrongNormalSeeds(unittest.TestCase):
+    def test_full_domain_inputs_and_all_slice_lengths_are_retained(self):
+        from scripts.seed_elementary_fuzz import strong_normal_seeds
+
+        inputs = {op: set() for op in range(3)}
+        lengths = {op: set() for op in range(3)}
+        for data in strong_normal_seeds():
+            op = data[0]
+            self.assertEqual((len(data) - 1) % 16, 0)
+            lengths[op].add((len(data) - 1) // 16)
+            inputs[op].update(struct.unpack_from("<Q", data, i)[0]
+                              for i in range(1, len(data), 16))
+        for op in range(3):
+            self.assertEqual(lengths[op], set(range(66)))
+            for center in [0x403AA0F4D2E063CF, 0x40433E21DC3F3BD8,
+                           0x402095B059D67C4D, 0x5FF6A09E667F3BCD,
+                           0x7FC20DD750429B6E]:
+                for delta in range(-3, 4):
+                    for sign in [0, 1 << 63]:
+                        self.assertIn((center + delta) | sign, inputs[op])
+            for exponent in range(1, 2047):
+                for sign in [0, 1 << 63]:
+                    self.assertIn((exponent << 52) | sign, inputs[op])
+            for word in [0, 1 << 63, 1, 0x7FEFFFFFFFFFFFFF,
                          0x7FF0000000000001, 0xFFFABCDE12345678]:
                 self.assertIn(word, inputs[op])
 
