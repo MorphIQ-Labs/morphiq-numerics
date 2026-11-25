@@ -94,7 +94,7 @@ mod tests {
                     .visit(|packet| {
                         assert_eq!(packet[0], 2);
                         assert!(packet.len() <= 1 + 16 * LANES);
-                        for pair in packet[1..].chunks_exact(16) {
+                        for pair in packet[1..].as_chunks::<16>().0 {
                             observed.push(u64::from_le_bytes(pair[..8].try_into().unwrap()));
                             assert_eq!(&pair[8..], &[0; 8]);
                         }
