@@ -370,6 +370,18 @@ jobs:
       - name: MPFR elementary oracle, regression replay and short campaigns
         if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
         run: ./scripts/check_fuzz.sh 60
+      - name: Normal boundary sweep smoke and coverage controls
+        if: ${{ needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
+        run: |
+          python3 -m unittest scripts.test_normal_sweeps
+          python3 scripts/check_normal_sweeps.py "target/normal-sweeps/${{ github.run_id }}-${{ github.run_attempt }}" --profile smoke
+      - name: Retain boundary sweep coverage and failures
+        if: ${{ always() && needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: normal-sweep-smoke-${{ matrix.os }}
+          path: target/normal-sweeps/
+          retention-days: 14
       - name: Retain fuzz failures, logs and evolved corpora
         if: ${{ always() && needs.repository-hygiene.outputs.prose_only != 'true' && (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-15') }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0

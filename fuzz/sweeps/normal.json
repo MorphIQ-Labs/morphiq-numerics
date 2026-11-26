@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "windows": [
+    {
+      "name": "erfcx-negative-overflow",
+      "operation": "erfcx",
+      "first": "c03aa0f4d2e05bcf",
+      "last": "c03aa0f4d2e06bcf",
+      "anchor": "c03aa0f4d2e063cf",
+      "source": "docs/erfcx.md (boundary encodings and scalar kernels)"
+    },
+    {
+      "name": "erfcx-negative-rounds-one",
+      "operation": "erfcx",
+      "first": "bc9c5bf891b4e769",
+      "last": "bc9c5bf891b4f769",
+      "anchor": "bc9c5bf891b4ef69",
+      "source": "docs/erfcx.md (boundary encodings and scalar kernels)"
+    },
+    {
+      "name": "erfcx-positive-rounds-one",
+      "operation": "erfcx",
+      "first": "3c8c5bf891b4e76b",
+      "last": "3c8c5bf891b4f76b",
+      "anchor": "3c8c5bf891b4ef6b",
+      "source": "docs/erfcx.md (boundary encodings and scalar kernels)"
+    },
+    {
+      "name": "erfcx-reflection-table",
+      "operation": "erfcx",
+      "first": "bfdffffffffff800",
+      "last": "bfe0000000000800",
+      "anchor": "bfe0000000000000",
+      "source": "docs/erfcx.md (boundary encodings and scalar kernels)"
+    },
+    {
+      "name": "erfcx-table-binade-one",
+      "operation": "erfcx",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "docs/erfcx.md (boundary encodings and scalar kernels)"
+    },
+    {
+      "name": "erfcx-table-middle-tail",
+      "operation": "erfcx",
+      "first": "402ffffffffff800",
+      "last": "4030000000000800",
+      "anchor": "4030000000000000",
+      "source": "docs/erfcx.md (boundary encodings and scalar kernels)"
+    },
+    {
+      "name": "erfcx-middle-large-tail",
+      "operation": "erfcx",
+      "first": "407ffffffffff800",
+      "last": "4080000000000800",
+      "anchor": "4080000000000000",
+      "source": "docs/erfcx.md (boundary encodings and scalar kernels)"
+    },
+    {
+      "name": "erfcx-large-scaled-tail",
+      "operation": "erfcx",
+      "first": "77fe494034e7965c",
+      "last": "77fe494034e7a65c",
+      "anchor": "77fe494034e79e5c",
+      "source": "docs/erfcx.md (boundary encodings and scalar kernels)"
+    },
+    {
+      "name": "erfcx-positive-subnormal",
+      "operation": "erfcx",
+      "first": "7fc20dd75042936e",
+      "last": "7fc20dd75042a36e",
+      "anchor": "7fc20dd750429b6e",
+      "source": "docs/erfcx.md (boundary encodings and scalar kernels)"
+    },
+    {
+      "name": "erfcx-largest-positive",
+      "operation": "erfcx",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "docs/erfcx.md (boundary encodings and scalar kernels)"
+    },
+    {
+      "name": "cdf-positive-zero",
+      "operation": "cdf",
+      "first": "0000000000000000",
+      "last": "0000000000000800",
+      "anchor": "0000000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "cdf-negative-zero",
+      "operation": "cdf",
+      "first": "8000000000000000",
+      "last": "8000000000000800",
+      "anchor": "8000000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "cdf-positive-small",
+      "operation": "cdf",
+      "first": "3ddffffffffff800",
+      "last": "3de0000000000800",
+      "anchor": "3de0000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "cdf-negative-small",
+      "operation": "cdf",
+      "first": "bddffffffffff800",
+      "last": "bde0000000000800",
+      "anchor": "bde0000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "cdf-positive-central",
+      "operation": "cdf",
+      "first": "3fdffffffffff800",
+      "last": "3fe0000000000800",
+      "anchor": "3fe0000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "cdf-negative-central",
+      "operation": "cdf",
+      "first": "bfdffffffffff800",
+      "last": "bfe0000000000800",
+      "anchor": "bfe0000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "cdf-negative-far-tail",
+      "operation": "cdf",
+      "first": "c036fffffffff800",
+      "last": "c037000000000800",
+      "anchor": "c037000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "cdf-negative-fast-limit",
+      "operation": "cdf",
+      "first": "c0427ffffffff800",
+      "last": "c042800000000800",
+      "anchor": "c042800000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "log_cdf-positive-zero",
+      "operation": "log_cdf",
+      "first": "0000000000000000",
+      "last": "0000000000000800",
+      "anchor": "0000000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "log_cdf-negative-zero",
+      "operation": "log_cdf",
+      "first": "8000000000000000",
+      "last": "8000000000000800",
+      "anchor": "8000000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "log_cdf-positive-small",
+      "operation": "log_cdf",
+      "first": "3ddffffffffff800",
+      "last": "3de0000000000800",
+      "anchor": "3de0000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "log_cdf-negative-small",
+      "operation": "log_cdf",
+      "first": "bddffffffffff800",
+      "last": "bde0000000000800",
+      "anchor": "bde0000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "log_cdf-positive-central",
+      "operation": "log_cdf",
+      "first": "3fdffffffffff800",
+      "last": "3fe0000000000800",
+      "anchor": "3fe0000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "log_cdf-negative-central",
+      "operation": "log_cdf",
+      "first": "bfdffffffffff800",
+      "last": "bfe0000000000800",
+      "anchor": "bfe0000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "log_cdf-negative-far-tail",
+      "operation": "log_cdf",
+      "first": "c036fffffffff800",
+      "last": "c037000000000800",
+      "anchor": "c037000000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "log_cdf-negative-fast-limit",
+      "operation": "log_cdf",
+      "first": "c0427ffffffff800",
+      "last": "c042800000000800",
+      "anchor": "c042800000000000",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "cdf-rounds-one",
+      "operation": "cdf",
+      "first": "402095b059d6744d",
+      "last": "402095b059d6844d",
+      "anchor": "402095b059d67c4d",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "cdf-rounds-zero",
+      "operation": "cdf",
+      "first": "c0433e21dc3f33d8",
+      "last": "c0433e21dc3f43d8",
+      "anchor": "c0433e21dc3f3bd8",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "log_cdf-rounds-negative-zero",
+      "operation": "log_cdf",
+      "first": "40433e21dc3f33d8",
+      "last": "40433e21dc3f43d8",
+      "anchor": "40433e21dc3f3bd8",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    },
+    {
+      "name": "log_cdf-negative-overflow",
+      "operation": "log_cdf",
+      "first": "dff6a09e667f33cd",
+      "last": "dff6a09e667f43cd",
+      "anchor": "dff6a09e667f3bcd",
+      "source": "docs/normal.md (generated boundaries and composition regions)"
+    }
+  ]
+}

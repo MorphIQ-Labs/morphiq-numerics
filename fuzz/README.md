@@ -252,3 +252,66 @@ violation into a weaker tolerance or a discarded input.
 Oracle API documentation: [rug Float](https://docs.rs/rug/1.30.0/rug/struct.Float.html).
 Fuzzer usage: [Rust Fuzz Book](https://rust-fuzz.github.io/book/cargo-fuzz.html).
 No external numerical implementation source is used by this harness.
+
+## Deterministic normal boundary sweeps
+
+[`sweeps/normal.json`](sweeps/normal.json) declares 30 finite binary64 windows
+for strong erfcx, CDF and log-CDF. They surround the documented overflow,
+underflow and saturation thresholds, central/tail region joins, selected
+binade boundaries, signed zeros and erfcx's largest positive input. These are
+explicitly selected windows, not all internal rounding-test transitions or the
+whole binary64 domain. Each row gives a stable name, operation, inclusive first
+and last encodings, a smoke anchor, and the source of its boundary.
+
+The enumerator visits every integer encoding between the endpoints exactly
+once, in packets of up to 65 lanes. On the negative side, increasing encoding
+means decreasing numerical value; both endpoints still belong to the window.
+Windows have one sign, contain only finite values, and cannot overlap for the
+same function. Zero and largest-finite windows are clipped to their finite sign
+domain. Every other window spans 2048 encodings on each side of its anchor.
+One invocation is limited to 1,048,576 inputs and rejects malformed windows.
+
+The full plan contains **112,670 inputs per feature mode**, or **225,340 checks
+per host** across scalar and `simd,std` builds. Every input uses the same
+contract-aware MPFR oracle and scalar/slice bit comparison as `strong_normal`.
+Correct rounding is required where established; bounded-result domains retain
+their published bounds. The sweep does not inspect or infer internal path
+coverage from sampled public results. Other functions and exhaustive f32
+analogue coverage are outside this plan.
+
+```sh
+# NEW_DIRECTORY must not already exist; all attempts remain separate.
+python3 scripts/check_normal_sweeps.py target/normal-sweeps/my-run
+# PR smoke: at most five encodings per window, explicitly partial coverage.
+python3 scripts/check_normal_sweeps.py target/normal-sweeps/my-smoke --profile smoke
+```
+
+The runner builds the unpublished `normal-sweep` binary with the pinned stable
+toolchain and locked oracle dependencies; no nightly or sanitizer is needed for
+deterministic enumeration. The weekly/manual `normal-sweeps.yml` workflow runs
+the full plan on native Linux x86-64 and macOS ARM. Existing required PR test
+jobs execute the smoke profile and runner controls on both hosts. Smoke success
+does not establish a completed full-window campaign.
+
+Each attempt retains its manifest, revision, working-tree status, manifest and
+oracle-lock hashes, toolchain, host, feature modes, expected count, and exact
+completed ranges in `coverage.json`. Build and per-window logs are retained
+alongside it. A clean working tree identifies the recorded source revision;
+dirty-tree runs are explicitly identified and are not clean-revision evidence.
+The top-level status becomes `passed` only after both modes finish and the
+reported count equals the declared count. A timeout or interruption leaves a
+failed job and an incomplete/failed receipt; completed windows remain visible.
+
+Oracle failures retain a `.packet` in the existing `strong_normal` format and
+propagate failure. Completed counts exclude the entire failed window. Replay a
+retained packet using its recorded feature mode:
+
+```sh
+cargo run --release --locked --manifest-path fuzz/Cargo.toml --no-default-features \
+  --features simd --bin replay -- strong_normal target/normal-sweeps/my-run/simd/WINDOW.packet
+```
+
+Artifacts, including failures and partial coverage, are uploaded for 14 days.
+Exhaustiveness applies only to completed declared windows at the recorded
+source and settings; it is neither a whole-domain proof nor native performance
+evidence.
