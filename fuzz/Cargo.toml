@@ -70,3 +70,11 @@ test = false
 doc = false
 bench = false
 required-features = ["fuzzing"]
+
+[[bin]]
+name = "arithmetic"
+path = "fuzz_targets/arithmetic.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]

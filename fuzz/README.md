@@ -203,6 +203,27 @@ allowance and accept valid non-CR results. The retained `tail-boundaries` packet
 contains exact binary64 inputs spanning finite log tails, overflow, and
 underflow; it is a coverage witness, not a known library defect.
 
+## Arithmetic target
+
+`arithmetic` checks `eft`, `ulp` and `double_word` against exact MPFR values and
+the contracts in [double-word.md](../docs/double-word.md) and
+[ulp.md](../docs/ulp.md). At 4400 bits every sum and product it forms is exact,
+and quotient bounds are checked by multiplying through.
+
+- `two_sum`, `fast_two_sum` and `two_prod` are exact on their stated domains,
+  with the correctly rounded head. Nothing is claimed outside them.
+- Each `checked_` operation must admit exactly the operands its published
+  hypotheses admit, repeat the unchecked result bit for bit, return a double
+  word and meet the table's relative bound. The reason reported on rejection is
+  covered by `crates/reference/tests/checked.rs`, not here.
+- `exp_split` meets `16u²` on its domain, with its stated value and exponent
+  ranges, and returns `None` outside it.
+- The ULP utilities match the definitions from the binary64 encoding.
+
+Its corpus format is up to sixteen records of four little-endian encodings. The
+retained `product-underflow-edge` input is a product below `2^-969` that rounds
+to it; it is a boundary witness, not a known library defect.
+
 ## Run and replay
 
 On Apple Silicon macOS or native x86-64 Linux, with the repository toolchain,
@@ -222,7 +243,7 @@ change. AddressSanitizer and coverage instrumentation are enabled for fuzz runs.
 Each run replays the versioned strong elementary inputs and fast inputs from
 `fast.json`, `fast_ln.json` and `fast_log_cdf.json`, plus strong normal inputs
 from `erfcx.json` and `normal.json`, then mutates each target for the
-requested number of seconds **per target and feature mode** (ten campaigns).
+requested number of seconds **per target and feature mode** (twelve campaigns).
 Target names after the duration run only those targets, and
 `./scripts/check_fuzz.sh --list` prints them.
 Expected fixture outputs are not imported. The seed encoder adds both signs of

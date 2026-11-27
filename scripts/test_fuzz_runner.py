@@ -63,14 +63,14 @@ if os.environ["FUZZ_RUNNER_FAIL_TEST"] == "1" and args[0] == "test":
                 self.assertIn("--no-default-features", tests[1])
                 self.assertEqual(tests[1][tests[1].index("--features") + 1], "simd")
                 replay = [args for args in calls if args[0] == "run"]
-                self.assertEqual(len(replay), 10)
+                self.assertEqual(len(replay), 12)
                 expected_targets = {"elementary", "fast_elementary", "fast_normal", "strong_normal",
-                                    "strong_density"}
+                                    "strong_density", "arithmetic"}
                 self.assertEqual({args[args.index("--") + 1] for args in replay}, expected_targets)
                 for args in replay:
                     self.assertIn("--no-default-features", args)
                 campaigns = [args for args in calls if args[0].startswith("+")]
-                self.assertEqual(len(campaigns), 10)
+                self.assertEqual(len(campaigns), 12)
                 self.assertEqual({args[3] for args in campaigns}, expected_targets)
                 for args in campaigns:
                     self.assertIn("-max_len=" + ("257" if args[3] == "elementary" else "1041"), args)
