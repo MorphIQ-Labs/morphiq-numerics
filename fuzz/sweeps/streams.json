@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "windows": [
+    {
+      "name": "word-zero",
+      "operation": "words",
+      "first": "0000000000000000",
+      "last": "0000000000000800",
+      "anchor": "0000000000000000",
+      "source": "docs/random.md uniform extremes",
+      "fixed": [
+        "0000000000000000"
+      ]
+    },
+    {
+      "name": "word-largest",
+      "operation": "words",
+      "first": "fffffffffffff7ff",
+      "last": "ffffffffffffffff",
+      "anchor": "ffffffffffffffff",
+      "source": "docs/random.md uniform extremes",
+      "fixed": [
+        "ffffffffffffffff"
+      ]
+    },
+    {
+      "name": "octant-0",
+      "operation": "words",
+      "first": "00000003038ff800",
+      "last": "0000000303900800",
+      "anchor": "0000000303900000",
+      "source": "docs/random.md octant boundary",
+      "fixed": [
+        "0000000000000000"
+      ]
+    },
+    {
+      "name": "octant-1",
+      "operation": "words",
+      "first": "00000003038ff800",
+      "last": "0000000303900800",
+      "anchor": "0000000303900000",
+      "source": "docs/random.md octant boundary",
+      "fixed": [
+        "2000000000000000"
+      ]
+    },
+    {
+      "name": "octant-2",
+      "operation": "words",
+      "first": "00000003038ff800",
+      "last": "0000000303900800",
+      "anchor": "0000000303900000",
+      "source": "docs/random.md octant boundary",
+      "fixed": [
+        "4000000000000000"
+      ]
+    },
+    {
+      "name": "octant-3",
+      "operation": "words",
+      "first": "00000003038ff800",
+      "last": "0000000303900800",
+      "anchor": "0000000303900000",
+      "source": "docs/random.md octant boundary",
+      "fixed": [
+        "6000000000000000"
+      ]
+    },
+    {
+      "name": "octant-4",
+      "operation": "words",
+      "first": "00000003038ff800",
+      "last": "0000000303900800",
+      "anchor": "0000000303900000",
+      "source": "docs/random.md octant boundary",
+      "fixed": [
+        "8000000000000000"
+      ]
+    },
+    {
+      "name": "octant-5",
+      "operation": "words",
+      "first": "00000003038ff800",
+      "last": "0000000303900800",
+      "anchor": "0000000303900000",
+      "source": "docs/random.md octant boundary",
+      "fixed": [
+        "a000000000000000"
+      ]
+    },
+    {
+      "name": "octant-6",
+      "operation": "words",
+      "first": "00000003038ff800",
+      "last": "0000000303900800",
+      "anchor": "0000000303900000",
+      "source": "docs/random.md octant boundary",
+      "fixed": [
+        "c000000000000000"
+      ]
+    },
+    {
+      "name": "octant-7",
+      "operation": "words",
+      "first": "00000003038ff800",
+      "last": "0000000303900800",
+      "anchor": "0000000303900000",
+      "source": "docs/random.md octant boundary",
+      "fixed": [
+        "e000000000000000"
+      ]
+    }
+  ]
+}

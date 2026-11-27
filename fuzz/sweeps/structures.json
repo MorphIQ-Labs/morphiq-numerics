@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "windows": [
+    {
+      "name": "exp-overflow",
+      "operation": "interval",
+      "first": "40862e42fefa31ef",
+      "last": "40862e42fefa41ef",
+      "anchor": "40862e42fefa39ef",
+      "source": "docs/interval.md exp range refusal",
+      "fixed": [
+        "0000000000000000"
+      ]
+    },
+    {
+      "name": "zero-denominator",
+      "operation": "interval",
+      "first": "0000000000000000",
+      "last": "0000000000000800",
+      "anchor": "0000000000000000",
+      "source": "docs/interval.md division domain",
+      "fixed": [
+        "3ff0000000000000"
+      ]
+    },
+    {
+      "name": "largest",
+      "operation": "interval",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "docs/interval.md outward neighbour range",
+      "fixed": [
+        "3ff0000000000000"
+      ]
+    },
+    {
+      "name": "square-root-zero",
+      "operation": "interval",
+      "first": "0000000000000000",
+      "last": "0000000000000801",
+      "anchor": "0000000000000001",
+      "source": "docs/interval.md subnormal enclosure",
+      "fixed": [
+        "4000000000000000"
+      ]
+    }
+  ]
+}

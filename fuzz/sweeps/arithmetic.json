@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "windows": [
+    {
+      "name": "exp-split-limit",
+      "operation": "double_word",
+      "first": "4096bbfffffff800",
+      "last": "4096bc0000000800",
+      "anchor": "4096bc0000000000",
+      "source": "docs/double-word.md exponential domain",
+      "fixed": [
+        "3d06849b86a12b9b",
+        "4000000000000000",
+        "0000000000000000"
+      ]
+    },
+    {
+      "name": "product-underflow",
+      "operation": "double_word",
+      "first": "219ffffffffff800",
+      "last": "21a0000000000800",
+      "anchor": "21a0000000000000",
+      "source": "docs/double-word.md two_prod domain",
+      "fixed": [
+        "0000000000000000",
+        "21b0000000000000",
+        "0000000000000000"
+      ]
+    },
+    {
+      "name": "sum-magnitude",
+      "operation": "double_word",
+      "first": "7faffffffffff800",
+      "last": "7fb0000000000800",
+      "anchor": "7fb0000000000000",
+      "source": "docs/double-word.md two_sum domain",
+      "fixed": [
+        "3ff0000000000000",
+        "3ff0000000000000",
+        "0000000000000000"
+      ]
+    },
+    {
+      "name": "add-magnitude",
+      "operation": "double_word",
+      "first": "7f6ffffffffff800",
+      "last": "7f70000000000800",
+      "anchor": "7f70000000000000",
+      "source": "docs/double-word.md add domain",
+      "fixed": [
+        "3ff0000000000000",
+        "7f70000000000000",
+        "3ff0000000000000"
+      ]
+    },
+    {
+      "name": "mul-magnitude",
+      "operation": "double_word",
+      "first": "5faffffffffff800",
+      "last": "5fb0000000000800",
+      "anchor": "5fb0000000000000",
+      "source": "docs/double-word.md mul domain",
+      "fixed": [
+        "3ff0000000000000",
+        "4008000000000000",
+        "0000000000000000"
+      ]
+    },
+    {
+      "name": "quotient-range",
+      "operation": "double_word",
+      "first": "4e3ffffffffff800",
+      "last": "4e40000000000800",
+      "anchor": "4e40000000000000",
+      "source": "docs/double-word.md division domain",
+      "fixed": [
+        "3ff0000000000000",
+        "31a0000000000000",
+        "0000000000000000"
+      ]
+    }
+  ]
+}
