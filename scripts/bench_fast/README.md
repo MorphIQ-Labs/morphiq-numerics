@@ -520,7 +520,10 @@ their original policy and results; they are not amended or relabelled.
 
 Each paired round visits all 256 ABI-aligned stack positions modulo
 4 KiB, giving each position equal work for each product. The native trampoline
-sets the stack outside the clocks, and every observed position is checked. At
+sets the stack outside the clocks, and every observed position is checked. It
+reads the timer's stack address with a zero-work call before each chunk, from the
+same native frame, because the Python caller's depth can change between identical
+calls. At
 successive positions the starting product alternates; it also alternates across
 processes and rounds. This balances address-dependent costs and reduces the time
 between paired measurements during execution-state transitions.

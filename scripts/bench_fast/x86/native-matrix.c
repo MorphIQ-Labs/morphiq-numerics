@@ -51,7 +51,8 @@ static int inner_warmup = 1;
 void bench_set_inner_warmup(int enabled) { inner_warmup = enabled != 0; }
 /* The uniform first argument matches the public ctypes calling interface. */
 typedef uint64_t (*sample_timer)(void *, const double *, double *, size_t, uint64_t);
-BENCH_TARGET __attribute__((noinline)) uint64_t bench_with_stack(
+uintptr_t bench_last_stack_address(void);
+static BENCH_TARGET __attribute__((noinline)) uint64_t call_padded(
     sample_timer measure, void *function, const double *x, double *y,
     size_t n, uint64_t count, size_t padding) {
     volatile unsigned char *pad = __builtin_alloca(padding + 64);
@@ -60,6 +61,23 @@ BENCH_TARGET __attribute__((noinline)) uint64_t bench_with_stack(
     uint64_t elapsed = measure(function, x, y, n, count);
     __asm__ volatile("" :: "r"(pad) : "memory");
     if (pad[0] != 1) __builtin_trap();
+    return elapsed;
+}
+/* Time one sample with the timer's stack pointer at `offset` modulo 4 KiB
+ * (a multiple of 16). The caller's stack depth is not stable: an interpreter
+ * can change it between identical calls. So each sample first makes a zero-work
+ * call to read the timer's address from this frame. The volatile pointer keeps
+ * both calls on one out-of-line body, and the final barrier forbids a tail call,
+ * which would enter that body at a different depth. */
+BENCH_TARGET __attribute__((noinline)) uint64_t bench_at_stack_offset(
+    sample_timer measure, void *function, const double *x, double *y,
+    size_t n, uint64_t count, size_t offset) {
+    uint64_t (*volatile call)(sample_timer, void *, const double *, double *,
+                              size_t, uint64_t, size_t) = call_padded;
+    call(measure, function, x, y, 0, 0, 0);
+    size_t padding = (bench_last_stack_address() - offset) & 4095;
+    uint64_t elapsed = call(measure, function, x, y, n, count, padding);
+    __asm__ volatile("" ::: "memory");
     return elapsed;
 }
 static inline BENCH_TARGET __attribute__((always_inline)) void capture_stack(void) {

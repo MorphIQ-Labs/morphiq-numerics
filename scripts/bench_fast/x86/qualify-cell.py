@@ -202,30 +202,22 @@ def main():
     # SysV x86-64 call sites use 16-byte stack alignment. Cover every such
     # position modulo 4 KiB instead of sampling a few ASLR-selected positions.
     stack_offsets = list(range(0, PAGE, 16))
-    stack_bases = {}
     measurement_id = 0
     chunks = None
     if args.balanced_stack:
         native.bench_set_inner_warmup.argtypes = [C.c_int]
         native.bench_set_inner_warmup.restype = None
         native.bench_set_inner_warmup(0)
-        native.bench_with_stack.argtypes = [C.c_void_p, C.c_void_p, D, D,
-                                            C.c_size_t, C.c_uint64, C.c_size_t]
-        native.bench_with_stack.restype = C.c_uint64
+        native.bench_at_stack_offset.argtypes = [C.c_void_p, C.c_void_p, D, D,
+                                                 C.c_size_t, C.c_uint64, C.c_size_t]
+        native.bench_at_stack_offset.restype = C.c_uint64
         chunks = (out/'chunks.jsonl').open('x')
 
     def stack_sample(name, count, offset, kind, round_number, parent):
         ptr, method = entries[name]
         timer = C.cast(getattr(native, method), C.c_void_p).value
-        if method not in stack_bases:
-            # Placement probe performs zero numerical calls; it is not a sample.
-            native.bench_with_stack(timer, ptr, x, y, args.length, 0, 0)
-            stack_bases[method] = stack_address()
-            if stack_bases[method] % 16:
-                raise RuntimeError('Native timer stack is not ABI aligned')
-        padding = (stack_bases[method]-offset) % PAGE
         start = time.monotonic_ns()
-        elapsed = int(native.bench_with_stack(timer, ptr, x, y, args.length, count, padding))
+        elapsed = int(native.bench_at_stack_offset(timer, ptr, x, y, args.length, count, offset))
         stop = time.monotonic_ns()
         actual = stack_address()
         row = dict(name=name, kind=kind, round=round_number, measurement_id=parent,
