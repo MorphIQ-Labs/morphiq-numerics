@@ -141,3 +141,57 @@ pub(super) fn log_cdf(x: f64, p: u32) -> (Float, Float) {
         (lo, hi)
     }
 }
+
+/// phi(x) = exp(-x²/2) / sqrt(2 pi). The binary64 square is exact at p >= 256,
+/// and |x| <= 40 keeps the exponential inside MPFR's default exponent range.
+pub(super) fn pdf(x: f64, p: u32) -> (Float, Float) {
+    assert!(x.is_finite() && x.abs() <= 40.0);
+    let input = Float::with_val(p, x);
+    let half_square: Float = Float::with_val(p, &input * &input) >> 1;
+    let exponent = -half_square;
+    let (mut lo, mut hi) = (exponent.clone(), exponent);
+    lo.exp_round(Round::Down);
+    hi.exp_round(Round::Up);
+    let (mut root_lo, mut root_hi) = two_pi(p);
+    root_lo.sqrt_round(Round::Down);
+    root_hi.sqrt_round(Round::Up);
+    (
+        Float::with_val_round(p, &lo / &root_hi, Round::Down).0,
+        Float::with_val_round(p, &hi / &root_lo, Round::Up).0,
+    )
+}
+
+/// ln phi(x) = -x²/2 - ln(2 pi)/2, for every finite x.
+pub(super) fn log_pdf(x: f64, p: u32) -> (Float, Float) {
+    assert!(x.is_finite());
+    let input = Float::with_val(p, x);
+    let half_square = Float::with_val(p, &input * &input) >> 1;
+    let (mut c_lo, mut c_hi) = two_pi(p);
+    c_lo.ln_round(Round::Down);
+    c_hi.ln_round(Round::Up);
+    c_lo >>= 1;
+    c_hi >>= 1;
+    let magnitude_lo = Float::with_val_round(p, &half_square + &c_lo, Round::Down).0;
+    let magnitude_hi = Float::with_val_round(p, &half_square + &c_hi, Round::Up).0;
+    (-magnitude_hi, -magnitude_lo)
+}
+
+/// Phi(x) - 1/2 = erf(x / sqrt 2) / 2, which is odd and increasing.
+pub(super) fn centered(x: f64, p: u32) -> (Float, Float) {
+    assert!(x.is_finite() && x.abs() <= 40.0);
+    let (mut lo, mut hi) = scaled_argument(x, p);
+    lo.erf_round(Round::Down);
+    hi.erf_round(Round::Up);
+    let (lo, hi): (Float, Float) = (lo >> 1, hi >> 1);
+    if x.is_sign_negative() {
+        (-hi, -lo)
+    } else {
+        (lo, hi)
+    }
+}
+
+fn two_pi(p: u32) -> (Float, Float) {
+    let lo = Float::with_val_round(p, Constant::Pi, Round::Down).0 << 1;
+    let hi = Float::with_val_round(p, Constant::Pi, Round::Up).0 << 1;
+    (lo, hi)
+}
