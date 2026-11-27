@@ -211,12 +211,36 @@ def arithmetic_seeds():
         yield b"".join(struct.pack("<QQQQ", *r) for r in records[start:start + 16])
 
 
+def reduction_seeds():
+    # [operation, decoding mode, moment split] then little-endian words.
+    def encode(op, mode, split, values):
+        words = [struct.unpack("<Q", struct.pack("<d", v))[0] for v in values]
+        return bytes([op, mode, split]) + b"".join(struct.pack("<Q", w) for w in words)
+
+    tiny = 5e-324
+    slices = [
+        [], [-0.0], [0.0, -0.0, 0.0], [1.0, 2.0 ** -53, -1.0, -1.0],
+        [1e16, 1e16 + 2, 1e16 + 4], [1e300, -1e300, 1e-300, 3.0],
+        [tiny, tiny, -tiny, 0.5], [-800.0, -800.0, -801.5],
+        [0.0, -0.6931471805599453, -745.0, -746.0, -1000.0],
+        [1.7976931348623157e308, -1.7976931348623157e308],
+        [float("-inf")] * 2, [float("inf"), float("nan"), 1.0],
+    ]
+    slices += [[-100.0 - i / 7 for i in range(count)]
+               for count in [1, 2, 7, 15, 16, 31, 32, 33, 63, 64]]
+    for values in slices:
+        for op in range(3):
+            for mode in range(3):
+                yield encode(op, mode, len(values) // 2, values)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
     targets = {"elementary": seeds, "fast_elementary": fast_seeds,
                "fast_normal": fast_normal_seeds, "strong_normal": strong_normal_seeds,
-               "strong_density": strong_density_seeds, "arithmetic": arithmetic_seeds}
+               "strong_density": strong_density_seeds, "arithmetic": arithmetic_seeds,
+               "reductions": reduction_seeds}
     parser.add_argument("--target", choices=targets, default="elementary")
     args = parser.parse_args()
     args.directory.mkdir(parents=True, exist_ok=True)

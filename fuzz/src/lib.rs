@@ -8,6 +8,7 @@ pub mod arithmetic;
 pub mod fast_normal;
 mod normal_reference;
 pub mod normal_sweep;
+pub mod reductions;
 pub mod strong_density;
 pub mod strong_normal;
 

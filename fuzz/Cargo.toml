@@ -78,3 +78,11 @@ test = false
 doc = false
 bench = false
 required-features = ["fuzzing"]
+
+[[bin]]
+name = "reductions"
+path = "fuzz_targets/reductions.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]

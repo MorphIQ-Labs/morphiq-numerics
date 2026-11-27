@@ -224,6 +224,31 @@ Its corpus format is up to sixteen records of four little-endian encodings. The
 retained `product-underflow-edge` input is a product below `2^-969` that rounds
 to it; it is a boundary witness, not a known library defect.
 
+## Reductions target
+
+`reductions` checks `reduce`, including `Moments2`, and `log_space` on slices of
+up to 64 finite or special values. At 8600 bits the sums, products and squared
+sums are exact, so the algebraic bounds are checked without division.
+
+- [reduce.md](../docs/reduce.md): the `sum`, `sum2`, `dot` and `dot2` bounds on
+  their stated domains (here with `S <= 2^1019`, and operands at most `2^510`
+  for `dot2`); sum-of-squares identity with the dot products; exact `max_abs`;
+  empty slices.
+- [moments.md](../docs/moments.md): each successful readout encloses the exact
+  statistic; failed pushes and merges leave the receiver unchanged; merge leaves
+  its operand unchanged. Which checked-arithmetic refusals occur is not judged.
+- [log_space.md](../docs/log_space.md): special values and the `log_sum_exp` and
+  `log_diff_exp` bounds against directed MPFR enclosures; the pair records'
+  stated operations and refusals.
+- [log_normalize.md](../docs/log_normalize.md): refusals leave the output
+  untouched, and the returned radius covers every normalized component. A
+  refusal for an unrepresentable component must be near the overflow threshold.
+
+Byte 0 selects reductions, moments or log space; byte 1 selects how the words
+form a slice (as given, clustered around the first, or nearly cancelling); byte
+2 places the moment split. The retained `cancelling-log-sum` input has a log-sum
+near zero; it is a coverage witness, not a known library defect.
+
 ## Run and replay
 
 On Apple Silicon macOS or native x86-64 Linux, with the repository toolchain,
@@ -243,7 +268,7 @@ change. AddressSanitizer and coverage instrumentation are enabled for fuzz runs.
 Each run replays the versioned strong elementary inputs and fast inputs from
 `fast.json`, `fast_ln.json` and `fast_log_cdf.json`, plus strong normal inputs
 from `erfcx.json` and `normal.json`, then mutates each target for the
-requested number of seconds **per target and feature mode** (twelve campaigns).
+requested number of seconds **per target and feature mode** (fourteen campaigns).
 Target names after the duration run only those targets, and
 `./scripts/check_fuzz.sh --list` prints them.
 Expected fixture outputs are not imported. The seed encoder adds both signs of
