@@ -272,6 +272,30 @@ whether the coefficients are shaped into a dominant or sign-patterned matrix.
 The retained `near-overflow-intervals` input is a boundary witness, not a known
 library defect.
 
+## Streams and bivariate targets
+
+`streams` checks `random` and `fast::random` over arbitrary words:
+SplitMix64 and xoshiro256++ outputs and seeding against the specification in
+wider integers; jumps commuting with a step and distributing over exclusive or
+(the jump distances are checked in `crates/reference/tests/random.rs`); exact
+uniforms; the strong normal pair bit for bit against the specification with
+correctly rounded MPFR operations; and the fast pair within `2^-38` of it, with
+its zero signs and slice identity ([random.md](../docs/random.md),
+[fast_random.md](../docs/fast_random.md)). The retained `octant-extremes` packet
+is a boundary witness, not a known library defect. `double-rounding` is an oracle
+regression: a product rounded twice there disagreed with the library, which an
+independent mpmath evaluation confirmed.
+
+`bivariate` checks `bivariate_normal`: special values, symmetry, saturation,
+evaluator and slice identity, the reported bound, and the absolute error against
+Plackett's identity integrated from correlation -1 by tanh-sinh quadrature at 128
+bits ([bivariate_normal.md](../docs/bivariate_normal.md) §2 and §6). The
+reference is refined until successive levels agree to `2^-73`; that convergence
+test is numerical evidence, not a proved quadrature error bound, and an
+unresolved integral fails. The allowance is section 6's bound rounded up in the
+fourth digit, as `absolute_error_bound` returns it. The retained
+`high-correlation-peak` input comes from section 3 of that document.
+
 ## Run and replay
 
 On Apple Silicon macOS or native x86-64 Linux, with the repository toolchain,
@@ -291,7 +315,7 @@ change. AddressSanitizer and coverage instrumentation are enabled for fuzz runs.
 Each run replays the versioned strong elementary inputs and fast inputs from
 `fast.json`, `fast_ln.json` and `fast_log_cdf.json`, plus strong normal inputs
 from `erfcx.json` and `normal.json`, then mutates each target for the
-requested number of seconds **per target and feature mode** (sixteen campaigns).
+requested number of seconds **per target and feature mode** (twenty campaigns).
 Target names after the duration run only those targets, and
 `./scripts/check_fuzz.sh --list` prints them.
 Expected fixture outputs are not imported. The seed encoder adds both signs of

@@ -374,6 +374,8 @@ pub fn check_input(data: &[u8]) {
             check_exact_constructors(p, q);
         }
         check_ulp(a, b);
+        let single = DoubleWord::from_f64(a);
+        assert_eq!(words(single), [a.to_bits(), 0], "from_f64");
         check_ulp(c, d);
         for (p, q, s) in [(a, b, c), (c, d, a)] {
             assert_eq!(

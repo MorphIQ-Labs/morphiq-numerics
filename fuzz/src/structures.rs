@@ -504,6 +504,11 @@ fn check_system(a: &System, rhs: &[f64], obstacle: &[f64], candidate: &[f64]) {
             factored!(
                 matrix,
                 |factors: morphiq_numerics::linalg::tridiagonal::UnpivotedThomasFactors| {
+                    let smallest = reference
+                        .as_ref()
+                        .and_then(|r| r.as_ref().ok())
+                        .and_then(|(p, _)| p.iter().map(|v| v.abs()).reduce(f64::min));
+                    assert_eq!(factors.min_abs_pivot(), smallest, "minimum pivot");
                     if let Ok(c) = factors.certify_residual(rhs, candidate) {
                         check_residual_bound(c.max_residual(), a, rhs, candidate);
                     }

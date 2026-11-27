@@ -258,6 +258,35 @@ def structure_seeds():
                 yield encode(1, order + 16 * shape, values)
 
 
+def stream_seeds():
+    # Words at the uniform extremes and every octant boundary.
+    edges = [0, 1, 2 ** 64 - 1, 1 << 63, (1 << 12) - 1, 1 << 12]
+    for octant in range(8):
+        start = octant << 61
+        edges += [start, (start - 1) % 2 ** 64, start + (1 << 11)]
+    pack = lambda words: b"".join(struct.pack("<Q", w) for w in words)
+    for first in edges:
+        yield pack([word for second in edges for word in (first, second)])
+    for count in [0, 1, 2, 3, 63, 64, 65]:
+        yield pack([(i * 0x9E3779B97F4A7C15) % 2 ** 64 for i in range(2 * count)])
+
+
+def bivariate_seeds():
+    # [shape] then (x, y, rho) triples at regime limits from
+    # docs/bivariate_normal.md. Inputs only.
+    correlations = [-1.0, -0.999999999, -0.925, -0.924, -0.89, -0.75, -0.66, -0.29,
+                    -0.2, -1e-17, 0.0, 1e-17, 0.2, 0.29, 0.66, 0.75, 0.89, 0.924,
+                    0.925, 0.999999999, 1.0]
+    thresholds = [(0.0, 0.0), (-6.0, -6.0), (2.0, -2.0), (-38.0, -30.0), (39.0, 1.0),
+                  (float("-inf"), 1.0), (float("nan"), 0.0), (-0.2, -0.001)]
+    triples = [(x, y, r) for r in correlations for x, y in thresholds]
+    for start in range(0, len(triples), 8):
+        yield bytes([0]) + b"".join(struct.pack("<ddd", *t) for t in triples[start:start + 8])
+    for shape in range(1, 6):
+        words = [(i * 0x9E3779B97F4A7C15) % 2 ** 64 for i in range(1, 25)]
+        yield bytes([shape]) + b"".join(struct.pack("<Q", w) for w in words)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
@@ -265,7 +294,8 @@ def main():
                "fast_normal": fast_normal_seeds, "strong_normal": strong_normal_seeds,
                "strong_density": strong_density_seeds, "arithmetic": arithmetic_seeds,
                "reductions": reduction_seeds,
-               "structures": structure_seeds}
+               "structures": structure_seeds,
+               "streams": stream_seeds, "bivariate": bivariate_seeds}
     parser.add_argument("--target", choices=targets, default="elementary")
     args = parser.parse_args()
     args.directory.mkdir(parents=True, exist_ok=True)

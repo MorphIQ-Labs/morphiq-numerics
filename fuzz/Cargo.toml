@@ -94,3 +94,19 @@ test = false
 doc = false
 bench = false
 required-features = ["fuzzing"]
+
+[[bin]]
+name = "streams"
+path = "fuzz_targets/streams.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]
+
+[[bin]]
+name = "bivariate"
+path = "fuzz_targets/bivariate.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]
