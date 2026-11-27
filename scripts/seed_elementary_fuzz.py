@@ -234,13 +234,38 @@ def reduction_seeds():
                 yield encode(op, mode, len(values) // 2, values)
 
 
+def structure_seeds():
+    # [operation, order and shaping] then little-endian words, cycled.
+    def encode(op, shape, values):
+        return bytes([op, shape]) + b"".join(struct.pack("<d", v) for v in values)
+
+    intervals = [
+        [0.0, -0.0, 5e-324, -5e-324, 1.0, 2.0, -3.0, 4.0],
+        [709.782712893384, 710.0, -1000.0, -999.0, 1e154, 1e155, -1.0, 1.0],
+        [1.7976931348623157e308, 1.7976931348623157e308, 2.0, 2.0],
+        [float("inf"), float("nan"), 2.0, 1.0],
+    ]
+    for values in intervals:
+        yield encode(0, 0, values)
+    systems = [
+        [0.25, -0.5, 3.0, 1.0, -2.0, 0.125, 5.0, -0.75, 1e-3, 4.0, 7.0],
+        [0.0, 1.0, 1.7976931348623157e308, 1e-300, -1.0, 5e-324, 2.0, -0.0, 1e300],
+        [-1.0, 4.0, -1.0, 0.5, 0.25, -2.0, 8.0],
+    ]
+    for values in systems:
+        for order in [0, 1, 2, 3, 5, 8, 12]:
+            for shape in range(8):
+                yield encode(1, order + 16 * shape, values)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
     targets = {"elementary": seeds, "fast_elementary": fast_seeds,
                "fast_normal": fast_normal_seeds, "strong_normal": strong_normal_seeds,
                "strong_density": strong_density_seeds, "arithmetic": arithmetic_seeds,
-               "reductions": reduction_seeds}
+               "reductions": reduction_seeds,
+               "structures": structure_seeds}
     parser.add_argument("--target", choices=targets, default="elementary")
     args = parser.parse_args()
     args.directory.mkdir(parents=True, exist_ok=True)

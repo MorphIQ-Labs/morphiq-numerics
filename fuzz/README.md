@@ -251,6 +251,27 @@ found: reductions returned different NaN bits across targets and call paths.
 The retained `cancelling-log-sum` input has a log-sum
 near zero; it is a coverage witness, not a known library defect.
 
+## Structures target
+
+`structures` checks `interval` and `linalg::tridiagonal`.
+
+- [interval.md](../docs/interval.md): every successful operation contains the
+  exact image (algebraic endpoints exactly, `ln`, `exp` and `sqrt` against
+  directed 512-bit values); `Domain` only for forbidden arguments and `Range`
+  only near overflow.
+- [tridiagonal.md](../docs/tridiagonal.md), orders up to 12: the sign and
+  unpivoted admission conditions; a positive, lower-bounding dominance margin;
+  factor, solve, batched and obstacle results bit for bit with the documented
+  recurrence evaluated in MPFR; admitted obstacle solves within `2 tau`; residual
+  certificates against the exact residual; and the dominance solution-error
+  bound against an 8000-bit solve. Whether a dominance or complementarity refusal
+  was necessary is not judged.
+
+Byte 0 selects intervals or systems. For a system, byte 1 holds the order and
+whether the coefficients are shaped into a dominant or sign-patterned matrix.
+The retained `near-overflow-intervals` input is a boundary witness, not a known
+library defect.
+
 ## Run and replay
 
 On Apple Silicon macOS or native x86-64 Linux, with the repository toolchain,
@@ -270,7 +291,7 @@ change. AddressSanitizer and coverage instrumentation are enabled for fuzz runs.
 Each run replays the versioned strong elementary inputs and fast inputs from
 `fast.json`, `fast_ln.json` and `fast_log_cdf.json`, plus strong normal inputs
 from `erfcx.json` and `normal.json`, then mutates each target for the
-requested number of seconds **per target and feature mode** (fourteen campaigns).
+requested number of seconds **per target and feature mode** (sixteen campaigns).
 Target names after the duration run only those targets, and
 `./scripts/check_fuzz.sh --list` prints them.
 Expected fixture outputs are not imported. The seed encoder adds both signs of

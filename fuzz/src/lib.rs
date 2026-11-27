@@ -11,6 +11,7 @@ pub mod normal_sweep;
 pub mod reductions;
 pub mod strong_density;
 pub mod strong_normal;
+pub mod structures;
 
 /// Stable operation IDs in the corpus format (see README.md).
 #[derive(Clone, Copy, Debug)]
