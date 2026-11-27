@@ -12,6 +12,8 @@ enum Domain {
     Float,
     /// Raw 64-bit words.
     Word,
+    /// binary32 encodings, each widened exactly to its binary64 value.
+    Narrow,
 }
 
 /// One fuzz target's packet layout: a header, then up to `lanes` records of the
@@ -183,6 +185,20 @@ impl Window {
         })
     }
 
+    /// A window of binary32 encodings, NaNs and infinities included, for an
+    /// operation of one argument.
+    fn narrow(of: Target, selector: u8, first: u32, last: u32) -> Result<Self, String> {
+        // atan2, the elementary target's last operation, takes two arguments.
+        if !of.selects_operation || of.name == "elementary" && selector == of.operations - 1 {
+            return Err("only one-argument operations have a binary32 analogue".into());
+        }
+        let of = Target {
+            domain: Domain::Narrow,
+            ..of
+        };
+        Self::new(of, selector, u64::from(first), u64::from(last), &[])
+    }
+
     fn visit(&self, mut check: impl FnMut(&[u8]) -> Result<(), String>) -> Result<u64, String> {
         let mut next = self.first;
         let mut checked = 0;
@@ -195,7 +211,14 @@ impl Window {
                 self.of.header.to_vec()
             };
             for i in 0..count {
-                packet.extend_from_slice(&(next + i as u64).to_le_bytes());
+                let word = next + i as u64;
+                let input = if self.of.domain == Domain::Narrow {
+                    // Window::narrow bounds the encodings to 32 bits.
+                    f64::from(f32::from_bits(word as u32)).to_bits()
+                } else {
+                    word
+                };
+                packet.extend_from_slice(&input.to_le_bytes());
                 for word in &self.fixed {
                     packet.extend_from_slice(&word.to_le_bytes());
                 }
@@ -208,6 +231,19 @@ impl Window {
             next += count as u64;
         }
     }
+}
+
+/// Check the binary64 value of every binary32 encoding in an inclusive window
+/// against the named target's oracle, as [`check_window`] does.
+pub fn check_narrow_window(
+    name: &str,
+    selector: u8,
+    first: u32,
+    last: u32,
+    failure: &Path,
+) -> Result<u64, String> {
+    let of = target(name)?;
+    Window::narrow(of, selector, first, last)?.visit(|packet| check_packet(packet, failure, of))
 }
 
 /// Check every encoding in an inclusive window against the named fuzz target's
@@ -302,6 +338,30 @@ mod tests {
             assert!(Window::new(of, 0, 0, 1, &vec![0; of.fixed + 1]).is_err());
         }
         assert!(target("unknown").is_err());
+    }
+
+    #[test]
+    fn narrow_windows_widen_every_encoding_exactly() {
+        let of = target("strong_density").unwrap();
+        for first in [0_u32, 0x3f80_0000, 0x7f7f_ff00, u32::MAX - 99] {
+            let mut observed = Vec::new();
+            let count = Window::narrow(of, 0, first, first + 99)
+                .unwrap()
+                .visit(|packet| {
+                    for r in packet[1..].as_chunks::<16>().0 {
+                        observed.push(u64::from_le_bytes(r[..8].try_into().unwrap()));
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            assert_eq!(count, 100);
+            let expected: Vec<u64> = (first..=first + 99)
+                .map(|w| f64::from(f32::from_bits(w)).to_bits())
+                .collect();
+            assert_eq!(observed, expected);
+        }
+        assert!(Window::narrow(target("elementary").unwrap(), 13, 0, 1).is_err());
+        assert!(Window::narrow(target("bivariate").unwrap(), 0, 0, 1).is_err());
     }
 
     #[test]
