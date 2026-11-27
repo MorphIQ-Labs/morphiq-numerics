@@ -4,6 +4,7 @@
 use morphiq_numerics::{elementary as e, fast::elementary as fast};
 use rug::{Float, float::Round};
 
+pub mod arithmetic;
 pub mod fast_normal;
 mod normal_reference;
 pub mod normal_sweep;

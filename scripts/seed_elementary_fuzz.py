@@ -185,12 +185,38 @@ def strong_density_seeds():
             yield encode(op, inputs[start:start + 65])
 
 
+def arithmetic_seeds():
+    # Domain limits from docs/double-word.md, as signed powers of two with
+    # their neighbors; records are (a, b, c, d). Inputs only.
+    def power(k):
+        return 1 << (k + 1074) if k < -1022 else (k + 1023) << 52
+
+    edges = [0, 1 << 63, 1, 0x7FEFFFFFFFFFFFFF, 0x7FF0000000000000,
+             0xFFF0000000000000, 0x7FF0000000000001]
+    for k in [-1074, -1022, -969, -537, -485, -484, -229, -53, 0, 10, 508,
+              994, 1016, 1018, 1020, 1021]:
+        for word in [power(k) - 1, power(k), power(k) + 1]:
+            if word >= 0:
+                edges += [word, word | (1 << 63)]
+    one = struct.unpack("<Q", struct.pack("<d", 1.0))[0]
+    tail = struct.unpack("<Q", struct.pack("<d", 1.0e-18))[0]
+    records = []
+    for i, a in enumerate(edges):
+        b = edges[(i * 7 + 3) % len(edges)]
+        records += [(a, tail, b, one), (a, b, edges[(i * 11 + 5) % len(edges)], 0)]
+    for x in [1455.0, -1455.0, 709.0, -745.0, 0.5, 1.0e-19]:
+        word = struct.unpack("<Q", struct.pack("<d", x))[0]
+        records += [(word, tail, one, 0), (word, 0, word, tail)]
+    for start in range(0, len(records), 16):
+        yield b"".join(struct.pack("<QQQQ", *r) for r in records[start:start + 16])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
     targets = {"elementary": seeds, "fast_elementary": fast_seeds,
                "fast_normal": fast_normal_seeds, "strong_normal": strong_normal_seeds,
-               "strong_density": strong_density_seeds}
+               "strong_density": strong_density_seeds, "arithmetic": arithmetic_seeds}
     parser.add_argument("--target", choices=targets, default="elementary")
     args = parser.parse_args()
     args.directory.mkdir(parents=True, exist_ok=True)
