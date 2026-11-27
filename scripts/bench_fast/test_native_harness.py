@@ -407,14 +407,15 @@ class NativeHarness(unittest.TestCase):
                 self.assertAlmostEqual(summary['upper95'], ratio)
 
     @unittest.skipUnless(platform.machine() == 'x86_64', 'x86 stack placement')
-    def test_stack_trampoline_preserves_callback_count_and_results(self):
+    def test_stack_placement_is_independent_of_caller_depth(self):
         lib = C.CDLL(str(self.root/'bin/native-matrix.so'))
         lib.bench_set_inner_warmup.argtypes = [C.c_int]
         lib.bench_set_inner_warmup.restype = None
         lib.bench_last_stack_address.restype = C.c_size_t
-        lib.bench_with_stack.argtypes = [C.c_void_p, C.c_void_p, D, D,
-                                        C.c_size_t, C.c_uint64, C.c_size_t]
-        lib.bench_with_stack.restype = C.c_uint64
+        timer_arguments = [C.c_void_p, D, D, C.c_size_t, C.c_uint64]
+        lib.measure1.argtypes, lib.measure1.restype = timer_arguments, C.c_uint64
+        lib.bench_at_stack_offset.argtypes = [C.c_void_p]+timer_arguments+[C.c_size_t]
+        lib.bench_at_stack_offset.restype = C.c_uint64
         x = (C.c_double*2)(1, 2)
         y = (C.c_double*2)()
         calls = []
@@ -424,30 +425,73 @@ class NativeHarness(unittest.TestCase):
             return value+1
 
         function = C.CFUNCTYPE(C.c_double, C.c_double)(callback)
+
+        def at_depth(depth, action):
+            # Each level re-enters the interpreter from C, deepening the C stack.
+            if depth:
+                return list(map(lambda _: at_depth(depth-1, action), [None]))[0]
+            return action()
+
+        def unpadded():
+            lib.measure1(function, x, y, 2, 0)
+            return lib.bench_last_stack_address()
+
+        def place(offset):
+            lib.bench_at_stack_offset(lib.measure1, function, x, y, 2, 3, offset)
+            return lib.bench_last_stack_address()
+
         lib.bench_set_inner_warmup(0)
         try:
-            lib.bench_with_stack(lib.measure1, function, x, y, 2, 0, 0)
-            base = lib.bench_last_stack_address()
+            depths = range(4)
+            self.assertEqual(len({at_depth(depth, unpadded) for depth in depths}), len(depths))
             self.assertEqual(calls, [])
             for offset in range(0, 4096, 16):
-                lib.bench_with_stack(lib.measure1, function, x, y, 2, 3, (base-offset) % 4096)
-                self.assertEqual(lib.bench_last_stack_address() % 4096, offset)
-                self.assertEqual(list(y), [2, 3])
-            self.assertEqual(calls, [1, 2]*(3*256))
+                for depth in depths:
+                    address = at_depth(depth, lambda: place(offset))
+                    self.assertEqual(address % 4096, offset)
+                    self.assertEqual(list(y), [2, 3])
+            self.assertEqual(calls, [1, 2]*(3*256*len(depths)))
         finally:
             lib.bench_set_inner_warmup(1)
+
+    @unittest.skipUnless(platform.machine() == 'x86_64', 'x86 stack placement')
+    def test_balanced_calibration_places_every_chunk(self):
+        # Calibration repeats one Python call path until the interpreter changes
+        # its own stack use; no duration is judged here.
+        with tempfile.TemporaryDirectory(dir=self.root) as directory:
+            run = Path(directory)
+            product = self.identity_cdf(run)
+            inputs = run/'inputs.json'
+            inputs.write_text('["3ff0000000000000"]')
+            out = run/'samples'
+            command = [sys.executable, str(self.root/'qualify-cell.py'),
+                       '--product', str(product), '--reference-product', str(product),
+                       '--reference', 'baseline', '--primitive', 'cdf', '--kind', 'scalar',
+                       '--length', '1', '--population', str(inputs), '--process', 'calibration',
+                       '--counts', str(run/'counts.json'), '--out', str(out), '--diagnostic',
+                       '--target-ms', '100', '--balanced-stack']
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            chunks = [json.loads(line) for line in (out/'chunks.jsonl').read_text().splitlines()]
+            self.assertTrue(chunks)
+            self.assertTrue(all(row['stack_address'] % 4096 == row['requested_stack_offset']
+                                for row in chunks))
+
+    def identity_cdf(self, run):
+        source = run/'product.c'
+        source.write_text('double prod_norm_cdf(double x) { return x; }\n')
+        product = run/'product.so'
+        subprocess.run(['cc', '-O3', '-fPIC',
+                        '-dynamiclib' if platform.system() == 'Darwin' else '-shared',
+                        str(source), '-o', str(product)], check=True)
+        return product
 
     @unittest.skipUnless(platform.machine() == 'x86_64', 'x86 stack placement')
     def test_balanced_sampling_preserves_work_and_all_stack_positions(self):
         # A tiny native identity workload exercises the actual subprocess runner.
         with tempfile.TemporaryDirectory(dir=self.root) as directory:
             run = Path(directory)
-            source = run/'product.c'
-            source.write_text('double prod_norm_cdf(double x) { return x; }\n')
-            product = run/'product.so'
-            subprocess.run(['cc', '-O3', '-fPIC',
-                            '-dynamiclib' if platform.system() == 'Darwin' else '-shared',
-                            str(source), '-o', str(product)], check=True)
+            product = self.identity_cdf(run)
             counts = run/'counts.json'
             counts.write_text(json.dumps(dict(ours=512, reference=1024)))
             inputs = run/'inputs.json'
