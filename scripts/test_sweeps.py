@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from scripts import check_f32_sweeps as f32
 from scripts.check_sweeps import MANIFESTS, OPERATIONS, load_windows, run_windows
 
 
@@ -88,6 +89,42 @@ class NormalSweepTests(unittest.TestCase):
         self.assertEqual(saved["windows"][0]["mode"], "scalar")
         self.assertEqual(saved["windows"][0]["status"], "passed")
         self.assertEqual(saved["windows"][0]["first"], "3feffffffffffffe")
+
+
+class NarrowSweepTests(unittest.TestCase):
+    def test_shards_partition_every_binary32_encoding_exactly(self):
+        next_first = 0
+        for shard in range(f32.SHARDS):
+            first, last = f32.shard_range(shard, f32.SHARDS)
+            self.assertEqual(first, next_first)
+            pieces = f32.chunks(first, last)
+            self.assertEqual((pieces[0][0], pieces[-1][1]), (first, last))
+            self.assertTrue(all(b[0] == a[1] + 1 for a, b in zip(pieces, pieces[1:])))
+            self.assertTrue(all(end - start < 1_048_576 for start, end in pieces))
+            next_first = last + 1
+        self.assertEqual(next_first, 2 ** 32)
+        for shard, shards in [(-1, 64), (64, 64), (0, 0), (0, 3)]:
+            with self.assertRaises(ValueError):
+                f32.shard_range(shard, shards)
+
+    def test_the_weekly_rotation_reaches_every_unit_once_per_cycle(self):
+        total = len(f32.operations()) * f32.SHARDS
+        weeks = -(-total // f32.WEEKLY)
+        seen = [tuple(u.values()) for week in range(weeks) for u in f32.schedule(week)]
+        self.assertEqual(len(set(seen)), total)
+        self.assertNotIn(("elementary", "atan2"), f32.operations())
+
+    def test_a_chunk_passes_only_with_its_exact_count(self):
+        for behavior, expected in [("print(int(sys.argv[5], 16) - int(sys.argv[4], 16) + 1)\n", True),
+                                   ("print(1)\n", False), ("sys.exit(3)\n", False)]:
+            with self.subTest(behavior=behavior), tempfile.TemporaryDirectory() as temp:
+                binary = Path(temp) / "enumerator"
+                binary.write_text("#!/usr/bin/env python3\nimport sys\n" + behavior)
+                binary.chmod(0o755)
+                results = []
+                f32.run_chunks(binary, Path(temp), "strong_normal", 0, [(0, 9), (10, 19)], 2,
+                               lambda first, last, passed: results.append((first, last, passed)))
+                self.assertEqual(results, [(0, 9, expected), (10, 19, expected)])
 
 
 if __name__ == "__main__":

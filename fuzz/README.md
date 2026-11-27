@@ -438,3 +438,29 @@ Artifacts, including failures and partial coverage, are uploaded for 14 days.
 Exhaustiveness applies only to completed declared windows at the recorded
 source and settings; it is neither a whole-domain proof nor native performance
 evidence.
+
+## binary32 analogue sweeps
+
+`scripts/check_f32_sweeps.py` checks, for each of the 26 one-argument
+operations, the binary64 value of every one of the `2^32` binary32 encodings,
+NaNs and infinities included, with the same oracle and scalar/slice identity as
+the fuzz target. Each operation is split into 64 shards of `2^26` inputs, run in
+scalar and `simd,std` builds.
+
+```sh
+python3 scripts/check_f32_sweeps.py target/f32-sweeps/my-run \
+  --target elementary --operation exp --shard 0
+# A partial run, recorded as such:
+python3 scripts/check_f32_sweeps.py target/f32-sweeps/quick \
+  --target elementary --operation exp --shard 0 --limit 100000
+```
+
+The weekly `sweeps-f32.yml` workflow runs 64 shards on Linux x86-64, rotating so
+that all 1,664 are visited every 26 weeks; a manual dispatch runs all shards of
+one operation. Receipts record each shard's range and are retained for 90 days.
+**Coverage exists only for shards whose receipts show `passed` at a recorded
+revision**; the schedule alone establishes nothing, and a receipt does not carry
+over to a later revision. Cross-target agreement is the determinism digest's job.
+
+On an Apple M-series core the oracle costs about 7 to 150 microseconds per input
+for the operations measured, so one shard takes minutes to a few core-hours.
