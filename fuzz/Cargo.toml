@@ -62,3 +62,11 @@ test = false
 doc = false
 bench = false
 required-features = ["fuzzing"]
+
+[[bin]]
+name = "strong_density"
+path = "fuzz_targets/strong_density.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]

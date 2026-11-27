@@ -1,7 +1,7 @@
 # MPFR numerical fuzzing
 
 This independent, unpublished workspace checks strong and fast elementary APIs,
-three strong normal APIs and accelerated fast normal APIs against MPFR through
+the strong normal APIs and accelerated fast normal APIs against MPFR through
 `rug`. Neither MPFR nor the
 fuzzer is a dependency of the published crates. The root dependency license
 policy stays permissive-only; the separate
@@ -93,8 +93,30 @@ that cannot be represented in binary64. This does not substitute a blanket
 correct-rounding assertion for a bounded contract. Signs, ranges, NaN encodings,
 exact zero-input identities, overflow, and saturation rounding are checked
 separately. Finite erfcx results must remain strictly positive even at `f64::MAX`.
-The other strong normal APIs (PDF, CCDF, centered CDF and log-PDF), normal pairs,
-and other public modules still require their own independent fuzz coverage.
+The separate `strong_density` target independently checks `normal::norm_pdf`,
+`normal::norm_ccdf`, `normal::norm_cdf_centered` and `normal::log_norm_pdf` over
+all binary64 inputs, with the three slice wrappers bit for bit (log-PDF has no
+slice). The first three use the compound allowance above with `a = 0`:
+
+| Function and domain | `r` |
+| --- | --- |
+| PDF, `23 <= abs(x) <= 38.6` | `2^-222` |
+| PDF, elsewhere | `2^-236` |
+| CCDF, `abs(x) <= 1/2` | `2^-245` |
+| CCDF, `x > 1/2` | `2^-114` |
+| CCDF, `x < -1/2` | `2^-111` |
+| centered CDF, `abs(x) <= 1/2` | `2^-246` |
+| centered CDF, `abs(x) > 1/2` | `2^-111` |
+
+Underflow and saturation must round correctly, centered results keep the input's
+sign, and NaN encodings and exact zero-input identities are checked separately.
+Log-PDF ([log_norm_pdf.md](../docs/log_norm_pdf.md)) must be correctly rounded
+for `abs(x) < 2^-27` and `abs(x) > 2^500`, and within `(1/2 + 2^-50)` ulp
+elsewhere. Normal pairs and other public modules still require their own
+independent fuzz coverage.
+The retained `log-pdf-boundaries` packet contains the exact regime-limit and
+overflow encodings of both signs; it is a coverage witness, not a known library
+defect.
 
 ### Normal oracle across extreme tails
 
@@ -200,7 +222,7 @@ change. AddressSanitizer and coverage instrumentation are enabled for fuzz runs.
 Each run replays the versioned strong elementary inputs and fast inputs from
 `fast.json`, `fast_ln.json` and `fast_log_cdf.json`, plus strong normal inputs
 from `erfcx.json` and `normal.json`, then mutates each target for the
-requested number of seconds **per target and feature mode** (eight campaigns).
+requested number of seconds **per target and feature mode** (ten campaigns).
 Target names after the duration run only those targets, and
 `./scripts/check_fuzz.sh --list` prints them.
 Expected fixture outputs are not imported. The seed encoder adds both signs of
@@ -230,6 +252,8 @@ explicit target; corpus and regression directories are separated by target.
 
 `fast_normal` and `strong_normal` each use their own selector namespace: modulo 3 for erfcx, CDF and log-CDF, respectively, followed
 by up to 65 pairs in that same format (the second word is unused).
+`strong_density` uses modulo 4 for PDF, CCDF, centered CDF and log-PDF, in the
+same format.
 
 Generated seeds, evolving corpora, failure artifacts and logs live under
 `target/fuzz/`. CI runs 60 seconds per target and mode in the existing required Linux and
