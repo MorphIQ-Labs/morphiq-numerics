@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Run declared normal boundary windows; retain exact coverage and failures.
+"""Run declared boundary windows; retain exact coverage and failures.
 
-Usage: python3 scripts/check_normal_sweeps.py NEW_OUTPUT_DIRECTORY [--profile smoke]
-Full windows are versioned in fuzz/sweeps/normal.json. Smoke checks at most five
+Usage: python3 scripts/check_sweeps.py NEW_OUTPUT_DIRECTORY [--profile smoke]
+       [--target NAME ...]
+       python3 scripts/check_sweeps.py --list
+Full windows are versioned in fuzz/sweeps/TARGET.json. Smoke checks at most five
 encodings around each anchor and is explicitly recorded as partial coverage.
 """
 import argparse
@@ -15,26 +17,38 @@ import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = ROOT / "fuzz/sweeps/normal.json"
-OPERATIONS = {"erfcx": 0, "cdf": 1, "log_cdf": 2}
+MANIFESTS = ROOT / "fuzz/sweeps"
+# Operation selectors of each fuzz target's packet format (fuzz/README.md).
+OPERATIONS = {
+    "elementary": ["exp", "exp2", "expm1", "ln", "ln_1p", "log2", "log10", "sin",
+                   "cos", "tan", "sqrt", "asin", "asinh", "atan2"],
+    "fast_elementary": ["exp", "exp_coarse", "ln"],
+    "fast_normal": ["erfcx", "cdf", "log_cdf"],
+    "strong_normal": ["erfcx", "cdf", "log_cdf"],
+    "strong_density": ["pdf", "ccdf", "centered", "log_pdf"],
+}
 
 
-def load_windows(path, profile):
+def load_windows(path, profile, target):
+    operations = OPERATIONS[target]
     document = json.loads(path.read_text())
     if document["schema_version"] != 1 or not document["windows"]:
         raise ValueError("unsupported or empty sweep manifest")
     if profile not in ("full", "smoke"):
         raise ValueError("unknown sweep profile")
-    windows, names, intervals = [], set(), {op: [] for op in OPERATIONS}
+    windows, names, intervals = [], set(), {}
     for row in document["windows"]:
         name, op = row["name"], row["operation"]
         if not re.fullmatch(r"[a-z][a-z0-9_-]*", name) or name in names:
             raise ValueError(f"invalid or duplicate window name: {name}")
         names.add(name)
-        if op not in OPERATIONS or not row["source"]:
+        if op not in operations or not row["source"]:
             raise ValueError(f"missing operation/source: {name}")
         if any(not re.fullmatch(r"[0-9a-f]{16}", row[key]) for key in ("first", "last", "anchor")):
             raise ValueError(f"invalid binary64 encoding: {name}")
+        second = row.get("second", "0" * 16)
+        if not re.fullmatch(r"[0-9a-f]{16}", second) or ("second" in row) != (op == "atan2"):
+            raise ValueError(f"atan2 windows alone fix a second argument: {name}")
         first, last, anchor = (int(row[key], 16) for key in ("first", "last", "anchor"))
         if not first <= anchor <= last or first >> 63 != last >> 63:
             raise ValueError(f"unordered or sign-crossing window: {name}")
@@ -42,12 +56,14 @@ def load_windows(path, profile):
             raise ValueError(f"nonfinite window: {name}")
         if last - first >= 1_048_576:
             raise ValueError(f"window exceeds one million inputs: {name}")
-        if any(first <= end and start <= last for start, end in intervals[op]):
+        seen = intervals.setdefault((op, second), [])
+        if any(first <= end and start <= last for start, end in seen):
             raise ValueError(f"overlapping windows for {op}: {name}")
-        intervals[op].append((first, last))
+        seen.append((first, last))
         if profile == "smoke":
             first, last = max(first, anchor - 2), min(last, anchor + 2)
-        windows.append({**row, "first": f"{first:016x}", "last": f"{last:016x}",
+        windows.append({**row, "target": target, "selector": operations.index(op),
+                        "second": second, "first": f"{first:016x}", "last": f"{last:016x}",
                         "expected": last - first + 1})
     return windows
 
@@ -65,21 +81,23 @@ def run_windows(binary, output, mode, windows, receipt):
         entry = {**row, "mode": mode, "status": "running", "checked": 0}
         receipt["windows"].append(entry)
         save_receipt(output, receipt)
-        failure = mode_dir / (row["name"] + ".packet")
-        command = [str(binary), str(OPERATIONS[row["operation"]]), row["first"], row["last"], str(failure)]
-        with (mode_dir / (row["name"] + ".stderr.log")).open("w") as log:
+        stem = f'{row["target"]}-{row["name"]}'
+        failure = mode_dir / (stem + ".packet")
+        command = [str(binary), row["target"], str(row["selector"]), row["first"], row["last"],
+                   row["second"], str(failure)]
+        with (mode_dir / (stem + ".stderr.log")).open("w") as log:
             result = subprocess.run(command, stdout=subprocess.PIPE, stderr=log, text=True, check=False)
-        (mode_dir / (row["name"] + ".stdout.log")).write_text(result.stdout)
+        (mode_dir / (stem + ".stdout.log")).write_text(result.stdout)
         # An exit status alone is insufficient: require the enumerator's exact
         # completion count. Interrupted/failed windows contribute no coverage.
         if result.returncode != 0 or result.stdout.strip() != str(row["expected"]):
             entry["status"] = "failed"
             save_receipt(output, receipt)
-            raise RuntimeError(f"{mode}/{row['name']} failed or returned an incomplete count; see {mode_dir}")
+            raise RuntimeError(f"{mode}/{stem} failed or returned an incomplete count; see {mode_dir}")
         entry.update(status="passed", checked=row["expected"])
         receipt["checked"] += row["expected"]
         save_receipt(output, receipt)
-        print(f"{mode}/{row['name']}: {row['expected']} inputs passed", flush=True)
+        print(f"{mode}/{stem}: {row['expected']} inputs passed", flush=True)
 
 
 def command_text(*args):
@@ -88,19 +106,32 @@ def command_text(*args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("output", type=Path)
+    parser.add_argument("output", type=Path, nargs="?")
     parser.add_argument("--profile", choices=["full", "smoke"], default="full")
+    parser.add_argument("--target", action="append", choices=sorted(OPERATIONS))
+    parser.add_argument("--list", action="store_true")
     args = parser.parse_args()
-    windows = load_windows(MANIFEST, args.profile)
+    if args.list:
+        print("\n".join(OPERATIONS))
+        return
+    if args.output is None:
+        parser.error("an output directory is required")
+    targets = args.target or list(OPERATIONS)
+    manifests = {target: MANIFESTS / f"{target}.json" for target in targets}
+    windows = [row for target, path in manifests.items()
+               for row in load_windows(path, args.profile, target)]
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)  # Never overwrite an earlier attempt.
-    manifest_bytes = MANIFEST.read_bytes()
-    (output / "manifest.json").write_bytes(manifest_bytes)
+    digests = {}
+    for target, path in manifests.items():
+        manifest_bytes = path.read_bytes()
+        (output / f"manifest-{target}.json").write_bytes(manifest_bytes)
+        digests[target] = hashlib.sha256(manifest_bytes).hexdigest()
     receipt = {
         "schema_version": 1, "status": "running", "profile": args.profile,
         "revision": command_text("git", "rev-parse", "HEAD"),
         "working_tree": command_text("git", "status", "--porcelain"),
-        "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "manifest_sha256": digests,
         "oracle_lock_sha256": hashlib.sha256((ROOT / "fuzz/Cargo.lock").read_bytes()).hexdigest(),
         "rustc": command_text("rustc", "-Vv"), "host": platform.platform(),
         "github_run_id": os.environ.get("GITHUB_RUN_ID"),
@@ -114,9 +145,9 @@ def main():
         for mode, features in receipt["modes"].items():
             with (output / f"build-{mode}.log").open("w") as log:
                 subprocess.run(["cargo", "build", "--release", "--locked", "--manifest-path",
-                                "fuzz/Cargo.toml", "--target-dir", "fuzz/target", "--bin", "normal-sweep",
+                                "fuzz/Cargo.toml", "--target-dir", "fuzz/target", "--bin", "sweep",
                                 *features], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True)
-            binary = ROOT / "fuzz/target/release/normal-sweep"
+            binary = ROOT / "fuzz/target/release/sweep"
             run_windows(binary, output, mode, windows, receipt)
         if receipt["checked"] != receipt["expected"]:
             raise RuntimeError("incomplete campaign coverage")

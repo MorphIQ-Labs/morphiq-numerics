@@ -1,4 +1,4 @@
-name: scheduled normal boundary sweeps
+name: scheduled boundary sweeps
 
 on:
   schedule:
@@ -9,16 +9,30 @@ permissions:
   contents: read
 
 concurrency:
-  group: normal-boundary-sweeps-${{ github.ref }}
+  group: boundary-sweeps-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  targets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      list: ${{ steps.list.outputs.list }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: list
+        run: |
+          targets="$(python3 scripts/check_sweeps.py --list)"
+          echo "list=$(printf '%s\n' "$targets" | jq -Rsc 'split("\n")[:-1]')" >> "$GITHUB_OUTPUT"
+
   sweep:
-    name: normal sweeps (${{ matrix.os }})
+    name: ${{ matrix.target }} (${{ matrix.os }})
+    needs: targets
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, macos-15]
+        target: ${{ fromJSON(needs.targets.outputs.list) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     steps:
@@ -35,15 +49,15 @@ jobs:
           ./scripts/check_fuzz_licenses.sh
       - name: Validate enumeration and receipt failure behavior
         run: |
-          python3 -m unittest scripts.test_normal_sweeps
+          python3 -m unittest scripts.test_sweeps
           cargo test --manifest-path fuzz/Cargo.toml --locked --no-default-features --lib
           cargo test --manifest-path fuzz/Cargo.toml --locked --no-default-features --features simd --lib
       - name: Sweep every input in the declared windows, scalar and SIMD
-        run: python3 scripts/check_normal_sweeps.py "target/normal-sweeps/${{ github.run_id }}-${{ github.run_attempt }}"
+        run: python3 scripts/check_sweeps.py "target/sweeps/${{ github.run_id }}-${{ github.run_attempt }}" --target "${{ matrix.target }}"
       - name: Retain exact coverage, logs and failing packets
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: normal-sweeps-${{ matrix.os }}
-          path: target/normal-sweeps/
+          name: sweeps-${{ matrix.target }}-${{ matrix.os }}
+          path: target/sweeps/
           retention-days: 14

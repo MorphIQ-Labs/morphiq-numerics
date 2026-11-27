@@ -8,12 +8,12 @@ pub mod arithmetic;
 pub mod bivariate;
 pub mod fast_normal;
 mod normal_reference;
-pub mod normal_sweep;
 pub mod reductions;
 pub mod streams;
 pub mod strong_density;
 pub mod strong_normal;
 pub mod structures;
+pub mod sweep;
 
 /// Stable operation IDs in the corpus format (see README.md).
 #[derive(Clone, Copy, Debug)]
