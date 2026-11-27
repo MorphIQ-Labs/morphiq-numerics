@@ -16,10 +16,12 @@ consistent across runs; declare any difference. Do not kill unrelated work.
 
 Use the repository's pinned Rust toolchain, a C compiler, CMake and Ninja. Record
 `rustc -Vv`, `cc --version`, `cmake --version`, Python version and `pip freeze`
-with the run. Python dependencies are pinned in `requirements.txt`:
+with the run. The interpreter is pinned in `.cargo/python-version` and its
+packages in `requirements.txt`; `freeze.py` and the campaign controller refuse
+any other Python version. For example, with [uv](https://docs.astral.sh/uv/):
 
 ```sh
-python3 -m venv target/bench-fast-venv
+uv venv --seed --python "$(cat .cargo/python-version)" target/bench-fast-venv
 . target/bench-fast-venv/bin/activate
 python -m pip install -r scripts/bench_fast/requirements.txt
 ```

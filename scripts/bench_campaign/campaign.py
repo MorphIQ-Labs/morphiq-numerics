@@ -9,6 +9,7 @@ import math
 import os
 from pathlib import Path
 import platform
+import runpy
 import signal
 import shutil
 import subprocess
@@ -27,7 +28,7 @@ PINS = {
     'sleef': '906ca7512ee483296780a81a21b9ca715d40dfe1',
     'libcerf': '7e6b637031b5c6cbc89a5f7220bf4ef07518d035',
 }
-PACKAGES = {'scipy': '1.16.3', 'numpy': '2.3.4', 'mpmath': '1.3.0'}
+PACKAGES = {'scipy': '1.18.1', 'numpy': '2.5.5', 'mpmath': '1.3.0'}
 LIBRARIES = {
     'x86-linux': {'core-math': ['libcoreexp.so'], 'sleef': ['libsleef.so', 'libsleef.so.3'], 'libcerf': ['libcerf.so']},
     'arm-macos': {'core-math': ['libcoreexp.dylib'], 'sleef': ['libsleef.3.dylib', 'libsleef.3.9.0.dylib'], 'libcerf': ['libcerf.3.1.dylib']},
@@ -438,6 +439,7 @@ def main():
     plan.add_argument('--backend', action='append', default=[])
     plan.add_argument('--cell', action='append', default=[])
     args = parser.parse_args()
+    runpy.run_path(str(REPO / 'scripts/bench_fast/python_pin.py'))['require_pinned_python']()
     try:
         if args.command == 'lock-references':
             reference_lock(args)

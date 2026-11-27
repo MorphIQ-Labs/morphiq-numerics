@@ -23,7 +23,7 @@
   "scipy": {
     "repository": "https://github.com/scipy/scipy",
     "primitive": "normal CDF",
-    "contract": "SciPy 1.16.3 ndtr is a black-box binary64 reference. This harness does not establish a proved whole-domain bound or cross-target determinism for it.",
+    "contract": "SciPy 1.18.1 ndtr is a black-box binary64 reference. This harness does not establish a proved whole-domain bound or cross-target determinism for it.",
     "interface": "scipy.special.cython_special __pyx_fuse_1ndtr capsule, double(double, int), called in the native timer without a Python loop.",
     "special_values": "Special/mixed/fallback cells are diagnostic; no NaN payload equivalence claim."
   }

@@ -4,7 +4,8 @@ This controller bootstraps and runs the existing `bench_fast` matrix, or declare
 subsets of it, on native x86 Linux or
 Apple Silicon macOS. It records pinned canonical references, candidate/control
 commits, commands, host conditions, raw attempts, comparisons and checksums.
-Python 3.11 or newer is required. It adds no Rust dependencies and changes no
+The exact Python in `.cargo/python-version` is required; the controller and
+`freeze.py` refuse any other. It adds no Rust dependencies and changes no
 numerical implementation, timing loop, statistical rule or numerical contract.
 
 This is the Numerics workload adapter for the shared benchmarking program.
@@ -25,7 +26,7 @@ teardown are not implemented here. GCP ARM Linux cannot run the macOS harness.
 | CORE-MATH | `c7100a07428584639defdd64409e3621884c362b` | Native scalar `cr_exp` | Correct rounding is a stronger guarantee than the fast exp bound. |
 | SLEEF 3.9.0 | `906ca7512ee483296780a81a21b9ca715d40dfe1` | Scalar FMA exp; SSE2/AVX2/AVX-512 or NEON exp and composed CDF packets | Selected u10 exp/u15 erfc; composition does not inherit an unproved bound automatically. |
 | libcerf | `7e6b637031b5c6cbc89a5f7220bf4ef07518d035` | Scalar `erfcx`, including scalar-in-a-batch | Whole-domain proved equivalence is not established by this harness. |
-| SciPy 1.16.3 | Installed distribution files hashed | Native Cython `ndtr` capsule, not a Python call loop | Whole-domain proved equivalence and cross-target determinism are not established here. |
+| SciPy 1.18.1 | Installed distribution files hashed | Native Cython `ndtr` capsule, not a Python call loop | Whole-domain proved equivalence and cross-target determinism are not established here. |
 
 The matrix's domains, populations, scalar/slice interfaces and backends travel
 with each result. `references.json` describes the reference contracts and
