@@ -12,7 +12,8 @@ use rug::{Float, float::Round};
 /// Binary64 products span 2^-2148 to 2^2048; squared sums of 64 terms double
 /// that span.
 const WIDE: u32 = 8600;
-const TERMS: usize = 64;
+/// The runner's 1041-byte packets hold at most 129 words.
+const TERMS: usize = 129;
 
 fn exact(x: f64) -> Float {
     Float::with_val(WIDE, x)
@@ -121,25 +122,43 @@ fn check_sums(xs: &[f64]) {
     }
     let target = total(xs.iter().map(|&x| exact(x)));
     let scale = total(xs.iter().map(|&x| exact(x.abs())));
-    // S <= 2^1019 excludes overflow and keeps every two_sum in its domain.
-    if scale > power(1019) {
-        return;
-    }
     let k = xs.len() - 1;
-    assert!(
-        gamma_bound(&sub(&exact(plain), &target), None, k, false, &scale),
-        "sum bound {xs:?}"
-    );
-    assert!(
-        gamma_bound(
-            &sub(&exact(compensated), &target),
-            Some(&target),
-            k,
-            true,
-            &scale
-        ),
-        "sum2 bound {xs:?}"
-    );
+    // An overflowing operation leaves an infinity or NaN that every later step
+    // keeps, so a finite result establishes the bound's no-overflow condition.
+    if plain.is_finite() {
+        assert!(
+            gamma_bound(&sub(&exact(plain), &target), None, k, false, &scale),
+            "sum bound {xs:?}"
+        );
+    }
+    if compensated.is_finite() {
+        assert!(
+            gamma_bound(
+                &sub(&exact(compensated), &target),
+                Some(&target),
+                k,
+                true,
+                &scale
+            ),
+            "sum2 bound {xs:?}"
+        );
+    }
+}
+
+/// The least `e` with `|x| <= 2^e`; any exponent bounds zero.
+fn bounding_exponent(x: f64) -> i32 {
+    match exact(x).get_exp() {
+        None => -1074,
+        // MPFR's exponent satisfies 2^(e-1) <= |x| < 2^e.
+        Some(e) if exact(x.abs()) == power(e - 1) => e - 1,
+        Some(e) => e,
+    }
+}
+
+/// `two_prod`'s magnitude limits (docs/double-word.md).
+fn product_fits(a: f64, b: f64) -> bool {
+    let (ea, eb) = (bounding_exponent(a), bounding_exponent(b));
+    ea <= 994 && eb <= 994 && ea + eb <= 1020
 }
 
 fn check_dots(xs: &[f64], ys: &[f64]) {
@@ -170,26 +189,25 @@ fn check_dots(xs: &[f64], ys: &[f64]) {
             .collect();
         let target = total(products.iter().cloned());
         let scale = total(products.iter().map(magnitude));
-        if scale > power(1019) {
-            continue;
-        }
         let above = |k| {
             products
                 .iter()
                 .all(|p| p.is_zero() || magnitude(p) >= power(k))
         };
         let n = a.len();
-        if above(-1022) {
-            let error = sub(&exact(reduce::dot(a, b)), &target);
+        let plain = reduce::dot(a, b);
+        if above(-1022) && plain.is_finite() {
+            let error = sub(&exact(plain), &target);
             assert!(
                 gamma_bound(&error, None, n, false, &scale),
                 "dot bound {a:?} {b:?}"
             );
         }
-        // Dot2 also needs every operand inside two_prod's magnitude limits.
-        let bounded = a.iter().chain(b).all(|x| x.abs() <= power(510).to_f64());
-        if above(-969) && bounded {
-            let error = sub(&exact(reduce::dot2(a, b)), &target);
+        // Dot2 also needs every product inside two_prod's domain.
+        let compensated = reduce::dot2(a, b);
+        let fits = a.iter().zip(b).all(|(&x, &y)| product_fits(x, y));
+        if above(-969) && fits && compensated.is_finite() {
+            let error = sub(&exact(compensated), &target);
             assert!(
                 gamma_bound(&error, Some(&target), n, true, &scale),
                 "dot2 bound {a:?} {b:?}"
@@ -686,8 +704,28 @@ mod tests {
     }
 
     #[test]
+    fn slices_near_the_overflow_threshold_satisfy_their_bounds() {
+        let big = f64::from_bits(0x7fe0_0000_0000_0000); // 2^1023
+        let limit = f64::from_bits(0x7e10_0000_0000_0000); // 2^994
+        let slices: [&[f64]; 6] = [
+            &[big, -big, big, -1.0],
+            &[f64::MAX, -f64::MAX, 3.0],
+            &[big, big.next_down(), -big, -big.next_down(), 1.0e290],
+            &[limit, 2.0_f64, -limit, 2.0, 1.5, limit.next_down()],
+            &[1.0e154, -1.0e154, 1.0e153, 7.0],
+            &[f64::MAX, f64::MAX],
+        ];
+        for xs in slices {
+            for mode in 0..3 {
+                check_input(&packet(0, mode, 0, xs));
+            }
+        }
+        assert!(product_fits(limit, 2.0) && !product_fits(limit.next_up(), 2.0));
+    }
+
+    #[test]
     fn long_clustered_slices_reach_lane_remainders() {
-        for count in [1_usize, 7, 31, 32, 33, 63, 64] {
+        for count in [1_usize, 7, 31, 32, 33, 63, 64, 128, 129] {
             let xs: Vec<f64> = (0..count)
                 .map(|i| f64::from_bits(0xc059_0000_0000_0000 + i as u64 * 977))
                 .collect();

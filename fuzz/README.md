@@ -226,13 +226,14 @@ to it; it is a boundary witness, not a known library defect.
 
 ## Reductions target
 
-`reductions` checks `reduce`, including `Moments2`, and `log_space` on slices of
-up to 64 finite or special values. At 8600 bits the sums, products and squared
+`reductions` checks `reduce`, including `Moments2`, and `log_space` on slices of up to
+129 finite or special values. At 8600 bits the sums, products and squared
 sums are exact, so the algebraic bounds are checked without division.
 
 - [reduce.md](../docs/reduce.md): the `sum`, `sum2`, `dot` and `dot2` bounds on
-  their stated domains (here with `S <= 2^1019`, and operands at most `2^510`
-  for `dot2`); sum-of-squares identity with the dot products; exact `max_abs`;
+  their stated domains: wherever the result is finite, which establishes the
+  no-overflow condition, and for `dot2` where every product is also inside
+  `two_prod`'s domain; sum-of-squares identity with the dot products; exact `max_abs`;
   empty slices; and the bits of every NaN result.
 - [moments.md](../docs/moments.md): each successful readout encloses the exact
   statistic; failed pushes and merges leave the receiver unchanged; merge leaves
