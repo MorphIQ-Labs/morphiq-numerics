@@ -86,3 +86,11 @@ test = false
 doc = false
 bench = false
 required-features = ["fuzzing"]
+
+[[bin]]
+name = "structures"
+path = "fuzz_targets/structures.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]

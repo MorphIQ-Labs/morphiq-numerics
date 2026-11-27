@@ -30,6 +30,7 @@ fn main() {
         Some("strong_density") => morphiq_numerics_fuzz::strong_density::check_input,
         Some("arithmetic") => morphiq_numerics_fuzz::arithmetic::check_input,
         Some("reductions") => morphiq_numerics_fuzz::reductions::check_input,
+        Some("structures") => morphiq_numerics_fuzz::structures::check_input,
         _ => panic!("unknown fuzz target: {target:?}"),
     };
     let paths: Vec<_> = args.collect();
