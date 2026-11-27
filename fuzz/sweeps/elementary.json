@@ -1,0 +1,762 @@
+{
+  "schema_version": 1,
+  "windows": [
+    {
+      "name": "exp-tiny-lower",
+      "operation": "exp",
+      "first": "bc8ffffffffff800",
+      "last": "bc90000000000800",
+      "anchor": "bc90000000000000",
+      "source": "docs/exp.md section 1, rounds-to-one interval"
+    },
+    {
+      "name": "exp-tiny-upper",
+      "operation": "exp",
+      "first": "3c9ffffffffff800",
+      "last": "3ca0000000000800",
+      "anchor": "3ca0000000000000",
+      "source": "docs/exp.md section 1, rounds-to-one interval"
+    },
+    {
+      "name": "exp-overflow",
+      "operation": "exp",
+      "first": "40862e42fefa31f0",
+      "last": "40862e42fefa41f0",
+      "anchor": "40862e42fefa39f0",
+      "source": "overflow threshold encoding, docs/expm1.md section 1"
+    },
+    {
+      "name": "exp-underflow",
+      "operation": "exp",
+      "first": "c0874910d52d2852",
+      "last": "c0874910d52d3852",
+      "anchor": "c0874910d52d3052",
+      "source": "near the underflow threshold, docs/exp.md section 1"
+    },
+    {
+      "name": "exp-small-join",
+      "operation": "exp",
+      "first": "3e0ffffffffff800",
+      "last": "3e10000000000800",
+      "anchor": "3e10000000000000",
+      "source": "docs/exp.md section 3"
+    },
+    {
+      "name": "exp-binade-one",
+      "operation": "exp",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "exp-subnormal-normal",
+      "operation": "exp",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "exp-largest",
+      "operation": "exp",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    },
+    {
+      "name": "exp2-overflow",
+      "operation": "exp2",
+      "first": "408ffffffffff800",
+      "last": "4090000000000800",
+      "anchor": "4090000000000000",
+      "source": "docs/exp2.md section 1"
+    },
+    {
+      "name": "exp2-underflow",
+      "operation": "exp2",
+      "first": "c090cbfffffff800",
+      "last": "c090cc0000000800",
+      "anchor": "c090cc0000000000",
+      "source": "docs/exp2.md section 1"
+    },
+    {
+      "name": "exp2-one-lower",
+      "operation": "exp2",
+      "first": "bc971547652b7afe",
+      "last": "bc971547652b8afe",
+      "anchor": "bc971547652b82fe",
+      "source": "docs/exp2.md section 1"
+    },
+    {
+      "name": "exp2-one-upper",
+      "operation": "exp2",
+      "first": "3ca71547652b7afd",
+      "last": "3ca71547652b8afd",
+      "anchor": "3ca71547652b82fd",
+      "source": "docs/exp2.md section 1"
+    },
+    {
+      "name": "exp2-fast-limit",
+      "operation": "exp2",
+      "first": "408fbffffffff800",
+      "last": "408fc00000000800",
+      "anchor": "408fc00000000000",
+      "source": "docs/exp2.md fast-path domain"
+    },
+    {
+      "name": "exp2-binade-one",
+      "operation": "exp2",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "exp2-subnormal-normal",
+      "operation": "exp2",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "exp2-largest",
+      "operation": "exp2",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    },
+    {
+      "name": "expm1-overflow",
+      "operation": "expm1",
+      "first": "40862e42fefa31f0",
+      "last": "40862e42fefa41f0",
+      "anchor": "40862e42fefa39f0",
+      "source": "docs/expm1.md section 1"
+    },
+    {
+      "name": "expm1-minus-one",
+      "operation": "expm1",
+      "first": "c042b708872318e2",
+      "last": "c042b708872328e2",
+      "anchor": "c042b708872320e2",
+      "source": "docs/expm1.md section 1"
+    },
+    {
+      "name": "expm1-tiny",
+      "operation": "expm1",
+      "first": "3c8ffffffffff800",
+      "last": "3c90000000000800",
+      "anchor": "3c90000000000000",
+      "source": "docs/expm1.md section 1"
+    },
+    {
+      "name": "expm1-tiny-negative",
+      "operation": "expm1",
+      "first": "bc8ffffffffff800",
+      "last": "bc90000000000800",
+      "anchor": "bc90000000000000",
+      "source": "docs/expm1.md section 1"
+    },
+    {
+      "name": "expm1-small-join",
+      "operation": "expm1",
+      "first": "3f9ffffffffff800",
+      "last": "3fa0000000000800",
+      "anchor": "3fa0000000000000",
+      "source": "docs/expm1.md section 1"
+    },
+    {
+      "name": "expm1-small-join-negative",
+      "operation": "expm1",
+      "first": "bf9ffffffffff800",
+      "last": "bfa0000000000800",
+      "anchor": "bfa0000000000000",
+      "source": "docs/expm1.md section 1"
+    },
+    {
+      "name": "expm1-binade-one",
+      "operation": "expm1",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "expm1-subnormal-normal",
+      "operation": "expm1",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "expm1-largest",
+      "operation": "expm1",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    },
+    {
+      "name": "ln-below-one",
+      "operation": "ln",
+      "first": "3fefeffffffff800",
+      "last": "3feff00000000800",
+      "anchor": "3feff00000000000",
+      "source": "docs/ln.md reciprocal-one cells"
+    },
+    {
+      "name": "ln-above-one",
+      "operation": "ln",
+      "first": "3ff007fffffff800",
+      "last": "3ff0080000000800",
+      "anchor": "3ff0080000000000",
+      "source": "docs/ln.md reciprocal-one cells"
+    },
+    {
+      "name": "ln-binade-one",
+      "operation": "ln",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "ln-subnormal-normal",
+      "operation": "ln",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "ln-largest",
+      "operation": "ln",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    },
+    {
+      "name": "ln_1p-tiny",
+      "operation": "ln_1p",
+      "first": "3c8ffffffffff800",
+      "last": "3c90000000000800",
+      "anchor": "3c90000000000000",
+      "source": "docs/ln.md section 7"
+    },
+    {
+      "name": "ln_1p-tiny-negative",
+      "operation": "ln_1p",
+      "first": "bc8ffffffffff800",
+      "last": "bc90000000000800",
+      "anchor": "bc90000000000000",
+      "source": "docs/ln.md section 7"
+    },
+    {
+      "name": "ln_1p-stage",
+      "operation": "ln_1p",
+      "first": "3d0ffffffffff800",
+      "last": "3d10000000000800",
+      "anchor": "3d10000000000000",
+      "source": "docs/ln.md section 7 stages"
+    },
+    {
+      "name": "ln_1p-stage-negative",
+      "operation": "ln_1p",
+      "first": "bd0ffffffffff800",
+      "last": "bd10000000000800",
+      "anchor": "bd10000000000000",
+      "source": "docs/ln.md section 7 stages"
+    },
+    {
+      "name": "ln_1p-minus-one",
+      "operation": "ln_1p",
+      "first": "bfeffffffffff800",
+      "last": "bff0000000000800",
+      "anchor": "bff0000000000000",
+      "source": "domain edge at -1"
+    },
+    {
+      "name": "ln_1p-binade-one",
+      "operation": "ln_1p",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "ln_1p-subnormal-normal",
+      "operation": "ln_1p",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "ln_1p-largest",
+      "operation": "ln_1p",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    },
+    {
+      "name": "log2-binade-one",
+      "operation": "log2",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "log2-subnormal-normal",
+      "operation": "log2",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "log2-largest",
+      "operation": "log2",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    },
+    {
+      "name": "log10-binade-one",
+      "operation": "log10",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "log10-subnormal-normal",
+      "operation": "log10",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "log10-largest",
+      "operation": "log10",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    },
+    {
+      "name": "log10-ten",
+      "operation": "log10",
+      "first": "4023fffffffff800",
+      "last": "4024000000000800",
+      "anchor": "4024000000000000",
+      "source": "exact power of ten"
+    },
+    {
+      "name": "sin-identity",
+      "operation": "sin",
+      "first": "3e571374491236f6",
+      "last": "3e571374491246f6",
+      "anchor": "3e57137449123ef6",
+      "source": "docs/sin_cos.md section 1"
+    },
+    {
+      "name": "sin-identity-negative",
+      "operation": "sin",
+      "first": "be571374491236f6",
+      "last": "be571374491246f6",
+      "anchor": "be57137449123ef6",
+      "source": "docs/sin_cos.md section 1"
+    },
+    {
+      "name": "sin-cr-lower",
+      "operation": "sin",
+      "first": "3e6ffffffffff800",
+      "last": "3e70000000000800",
+      "anchor": "3e70000000000000",
+      "source": "docs/sin_cos.md correct-rounding domain"
+    },
+    {
+      "name": "sin-cr-lower-negative",
+      "operation": "sin",
+      "first": "be6ffffffffff800",
+      "last": "be70000000000800",
+      "anchor": "be70000000000000",
+      "source": "docs/sin_cos.md correct-rounding domain"
+    },
+    {
+      "name": "sin-cr-upper",
+      "operation": "sin",
+      "first": "400490bffffff800",
+      "last": "400490c000000800",
+      "anchor": "400490c000000000",
+      "source": "docs/sin_cos.md correct-rounding domain"
+    },
+    {
+      "name": "sin-cr-upper-negative",
+      "operation": "sin",
+      "first": "c00490bffffff800",
+      "last": "c00490c000000800",
+      "anchor": "c00490c000000000",
+      "source": "docs/sin_cos.md correct-rounding domain"
+    },
+    {
+      "name": "sin-binade-one",
+      "operation": "sin",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "sin-subnormal-normal",
+      "operation": "sin",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "sin-largest",
+      "operation": "sin",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    },
+    {
+      "name": "cos-table",
+      "operation": "cos",
+      "first": "3e5ffffffffff800",
+      "last": "3e60000000000800",
+      "anchor": "3e60000000000000",
+      "source": "docs/sin_cos.md section 1"
+    },
+    {
+      "name": "cos-table-negative",
+      "operation": "cos",
+      "first": "be5ffffffffff800",
+      "last": "be60000000000800",
+      "anchor": "be60000000000000",
+      "source": "docs/sin_cos.md section 1"
+    },
+    {
+      "name": "cos-cr-upper",
+      "operation": "cos",
+      "first": "3ff9217ffffff800",
+      "last": "3ff9218000000800",
+      "anchor": "3ff9218000000000",
+      "source": "docs/sin_cos.md correct-rounding domain"
+    },
+    {
+      "name": "cos-cr-upper-negative",
+      "operation": "cos",
+      "first": "bff9217ffffff800",
+      "last": "bff9218000000800",
+      "anchor": "bff9218000000000",
+      "source": "docs/sin_cos.md correct-rounding domain"
+    },
+    {
+      "name": "cos-binade-one",
+      "operation": "cos",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "cos-subnormal-normal",
+      "operation": "cos",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "cos-largest",
+      "operation": "cos",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    },
+    {
+      "name": "tan-identity",
+      "operation": "tan",
+      "first": "3e4d12ed0af19a7e",
+      "last": "3e4d12ed0af1aa7e",
+      "anchor": "3e4d12ed0af1a27e",
+      "source": "docs/sin_cos.md section 8"
+    },
+    {
+      "name": "tan-identity-negative",
+      "operation": "tan",
+      "first": "be4d12ed0af19a7e",
+      "last": "be4d12ed0af1aa7e",
+      "anchor": "be4d12ed0af1a27e",
+      "source": "docs/sin_cos.md section 8"
+    },
+    {
+      "name": "tan-cr-lower",
+      "operation": "tan",
+      "first": "3e5ffffffffff800",
+      "last": "3e60000000000800",
+      "anchor": "3e60000000000000",
+      "source": "docs/sin_cos.md section 8"
+    },
+    {
+      "name": "tan-cr-lower-negative",
+      "operation": "tan",
+      "first": "be5ffffffffff800",
+      "last": "be60000000000800",
+      "anchor": "be60000000000000",
+      "source": "docs/sin_cos.md section 8"
+    },
+    {
+      "name": "tan-cr-upper",
+      "operation": "tan",
+      "first": "3ff1b6e192ebb645",
+      "last": "3ff1b6e192ebc645",
+      "anchor": "3ff1b6e192ebbe45",
+      "source": "near atan(2), docs/sin_cos.md section 8"
+    },
+    {
+      "name": "tan-cr-upper-negative",
+      "operation": "tan",
+      "first": "bff1b6e192ebb645",
+      "last": "bff1b6e192ebc645",
+      "anchor": "bff1b6e192ebbe45",
+      "source": "near atan(2), docs/sin_cos.md section 8"
+    },
+    {
+      "name": "tan-binade-one",
+      "operation": "tan",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "tan-subnormal-normal",
+      "operation": "tan",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "tan-largest",
+      "operation": "tan",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    },
+    {
+      "name": "sqrt-four",
+      "operation": "sqrt",
+      "first": "400ffffffffff800",
+      "last": "4010000000000800",
+      "anchor": "4010000000000000",
+      "source": "binade edge at 4"
+    },
+    {
+      "name": "sqrt-binade-one",
+      "operation": "sqrt",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "sqrt-subnormal-normal",
+      "operation": "sqrt",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "sqrt-largest",
+      "operation": "sqrt",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    },
+    {
+      "name": "asin-identity",
+      "operation": "asin",
+      "first": "3e571374491236f6",
+      "last": "3e571374491246f6",
+      "anchor": "3e57137449123ef6",
+      "source": "docs/asin.md section 1"
+    },
+    {
+      "name": "asin-identity-negative",
+      "operation": "asin",
+      "first": "be571374491236f6",
+      "last": "be571374491246f6",
+      "anchor": "be57137449123ef6",
+      "source": "docs/asin.md section 1"
+    },
+    {
+      "name": "asin-split",
+      "operation": "asin",
+      "first": "3fe6a09e667f33cc",
+      "last": "3fe6a09e667f43cc",
+      "anchor": "3fe6a09e667f3bcc",
+      "source": "docs/asin.md SPLIT"
+    },
+    {
+      "name": "asin-split-negative",
+      "operation": "asin",
+      "first": "bfe6a09e667f33cc",
+      "last": "bfe6a09e667f43cc",
+      "anchor": "bfe6a09e667f3bcc",
+      "source": "docs/asin.md SPLIT"
+    },
+    {
+      "name": "asin-edge",
+      "operation": "asin",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "domain edge, docs/asin.md section 1"
+    },
+    {
+      "name": "asin-edge-negative",
+      "operation": "asin",
+      "first": "bfeffffffffff800",
+      "last": "bff0000000000800",
+      "anchor": "bff0000000000000",
+      "source": "domain edge, docs/asin.md section 1"
+    },
+    {
+      "name": "asinh-identity",
+      "operation": "asinh",
+      "first": "3e571374491236f6",
+      "last": "3e571374491246f6",
+      "anchor": "3e57137449123ef6",
+      "source": "docs/asinh.md section 1"
+    },
+    {
+      "name": "asinh-identity-negative",
+      "operation": "asinh",
+      "first": "be571374491236f6",
+      "last": "be571374491246f6",
+      "anchor": "be57137449123ef6",
+      "source": "docs/asinh.md section 1"
+    },
+    {
+      "name": "asinh-series-join",
+      "operation": "asinh",
+      "first": "3f7ffffffffff800",
+      "last": "3f80000000000800",
+      "anchor": "3f80000000000000",
+      "source": "docs/asinh.md region edge"
+    },
+    {
+      "name": "asinh-series-join-negative",
+      "operation": "asinh",
+      "first": "bf7ffffffffff800",
+      "last": "bf80000000000800",
+      "anchor": "bf80000000000000",
+      "source": "docs/asinh.md region edge"
+    },
+    {
+      "name": "asinh-large-join",
+      "operation": "asinh",
+      "first": "41affffffffff800",
+      "last": "41b0000000000800",
+      "anchor": "41b0000000000000",
+      "source": "docs/asinh.md region edge"
+    },
+    {
+      "name": "asinh-large-join-negative",
+      "operation": "asinh",
+      "first": "c1affffffffff800",
+      "last": "c1b0000000000800",
+      "anchor": "c1b0000000000000",
+      "source": "docs/asinh.md region edge"
+    },
+    {
+      "name": "asinh-binade-one",
+      "operation": "asinh",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "asinh-subnormal-normal",
+      "operation": "asinh",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "asinh-largest",
+      "operation": "asinh",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    },
+    {
+      "name": "atan2-diagonal",
+      "operation": "atan2",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "docs/atan2.md ratio one",
+      "second": "3ff0000000000000"
+    },
+    {
+      "name": "atan2-diagonal-negative-x",
+      "operation": "atan2",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "docs/atan2.md ratio one",
+      "second": "bff0000000000000"
+    },
+    {
+      "name": "atan2-tiny-ratio",
+      "operation": "atan2",
+      "first": "07affffffffff800",
+      "last": "07b0000000000800",
+      "anchor": "07b0000000000000",
+      "source": "docs/atan2.md tiny ratios",
+      "second": "3ff0000000000000"
+    },
+    {
+      "name": "atan2-segment",
+      "operation": "atan2",
+      "first": "3f8ffffffffff800",
+      "last": "3f90000000000800",
+      "anchor": "3f90000000000000",
+      "source": "docs/atan2.md segment boundary",
+      "second": "3ff0000000000000"
+    },
+    {
+      "name": "atan2-large",
+      "operation": "atan2",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input",
+      "second": "3ff0000000000000"
+    }
+  ]
+}

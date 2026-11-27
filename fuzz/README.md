@@ -373,43 +373,48 @@ Oracle API documentation: [rug Float](https://docs.rs/rug/1.30.0/rug/struct.Floa
 Fuzzer usage: [Rust Fuzz Book](https://rust-fuzz.github.io/book/cargo-fuzz.html).
 No external numerical implementation source is used by this harness.
 
-## Deterministic normal boundary sweeps
+## Deterministic boundary sweeps
 
-[`sweeps/normal.json`](sweeps/normal.json) declares 30 finite binary64 windows
-for strong erfcx, CDF and log-CDF. They surround the documented overflow,
-underflow and saturation thresholds, central/tail region joins, selected
-binade boundaries, signed zeros and erfcx's largest positive input. These are
-explicitly selected windows, not all internal rounding-test transitions or the
-whole binary64 domain. Each row gives a stable name, operation, inclusive first
-and last encodings, a smoke anchor, and the source of its boundary.
+`sweeps/TARGET.json` declares finite binary64 windows for the `elementary`,
+`fast_elementary`, `fast_normal`, `strong_normal` and `strong_density` targets,
+with at least one window for every operation of each. They surround documented
+overflow, underflow, saturation and domain thresholds, correct-rounding and
+region joins, and selected binade edges. Each row gives a stable name,
+operation, inclusive first and last encodings, a smoke anchor and the source of
+its boundary; an `atan2` row also fixes the second argument. These are
+explicitly selected windows, not all internal rounding-test transitions.
+
+**Not covered:** exhaustive sweeps of `f32` analogues are not implemented; the
+functions of several arguments other than `atan2` (bivariate normal, log-space,
+double-word, reductions, intervals, linear algebra) and the integer streams have
+fuzz targets but no declared windows.
 
 The enumerator visits every integer encoding between the endpoints exactly
-once, in packets of up to 65 lanes. On the negative side, increasing encoding
-means decreasing numerical value; both endpoints still belong to the window.
-Windows have one sign, contain only finite values, and cannot overlap for the
-same function. Zero and largest-finite windows are clipped to their finite sign
-domain. Every other window spans 2048 encodings on each side of its anchor.
-One invocation is limited to 1,048,576 inputs and rejects malformed windows.
+once, in packets of the target's lane count. On the negative side, increasing
+encoding means decreasing numerical value; both endpoints still belong to the
+window. Windows have one sign, contain only finite values, and cannot overlap for
+the same operation and second argument. Zero and largest-finite windows are
+clipped to their finite sign domain. Every other window spans 2048 encodings on
+each side of its anchor. One window is limited to 1,048,576 inputs.
 
-The full plan contains **112,670 inputs per feature mode**, or **225,340 checks
-per host** across scalar and `simd,std` builds. Every input uses the same
-contract-aware MPFR oracle and scalar/slice bit comparison as `strong_normal`.
-Correct rounding is required where established; bounded-result domains retain
-their published bounds. The sweep does not inspect or infer internal path
-coverage from sampled public results. Other functions and exhaustive f32
-analogue coverage are outside this plan.
+Every input uses the same contract-aware MPFR oracle and scalar/slice bit
+comparison as its fuzz target. Correct rounding is required where established;
+bounded-result domains retain their published bounds. The sweep does not infer
+internal path coverage from sampled public results.
 
 ```sh
 # NEW_DIRECTORY must not already exist; all attempts remain separate.
-python3 scripts/check_normal_sweeps.py target/normal-sweeps/my-run
+python3 scripts/check_sweeps.py target/sweeps/my-run
+# One target only; --list prints the names.
+python3 scripts/check_sweeps.py target/sweeps/my-elementary --target elementary
 # PR smoke: at most five encodings per window, explicitly partial coverage.
-python3 scripts/check_normal_sweeps.py target/normal-sweeps/my-smoke --profile smoke
+python3 scripts/check_sweeps.py target/sweeps/my-smoke --profile smoke
 ```
 
-The runner builds the unpublished `normal-sweep` binary with the pinned stable
+The runner builds the unpublished `sweep` binary with the pinned stable
 toolchain and locked oracle dependencies; no nightly or sanitizer is needed for
-deterministic enumeration. The weekly/manual `normal-sweeps.yml` workflow runs
-the full plan on native Linux x86-64 and macOS ARM. Existing required PR test
+deterministic enumeration. The weekly/manual `sweeps.yml` workflow runs the full
+plan on native Linux x86-64 and macOS ARM, one job per target and host. Existing required PR test
 jobs execute the smoke profile and runner controls on both hosts. Smoke success
 does not establish a completed full-window campaign.
 
@@ -422,13 +427,13 @@ The top-level status becomes `passed` only after both modes finish and the
 reported count equals the declared count. A timeout or interruption leaves a
 failed job and an incomplete/failed receipt; completed windows remain visible.
 
-Oracle failures retain a `.packet` in the existing `strong_normal` format and
+Oracle failures retain a `.packet` in the target's fuzz format and
 propagate failure. Completed counts exclude the entire failed window. Replay a
 retained packet using its recorded feature mode:
 
 ```sh
 cargo run --release --locked --manifest-path fuzz/Cargo.toml --no-default-features \
-  --features simd --bin replay -- strong_normal target/normal-sweeps/my-run/simd/WINDOW.packet
+  --features simd --bin replay -- TARGET target/sweeps/my-run/simd/TARGET-WINDOW.packet
 ```
 
 Artifacts, including failures and partial coverage, are uploaded for 14 days.

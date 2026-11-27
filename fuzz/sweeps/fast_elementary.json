@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "windows": [
+    {
+      "name": "exp-limit",
+      "operation": "exp",
+      "first": "4085fffffffff800",
+      "last": "4086000000000800",
+      "anchor": "4086000000000000",
+      "source": "docs/fast.md accelerated domain"
+    },
+    {
+      "name": "exp-limit-negative",
+      "operation": "exp",
+      "first": "c085fffffffff800",
+      "last": "c086000000000800",
+      "anchor": "c086000000000000",
+      "source": "docs/fast.md accelerated domain"
+    },
+    {
+      "name": "exp-zero",
+      "operation": "exp",
+      "first": "0000000000000000",
+      "last": "0000000000000800",
+      "anchor": "0000000000000000",
+      "source": "signed zero"
+    },
+    {
+      "name": "exp-binade-one",
+      "operation": "exp",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "exp-subnormal-normal",
+      "operation": "exp",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "exp_coarse-limit",
+      "operation": "exp_coarse",
+      "first": "4085fffffffff800",
+      "last": "4086000000000800",
+      "anchor": "4086000000000000",
+      "source": "docs/fast.md accelerated domain"
+    },
+    {
+      "name": "exp_coarse-limit-negative",
+      "operation": "exp_coarse",
+      "first": "c085fffffffff800",
+      "last": "c086000000000800",
+      "anchor": "c086000000000000",
+      "source": "docs/fast.md accelerated domain"
+    },
+    {
+      "name": "exp_coarse-zero",
+      "operation": "exp_coarse",
+      "first": "0000000000000000",
+      "last": "0000000000000800",
+      "anchor": "0000000000000000",
+      "source": "signed zero"
+    },
+    {
+      "name": "exp_coarse-binade-one",
+      "operation": "exp_coarse",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "exp_coarse-subnormal-normal",
+      "operation": "exp_coarse",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "ln-binade-one",
+      "operation": "ln",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "ln-subnormal-normal",
+      "operation": "ln",
+      "first": "000ffffffffff800",
+      "last": "0010000000000800",
+      "anchor": "0010000000000000",
+      "source": "subnormal to normal edge"
+    },
+    {
+      "name": "ln-largest",
+      "operation": "ln",
+      "first": "7feffffffffff7ff",
+      "last": "7fefffffffffffff",
+      "anchor": "7fefffffffffffff",
+      "source": "largest finite input"
+    }
+  ]
+}

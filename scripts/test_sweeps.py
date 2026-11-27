@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scripts.check_normal_sweeps import MANIFEST, load_windows, run_windows
+from scripts.check_sweeps import MANIFESTS, OPERATIONS, load_windows, run_windows
 
 
 def window(name="one", first="3feffffffffffffe", last="3ff0000000000002", anchor="3ff0000000000000"):
@@ -16,7 +16,7 @@ class NormalSweepTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "manifest.json"
             path.write_text(json.dumps(dict(schema_version=1, windows=rows)))
-            return load_windows(path, profile)
+            return load_windows(path, profile, "strong_normal")
 
     def test_counts_include_both_endpoints_and_smoke_stays_inside_declared_windows(self):
         rows = [window(first="0000000000000000", last="0000000000001000", anchor="0000000000000000")]
@@ -25,14 +25,19 @@ class NormalSweepTests(unittest.TestCase):
         self.assertEqual(smoke["first"], "0000000000000000")
         self.assertEqual(smoke["last"], "0000000000000002")
         self.assertEqual(smoke["expected"], 3)
-        full = load_windows(MANIFEST, "full")
-        short = load_windows(MANIFEST, "smoke")
-        self.assertEqual({row["operation"] for row in full}, {"erfcx", "cdf", "log_cdf"})
-        self.assertEqual(len(short), len(full))
-        for complete, sample in zip(full, short):
-            self.assertLessEqual(int(complete["first"], 16), int(sample["first"], 16))
-            self.assertLessEqual(int(sample["last"], 16), int(complete["last"], 16))
-            self.assertLessEqual(sample["expected"], 5)
+    def test_every_declared_manifest_loads_and_covers_each_operation(self):
+        self.assertEqual({path.stem for path in MANIFESTS.glob("*.json")}, set(OPERATIONS))
+        for target, operations in OPERATIONS.items():
+            with self.subTest(target=target):
+                path = MANIFESTS / f"{target}.json"
+                full = load_windows(path, "full", target)
+                short = load_windows(path, "smoke", target)
+                self.assertEqual({row["operation"] for row in full}, set(operations))
+                self.assertEqual(len(short), len(full))
+                for complete, sample in zip(full, short):
+                    self.assertLessEqual(int(complete["first"], 16), int(sample["first"], 16))
+                    self.assertLessEqual(int(sample["last"], 16), int(complete["last"], 16))
+                    self.assertLessEqual(sample["expected"], 5)
 
     def test_invalid_empty_duplicate_overlapping_and_unbounded_plans_are_rejected(self):
         cases = [[], [window(), window()], [window(), window(name="overlap")],
@@ -72,11 +77,11 @@ class NormalSweepTests(unittest.TestCase):
                 self.assertIsNotNone(error)
                 self.assertEqual(saved["checked"], 0)
                 self.assertEqual(saved["windows"][0]["status"], "failed")
-                self.assertIn("one.stderr.log", logs)
-                self.assertIn("one.stdout.log", logs)
+                self.assertIn("strong_normal-one.stderr.log", logs)
+                self.assertIn("strong_normal-one.stdout.log", logs)
 
     def test_completed_counts_are_recorded_with_the_exact_range_and_mode(self):
-        error, saved, _ = self.run_fake("print(int(sys.argv[3], 16) - int(sys.argv[2], 16) + 1)\n")
+        error, saved, _ = self.run_fake("print(int(sys.argv[4], 16) - int(sys.argv[3], 16) + 1)\n")
         self.assertIsNone(error)
         self.assertEqual(saved["checked"], 5)
         self.assertEqual(saved["windows"][0]["checked"], 5)

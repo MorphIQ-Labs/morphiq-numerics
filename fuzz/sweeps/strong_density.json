@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "windows": [
+    {
+      "name": "pdf-binade-one",
+      "operation": "pdf",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "ccdf-binade-one",
+      "operation": "ccdf",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "centered-binade-one",
+      "operation": "centered",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "log_pdf-binade-one",
+      "operation": "log_pdf",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "binade edge at 1"
+    },
+    {
+      "name": "pdf-zero",
+      "operation": "pdf",
+      "first": "40434a429ac29ebc",
+      "last": "40434a429ac2aebc",
+      "anchor": "40434a429ac2a6bc",
+      "source": "docs/normal.md and docs/log_norm_pdf.md thresholds"
+    },
+    {
+      "name": "ccdf-zero",
+      "operation": "ccdf",
+      "first": "40433e21dc3f33d8",
+      "last": "40433e21dc3f43d8",
+      "anchor": "40433e21dc3f3bd8",
+      "source": "docs/normal.md and docs/log_norm_pdf.md thresholds"
+    },
+    {
+      "name": "ccdf-one",
+      "operation": "ccdf",
+      "first": "c02095b059d6744d",
+      "last": "c02095b059d6844d",
+      "anchor": "c02095b059d67c4d",
+      "source": "docs/normal.md and docs/log_norm_pdf.md thresholds"
+    },
+    {
+      "name": "centered-half",
+      "operation": "centered",
+      "first": "4020bfafe7a91668",
+      "last": "4020bfafe7a92668",
+      "anchor": "4020bfafe7a91e68",
+      "source": "docs/normal.md and docs/log_norm_pdf.md thresholds"
+    },
+    {
+      "name": "log_pdf-overflow",
+      "operation": "log_pdf",
+      "first": "5ff6a09e667f33cd",
+      "last": "5ff6a09e667f43cd",
+      "anchor": "5ff6a09e667f3bcd",
+      "source": "docs/normal.md and docs/log_norm_pdf.md thresholds"
+    },
+    {
+      "name": "ccdf-central-join",
+      "operation": "ccdf",
+      "first": "3fdffffffffff800",
+      "last": "3fe0000000000800",
+      "anchor": "3fe0000000000000",
+      "source": "docs/normal.md central/tail join"
+    },
+    {
+      "name": "ccdf-central-join-negative",
+      "operation": "ccdf",
+      "first": "bfdffffffffff800",
+      "last": "bfe0000000000800",
+      "anchor": "bfe0000000000000",
+      "source": "docs/normal.md central/tail join"
+    },
+    {
+      "name": "centered-central-join",
+      "operation": "centered",
+      "first": "3fdffffffffff800",
+      "last": "3fe0000000000800",
+      "anchor": "3fe0000000000000",
+      "source": "docs/normal.md central/tail join"
+    },
+    {
+      "name": "centered-central-join-negative",
+      "operation": "centered",
+      "first": "bfdffffffffff800",
+      "last": "bfe0000000000800",
+      "anchor": "bfe0000000000000",
+      "source": "docs/normal.md central/tail join"
+    },
+    {
+      "name": "pdf-far-lower",
+      "operation": "pdf",
+      "first": "4036fffffffff800",
+      "last": "4037000000000800",
+      "anchor": "4037000000000000",
+      "source": "docs/normal.md far-tail composition"
+    },
+    {
+      "name": "pdf-far-lower-negative",
+      "operation": "pdf",
+      "first": "c036fffffffff800",
+      "last": "c037000000000800",
+      "anchor": "c037000000000000",
+      "source": "docs/normal.md far-tail composition"
+    },
+    {
+      "name": "log_pdf-tiny",
+      "operation": "log_pdf",
+      "first": "3e3ffffffffff800",
+      "last": "3e40000000000800",
+      "anchor": "3e40000000000000",
+      "source": "docs/log_norm_pdf.md section 2"
+    },
+    {
+      "name": "log_pdf-tiny-negative",
+      "operation": "log_pdf",
+      "first": "be3ffffffffff800",
+      "last": "be40000000000800",
+      "anchor": "be40000000000000",
+      "source": "docs/log_norm_pdf.md section 2"
+    },
+    {
+      "name": "log_pdf-large",
+      "operation": "log_pdf",
+      "first": "5f2ffffffffff800",
+      "last": "5f30000000000800",
+      "anchor": "5f30000000000000",
+      "source": "docs/log_norm_pdf.md section 4"
+    },
+    {
+      "name": "log_pdf-large-negative",
+      "operation": "log_pdf",
+      "first": "df2ffffffffff800",
+      "last": "df30000000000800",
+      "anchor": "df30000000000000",
+      "source": "docs/log_norm_pdf.md section 4"
+    }
+  ]
+}
