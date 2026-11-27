@@ -233,7 +233,7 @@ sums are exact, so the algebraic bounds are checked without division.
 - [reduce.md](../docs/reduce.md): the `sum`, `sum2`, `dot` and `dot2` bounds on
   their stated domains (here with `S <= 2^1019`, and operands at most `2^510`
   for `dot2`); sum-of-squares identity with the dot products; exact `max_abs`;
-  empty slices.
+  empty slices; and the bits of every NaN result.
 - [moments.md](../docs/moments.md): each successful readout encloses the exact
   statistic; failed pushes and merges leave the receiver unchanged; merge leaves
   its operand unchanged. Which checked-arithmetic refusals occur is not judged.
@@ -246,7 +246,9 @@ sums are exact, so the algebraic bounds are checked without division.
 
 Byte 0 selects reductions, moments or log space; byte 1 selects how the words
 form a slice (as given, clustered around the first, or nearly cancelling); byte
-2 places the moment split. The retained `cancelling-log-sum` input has a log-sum
+2 places the moment split. The retained `nan-payload-order` input reproduces a library defect this target
+found: reductions returned different NaN bits across targets and call paths.
+The retained `cancelling-log-sum` input has a log-sum
 near zero; it is a coverage witness, not a known library defect.
 
 ## Run and replay
