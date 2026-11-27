@@ -1166,8 +1166,49 @@ pub fn corpus_digest() -> [u8; 32] {
     moments_section(&mut r);
     radix_log_slice_section(&mut r);
     trig_slice_section(&mut r);
+    reduce_non_finite_section(&mut r);
 
     r.0.finalize().into()
+}
+
+// Literal encodings only, appended so every earlier section is unchanged.
+fn reduce_non_finite_section(r: &mut Recorder) {
+    r.label("reduce_non_finite");
+    // Two quiet NaNs with different payloads, a signaling NaN, both
+    // infinities, an overflowing magnitude, zero and one.
+    let values = [
+        0xffff_0101_0292_4925,
+        0xffff_7fef_ffff_ffff,
+        0x7ff0_0000_0000_0042,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0x7fef_ffff_ffff_ffff,
+        0,
+        0x3ff0_0000_0000_0000,
+    ]
+    .map(f64::from_bits);
+    for a in values {
+        for b in values {
+            for c in values {
+                let x = [a, b, c];
+                let y = [c, a, b];
+                for len in 0..=3 {
+                    let (x, y) = (&x[..len], &y[..len]);
+                    for v in [
+                        sum(x),
+                        sum2(x),
+                        dot(x, y),
+                        dot2(x, y),
+                        sum_squares(x),
+                        sum_squares2(x),
+                        max_abs(x),
+                    ] {
+                        r.f64(v);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn trig_slice_section(r: &mut Recorder) {
