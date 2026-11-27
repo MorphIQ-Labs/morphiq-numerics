@@ -376,25 +376,22 @@ No external numerical implementation source is used by this harness.
 
 ## Deterministic boundary sweeps
 
-`sweeps/TARGET.json` declares finite binary64 windows for the `elementary`,
-`fast_elementary`, `fast_normal`, `strong_normal` and `strong_density` targets,
-with at least one window for every operation of each. They surround documented
-overflow, underflow, saturation and domain thresholds, correct-rounding and
-region joins, and selected binade edges. Each row gives a stable name,
-operation, inclusive first and last encodings, a smoke anchor and the source of
-its boundary; an `atan2` row also fixes the second argument. These are
-explicitly selected windows, not all internal rounding-test transitions.
-
-**Not covered:** exhaustive sweeps of `f32` analogues are not implemented; the
-functions of several arguments other than `atan2` (bivariate normal, log-space,
-double-word, reductions, intervals, linear algebra) and the integer streams have
-fuzz targets but no declared windows.
+`sweeps/TARGET.json` declares binary64 windows for every fuzz target. The
+one-argument targets (`elementary`, `fast_elementary`, `fast_normal`,
+`strong_normal`, `strong_density`) have at least one window for every operation,
+around documented overflow, underflow, saturation and domain thresholds,
+correct-rounding and region joins, and selected binade edges. Targets of several
+arguments sweep the first and fix the rest in each row's `fixed` words: `atan2`,
+`bivariate` (`y`, `rho`), `reductions` (a log-space pair), `arithmetic` (the
+other three words of a double-word record) and `structures` (an interval's other
+bound). `streams` windows range over raw words. These are explicitly selected
+windows, not all internal rounding-test transitions.
 
 The enumerator visits every integer encoding between the endpoints exactly
 once, in packets of the target's lane count. On the negative side, increasing
 encoding means decreasing numerical value; both endpoints still belong to the
-window. Windows have one sign, contain only finite values, and cannot overlap for
-the same operation and second argument. Zero and largest-finite windows are
+window. Windows have one sign, contain only finite values (except raw-word windows), and
+cannot overlap for the same operation and fixed words. Zero and largest-finite windows are
 clipped to their finite sign domain. Every other window spans 2048 encodings on
 each side of its anchor. One window is limited to 1,048,576 inputs.
 

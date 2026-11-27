@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "windows": [
+    {
+      "name": "origin",
+      "operation": "cdf",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "docs/bivariate_normal.md section 3 low correlation",
+      "fixed": [
+        "3ff0000000000000",
+        "3fe0000000000000"
+      ]
+    },
+    {
+      "name": "lower-saturation",
+      "operation": "cdf",
+      "first": "c0437ffffffff800",
+      "last": "c043800000000800",
+      "anchor": "c043800000000000",
+      "source": "docs/bivariate_normal.md section 2 saturation",
+      "fixed": [
+        "3ff0000000000000",
+        "3fe0000000000000"
+      ]
+    },
+    {
+      "name": "upper-saturation",
+      "operation": "cdf",
+      "first": "40437ffffffff800",
+      "last": "4043800000000800",
+      "anchor": "4043800000000000",
+      "source": "docs/bivariate_normal.md section 2 saturation",
+      "fixed": [
+        "3ff0000000000000",
+        "3fe0000000000000"
+      ]
+    },
+    {
+      "name": "rule-limit",
+      "operation": "cdf",
+      "first": "bffffffffffff800",
+      "last": "c000000000000800",
+      "anchor": "c000000000000000",
+      "source": "docs/bivariate_normal.md section 4 rule limit",
+      "fixed": [
+        "c000000000000000",
+        "3fe51eb851eb851f"
+      ]
+    },
+    {
+      "name": "regime-split",
+      "operation": "cdf",
+      "first": "bfcb02704dbe0c79",
+      "last": "bfcb02704dbe1c79",
+      "anchor": "bfcb02704dbe1479",
+      "source": "docs/bivariate_normal.md section 3 witness at the regime split",
+      "fixed": [
+        "bf57d69ad7989ddc",
+        "3fed99999999999a"
+      ]
+    },
+    {
+      "name": "high-negative",
+      "operation": "cdf",
+      "first": "3ff7fffffffff800",
+      "last": "3ff8000000000800",
+      "anchor": "3ff8000000000000",
+      "source": "docs/bivariate_normal.md section 3 high correlation",
+      "fixed": [
+        "bff8000000000000",
+        "bfefae147ae147ae"
+      ]
+    },
+    {
+      "name": "near-comonotone",
+      "operation": "cdf",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "docs/bivariate_normal.md section 2 correlations near one",
+      "fixed": [
+        "3ff0000000000000",
+        "3feffffffffffffe"
+      ]
+    }
+  ]
+}

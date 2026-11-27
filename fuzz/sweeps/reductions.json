@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "windows": [
+    {
+      "name": "difference-region",
+      "operation": "log_space",
+      "first": "bfe62e42fefa31ef",
+      "last": "bfe62e42fefa41ef",
+      "anchor": "bfe62e42fefa39ef",
+      "source": "docs/log_space.md section 5 region boundary",
+      "fixed": [
+        "bff62e42fefa39ef"
+      ]
+    },
+    {
+      "name": "cancellation",
+      "operation": "log_space",
+      "first": "3feffffffffff800",
+      "last": "3ff0000000000800",
+      "anchor": "3ff0000000000000",
+      "source": "docs/log_space.md section 5 near-cancellation",
+      "fixed": [
+        "3ff0000000000000"
+      ]
+    },
+    {
+      "name": "exp-underflow",
+      "operation": "log_space",
+      "first": "c0874910d52d2852",
+      "last": "c0874910d52d3852",
+      "anchor": "c0874910d52d3052",
+      "source": "docs/log_space.md section 7 underflow",
+      "fixed": [
+        "0000000000000000"
+      ]
+    },
+    {
+      "name": "large-offset",
+      "operation": "log_space",
+      "first": "7e37e43c88006d9c",
+      "last": "7e37e43c88007d9c",
+      "anchor": "7e37e43c8800759c",
+      "source": "docs/log_space.md section 3 exact reduction",
+      "fixed": [
+        "7e37e43c8800759c"
+      ]
+    }
+  ]
+}

@@ -720,7 +720,9 @@
       "last": "3ff0000000000800",
       "anchor": "3ff0000000000000",
       "source": "docs/atan2.md ratio one",
-      "second": "3ff0000000000000"
+      "fixed": [
+        "3ff0000000000000"
+      ]
     },
     {
       "name": "atan2-diagonal-negative-x",
@@ -729,7 +731,9 @@
       "last": "3ff0000000000800",
       "anchor": "3ff0000000000000",
       "source": "docs/atan2.md ratio one",
-      "second": "bff0000000000000"
+      "fixed": [
+        "bff0000000000000"
+      ]
     },
     {
       "name": "atan2-tiny-ratio",
@@ -738,7 +742,9 @@
       "last": "07b0000000000800",
       "anchor": "07b0000000000000",
       "source": "docs/atan2.md tiny ratios",
-      "second": "3ff0000000000000"
+      "fixed": [
+        "3ff0000000000000"
+      ]
     },
     {
       "name": "atan2-segment",
@@ -747,7 +753,9 @@
       "last": "3f90000000000800",
       "anchor": "3f90000000000000",
       "source": "docs/atan2.md segment boundary",
-      "second": "3ff0000000000000"
+      "fixed": [
+        "3ff0000000000000"
+      ]
     },
     {
       "name": "atan2-large",
@@ -756,7 +764,9 @@
       "last": "7fefffffffffffff",
       "anchor": "7fefffffffffffff",
       "source": "largest finite input",
-      "second": "3ff0000000000000"
+      "fixed": [
+        "3ff0000000000000"
+      ]
     }
   ]
 }

@@ -3,8 +3,10 @@ use std::{env, path::Path, process};
 
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args().skip(1).collect();
-    if args.len() != 6 {
-        return Err("usage: sweep TARGET OP FIRST_HEX LAST_HEX SECOND_HEX FAILURE_PACKET".into());
+    if args.len() < 5 {
+        return Err(
+            "usage: sweep TARGET OP FIRST_HEX LAST_HEX FAILURE_PACKET [FIXED_HEX ...]".into(),
+        );
     }
     let op = args[1]
         .parse::<u8>()
@@ -20,8 +22,11 @@ fn run() -> Result<(), String> {
         op,
         bits(&args[2])?,
         bits(&args[3])?,
-        bits(&args[4])?,
-        Path::new(&args[5]),
+        &args[5..]
+            .iter()
+            .map(|word| bits(word))
+            .collect::<Result<Vec<_>, _>>()?,
+        Path::new(&args[4]),
     )?;
     println!("{count}");
     Ok(())

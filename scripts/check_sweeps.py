@@ -26,7 +26,20 @@ OPERATIONS = {
     "fast_normal": ["erfcx", "cdf", "log_cdf"],
     "strong_normal": ["erfcx", "cdf", "log_cdf"],
     "strong_density": ["pdf", "ccdf", "centered", "log_pdf"],
+    # Targets with one packet layout; the window varies its first argument.
+    "bivariate": ["cdf"],
+    "reductions": ["log_space"],
+    "arithmetic": ["double_word"],
+    "structures": ["interval"],
+    "streams": ["words"],
 }
+# Fixed words each record takes after the swept one.
+FIXED = {"atan2": 1, "cdf_bivariate": 2, "log_space": 1, "double_word": 3, "interval": 1, "words": 1}
+INTEGER_TARGETS = {"streams"}
+
+
+def fixed_count(target, operation):
+    return FIXED.get("cdf_bivariate" if target == "bivariate" else operation, 0)
 
 
 def load_windows(path, profile, target):
@@ -46,24 +59,25 @@ def load_windows(path, profile, target):
             raise ValueError(f"missing operation/source: {name}")
         if any(not re.fullmatch(r"[0-9a-f]{16}", row[key]) for key in ("first", "last", "anchor")):
             raise ValueError(f"invalid binary64 encoding: {name}")
-        second = row.get("second", "0" * 16)
-        if not re.fullmatch(r"[0-9a-f]{16}", second) or ("second" in row) != (op == "atan2"):
-            raise ValueError(f"atan2 windows alone fix a second argument: {name}")
+        fixed = row.get("fixed", [])
+        if len(fixed) != fixed_count(target, op) or any(
+                not re.fullmatch(r"[0-9a-f]{16}", word) for word in fixed):
+            raise ValueError(f"wrong fixed words for {op}: {name}")
         first, last, anchor = (int(row[key], 16) for key in ("first", "last", "anchor"))
-        if not first <= anchor <= last or first >> 63 != last >> 63:
+        if not first <= anchor <= last or target not in INTEGER_TARGETS and first >> 63 != last >> 63:
             raise ValueError(f"unordered or sign-crossing window: {name}")
-        if any((bits >> 52) & 0x7ff == 0x7ff for bits in (first, last)):
+        if target not in INTEGER_TARGETS and any((bits >> 52) & 0x7ff == 0x7ff for bits in (first, last)):
             raise ValueError(f"nonfinite window: {name}")
         if last - first >= 1_048_576:
             raise ValueError(f"window exceeds one million inputs: {name}")
-        seen = intervals.setdefault((op, second), [])
+        seen = intervals.setdefault((op, tuple(fixed)), [])
         if any(first <= end and start <= last for start, end in seen):
             raise ValueError(f"overlapping windows for {op}: {name}")
         seen.append((first, last))
         if profile == "smoke":
             first, last = max(first, anchor - 2), min(last, anchor + 2)
         windows.append({**row, "target": target, "selector": operations.index(op),
-                        "second": second, "first": f"{first:016x}", "last": f"{last:016x}",
+                        "fixed": fixed, "first": f"{first:016x}", "last": f"{last:016x}",
                         "expected": last - first + 1})
     return windows
 
@@ -84,7 +98,7 @@ def run_windows(binary, output, mode, windows, receipt):
         stem = f'{row["target"]}-{row["name"]}'
         failure = mode_dir / (stem + ".packet")
         command = [str(binary), row["target"], str(row["selector"]), row["first"], row["last"],
-                   row["second"], str(failure)]
+                   str(failure), *row["fixed"]]
         with (mode_dir / (stem + ".stderr.log")).open("w") as log:
             result = subprocess.run(command, stdout=subprocess.PIPE, stderr=log, text=True, check=False)
         (mode_dir / (stem + ".stdout.log")).write_text(result.stdout)
