@@ -66,6 +66,9 @@ jobs:
         run: python3 -m unittest discover -s ci -p test_prose_ci.py
       - name: Release lockfile synchronization
         run: python3 -m unittest scripts.test_release_fuzz_lock
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .cargo/python-version
       - name: Benchmark campaign lifecycle and cost model
         run: |
           python3 -m venv target/benchmark-test-venv

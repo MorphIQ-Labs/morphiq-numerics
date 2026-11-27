@@ -292,6 +292,27 @@ for cell in cells: cell.update(product=str(p/'input.bin'),input={{'file':str(p/'
         self.assertEqual(c.read(base / '0/metadata.json')['cell']['id'], '029')
 
 
+class InterpreterPinTests(unittest.TestCase):
+    def test_controller_and_freeze_refuse_an_unpinned_interpreter(self):
+        # A copy of the harness with a pin no interpreter can satisfy.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = Path(__file__).resolve().parents[2]
+            for name in ['scripts/bench_campaign/campaign.py', 'scripts/bench_campaign/selection.py',
+                         'scripts/bench_fast/freeze.py', 'scripts/bench_fast/python_pin.py']:
+                (root / name).parent.mkdir(parents=True, exist_ok=True)
+                (root / name).write_text((repo / name).read_text())
+            (root / '.cargo').mkdir()
+            (root / '.cargo/python-version').write_text('0.0.0\n')
+            for command in [['scripts/bench_campaign/campaign.py', 'plan', '--prepared', 'absent'],
+                            ['scripts/bench_fast/freeze.py', 'absent']]:
+                with self.subTest(entry=command[0]):
+                    result = subprocess.run([sys.executable, '-B', *command], cwd=root,
+                                            capture_output=True, text=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn('requires Python 0.0.0', result.stderr)
+
+
 class SelectionTests(unittest.TestCase):
     def test_full_arm_inventory_retains_composition_diagnostics(self):
         # The cell generator is pure; isolate it from native library loading so
