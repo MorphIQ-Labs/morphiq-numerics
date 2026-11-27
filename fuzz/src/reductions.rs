@@ -80,6 +80,23 @@ fn gamma_bound(
     }
 }
 
+/// docs/reduce.md: a NaN result is the first input NaN in index order, `x`
+/// before `y`, or the canonical quiet NaN when no input is NaN.
+fn check_nan(name: &str, result: f64, x: &[f64], y: &[f64]) {
+    let first = (0..x.len().max(y.len()))
+        .flat_map(|i| [x.get(i), y.get(i)])
+        .flatten()
+        .find(|v| v.is_nan());
+    match first {
+        Some(nan) => assert_eq!(result.to_bits(), nan.to_bits(), "{name} NaN {x:?} {y:?}"),
+        None => assert!(
+            !result.is_nan() || result.to_bits() == 0x7ff8_0000_0000_0000,
+            "{name} created NaN {:016x}",
+            result.to_bits()
+        ),
+    }
+}
+
 fn check_max_abs(xs: &[f64]) {
     let actual = reduce::max_abs(xs);
     let expected = match xs.iter().find(|x| x.is_nan()) {
@@ -93,6 +110,8 @@ fn check_max_abs(xs: &[f64]) {
 
 fn check_sums(xs: &[f64]) {
     let (plain, compensated) = (reduce::sum(xs), reduce::sum2(xs));
+    check_nan("sum", plain, xs, &[]);
+    check_nan("sum2", compensated, xs, &[]);
     if xs.is_empty() {
         assert_eq!([plain.to_bits(), compensated.to_bits()], [0, 0]);
         return;
@@ -125,6 +144,10 @@ fn check_sums(xs: &[f64]) {
 
 fn check_dots(xs: &[f64], ys: &[f64]) {
     let (plain, compensated) = (reduce::dot(xs, ys), reduce::dot2(xs, ys));
+    check_nan("dot", plain, xs, ys);
+    check_nan("dot2", compensated, xs, ys);
+    check_nan("sum_squares", reduce::sum_squares(xs), xs, &[]);
+    check_nan("sum_squares2", reduce::sum_squares2(xs), xs, &[]);
     if xs.is_empty() {
         assert_eq!([plain.to_bits(), compensated.to_bits()], [0, 0]);
     }
@@ -643,6 +666,22 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    #[test]
+    fn nan_results_follow_the_rule() {
+        check_input(include_bytes!(
+            "../regressions/reductions/nan-payload-order"
+        ));
+        let a = f64::from_bits(0xffff_0101_0292_4925);
+        let b = f64::from_bits(0xffff_7fef_ffff_ffff);
+        check_nan("planted", a, &[a, b], &[]);
+        for (wrong, x) in [
+            (b, vec![a, b]),
+            (f64::from_bits(0xfff8_0000_0000_0000), vec![f64::INFINITY]),
+        ] {
+            assert!(std::panic::catch_unwind(|| check_nan("planted", wrong, &x, &[])).is_err());
         }
     }
 
