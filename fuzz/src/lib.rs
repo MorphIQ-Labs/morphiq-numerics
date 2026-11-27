@@ -5,10 +5,12 @@ use morphiq_numerics::{elementary as e, fast::elementary as fast};
 use rug::{Float, float::Round};
 
 pub mod arithmetic;
+pub mod bivariate;
 pub mod fast_normal;
 mod normal_reference;
 pub mod normal_sweep;
 pub mod reductions;
+pub mod streams;
 pub mod strong_density;
 pub mod strong_normal;
 pub mod structures;

@@ -5,7 +5,7 @@
 # Without target names, every target runs.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-all_targets=(elementary fast_elementary fast_normal strong_normal strong_density arithmetic reductions structures)
+all_targets=(elementary fast_elementary fast_normal strong_normal strong_density arithmetic reductions structures streams bivariate)
 if [[ "${1:-}" == --list ]]; then
   printf '%s\n' "${all_targets[@]}"
   exit 0
