@@ -1,12 +1,29 @@
 #!/usr/bin/env bash
 # Replay versioned numerical inputs, then mutate them with libFuzzer.
-# Usage: ./scripts/check_fuzz.sh [seconds-per-target-and-mode, default 60]
+# Usage: ./scripts/check_fuzz.sh [seconds-per-target-and-mode, default 60] [target ...]
+#        ./scripts/check_fuzz.sh --list
+# Without target names, every target runs.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+all_targets=(elementary fast_elementary fast_normal strong_normal)
+if [[ "${1:-}" == --list ]]; then
+  printf '%s\n' "${all_targets[@]}"
+  exit 0
+fi
 seconds=${1:-60}
 if [[ ! "$seconds" =~ ^[1-9][0-9]*$ ]]; then
   echo 'fuzz duration must be a positive integer in seconds' >&2
   exit 2
+fi
+targets=("${all_targets[@]}")
+if (( $# > 1 )); then
+  targets=("${@:2}")
+  for target in "${targets[@]}"; do
+    if [[ " ${all_targets[*]} " != *" $target "* ]]; then
+      echo "unknown fuzz target: $target" >&2
+      exit 2
+    fi
+  done
 fi
 nightly=$(cat .cargo/fuzz-nightly-version)
 required=$(cat .cargo/fuzz-version)
@@ -15,7 +32,7 @@ if [[ "$(cargo fuzz --version)" != "cargo-fuzz $required" ]]; then
   exit 127
 fi
 mkdir -p target/fuzz/logs
-for target in elementary fast_elementary fast_normal strong_normal; do
+for target in "${targets[@]}"; do
   python3 scripts/seed_elementary_fuzz.py "target/fuzz/seeds-$target" --target "$target"
 done
 # Includes planted wrong results, boundary violations and oracle midpoint tests.
@@ -32,7 +49,7 @@ for mode in scalar simd; do
     fuzz_features=fuzzing,simd
   fi
   cargo test --manifest-path fuzz/Cargo.toml --locked "${features[@]}" --lib
-  for target in elementary fast_elementary fast_normal strong_normal; do
+  for target in "${targets[@]}"; do
     max_len=257
     if [[ "$target" != elementary ]]; then max_len=1041; fi
     seeds="target/fuzz/seeds-$target"

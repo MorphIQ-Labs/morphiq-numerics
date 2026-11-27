@@ -20,7 +20,7 @@ SHELLS = sorted({str(Path(p).resolve()) for p in ["/bin/bash", shutil.which("bas
 
 
 class FuzzRunnerTests(unittest.TestCase):
-    def run_runner(self, shell, fail_test=False):
+    def run_runner(self, shell, fail_test=False, arguments=("1",)):
         with tempfile.TemporaryDirectory(prefix="fuzz-runner-") as temp:
             root = Path(temp)
             for directory in ["scripts", ".cargo", "fuzz", "bin"]:
@@ -45,9 +45,9 @@ if os.environ["FUZZ_RUNNER_FAIL_TEST"] == "1" and args[0] == "test":
             log = root / "calls.jsonl"
             env = dict(os.environ, PATH=str(root / "bin") + os.pathsep + os.environ["PATH"],
                        FUZZ_RUNNER_CALLS=str(log), FUZZ_RUNNER_FAIL_TEST=str(int(fail_test)))
-            result = subprocess.run([shell, str(root / "scripts/check_fuzz.sh"), "1"],
+            result = subprocess.run([shell, str(root / "scripts/check_fuzz.sh"), *arguments],
                                     env=env, text=True, capture_output=True, timeout=30)
-            calls = [json.loads(line) for line in log.read_text().splitlines()]
+            calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
             return result, calls
 
     def test_scalar_and_simd_arguments_work_on_each_installed_bash(self):
@@ -75,6 +75,26 @@ if os.environ["FUZZ_RUNNER_FAIL_TEST"] == "1" and args[0] == "test":
                     self.assertIn("-max_len=" + ("257" if args[3] == "elementary" else "1041"), args)
                 self.assertEqual({args[args.index("--features") + 1] for args in campaigns},
                                  {"fuzzing", "fuzzing,simd"})
+
+    def test_named_targets_run_alone_and_unknown_names_fail_before_any_work(self):
+        for shell in SHELLS:
+            with self.subTest(shell=shell):
+                result, calls = self.run_runner(shell, arguments=("1", "strong_normal"))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                replay = [args for args in calls if args[0] == "run"]
+                campaigns = [args for args in calls if args[0].startswith("+")]
+                self.assertEqual([args[args.index("--") + 1] for args in replay], ["strong_normal"] * 2)
+                self.assertEqual([args[3] for args in campaigns], ["strong_normal"] * 2)
+                result, calls = self.run_runner(shell, arguments=("1", "strong_normal", "missing"))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("unknown fuzz target: missing", result.stderr)
+                self.assertEqual(calls, [])
+
+    def test_the_listing_names_every_declared_fuzz_binary(self):
+        listed = subprocess.run(["bash", str(ROOT / "scripts/check_fuzz.sh"), "--list"],
+                                text=True, capture_output=True, check=True).stdout.split()
+        binaries = sorted(path.stem for path in (ROOT / "fuzz/fuzz_targets").glob("*.rs"))
+        self.assertEqual(sorted(listed), binaries)
 
     def test_a_failed_oracle_test_stops_before_fuzzing(self):
         for shell in SHELLS:

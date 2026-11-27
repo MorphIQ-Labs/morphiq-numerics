@@ -201,6 +201,8 @@ Each run replays the versioned strong elementary inputs and fast inputs from
 `fast.json`, `fast_ln.json` and `fast_log_cdf.json`, plus strong normal inputs
 from `erfcx.json` and `normal.json`, then mutates each target for the
 requested number of seconds **per target and feature mode** (eight campaigns).
+Target names after the duration run only those targets, and
+`./scripts/check_fuzz.sh --list` prints them.
 Expected fixture outputs are not imported. The seed encoder adds both signs of
 every binary64 binade boundary and its adjacent encodings, NaN payloads,
 infinities, subnormal edges, and strong slice lengths 0 through 16. Fast seeds
@@ -232,8 +234,9 @@ by up to 65 pairs in that same format (the second word is unused).
 Generated seeds, evolving corpora, failure artifacts and logs live under
 `target/fuzz/`. CI runs 60 seconds per target and mode in the existing required Linux and
 macOS test jobs. The weekly/manual workflow runs 1800 seconds per target and mode on both
-hosts (four hours of mutation per host, with a five-hour job limit for preparation
-and replay). Artifacts are retained for 14 days, including on failure. A passing
+hosts, one job per target and host (an hour of mutation each, with a two-hour job
+limit for preparation and replay). Artifacts are retained for 14 days, including on
+failure. A passing
 campaign is sampled evidence, not an exhaustive proof or a performance result.
 
 Replay a failure without nightly instrumentation:
