@@ -4,7 +4,7 @@ use morphiq_numerics_arch::{Simd, WithSimd};
 use super::{
     COS_SMALL, EPS, EPS_TAN, Function, POLY_C, POLY_S, Reduced, SHIFTER, SIN_IS_X, TABLE, TAN_IS_X,
 };
-use crate::double_word::DoubleWord;
+use crate::double_word::kernel::DoubleWord;
 use crate::lanes::{
     Dw, Kernel, add_dw, add_f64, decide_relative, fast_two_sum, mask_from, mul_dw, two_prod,
     two_sum,

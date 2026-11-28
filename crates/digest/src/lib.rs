@@ -1166,8 +1166,93 @@ pub fn corpus_digest() -> [u8; 32] {
     moments_section(&mut r);
     radix_log_slice_section(&mut r);
     trig_slice_section(&mut r);
+    reduce_non_finite_section(&mut r);
+    eft_non_finite_section(&mut r);
 
     r.0.finalize().into()
+}
+
+// Literal encodings only, appended so every earlier section is unchanged.
+fn eft_non_finite_section(r: &mut Recorder) {
+    r.label("eft_non_finite");
+    // Two quiet NaN payloads, a signaling NaN, both infinities, the largest
+    // finite, zero and one and a half.
+    let values = [
+        0xffff_0101_0292_4925,
+        0xffff_7fef_ffff_ffff,
+        0x7ff0_0000_0000_0042,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0x7fef_ffff_ffff_ffff,
+        0,
+        0x3ff8_0000_0000_0000,
+    ]
+    .map(f64::from_bits);
+    for a in values {
+        for b in values {
+            for (s, t) in [two_sum(a, b), fast_two_sum(a, b), two_prod(a, b)] {
+                r.f64(s);
+                r.f64(t);
+            }
+            r.double_word(DoubleWord::sum(a, b));
+            r.double_word(DoubleWord::product(a, b));
+            for c in values {
+                let x = DoubleWord::sum(a, b);
+                let y = DoubleWord::from_f64(c);
+                for z in [
+                    x.add_f64(c),
+                    x.mul_f64(c),
+                    x.div_f64(c),
+                    x.add(y),
+                    x.sub(y),
+                    x.mul(y),
+                    x.div(y),
+                ] {
+                    r.double_word(z);
+                }
+            }
+        }
+    }
+}
+
+// Literal encodings only, appended so every earlier section is unchanged.
+fn reduce_non_finite_section(r: &mut Recorder) {
+    r.label("reduce_non_finite");
+    // Two quiet NaNs with different payloads, a signaling NaN, both
+    // infinities, an overflowing magnitude, zero and one.
+    let values = [
+        0xffff_0101_0292_4925,
+        0xffff_7fef_ffff_ffff,
+        0x7ff0_0000_0000_0042,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0x7fef_ffff_ffff_ffff,
+        0,
+        0x3ff0_0000_0000_0000,
+    ]
+    .map(f64::from_bits);
+    for a in values {
+        for b in values {
+            for c in values {
+                let x = [a, b, c];
+                let y = [c, a, b];
+                for len in 0..=3 {
+                    let (x, y) = (&x[..len], &y[..len]);
+                    for v in [
+                        sum(x),
+                        sum2(x),
+                        dot(x, y),
+                        dot2(x, y),
+                        sum_squares(x),
+                        sum_squares2(x),
+                        max_abs(x),
+                    ] {
+                        r.f64(v);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn trig_slice_section(r: &mut Recorder) {

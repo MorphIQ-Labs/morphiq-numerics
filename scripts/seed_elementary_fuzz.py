@@ -151,11 +151,151 @@ def strong_normal_seeds():
             yield encode(op, inputs[start:start + 65])
 
 
+def strong_density_seeds():
+    def encode(op, words):
+        return bytes([op]) + b"".join(struct.pack("<QQ", word, 0) for word in words)
+
+    # Regime joins and screens from docs/normal.md and docs/log_norm_pdf.md.
+    # Inputs only; neither expected values nor runtime tables.
+    centers = [0x3DE0000000000000, 0x3E40000000000000, 0x23D0000000000000,
+               0x3FE0000000000000, 0x402095B059D67C4D, 0x4020BFAFE7A91E68,
+               0x4037000000000000, 0x4042000000000000, 0x4042800000000000,
+               0x40433E21DC3F3BD8, 0x40434A429AC2A6BC, 0x4044000000000000,
+               0x5F30000000000000, 0x5FF0000000000000, 0x5FF6A09E667F3BCD,
+               0x6000000000000000]
+    boundary = [0, 1 << 63, 1, 0x7FEFFFFFFFFFFFFF, 0x7FF0000000000000,
+                0xFFF0000000000000, 0x7FF0000000000001, 0xFFFABCDE12345678]
+    boundary += [(center + delta) | sign for center in centers
+                 for delta in range(-3, 4) for sign in [0, 1 << 63]]
+    common = [a for a, _ in boundary_pairs()]
+    fixtures = ["normal", "normal", "normal", "log_norm_pdf"]
+    for op, name in enumerate(fixtures):
+        document = json.loads((FIXTURES / f"{name}.json").read_text())
+        # The log-density fixture groups its rows by provenance.
+        groups = ["hand", "random"] if name == "log_norm_pdf" else ["cases"]
+        rows = [row for group in groups for row in document[group]]
+        inputs = list(dict.fromkeys(common + boundary + [int(row["x"], 16) for row in rows]))
+        yield encode(op, [])
+        regular = [struct.unpack("<Q", struct.pack("<d", x))[0]
+                   for x in [-26.0, -8.0, -0.5, 0.25, 1.0, 16.0, 36.5]]
+        for count in range(1, 66):
+            yield encode(op, [regular[i % len(regular)] for i in range(count)])
+            yield encode(op, [boundary[(i + count) % len(boundary)] for i in range(count)])
+        for start in range(0, len(inputs), 65):
+            yield encode(op, inputs[start:start + 65])
+
+
+def arithmetic_seeds():
+    # Domain limits from docs/double-word.md, as signed powers of two with
+    # their neighbors; records are (a, b, c, d). Inputs only.
+    def power(k):
+        return 1 << (k + 1074) if k < -1022 else (k + 1023) << 52
+
+    edges = [0, 1 << 63, 1, 0x7FEFFFFFFFFFFFFF, 0x7FF0000000000000,
+             0xFFF0000000000000, 0x7FF0000000000001]
+    for k in [-1074, -1022, -969, -537, -485, -484, -229, -53, 0, 10, 508,
+              994, 1016, 1018, 1020, 1021]:
+        for word in [power(k) - 1, power(k), power(k) + 1]:
+            if word >= 0:
+                edges += [word, word | (1 << 63)]
+    one = struct.unpack("<Q", struct.pack("<d", 1.0))[0]
+    tail = struct.unpack("<Q", struct.pack("<d", 1.0e-18))[0]
+    records = []
+    for i, a in enumerate(edges):
+        b = edges[(i * 7 + 3) % len(edges)]
+        records += [(a, tail, b, one), (a, b, edges[(i * 11 + 5) % len(edges)], 0)]
+    for x in [1455.0, -1455.0, 709.0, -745.0, 0.5, 1.0e-19]:
+        word = struct.unpack("<Q", struct.pack("<d", x))[0]
+        records += [(word, tail, one, 0), (word, 0, word, tail)]
+    for start in range(0, len(records), 16):
+        yield b"".join(struct.pack("<QQQQ", *r) for r in records[start:start + 16])
+
+
+def reduction_seeds():
+    # [operation, decoding mode, moment split] then little-endian words.
+    def encode(op, mode, split, values):
+        words = [struct.unpack("<Q", struct.pack("<d", v))[0] for v in values]
+        return bytes([op, mode, split]) + b"".join(struct.pack("<Q", w) for w in words)
+
+    tiny = 5e-324
+    slices = [
+        [], [-0.0], [0.0, -0.0, 0.0], [1.0, 2.0 ** -53, -1.0, -1.0],
+        [1e16, 1e16 + 2, 1e16 + 4], [1e300, -1e300, 1e-300, 3.0],
+        [tiny, tiny, -tiny, 0.5], [-800.0, -800.0, -801.5],
+        [0.0, -0.6931471805599453, -745.0, -746.0, -1000.0],
+        [1.7976931348623157e308, -1.7976931348623157e308],
+        [float("-inf")] * 2, [float("inf"), float("nan"), 1.0],
+    ]
+    slices += [[-100.0 - i / 7 for i in range(count)]
+               for count in [1, 2, 7, 15, 16, 31, 32, 33, 63, 64]]
+    for values in slices:
+        for op in range(3):
+            for mode in range(3):
+                yield encode(op, mode, len(values) // 2, values)
+
+
+def structure_seeds():
+    # [operation, order and shaping] then little-endian words, cycled.
+    def encode(op, shape, values):
+        return bytes([op, shape]) + b"".join(struct.pack("<d", v) for v in values)
+
+    intervals = [
+        [0.0, -0.0, 5e-324, -5e-324, 1.0, 2.0, -3.0, 4.0],
+        [709.782712893384, 710.0, -1000.0, -999.0, 1e154, 1e155, -1.0, 1.0],
+        [1.7976931348623157e308, 1.7976931348623157e308, 2.0, 2.0],
+        [float("inf"), float("nan"), 2.0, 1.0],
+    ]
+    for values in intervals:
+        yield encode(0, 0, values)
+    systems = [
+        [0.25, -0.5, 3.0, 1.0, -2.0, 0.125, 5.0, -0.75, 1e-3, 4.0, 7.0],
+        [0.0, 1.0, 1.7976931348623157e308, 1e-300, -1.0, 5e-324, 2.0, -0.0, 1e300],
+        [-1.0, 4.0, -1.0, 0.5, 0.25, -2.0, 8.0],
+    ]
+    for values in systems:
+        for order in [0, 1, 2, 3, 5, 8, 12]:
+            for shape in range(8):
+                yield encode(1, order + 16 * shape, values)
+
+
+def stream_seeds():
+    # Words at the uniform extremes and every octant boundary.
+    edges = [0, 1, 2 ** 64 - 1, 1 << 63, (1 << 12) - 1, 1 << 12]
+    for octant in range(8):
+        start = octant << 61
+        edges += [start, (start - 1) % 2 ** 64, start + (1 << 11)]
+    pack = lambda words: b"".join(struct.pack("<Q", w) for w in words)
+    for first in edges:
+        yield pack([word for second in edges for word in (first, second)])
+    for count in [0, 1, 2, 3, 63, 64, 65]:
+        yield pack([(i * 0x9E3779B97F4A7C15) % 2 ** 64 for i in range(2 * count)])
+
+
+def bivariate_seeds():
+    # [shape] then (x, y, rho) triples at regime limits from
+    # docs/bivariate_normal.md. Inputs only.
+    correlations = [-1.0, -0.999999999, -0.925, -0.924, -0.89, -0.75, -0.66, -0.29,
+                    -0.2, -1e-17, 0.0, 1e-17, 0.2, 0.29, 0.66, 0.75, 0.89, 0.924,
+                    0.925, 0.999999999, 1.0]
+    thresholds = [(0.0, 0.0), (-6.0, -6.0), (2.0, -2.0), (-38.0, -30.0), (39.0, 1.0),
+                  (float("-inf"), 1.0), (float("nan"), 0.0), (-0.2, -0.001)]
+    triples = [(x, y, r) for r in correlations for x, y in thresholds]
+    for start in range(0, len(triples), 8):
+        yield bytes([0]) + b"".join(struct.pack("<ddd", *t) for t in triples[start:start + 8])
+    for shape in range(1, 6):
+        words = [(i * 0x9E3779B97F4A7C15) % 2 ** 64 for i in range(1, 25)]
+        yield bytes([shape]) + b"".join(struct.pack("<Q", w) for w in words)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
     targets = {"elementary": seeds, "fast_elementary": fast_seeds,
-               "fast_normal": fast_normal_seeds, "strong_normal": strong_normal_seeds}
+               "fast_normal": fast_normal_seeds, "strong_normal": strong_normal_seeds,
+               "strong_density": strong_density_seeds, "arithmetic": arithmetic_seeds,
+               "reductions": reduction_seeds,
+               "structures": structure_seeds,
+               "streams": stream_seeds, "bivariate": bivariate_seeds}
     parser.add_argument("--target", choices=targets, default="elementary")
     args = parser.parse_args()
     args.directory.mkdir(parents=True, exist_ok=True)

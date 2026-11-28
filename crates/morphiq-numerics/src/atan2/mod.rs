@@ -11,7 +11,7 @@ mod tables;
 #[cfg(test)]
 mod tests;
 
-use crate::double_word::DoubleWord;
+use crate::double_word::kernel::DoubleWord;
 use crate::eft::two_prod_d;
 use crate::ln::decide_with;
 use crate::q256::Q256;

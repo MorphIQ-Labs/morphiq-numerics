@@ -10,8 +10,8 @@ mod tables;
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;
 
-use crate::double_word::DoubleWord;
-use crate::eft::two_prod;
+use crate::double_word::kernel::DoubleWord;
+use crate::eft::two_prod_kernel as two_prod;
 use crate::ln::decide_with;
 use crate::q256::Q256;
 use reduction::{FRACTION_BITS, HALF_PI, HALF_PI_EXPONENT, TWO_OVER_PI};

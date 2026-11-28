@@ -2,7 +2,7 @@
 //! and negative reflection. Assurance limits are stated in docs/erfcx.md.
 use super::accurate_tables::{C, C2, CS, F_AT_C, LN2_128, RECIP, T2};
 use super::{Region, region, t_reduce};
-use crate::eft::two_prod;
+use crate::eft::two_prod_kernel as two_prod;
 use crate::exp::tables::{INV_L, SHIFTER};
 use crate::q256::Q256;
 

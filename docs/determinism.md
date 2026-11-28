@@ -56,6 +56,10 @@ functions unnoticed.
 
 | `fast::exp`, `fast::erfcx`, `fast::norm_cdf`, `fast::ln`, `fast::log_norm_cdf`, `fast::exp_coarse` and matching slices | signed special values, subnormals, screen boundaries and neighbors; 512 mixed scalar inputs per function; eight slices of each length 0–17, 31–33, 51–53 and 63–65 | every scalar and batched output; separate seed preserves all earlier corpus sections |
 
+| `reduce_non_finite` | every ordered triple of two quiet NaN payloads, a signaling NaN, both infinities, the largest finite, zero and one, at lengths 0–3 | every `reduce` slice function, NaN bits included; appended without changing earlier input streams |
+
+| `eft_non_finite` | every ordered pair, and triple for the `DoubleWord` operations, of two quiet NaN payloads, a signaling NaN, both infinities, the largest finite, zero and 1.5 | every `eft` function and unchecked `DoubleWord` operation, NaN bits included; appended without changing earlier input streams |
+
 | `reduce::Moments2` | lengths 0–65, four partitions, mixed signs/exponents, high means with small spreads, signed zeros, nonfinite/arithmetic/count refusals | exact count, update/merge status, mean/variance/standard-error values and absolute error bounds |
 
 ## Where it is checked

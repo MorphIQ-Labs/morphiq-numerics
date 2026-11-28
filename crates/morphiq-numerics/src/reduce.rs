@@ -6,7 +6,9 @@
 //! Ogita, Rump and Oishi's Sum2 and Dot2 ("Accurate sum and dot product",
 //! *SIAM J. Sci. Comput.* 26(6), 2005), operation for operation; their results
 //! are as accurate as if computed in twice the working precision and rounded
-//! once. The contracts, error bounds and the conditions they need are in
+//! once. A NaN result is the first input NaN, unchanged, or the canonical quiet
+//! NaN when no input is NaN. The contracts, error bounds and the conditions they
+//! need are in
 //! [`docs/reduce.md`](https://github.com/MorphIQ-Labs/morphiq-numerics/blob/main/docs/reduce.md).
 //!
 //! Here `u = 2^-53`, `γ_k = k·u / (1 − k·u)`, `s` is the exact sum or dot
@@ -16,10 +18,38 @@
 //! statistics with an explicit absolute error bound per readout. Its batch
 //! partition and merge order are part of its separate numerical contract.
 
-use crate::eft::{two_prod, two_sum};
+use crate::eft::{two_prod_kernel as two_prod, two_sum_kernel as two_sum};
 
 mod moments;
 pub use moments::{MomentEstimate, Moments2, MomentsError};
+
+/// The quiet NaN returned when the arithmetic itself creates one.
+const CANONICAL_NAN: u64 = 0x7ff8_0000_0000_0000;
+
+/// `result`, with a NaN's bits taken from the contract: which operand's payload
+/// survives an operation depends on the compiler's operand order, and the NaN
+/// an invalid operation creates depends on the processor.
+#[inline]
+fn defined(result: f64, x: &[f64], y: &[f64]) -> f64 {
+    if result.is_nan() {
+        nan_result(x, y)
+    } else {
+        result
+    }
+}
+
+/// The first NaN term in index order, `x` before `y`, or the canonical NaN.
+#[cold]
+fn nan_result(x: &[f64], y: &[f64]) -> f64 {
+    for i in 0..x.len().max(y.len()) {
+        for v in [x.get(i), y.get(i)].into_iter().flatten() {
+            if v.is_nan() {
+                return *v;
+            }
+        }
+    }
+    f64::from_bits(CANONICAL_NAN)
+}
 
 /// `x[0] + x[1] + … + x[n-1]`, rounded at each step, left to right:
 /// `π_n` of Ogita, Rump and Oishi's Algorithm 4.1. Zero for an empty slice.
@@ -35,12 +65,12 @@ pub fn sum(x: &[f64]) -> f64 {
     for &p in rest {
         pi += p;
     }
-    pi
+    defined(pi, x, &[])
 }
 
 /// The compensated sum: Ogita, Rump and Oishi's Algorithm 4.1 (Sum2), in
 /// which each rounding error of the plain sum is recovered exactly by
-/// [`two_sum`] and the errors are summed in working precision. Zero for an
+/// [`two_sum`](crate::eft::two_sum) and the errors are summed in working precision. Zero for an
 /// empty slice.
 ///
 /// `|sum2 − s| ≤ u·|s| + γ_{n−1}²·S` (their Proposition 4.5), also with
@@ -60,7 +90,7 @@ pub fn sum2(x: &[f64]) -> f64 {
         sigma += q;
     }
     // res = fl(π_n + σ_n).
-    pi + sigma
+    defined(pi + sigma, x, &[])
 }
 
 /// `x[0]·y[0] + … + x[n-1]·y[n-1]`, each product rounded and the products
@@ -84,15 +114,15 @@ pub fn dot(x: &[f64], y: &[f64]) -> f64 {
     for (&xi, &yi) in terms {
         p += xi * yi;
     }
-    p
+    defined(p, x, y)
 }
 
 /// The compensated dot product: Ogita, Rump and Oishi's Algorithm 5.3
 /// (Dot2), in which each product's rounding error is recovered exactly by
-/// [`two_prod`] and each sum's by [`two_sum`]. Zero for empty slices.
+/// [`two_prod`](crate::eft::two_prod) and each sum's by [`two_sum`](crate::eft::two_sum). Zero for empty slices.
 ///
 /// `|dot2 − xᵀy| ≤ u·|xᵀy| + γ_n²·|x|ᵀ|y|` (their Proposition 5.5) when
-/// `n·u < 1`, every product `x[i]·y[i]` is within [`two_prod`]'s domain (zero
+/// `n·u < 1`, every product `x[i]·y[i]` is within [`two_prod`](crate::eft::two_prod)'s domain (zero
 /// or at least `2^-969` in magnitude), and no operation overflows.
 ///
 /// # Panics
@@ -116,7 +146,7 @@ pub fn dot2(x: &[f64], y: &[f64]) -> f64 {
         s += q + r;
     }
     // res = fl(p + s).
-    p + s
+    defined(p + s, x, y)
 }
 
 /// `x[0]² + … + x[n-1]²`: [`dot`]`(x, x)`, with its bound, in which

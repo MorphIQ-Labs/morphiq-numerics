@@ -1,6 +1,6 @@
 //! Checked, compensated moments about a retained sample anchor.
 
-use crate::double_word::{CheckError, DoubleWord};
+use crate::double_word::{CheckError, kernel::DoubleWord};
 use crate::elementary::sqrt;
 use crate::interval::FiniteInterval;
 

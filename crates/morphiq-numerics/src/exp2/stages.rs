@@ -2,7 +2,7 @@
 //! `formal/exp/Exp2Stages.v` proves the reduction, both evaluations and tests.
 
 use super::tables::{LN2_HI, LN2_LO};
-use crate::eft::two_prod;
+use crate::eft::two_prod_kernel as two_prod;
 use crate::exp::{decide, stage_a_at, stage_b_at};
 
 pub(super) const SHIFTER: f64 = f64::from_bits(0x4338_0000_0000_0000);

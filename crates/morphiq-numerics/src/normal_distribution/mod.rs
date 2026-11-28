@@ -21,7 +21,7 @@ pub(crate) const LN2_HIGH: f64 = tables::LN2.0;
 #[cfg(test)]
 mod tests;
 
-use crate::double_word::DoubleWord as Dw;
+use crate::double_word::kernel::DoubleWord as Dw;
 use crate::eft::two_prod_d;
 
 #[derive(Clone, Copy, Debug)]
@@ -226,7 +226,7 @@ pub(crate) fn center_first(op: Operation, x: f64) -> Option<f64> {
         Operation::Centered => (ch, cl),
         Operation::Cdf => {
             // |ch| <= 0.21, so 1/2 + ch is a Fast2Sum.
-            let (u, v) = crate::eft::fast_two_sum(0.5, ch);
+            let (u, v) = crate::eft::fast_two_sum_kernel(0.5, ch);
             (u, v + cl)
         }
         _ => return None,
@@ -253,8 +253,8 @@ pub(crate) fn center_first_parts(x: f64) -> (f64, f64) {
     let dl = dp + tables::DENSITY.1 * x;
     let (ph, pp) = two_prod_d(dh, e1h);
     let rest = dl + (pp + (dh * e1l + dl * e1h + dh * e2));
-    let (s, t) = crate::eft::fast_two_sum(dh, ph);
-    crate::eft::fast_two_sum(s, t + rest)
+    let (s, t) = crate::eft::fast_two_sum_kernel(dh, ph);
+    crate::eft::fast_two_sum_kernel(s, t + rest)
 }
 
 /// The CDF family's first-stage guard on the tail probability `q`: its
@@ -276,11 +276,11 @@ pub(crate) fn tail_first(op: Operation, x: f64) -> Option<f64> {
     let (y, w, e) = match op {
         Operation::Cdf if x < 0.0 => (qh, ql, e),
         Operation::Cdf => {
-            let (s, t) = crate::eft::fast_two_sum(1.0, -qh);
+            let (s, t) = crate::eft::fast_two_sum_kernel(1.0, -qh);
             (s, t - ql, e + E_TAIL_FIRST_ONE)
         }
         Operation::Centered => {
-            let (s, t) = crate::eft::fast_two_sum(0.5, -qh);
+            let (s, t) = crate::eft::fast_two_sum_kernel(0.5, -qh);
             let (s, t) = (s, t - ql);
             let e = e + E_TAIL_FIRST_ONE;
             if x.is_sign_negative() {
@@ -375,7 +375,7 @@ pub(crate) fn density_first_parts(x: f64) -> (f64, f64, i64, [f64; 2]) {
     // h + l = −a²/2 exactly; s + e = h − ln √(2π)'s high word exactly.
     // In D: NormalGaussianKernel.normal_half_square_exact.
     let (h, l) = two_prod_d(a, -0.5 * a);
-    let (s, e) = crate::eft::two_sum(h, -tables::LN_SQRT_2PI.0);
+    let (s, e) = crate::eft::two_sum_kernel(h, -tables::LN_SQRT_2PI.0);
     let se = e + (l - tables::LN_SQRT_2PI.1);
     let (y, w, k) = crate::exp::stage_a_double_word(s, se);
     (y, w, k, [s, se])

@@ -13,8 +13,8 @@ mod stage_tables;
 pub(crate) mod stages;
 mod tables;
 
-use crate::double_word::DoubleWord;
-use crate::eft::{two_prod, two_sum};
+use crate::double_word::kernel::DoubleWord;
+use crate::eft::{two_prod_kernel as two_prod, two_sum_kernel as two_sum};
 use crate::q128::Q128;
 use crate::ulp::ulp;
 use tables::{LN2_HI, LN2_LO, LN2_Q128, NEG_LN_R_BITS, NEG_LN_R_Q128, POLY, R_BITS, RECIPROCALS};

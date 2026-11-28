@@ -27,7 +27,7 @@ fn the_reduction_is_within_its_bound_everywhere() {
 }
 
 use super::{EPS, EPS_TAN, Function, Reduced, accurate, fast, tan, tan_accurate, tan_fast};
-use crate::double_word::DoubleWord;
+use crate::double_word::kernel::DoubleWord;
 use crate::ln::decide_with;
 use crate::q128::Q128;
 use crate::random::SplitMix64;

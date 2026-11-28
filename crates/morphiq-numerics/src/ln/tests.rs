@@ -2,7 +2,7 @@
 //! unrounded result against its certified bound (docs/ln.md §4–§7).
 
 use super::{EPS, Reduced, TWO_M7, decide, ln_1p_double_word, series, split};
-use crate::double_word::DoubleWord;
+use crate::double_word::kernel::DoubleWord;
 use crate::q128::Q128;
 use crate::random::SplitMix64;
 use crate::test_exact::{Exact, entries, field, word};

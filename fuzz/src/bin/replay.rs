@@ -27,6 +27,12 @@ fn main() {
         Some("fast_elementary") => morphiq_numerics_fuzz::check_fast_input,
         Some("strong_normal") => morphiq_numerics_fuzz::strong_normal::check_input,
         Some("fast_normal") => morphiq_numerics_fuzz::fast_normal::check_input,
+        Some("strong_density") => morphiq_numerics_fuzz::strong_density::check_input,
+        Some("arithmetic") => morphiq_numerics_fuzz::arithmetic::check_input,
+        Some("reductions") => morphiq_numerics_fuzz::reductions::check_input,
+        Some("structures") => morphiq_numerics_fuzz::structures::check_input,
+        Some("streams") => morphiq_numerics_fuzz::streams::check_input,
+        Some("bivariate") => morphiq_numerics_fuzz::bivariate::check_input,
         _ => panic!("unknown fuzz target: {target:?}"),
     };
     let paths: Vec<_> = args.collect();

@@ -545,7 +545,7 @@ fn write_center_tail(out: &mut String, rng: &mut SplitMix64) {
             _ => lower + rng.next_u64() % (upper - lower),
         };
         for x in [f64::from_bits(bits), -f64::from_bits(bits)] {
-            let (h, l) = crate::eft::two_prod(x, x);
+            let (h, l) = crate::eft::two_prod_kernel(x, x);
             writeln!(
                 out,
                 "normal_center_tail {:016x} : {:016x} {:016x} {:016x}",
@@ -556,7 +556,7 @@ fn write_center_tail(out: &mut String, rng: &mut SplitMix64) {
             )
             .unwrap();
             let shape = normal_distribution::center_polynomial(
-                crate::double_word::DoubleWord::product(x, x),
+                crate::double_word::kernel::DoubleWord::product(x, x),
             );
             writeln!(
                 out,

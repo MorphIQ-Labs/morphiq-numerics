@@ -1,7 +1,7 @@
 # MPFR numerical fuzzing
 
 This independent, unpublished workspace checks strong and fast elementary APIs,
-three strong normal APIs and accelerated fast normal APIs against MPFR through
+the strong normal APIs and accelerated fast normal APIs against MPFR through
 `rug`. Neither MPFR nor the
 fuzzer is a dependency of the published crates. The root dependency license
 policy stays permissive-only; the separate
@@ -93,8 +93,30 @@ that cannot be represented in binary64. This does not substitute a blanket
 correct-rounding assertion for a bounded contract. Signs, ranges, NaN encodings,
 exact zero-input identities, overflow, and saturation rounding are checked
 separately. Finite erfcx results must remain strictly positive even at `f64::MAX`.
-The other strong normal APIs (PDF, CCDF, centered CDF and log-PDF), normal pairs,
-and other public modules still require their own independent fuzz coverage.
+The separate `strong_density` target independently checks `normal::norm_pdf`,
+`normal::norm_ccdf`, `normal::norm_cdf_centered` and `normal::log_norm_pdf` over
+all binary64 inputs, with the three slice wrappers bit for bit (log-PDF has no
+slice). The first three use the compound allowance above with `a = 0`:
+
+| Function and domain | `r` |
+| --- | --- |
+| PDF, `23 <= abs(x) <= 38.6` | `2^-222` |
+| PDF, elsewhere | `2^-236` |
+| CCDF, `abs(x) <= 1/2` | `2^-245` |
+| CCDF, `x > 1/2` | `2^-114` |
+| CCDF, `x < -1/2` | `2^-111` |
+| centered CDF, `abs(x) <= 1/2` | `2^-246` |
+| centered CDF, `abs(x) > 1/2` | `2^-111` |
+
+Underflow and saturation must round correctly, centered results keep the input's
+sign, and NaN encodings and exact zero-input identities are checked separately.
+Log-PDF ([log_norm_pdf.md](../docs/log_norm_pdf.md)) must be correctly rounded
+for `abs(x) < 2^-27` and `abs(x) > 2^500`, and within `(1/2 + 2^-50)` ulp
+elsewhere. Normal pairs and other public modules still require their own
+independent fuzz coverage.
+The retained `log-pdf-boundaries` packet contains the exact regime-limit and
+overflow encodings of both signs; it is a coverage witness, not a known library
+defect.
 
 ### Normal oracle across extreme tails
 
@@ -181,6 +203,102 @@ allowance and accept valid non-CR results. The retained `tail-boundaries` packet
 contains exact binary64 inputs spanning finite log tails, overflow, and
 underflow; it is a coverage witness, not a known library defect.
 
+## Arithmetic target
+
+`arithmetic` checks `eft`, `ulp` and `double_word` against exact MPFR values and
+the contracts in [double-word.md](../docs/double-word.md) and
+[ulp.md](../docs/ulp.md). At 4400 bits every sum and product it forms is exact,
+and quotient bounds are checked by multiplying through.
+
+- `two_sum`, `fast_two_sum` and `two_prod` are exact on their stated domains,
+  with the correctly rounded head. Nothing is claimed outside them.
+- Each `checked_` operation must admit exactly the operands its published
+  hypotheses admit, repeat the unchecked result bit for bit, return a double
+  word and meet the table's relative bound. The reason reported on rejection is
+  covered by `crates/reference/tests/checked.rs`, not here.
+- `exp_split` meets `16u²` on its domain, with its stated value and exponent
+  ranges, and returns `None` outside it.
+- The ULP utilities match the definitions from the binary64 encoding.
+- NaN result words of every `eft` and unchecked `DoubleWord` operation have the
+  documented bits.
+
+Its corpus format is up to sixteen records of four little-endian encodings. The
+retained `product-underflow-edge` input is a product below `2^-969` that rounds
+to it; it is a boundary witness, not a known library defect.
+
+## Reductions target
+
+`reductions` checks `reduce`, including `Moments2`, and `log_space` on slices of up to
+129 finite or special values. At 8600 bits the sums, products and squared
+sums are exact, so the algebraic bounds are checked without division.
+
+- [reduce.md](../docs/reduce.md): the `sum`, `sum2`, `dot` and `dot2` bounds on
+  their stated domains: wherever the result is finite, which establishes the
+  no-overflow condition, and for `dot2` where every product is also inside
+  `two_prod`'s domain; sum-of-squares identity with the dot products; exact `max_abs`;
+  empty slices; and the bits of every NaN result.
+- [moments.md](../docs/moments.md): each successful readout encloses the exact
+  statistic; failed pushes and merges leave the receiver unchanged; merge leaves
+  its operand unchanged. Which checked-arithmetic refusals occur is not judged.
+- [log_space.md](../docs/log_space.md): special values and the `log_sum_exp` and
+  `log_diff_exp` bounds against directed MPFR enclosures; the pair records'
+  stated operations and refusals.
+- [log_normalize.md](../docs/log_normalize.md): refusals leave the output
+  untouched, and the returned radius covers every normalized component. A
+  refusal for an unrepresentable component must be near the overflow threshold.
+
+Byte 0 selects reductions, moments or log space; byte 1 selects how the words
+form a slice (as given, clustered around the first, or nearly cancelling); byte
+2 places the moment split. The retained `nan-payload-order` input reproduces a library defect this target
+found: reductions returned different NaN bits across targets and call paths.
+The retained `cancelling-log-sum` input has a log-sum
+near zero; it is a coverage witness, not a known library defect.
+
+## Structures target
+
+`structures` checks `interval` and `linalg::tridiagonal`.
+
+- [interval.md](../docs/interval.md): every successful operation contains the
+  exact image (algebraic endpoints exactly, `ln`, `exp` and `sqrt` against
+  directed 512-bit values); `Domain` only for forbidden arguments and `Range`
+  only near overflow.
+- [tridiagonal.md](../docs/tridiagonal.md), orders up to 12: the sign and
+  unpivoted admission conditions; a positive, lower-bounding dominance margin;
+  factor, solve, batched and obstacle results bit for bit with the documented
+  recurrence evaluated in MPFR; admitted obstacle solves within `2 tau`; residual
+  certificates against the exact residual; and the dominance solution-error
+  bound against an 8000-bit solve. Whether a dominance or complementarity refusal
+  was necessary is not judged.
+
+Byte 0 selects intervals or systems. For a system, byte 1 holds the order and
+whether the coefficients are shaped into a dominant or sign-patterned matrix.
+The retained `near-overflow-intervals` input is a boundary witness, not a known
+library defect.
+
+## Streams and bivariate targets
+
+`streams` checks `random` and `fast::random` over arbitrary words:
+SplitMix64 and xoshiro256++ outputs and seeding against the specification in
+wider integers; jumps commuting with a step and distributing over exclusive or
+(the jump distances are checked in `crates/reference/tests/random.rs`); exact
+uniforms; the strong normal pair bit for bit against the specification with
+correctly rounded MPFR operations; and the fast pair within `2^-38` of it, with
+its zero signs and slice identity ([random.md](../docs/random.md),
+[fast_random.md](../docs/fast_random.md)). The retained `octant-extremes` packet
+is a boundary witness, not a known library defect. `double-rounding` is an oracle
+regression: a product rounded twice there disagreed with the library, which an
+independent mpmath evaluation confirmed.
+
+`bivariate` checks `bivariate_normal`: special values, symmetry, saturation,
+evaluator and slice identity, the reported bound, and the absolute error against
+Plackett's identity integrated from correlation -1 by tanh-sinh quadrature at 128
+bits ([bivariate_normal.md](../docs/bivariate_normal.md) §2 and §6). The
+reference is refined until successive levels agree to `2^-73`; that convergence
+test is numerical evidence, not a proved quadrature error bound, and an
+unresolved integral fails. The allowance is section 6's bound rounded up in the
+fourth digit, as `absolute_error_bound` returns it. The retained
+`high-correlation-peak` input comes from section 3 of that document.
+
 ## Run and replay
 
 On Apple Silicon macOS or native x86-64 Linux, with the repository toolchain,
@@ -200,7 +318,9 @@ change. AddressSanitizer and coverage instrumentation are enabled for fuzz runs.
 Each run replays the versioned strong elementary inputs and fast inputs from
 `fast.json`, `fast_ln.json` and `fast_log_cdf.json`, plus strong normal inputs
 from `erfcx.json` and `normal.json`, then mutates each target for the
-requested number of seconds **per target and feature mode** (eight campaigns).
+requested number of seconds **per target and feature mode** (twenty campaigns).
+Target names after the duration run only those targets, and
+`./scripts/check_fuzz.sh --list` prints them.
 Expected fixture outputs are not imported. The seed encoder adds both signs of
 every binary64 binade boundary and its adjacent encodings, NaN payloads,
 infinities, subnormal edges, and strong slice lengths 0 through 16. Fast seeds
@@ -228,12 +348,15 @@ explicit target; corpus and regression directories are separated by target.
 
 `fast_normal` and `strong_normal` each use their own selector namespace: modulo 3 for erfcx, CDF and log-CDF, respectively, followed
 by up to 65 pairs in that same format (the second word is unused).
+`strong_density` uses modulo 4 for PDF, CCDF, centered CDF and log-PDF, in the
+same format.
 
 Generated seeds, evolving corpora, failure artifacts and logs live under
 `target/fuzz/`. CI runs 60 seconds per target and mode in the existing required Linux and
 macOS test jobs. The weekly/manual workflow runs 1800 seconds per target and mode on both
-hosts (four hours of mutation per host, with a five-hour job limit for preparation
-and replay). Artifacts are retained for 14 days, including on failure. A passing
+hosts, one job per target and host (an hour of mutation each, with a two-hour job
+limit for preparation and replay). Artifacts are retained for 14 days, including on
+failure. A passing
 campaign is sampled evidence, not an exhaustive proof or a performance result.
 
 Replay a failure without nightly instrumentation:
@@ -253,43 +376,45 @@ Oracle API documentation: [rug Float](https://docs.rs/rug/1.30.0/rug/struct.Floa
 Fuzzer usage: [Rust Fuzz Book](https://rust-fuzz.github.io/book/cargo-fuzz.html).
 No external numerical implementation source is used by this harness.
 
-## Deterministic normal boundary sweeps
+## Deterministic boundary sweeps
 
-[`sweeps/normal.json`](sweeps/normal.json) declares 30 finite binary64 windows
-for strong erfcx, CDF and log-CDF. They surround the documented overflow,
-underflow and saturation thresholds, central/tail region joins, selected
-binade boundaries, signed zeros and erfcx's largest positive input. These are
-explicitly selected windows, not all internal rounding-test transitions or the
-whole binary64 domain. Each row gives a stable name, operation, inclusive first
-and last encodings, a smoke anchor, and the source of its boundary.
+`sweeps/TARGET.json` declares binary64 windows for every fuzz target. The
+one-argument targets (`elementary`, `fast_elementary`, `fast_normal`,
+`strong_normal`, `strong_density`) have at least one window for every operation,
+around documented overflow, underflow, saturation and domain thresholds,
+correct-rounding and region joins, and selected binade edges. Targets of several
+arguments sweep the first and fix the rest in each row's `fixed` words: `atan2`,
+`bivariate` (`y`, `rho`), `reductions` (a log-space pair), `arithmetic` (the
+other three words of a double-word record) and `structures` (an interval's other
+bound). `streams` windows range over raw words. These are explicitly selected
+windows, not all internal rounding-test transitions.
 
 The enumerator visits every integer encoding between the endpoints exactly
-once, in packets of up to 65 lanes. On the negative side, increasing encoding
-means decreasing numerical value; both endpoints still belong to the window.
-Windows have one sign, contain only finite values, and cannot overlap for the
-same function. Zero and largest-finite windows are clipped to their finite sign
-domain. Every other window spans 2048 encodings on each side of its anchor.
-One invocation is limited to 1,048,576 inputs and rejects malformed windows.
+once, in packets of the target's lane count. On the negative side, increasing
+encoding means decreasing numerical value; both endpoints still belong to the
+window. Windows have one sign, contain only finite values (except raw-word windows), and
+cannot overlap for the same operation and fixed words. Zero and largest-finite windows are
+clipped to their finite sign domain. Every other window spans 2048 encodings on
+each side of its anchor. One window is limited to 1,048,576 inputs.
 
-The full plan contains **112,670 inputs per feature mode**, or **225,340 checks
-per host** across scalar and `simd,std` builds. Every input uses the same
-contract-aware MPFR oracle and scalar/slice bit comparison as `strong_normal`.
-Correct rounding is required where established; bounded-result domains retain
-their published bounds. The sweep does not inspect or infer internal path
-coverage from sampled public results. Other functions and exhaustive f32
-analogue coverage are outside this plan.
+Every input uses the same contract-aware MPFR oracle and scalar/slice bit
+comparison as its fuzz target. Correct rounding is required where established;
+bounded-result domains retain their published bounds. The sweep does not infer
+internal path coverage from sampled public results.
 
 ```sh
 # NEW_DIRECTORY must not already exist; all attempts remain separate.
-python3 scripts/check_normal_sweeps.py target/normal-sweeps/my-run
+python3 scripts/check_sweeps.py target/sweeps/my-run
+# One target only; --list prints the names.
+python3 scripts/check_sweeps.py target/sweeps/my-elementary --target elementary
 # PR smoke: at most five encodings per window, explicitly partial coverage.
-python3 scripts/check_normal_sweeps.py target/normal-sweeps/my-smoke --profile smoke
+python3 scripts/check_sweeps.py target/sweeps/my-smoke --profile smoke
 ```
 
-The runner builds the unpublished `normal-sweep` binary with the pinned stable
+The runner builds the unpublished `sweep` binary with the pinned stable
 toolchain and locked oracle dependencies; no nightly or sanitizer is needed for
-deterministic enumeration. The weekly/manual `normal-sweeps.yml` workflow runs
-the full plan on native Linux x86-64 and macOS ARM. Existing required PR test
+deterministic enumeration. The weekly/manual `sweeps.yml` workflow runs the full
+plan on native Linux x86-64 and macOS ARM, one job per target and host. Existing required PR test
 jobs execute the smoke profile and runner controls on both hosts. Smoke success
 does not establish a completed full-window campaign.
 
@@ -302,16 +427,42 @@ The top-level status becomes `passed` only after both modes finish and the
 reported count equals the declared count. A timeout or interruption leaves a
 failed job and an incomplete/failed receipt; completed windows remain visible.
 
-Oracle failures retain a `.packet` in the existing `strong_normal` format and
+Oracle failures retain a `.packet` in the target's fuzz format and
 propagate failure. Completed counts exclude the entire failed window. Replay a
 retained packet using its recorded feature mode:
 
 ```sh
 cargo run --release --locked --manifest-path fuzz/Cargo.toml --no-default-features \
-  --features simd --bin replay -- strong_normal target/normal-sweeps/my-run/simd/WINDOW.packet
+  --features simd --bin replay -- TARGET target/sweeps/my-run/simd/TARGET-WINDOW.packet
 ```
 
 Artifacts, including failures and partial coverage, are uploaded for 14 days.
 Exhaustiveness applies only to completed declared windows at the recorded
 source and settings; it is neither a whole-domain proof nor native performance
 evidence.
+
+## binary32 analogue sweeps
+
+`scripts/check_f32_sweeps.py` checks, for each of the 26 one-argument
+operations, the binary64 value of every one of the `2^32` binary32 encodings,
+NaNs and infinities included, with the same oracle and scalar/slice identity as
+the fuzz target. Each operation is split into 64 shards of `2^26` inputs, run in
+scalar and `simd,std` builds.
+
+```sh
+python3 scripts/check_f32_sweeps.py target/f32-sweeps/my-run \
+  --target elementary --operation exp --shard 0
+# A partial run, recorded as such:
+python3 scripts/check_f32_sweeps.py target/f32-sweeps/quick \
+  --target elementary --operation exp --shard 0 --limit 100000
+```
+
+The weekly `sweeps-f32.yml` workflow runs 64 shards on Linux x86-64, rotating so
+that all 1,664 are visited every 26 weeks; a manual dispatch runs all shards of
+one operation. Receipts record each shard's range and are retained for 90 days.
+**Coverage exists only for shards whose receipts show `passed` at a recorded
+revision**; the schedule alone establishes nothing, and a receipt does not carry
+over to a later revision. Cross-target agreement is the determinism digest's job.
+
+On an Apple M-series core the oracle costs about 7 to 150 microseconds per input
+for the operations measured, so one shard takes minutes to a few core-hours.

@@ -717,7 +717,7 @@ impl WithSimd for TwoProd {
             let (p, e) = (k.store(p), k.store(e));
             for i in 0..K::LANES {
                 let (x, y) = (a.as_ref()[i], b.as_ref()[i]);
-                let (wp, we) = crate::eft::two_prod(x, y);
+                let (wp, we) = crate::eft::two_prod_kernel(x, y);
                 let same =
                     |u: f64, v: f64| u.to_bits() == v.to_bits() || (u.is_nan() && v.is_nan());
                 assert!(

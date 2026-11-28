@@ -18,7 +18,7 @@ mod tables;
 #[cfg(test)]
 pub(crate) mod tests;
 
-use crate::eft::{fast_two_sum, two_prod_d, two_sum};
+use crate::eft::{fast_two_sum_kernel as fast_two_sum, two_prod_d, two_sum_kernel as two_sum};
 pub(crate) use crate::exp::stage_b_double_word as exp_dw;
 use crate::exp::tables::SHIFTER;
 use crate::ulp::ulp;

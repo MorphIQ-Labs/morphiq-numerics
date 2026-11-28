@@ -19,7 +19,7 @@ mod normalize;
 mod normalize_constants;
 pub use normalize::{LogNormalization, MAX_NORMALIZE_TERMS, NormalizeError, normalize_log_weights};
 
-use crate::eft::two_sum;
+use crate::eft::two_sum_kernel as two_sum;
 use crate::elementary::{exp, exp_slice, expm1, ln, ln_1p, ln_1p_slice};
 
 /// `T = RN(−ln 2)`, the boundary between `log_diff_exp`'s regions (decision 6).

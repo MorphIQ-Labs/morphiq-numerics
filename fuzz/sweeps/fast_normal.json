@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "windows": [
+    {
+      "name": "erfcx-tiny",
+      "operation": "erfcx",
+      "first": "3ddffffffffff800",
+      "last": "3de0000000000800",
+      "anchor": "3de0000000000000",
+      "source": "docs/fast.md accelerated domain"
+    },
+    {
+      "name": "erfcx-tiny-negative",
+      "operation": "erfcx",
+      "first": "bddffffffffff800",
+      "last": "bde0000000000800",
+      "anchor": "bde0000000000000",
+      "source": "docs/fast.md accelerated domain"
+    },
+    {
+      "name": "cdf-tiny",
+      "operation": "cdf",
+      "first": "3ddffffffffff800",
+      "last": "3de0000000000800",
+      "anchor": "3de0000000000000",
+      "source": "docs/fast.md accelerated domain"
+    },
+    {
+      "name": "cdf-tiny-negative",
+      "operation": "cdf",
+      "first": "bddffffffffff800",
+      "last": "bde0000000000800",
+      "anchor": "bde0000000000000",
+      "source": "docs/fast.md accelerated domain"
+    },
+    {
+      "name": "log_cdf-tiny",
+      "operation": "log_cdf",
+      "first": "3ddffffffffff800",
+      "last": "3de0000000000800",
+      "anchor": "3de0000000000000",
+      "source": "docs/fast.md accelerated domain"
+    },
+    {
+      "name": "log_cdf-tiny-negative",
+      "operation": "log_cdf",
+      "first": "bddffffffffff800",
+      "last": "bde0000000000800",
+      "anchor": "bde0000000000000",
+      "source": "docs/fast.md accelerated domain"
+    },
+    {
+      "name": "erfcx-lower",
+      "operation": "erfcx",
+      "first": "bfdffffffffff800",
+      "last": "bfe0000000000800",
+      "anchor": "bfe0000000000000",
+      "source": "docs/fast.md accelerated domain"
+    },
+    {
+      "name": "erfcx-upper",
+      "operation": "erfcx",
+      "first": "402ffffffffff800",
+      "last": "4030000000000800",
+      "anchor": "4030000000000000",
+      "source": "docs/fast.md accelerated domain"
+    },
+    {
+      "name": "cdf-far-limit",
+      "operation": "cdf",
+      "first": "c0367ffffffff800",
+      "last": "c036800000000800",
+      "anchor": "c036800000000000",
+      "source": "docs/fast_cdf.md and docs/fast_log_cdf.md domains"
+    },
+    {
+      "name": "cdf-seam",
+      "operation": "cdf",
+      "first": "c01ffffffffff800",
+      "last": "c020000000000800",
+      "anchor": "c020000000000000",
+      "source": "docs/fast_cdf.md and docs/fast_log_cdf.md domains"
+    },
+    {
+      "name": "cdf-upper",
+      "operation": "cdf",
+      "first": "401ffffffffff800",
+      "last": "4020000000000800",
+      "anchor": "4020000000000000",
+      "source": "docs/fast_cdf.md and docs/fast_log_cdf.md domains"
+    },
+    {
+      "name": "log_cdf-far-limit",
+      "operation": "log_cdf",
+      "first": "c0367ffffffff800",
+      "last": "c036800000000800",
+      "anchor": "c036800000000000",
+      "source": "docs/fast_cdf.md and docs/fast_log_cdf.md domains"
+    },
+    {
+      "name": "log_cdf-seam",
+      "operation": "log_cdf",
+      "first": "c01ffffffffff800",
+      "last": "c020000000000800",
+      "anchor": "c020000000000000",
+      "source": "docs/fast_cdf.md and docs/fast_log_cdf.md domains"
+    },
+    {
+      "name": "log_cdf-upper",
+      "operation": "log_cdf",
+      "first": "401ffffffffff800",
+      "last": "4020000000000800",
+      "anchor": "4020000000000000",
+      "source": "docs/fast_cdf.md and docs/fast_log_cdf.md domains"
+    }
+  ]
+}
