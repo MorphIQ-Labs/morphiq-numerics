@@ -1,0 +1,72 @@
+name: scheduled binary32 sweeps
+
+on:
+  schedule:
+    - cron: '17 5 * * 6'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Sweep all shards of one operation: its fuzz target'
+        required: false
+      operation:
+        description: 'and its operation name; leave both empty for the weekly rotation'
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: binary32-sweeps-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      units: ${{ steps.units.outputs.units }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: units
+        env:
+          TARGET: ${{ inputs.target }}
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          if [ -n "$TARGET$OPERATION" ]; then
+            units="$(python3 scripts/check_f32_sweeps.py --matrix "$TARGET" "$OPERATION")"
+          else
+            units="$(python3 scripts/check_f32_sweeps.py --schedule "$(( $(date -u +%s) / 604800 ))")"
+          fi
+          echo "units=$units" >> "$GITHUB_OUTPUT"
+
+  sweep:
+    name: ${{ matrix.unit.target }} ${{ matrix.unit.operation }} ${{ matrix.unit.shard }}
+    needs: plan
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        unit: ${{ fromJSON(needs.plan.outputs.units) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: fuzz-ubuntu-24.04
+          workspaces: fuzz
+      - name: Sweep the shard, scalar and SIMD
+        env:
+          TARGET: ${{ matrix.unit.target }}
+          OPERATION: ${{ matrix.unit.operation }}
+          SHARD: ${{ matrix.unit.shard }}
+        run: |
+          python3 scripts/check_f32_sweeps.py "target/f32-sweeps/${{ github.run_id }}-${{ github.run_attempt }}" \
+            --target "$TARGET" --operation "$OPERATION" --shard "$SHARD"
+      - name: Retain coverage and failures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: f32-${{ matrix.unit.target }}-${{ matrix.unit.operation }}-${{ matrix.unit.shard }}
+          path: target/f32-sweeps/
+          retention-days: 90

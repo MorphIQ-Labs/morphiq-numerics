@@ -58,6 +58,8 @@ functions unnoticed.
 
 | `reduce_non_finite` | every ordered triple of two quiet NaN payloads, a signaling NaN, both infinities, the largest finite, zero and one, at lengths 0–3 | every `reduce` slice function, NaN bits included; appended without changing earlier input streams |
 
+| `eft_non_finite` | every ordered pair, and triple for the `DoubleWord` operations, of two quiet NaN payloads, a signaling NaN, both infinities, the largest finite, zero and 1.5 | every `eft` function and unchecked `DoubleWord` operation, NaN bits included; appended without changing earlier input streams |
+
 | `reduce::Moments2` | lengths 0–65, four partitions, mixed signs/exponents, high means with small spreads, signed zeros, nonfinite/arithmetic/count refusals | exact count, update/merge status, mean/variance/standard-error values and absolute error bounds |
 
 ## Where it is checked

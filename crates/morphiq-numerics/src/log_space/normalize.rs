@@ -161,7 +161,7 @@ pub fn normalize_log_weights(
 fn finite_pair(a: f64, b: f64) -> Result<([f64; 2], LogNormalization), NormalizeError> {
     let hi = usize::from(b > a);
     let (maximum, lower) = if hi == 0 { (a, b) } else { (b, a) };
-    let (dh, dl) = crate::eft::two_sum(lower, -maximum);
+    let (dh, dl) = crate::eft::two_sum_kernel(lower, -maximum);
     let mut sum = super::Sum2Stream::default();
     sum.add(crate::elementary::exp(dh), dl);
     let tail = sum.total();

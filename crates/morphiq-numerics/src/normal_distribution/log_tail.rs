@@ -25,7 +25,7 @@ pub(crate) fn first_candidate(a: f64) -> (f64, f64) {
     }
     // In D: NormalLogFirst.normal_log_first_square.
     let (sqh, sql) = crate::eft::two_prod_d(a, -0.5 * a);
-    let (high, low) = crate::eft::fast_two_sum(sqh, -c);
+    let (high, low) = crate::eft::fast_two_sum_kernel(sqh, -c);
     (high, low + sql)
 }
 

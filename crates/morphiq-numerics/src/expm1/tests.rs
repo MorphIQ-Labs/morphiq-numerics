@@ -4,7 +4,7 @@
 use super::{
     EPS, SMALL, X_MINUS_ONE, X_OVERFLOW, general_accurate, general_fast, small_accurate, small_fast,
 };
-use crate::double_word::DoubleWord;
+use crate::double_word::kernel::DoubleWord;
 use crate::exp::Reduced;
 use crate::ln::decide_with;
 use crate::q128::Q128;

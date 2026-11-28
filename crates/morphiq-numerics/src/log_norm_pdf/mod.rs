@@ -8,7 +8,7 @@ mod tables;
 #[cfg(test)]
 mod tests;
 
-use crate::double_word::DoubleWord;
+use crate::double_word::kernel::DoubleWord;
 use crate::ulp::ulp;
 use tables::{C_HI, C_LO};
 

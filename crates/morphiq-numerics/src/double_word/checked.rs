@@ -13,8 +13,8 @@
 //! not shown to be inaccurate; its accuracy is just not proved, and the
 //! unchecked operation still returns what the arithmetic produces.
 
-use super::DoubleWord;
-use crate::eft::{two_prod, two_sum};
+use super::kernel::DoubleWord;
+use crate::eft::{two_prod_kernel as two_prod, two_sum_kernel as two_sum};
 use core::fmt;
 
 /// Why a checked operation returned no result.

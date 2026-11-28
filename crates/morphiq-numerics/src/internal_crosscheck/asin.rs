@@ -3,7 +3,7 @@
 //! and run by `scripts/check_formal.sh`, so a difference in an operation or its
 //! order shows before rounding can hide it.
 use super::{SplitMix64, q256, unit};
-use crate::double_word::DoubleWord;
+use crate::double_word::kernel::DoubleWord;
 use std::fmt::Write as _;
 use std::string::String;
 use std::vec::Vec;

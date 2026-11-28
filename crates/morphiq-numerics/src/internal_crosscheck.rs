@@ -30,7 +30,7 @@
 //! decimal, its limb count and its 64-bit limbs in hex, least significant
 //! first. Each line is `op args : result`.
 
-use crate::double_word::DoubleWord;
+use crate::double_word::kernel::DoubleWord;
 use crate::q128::Q128;
 use crate::q256::Q256;
 use crate::random::SplitMix64;
@@ -287,7 +287,7 @@ fn internal_crosscheck_corpus() {
             _ => low + erfcx_rng.next_u64() % (high - low + 1),
         };
         let x = f64::from_bits(bits);
-        let (square, error) = crate::eft::two_prod(x, x);
+        let (square, error) = crate::eft::two_prod_kernel(x, x);
         writeln!(
             out,
             "erfcx_reflection_square {bits:016x} : {:016x} {:016x}",
@@ -1329,7 +1329,7 @@ fn erfcx_accurate_exponential_corpus(out: &mut String) {
                 }
             };
             let x = f64::from_bits(bits);
-            crate::eft::two_prod(x, x)
+            crate::eft::two_prod_kernel(x, x)
         };
         let n = (s * crate::exp::tables::INV_L + crate::exp::tables::SHIFTER)
             - crate::exp::tables::SHIFTER;

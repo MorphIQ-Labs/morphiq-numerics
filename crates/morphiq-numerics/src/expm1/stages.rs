@@ -2,7 +2,7 @@
 //! `formal/exp/Expm1Stages.v` proves the complete screened computation.
 
 use super::pow2;
-use crate::eft::two_sum;
+use crate::eft::two_sum_kernel as two_sum;
 use crate::exp::Stages;
 use crate::ln::stages::decide;
 
