@@ -229,3 +229,57 @@ fn max_abs_is_the_largest_magnitude_and_propagates_the_first_nan() {
         first.to_bits()
     );
 }
+
+/// docs/reduce.md, "Non-finite inputs": a NaN result is the first input NaN,
+/// unchanged, or the canonical quiet NaN when arithmetic creates it. Neither
+/// the processor's default NaN nor the compiler's operand order shows.
+#[test]
+fn nan_results_have_defined_bits() {
+    const CANONICAL: u64 = 0x7ff8_0000_0000_0000;
+    let quiet = f64::from_bits(0xffff_0101_0292_4925);
+    let other = f64::from_bits(0xffff_7fef_ffff_ffff);
+    let signaling = f64::from_bits(0x7ff0_0000_0000_0042);
+    let infinity = f64::INFINITY;
+    let one = |x: &[f64]| [sum(x), sum2(x), sum_squares(x), sum_squares2(x), max_abs(x)];
+
+    for nans in [[quiet, other], [other, quiet], [signaling, quiet]] {
+        // Padding puts the NaNs in different positions of the fixed order.
+        for lead in 0..4 {
+            let mut x = vec![1.5; lead];
+            x.extend([nans[0], 2.0, nans[1], infinity]);
+            let y = vec![0.5; x.len()];
+            for got in one(&x).into_iter().chain([dot(&x, &y), dot2(&x, &y)]) {
+                assert_eq!(got.to_bits(), nans[0].to_bits(), "{x:?}");
+            }
+            // The first NaN term wins, from either operand.
+            for got in [dot(&y, &x), dot2(&y, &x)] {
+                assert_eq!(got.to_bits(), nans[0].to_bits(), "{x:?}");
+            }
+        }
+        for got in one(&nans[..1]) {
+            assert_eq!(got.to_bits(), nans[0].to_bits());
+        }
+    }
+    // At one index, x comes before y; an earlier y precedes a later x.
+    for f in [dot, dot2] {
+        assert_eq!(f(&[quiet], &[other]).to_bits(), quiet.to_bits());
+        assert_eq!(f(&[1.0, other], &[quiet, 1.0]).to_bits(), quiet.to_bits());
+    }
+    // NaNs created by the arithmetic: opposite infinities, zero times infinity,
+    // and a compensated step's infinity minus infinity.
+    for got in [
+        sum(&[infinity, -infinity]),
+        sum2(&[infinity, -infinity]),
+        sum2(&[infinity, 1.0]),
+        dot(&[infinity], &[0.0]),
+        dot2(&[0.0], &[-infinity]),
+        dot(&[infinity, infinity], &[1.0, -1.0]),
+        dot2(&[f64::MAX, f64::MAX], &[f64::MAX, -f64::MAX]),
+        sum_squares2(&[infinity]),
+    ] {
+        assert_eq!(got.to_bits(), CANONICAL);
+    }
+    // Infinite results that are not NaN are unchanged.
+    assert_eq!(sum(&[infinity, 1.0]), infinity);
+    assert_eq!(sum_squares(&[-infinity]), infinity);
+}

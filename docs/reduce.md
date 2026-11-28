@@ -140,6 +140,18 @@ An infinity or NaN among the terms propagates through IEEE 754 arithmetic. The
 error bounds are statements about finite inputs whose computation doesn't
 overflow.
 
+**A NaN result has defined bits** in every function above:
+- if an input is NaN, the result is the first input NaN, unchanged, signaling
+  NaNs included. First means by index; at one index, `x` before `y`;
+- otherwise the arithmetic created the NaN (opposite infinities, zero times
+  infinity, or a compensated step on an infinite or overflowed partial result),
+  and the result is the canonical quiet NaN `7ff8000000000000`.
+
+IEEE 754 leaves both choices to the implementation: which payload survives
+depends on operand order, which a compiler may change, and processors differ in
+the NaN an invalid operation creates. The rule is applied once, to a NaN result;
+`max_abs` stops at the first NaN.
+
 ## What is checked, and how
 
 Not machine-checked: these bounds are the paper's propositions, and the
@@ -153,7 +165,9 @@ arithmetic, with the denominators of `γ` cleared:
   off), so `cond` reaches about `u^−1`;
 - the paper's Table 4.1: for `p = [1, θ, θ², −θ, −θ², −1]` with `θ = 2^−54`,
   `sum` returns exactly 0 and `sum2` exactly `−θ²`, as the paper shows;
-- empty slices, `−0`, mismatched lengths, and `max_abs`'s NaN rule.
+- empty slices, `−0`, mismatched lengths, `max_abs`'s NaN rule, and the bits of
+  every NaN result: both payload orders, signaling NaNs, either operand, and NaNs
+  the arithmetic creates.
 
 **The checks can fail.** With `sum2` returning `π_n` without its correction, both
 `sum2` tests fail. With `dot2` dropping the products' errors `r`, the `dot2` test
