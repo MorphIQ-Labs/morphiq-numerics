@@ -485,6 +485,10 @@ let compute op args =
       (match args with
        | [x] -> show_bits (x_expm1_entry (z_of_u64 (hex x)))
        | _ -> failwith "expm1_entry takes one word")
+  | "exp_entry" | "exp_fallback" ->
+      (match args with
+       | [x] -> show_bits ((if op = "exp_entry" then x_exp_entry else x_exp_fallback) (z_of_u64 (hex x)))
+       | _ -> failwith "exp entries take one word")
   | "exp2_entry" ->
       (match args with
        | [x] -> show_bits (x_exp2_entry (z_of_u64 (hex x)))

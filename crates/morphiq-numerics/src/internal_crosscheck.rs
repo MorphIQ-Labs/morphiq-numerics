@@ -10,6 +10,7 @@
 //! `ln::small_accurate`) and `ln_1p`'s screens and stages H and B
 //! (`ln::stages::stage_h_screen`, `stage_b_screen`, `stage_h_parts`,
 //! `stage_b_parts`), and `exp2`'s fallback reduction and accurate value
+//! `exp`'s public entry and fallback (`elementary::exp`, `exp::fallback`),
 //! on reproducible inputs, with
 //! this crate's results, and the bivariate normal's scalar kernel (`bivariate.rs`:
 //! `bivariate_norm_cdf` and the table `BivariateNormal::new` builds, with the library
@@ -272,6 +273,7 @@ fn internal_crosscheck_corpus() {
     erfcx_accurate_taylor_corpus(&mut out);
     erfcx_accurate_negative_corpus(&mut out);
     erfcx_public_entry_corpus(&mut out);
+    exp_public_entry_corpus(&mut out);
     // Cover the corrected reciprocal's full exponent range, including each
     // power-of-two boundary and its adjacent binary64 values.
     let mut erfcx_rng = SplitMix64::new(0x6572_6663_785f_0001);
@@ -1449,6 +1451,72 @@ fn ln_1p_stage_line(
         opt(y)
     )
     .unwrap();
+}
+
+/// exp's public entry and its fallback on the same argument: the fallback is
+/// also run where the stages decide, so both transcriptions see every input.
+fn exp_entry_lines(out: &mut String, x: f64) {
+    for (name, y) in [
+        ("exp_entry", crate::elementary::exp(x)),
+        ("exp_fallback", crate::exp::fallback(x)),
+    ] {
+        writeln!(out, "{name} {:016x} : {:016x}", x.to_bits(), y.to_bits()).unwrap();
+    }
+}
+
+/// Fixture inputs (worst cases included), arbitrary encodings, every screen
+/// boundary with its neighbours, both small-argument regions and the results
+/// that only the fallback reaches.
+fn exp_public_entry_corpus(out: &mut String) {
+    for case in include_str!("../../reference/fixtures/exp.json")
+        .lines()
+        .filter(|line| line.trim_start().starts_with("\"x\":"))
+    {
+        exp_entry_lines(out, crate::test_exact::word(case, "x"));
+    }
+    // Screen boundaries (exp/mod.rs), ±704, ±0 and the exceptional encodings.
+    for bits in [
+        0x4086_2e42_fefa_39f0_u64,
+        0xc087_4910_d52d_3052,
+        0xbc90_0000_0000_0000,
+        0x3ca0_0000_0000_0000,
+        0x3e10_0000_0000_0000,
+        0xbe10_0000_0000_0000,
+        0x4086_0000_0000_0000,
+        0xc086_0000_0000_0000,
+    ] {
+        for b in [bits - 1, bits, bits + 1] {
+            exp_entry_lines(out, f64::from_bits(b));
+        }
+    }
+    for bits in [
+        0,
+        0x8000_0000_0000_0000,
+        0x7ff0_0000_0000_0000,
+        0xfff0_0000_0000_0000,
+        0x7ff0_0000_0000_0001,
+        0xfff8_0000_0000_0042,
+    ] {
+        exp_entry_lines(out, f64::from_bits(bits));
+    }
+    let mut rng = SplitMix64::new(0x7163_726f_7373_0020);
+    // 1 + x is a midpoint for these x, so the small path decides them.
+    for k in 0..256_u32 {
+        let x = f64::from(2 * k + 1) * f64::from_bits((1023 - 53) << 52);
+        exp_entry_lines(out, x);
+        exp_entry_lines(out, -x * 0.5);
+    }
+    for _ in 0..2000 {
+        exp_entry_lines(out, f64::from_bits(rng.next_u64()));
+        exp_entry_lines(out, (unit(&mut rng) - 0.5) * 1500.0);
+        // Subnormal results and the overflow edge, beyond the stages.
+        exp_entry_lines(out, -745.0 + 41.0 * unit(&mut rng));
+        exp_entry_lines(out, 704.0 + 5.7 * unit(&mut rng));
+        exp_entry_lines(
+            out,
+            (unit(&mut rng) - 0.5) * f64::from_bits((1023 - 29) << 52),
+        );
+    }
 }
 
 fn exp2_entry_line(out: &mut String, x: f64) {

@@ -634,6 +634,31 @@ on binary64 and the proved `Q128` transcription, and proves them.
 The formal job compares `h`, `w` and `small`'s result with the Rust code bit for
 bit on the internal cross-check corpus.
 
+### 8.5 The public entry
+
+**Machine-checked:** `formal/exp/ExpEntry.v` transcribes `exp` and `fallback`
+through every screen of §1, the stages, the fallback's rounding test and both
+accurate paths, and composes their theorems.
+
+| Theorem | States |
+|---|---|
+| `exp_entry_finite` | for finite `x`: `x ≥ X_OVERFLOW` returns `+∞`, where `e^x ≥ 2^1024`; every other `x` returns `RN(e^x)`, finite |
+| `exp_entry_positive` | the result is positive for finite `X_ZERO < x < X_OVERFLOW` |
+| `exp_entry_nan` | a NaN is returned unchanged |
+| `exp_entry_infinities`, `exp_entry_signed_zeros` | `+∞` and `+0` for `±∞`; `1` for `±0` |
+
+**Assumed, from the published worst cases (§2).** For `X_ZERO < x <
+X_OVERFLOW`, `exp_entry_finite` and `exp_entry_positive` take [LM]'s mantissa
+distance as hypotheses: `2^−113` for `|x| ≥ 2^−30`, and `2^−158` for
+`2^−54 ≤ |x| < 2^−30`. No other hypothesis is left.
+
+**Compared, not proved.** The extracted `exp_entry` and `exp_fallback` match the
+Rust bit for bit on the internal cross-check corpus, the fallback also on
+arguments the stages decide.
+
+**Not covered.** `exp_slice`'s lanes are tested against the scalar kernel
+([lanes.md](lanes.md) §4), not proved. The compiler and processor are assumed.
+
 ## 9. Certificates, proofs and generators
 
 | Artifact | Tool | Establishes |
@@ -667,6 +692,7 @@ the Rust code on binary64 with its theorem:
 | `ExpStageB.v` | stage B's exact product (`mask_ok`), error (`stage_b_value_ok`) and result (`exp_stage_b_ok`); the screen (`screen_ok`); both stages as `exp` runs them (`exp_stages_ok`) |
 | `RoundingConstant.v` | the constant-bound test and the scaling (`decide_const_ok`) |
 | `ExpReduction.v`, `ExpFast.v`, `ExpAccurate.v`, `ExpSmall.v`, `ExpTables.v` | the fallback (§8) |
+| `ExpEntry.v` | the public entry, composed from the rows above (§8.5) |
 
 Each stage theorem holds for every finite `|x| < 704` and states its result is
 `RN(e^x)` with no hypothesis left: the certificates' theorems are applied

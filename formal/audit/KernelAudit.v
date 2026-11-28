@@ -99,6 +99,18 @@ Print Assumptions Exp2.exp2_entry_zero.
 Print Assumptions Exp2.exp2_entry_positive.
 Print Assumptions Exp2.exp2_entry_signed_zeros.
 
+Require ExpEntry.
+Print Assumptions ExpEntry.exp_overflows.
+Print Assumptions ExpEntry.exp_underflows.
+Print Assumptions ExpEntry.exp_rounds_positive.
+Print Assumptions ExpEntry.exp_rounds_to_one.
+Print Assumptions ExpEntry.exp_fallback_ok.
+Print Assumptions ExpEntry.exp_entry_finite.
+Print Assumptions ExpEntry.exp_entry_positive.
+Print Assumptions ExpEntry.exp_entry_nan.
+Print Assumptions ExpEntry.exp_entry_infinities.
+Print Assumptions ExpEntry.exp_entry_signed_zeros.
+
 Require Expm1GeneralReduction Expm1GeneralBounds Expm1GeneralScale Expm1GeneralSum Expm1GeneralSubtract Expm1GeneralFast Expm1GeneralAccurate.
 Print Assumptions ExpFast.fast_reduced_grid_ok.
 Print Assumptions Binary64.RoundingTest.decide_with_bounded_ok.
