@@ -13,7 +13,7 @@
 //! by a small probability must carry the absolute bound itself, and refuse the
 //! quotient where the bound is not far below the value.
 
-use crate::eft::{two_prod, two_sum};
+use crate::eft::{two_prod_kernel as two_prod, two_sum_kernel as two_sum};
 use crate::elementary::sqrt;
 #[cfg(not(test))]
 use crate::elementary::{asin, exp, sin};

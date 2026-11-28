@@ -49,6 +49,42 @@ fn rounds_to(x: f64, value: &Float) -> bool {
     x == rounded && (x == 0.0 || x.to_bits() == rounded.to_bits())
 }
 
+/// docs/double-word.md, "Non-finite results": a NaN word is the first NaN
+/// among the operands' words, or the canonical quiet NaN.
+fn check_nan_words(name: &str, got: [f64; 2], operands: &[f64]) {
+    let expected = operands
+        .iter()
+        .find(|v| v.is_nan())
+        .map_or(0x7ff8_0000_0000_0000, |v| v.to_bits());
+    for word in got.into_iter().filter(|w| w.is_nan()) {
+        assert_eq!(word.to_bits(), expected, "{name} NaN {operands:?}");
+    }
+}
+
+fn check_non_finite(a: f64, b: f64, c: f64, d: f64) {
+    let pair = |(p, q): (f64, f64)| [p, q];
+    check_nan_words("two_sum", pair(eft::two_sum(a, b)), &[a, b]);
+    check_nan_words("fast_two_sum", pair(eft::fast_two_sum(a, b)), &[a, b]);
+    check_nan_words("two_prod", pair(eft::two_prod(a, b)), &[a, b]);
+    let (x, y) = (DoubleWord::sum(a, b), DoubleWord::sum(c, d));
+    let parts = |z: DoubleWord| [z.hi(), z.lo()];
+    check_nan_words("sum", parts(x), &[a, b]);
+    check_nan_words("product", parts(DoubleWord::product(a, b)), &[a, b]);
+    let single = [x.hi(), x.lo(), c];
+    check_nan_words("add_f64", parts(x.add_f64(c)), &single);
+    check_nan_words("mul_f64", parts(x.mul_f64(c)), &single);
+    check_nan_words("div_f64", parts(x.div_f64(c)), &single);
+    let both = [x.hi(), x.lo(), y.hi(), y.lo()];
+    for (name, z) in [
+        ("add", x.add(y)),
+        ("sub", x.sub(y)),
+        ("mul", x.mul(y)),
+        ("div", x.div(y)),
+    ] {
+        check_nan_words(name, parts(z), &both);
+    }
+}
+
 fn check_transforms(a: f64, b: f64) {
     if !a.is_finite() || !b.is_finite() {
         return;
@@ -369,6 +405,7 @@ pub fn check_input(data: &[u8]) {
             ))
         });
         let [a, b, c, d] = w;
+        check_non_finite(a, b, c, d);
         for (p, q) in [(a, b), (c, d), (a, c)] {
             check_transforms(p, q);
             check_exact_constructors(p, q);
@@ -447,6 +484,20 @@ mod tests {
             for b in specials {
                 check_input(&packet([a, b, 1.0, b]));
             }
+        }
+    }
+
+    #[test]
+    fn the_nan_word_check_rejects_another_payload() {
+        let a = f64::from_bits(0xffff_0101_0292_4925);
+        let b = f64::from_bits(0xffff_7fef_ffff_ffff);
+        check_nan_words("planted", [a, 1.0], &[a, b]);
+        let canonical_for_x86 = f64::from_bits(0xfff8_0000_0000_0000);
+        for (got, operands) in [(b, [a, b]), (canonical_for_x86, [1.0, 2.0])] {
+            assert!(
+                std::panic::catch_unwind(|| check_nan_words("planted", [got, 0.0], &operands))
+                    .is_err()
+            );
         }
     }
 

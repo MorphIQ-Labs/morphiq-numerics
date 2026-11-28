@@ -14,10 +14,10 @@
 //! every source returns the same words (ADR 0002): a fused multiply-add's error
 //! term equals Dekker's on [`two_prod`](crate::eft::two_prod)'s proved domain.
 
-use super::DoubleWord;
 use super::exp_tables::{
     INV, L1, L2, L3, LIMIT, LOW_FLOOR, R_FLOOR, SHIFTER, TABLE, TAYLOR, TINY, V_FLOOR,
 };
+use super::kernel::DoubleWord;
 
 // Generated thresholds (`exp_tables.rs`), shared with the Coq transcription:
 // - `SHIFTER = 1.5 · 2^52`: adding and subtracting it rounds to the nearest
@@ -206,7 +206,7 @@ impl<K: morphiq_numerics_arch::Simd> ExactProduct for LaneProduct<K> {
         let product = a * b;
         match k.mul_add(k.splat(a), k.splat(b), k.splat(-product)) {
             Some(error) => (product, k.store(error).as_ref()[0]),
-            None => crate::eft::two_prod(a, b),
+            None => crate::eft::two_prod_kernel(a, b),
         }
     }
 }
@@ -233,7 +233,7 @@ mod tests {
     struct Dekker;
     impl ExactProduct for Dekker {
         fn two_prod(&self, a: f64, b: f64) -> (f64, f64) {
-            crate::eft::two_prod(a, b)
+            crate::eft::two_prod_kernel(a, b)
         }
     }
 

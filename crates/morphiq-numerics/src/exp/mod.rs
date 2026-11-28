@@ -10,8 +10,10 @@ mod bounded_tables;
 pub(crate) mod lanes;
 pub(crate) mod tables;
 
-use crate::double_word::DoubleWord;
-use crate::eft::{fast_two_sum, two_prod, two_sum};
+use crate::double_word::kernel::DoubleWord;
+use crate::eft::{
+    fast_two_sum_kernel as fast_two_sum, two_prod_kernel as two_prod, two_sum_kernel as two_sum,
+};
 use crate::q128::Q128;
 use crate::ulp::ulp;
 use tables::{

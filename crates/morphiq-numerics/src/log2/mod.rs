@@ -11,7 +11,7 @@ mod tables;
 #[cfg(feature = "simd")]
 pub(crate) mod lanes;
 
-use crate::double_word::DoubleWord;
+use crate::double_word::kernel::DoubleWord;
 use crate::ln::{Reduced, decide};
 use crate::q128::Q128;
 use tables::{INV_LN2_HI, INV_LN2_LO, INV_LN2_Q128, INV_LN10_HI, INV_LN10_LO, INV_LN10_Q128};

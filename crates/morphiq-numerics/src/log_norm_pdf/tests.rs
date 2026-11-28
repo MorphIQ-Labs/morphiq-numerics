@@ -8,7 +8,7 @@
 
 use super::tables::{C_HI, C_LO};
 use super::{TWO_500, TWO_M27, log_norm_pdf};
-use crate::double_word::DoubleWord;
+use crate::double_word::kernel::DoubleWord;
 use crate::ln::decide_with;
 use crate::test_exact::{entries, word};
 use crate::ulp::ulp;

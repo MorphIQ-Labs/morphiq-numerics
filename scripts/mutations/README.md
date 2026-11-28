@@ -66,7 +66,9 @@ fault because its square stays in the lower binade.
 The pinned `cargo-mutants --no-config --list --json --all-features` inventory
 covers both published crates. `inventory-floor.json` requires at least 10,595
 syntactic candidates in `morphiq-numerics` and 308 in `morphiq-numerics-arch`,
-with individual floors for all 74 inventoried files. Growth elsewhere cannot
+with individual floors for all 75 inventoried files. The double-word operation
+sequences moved to `double_word/kernel.rs` with their 70 candidates;
+`double_word.rs` keeps the 34 of its public wrappers. Growth elsewhere cannot
 hide a missing file. Raw inventory and counts are retained with each run.
 
 This is a discovery floor, not an assertion that all 10,903 candidates are

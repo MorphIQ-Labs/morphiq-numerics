@@ -8,15 +8,10 @@
 /// split into 26 and 27 bits (Dekker 1971, (5.7) and (6.2)).
 const SPLITTER: f64 = 134_217_729.0;
 
-/// `(s, t)` with `s = RN(a + b)` and `s + t = a + b` exactly, for any `a` and
-/// `b` at most `2^1020` in magnitude, which excludes overflow
-/// (`two_sum_ieee`, `formal/binary64/IEEE64Eft.v`).
-///
-/// Knuth and Møller's 2Sum, operation for operation as Joldes, Muller and
-/// Popescu (2017) state it in Algorithm 2.
-#[must_use]
+/// The operation sequence of [`two_sum`], as the crate's kernels use it: a NaN
+/// word's bits are whatever the arithmetic produces.
 #[inline]
-pub const fn two_sum(a: f64, b: f64) -> (f64, f64) {
+pub(crate) const fn two_sum_kernel(a: f64, b: f64) -> (f64, f64) {
     let s = a + b;
     let a_prime = s - b;
     let b_prime = s - a_prime;
@@ -25,17 +20,10 @@ pub const fn two_sum(a: f64, b: f64) -> (f64, f64) {
     (s, delta_a + delta_b)
 }
 
-/// `(s, t)` with `s = RN(a + b)` and `s + t = a + b` exactly, provided
-/// `a = 0`, `|a| ≥ |b|`, or the exponent of `a` is at least that of `b`, and
-/// `|a|, |b| ≤ 2^1021`, which excludes overflow (`fast_two_sum_ieee`,
-/// `formal/binary64/IEEE64Eft.v`).
-///
-/// Dekker's Fast2Sum, as Joldes, Muller and Popescu (2017) state it in
-/// Algorithm 1. Outside its precondition `t` need not be the exact error; use
-/// [`two_sum`] there.
-#[must_use]
+/// The operation sequence of [`fast_two_sum`], as the crate's kernels use it: a NaN
+/// word's bits are whatever the arithmetic produces.
 #[inline]
-pub const fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
+pub(crate) const fn fast_two_sum_kernel(a: f64, b: f64) -> (f64, f64) {
     let s = a + b;
     let z = s - a;
     (s, b - z)
@@ -55,31 +43,10 @@ const fn split(x: f64) -> (f64, f64) {
     (head, x - head)
 }
 
-/// `(p, e)` with `p = RN(a · b)` and `p + e = a · b` exactly.
-///
-/// Veltkamp's algorithm for the exact product, as Dekker (1971) gives it at
-/// the end of §5, on Dekker's splitting. It needs no fused
-/// multiply-add, so the result is the same on every target.
-///
-/// # Domain
-///
-/// Exact when `a · b = 0` or `|a · b| ≥ 2^-969`, and `|a| ≤ 2^e_a`,
-/// `|b| ≤ 2^e_b` for some `e_a, e_b ≤ 994` with `e_a + e_b ≤ 1020`, which
-/// excludes overflow.
-///
-/// - **Underflow:** the condition is that of Flocq's `Dekker` theorem,
-///   instantiated for binary64 with ties-to-even in
-///   `formal/two-prod/TwoProdBinary64.v`. It covers subnormal operands.
-/// - **Overflow:** machine-checked in Flocq's IEEE 754 model (`two_prod_ieee`,
-///   `formal/binary64/IEEE64Eft.v`).
-///
-/// These conditions are sufficient, not necessary: they are the proof's
-/// hypotheses, not the boundary of exactness. Below `2^-969`, or beyond the
-/// magnitude limits, `p + e = a · b` is neither claimed nor ruled out; the result
-/// is whatever the arithmetic produces.
-#[must_use]
+/// The operation sequence of [`two_prod`], as the crate's kernels use it: a NaN
+/// word's bits are whatever the arithmetic produces.
 #[inline]
-pub const fn two_prod(a: f64, b: f64) -> (f64, f64) {
+pub(crate) const fn two_prod_kernel(a: f64, b: f64) -> (f64, f64) {
     let p = a * b;
     let (a_head, a_tail) = split(a);
     let (b_head, b_tail) = split(b);
@@ -120,6 +87,94 @@ pub(crate) fn two_prod_d(a: f64, b: f64) -> (f64, f64) {
         )
     )))]
     {
-        two_prod(a, b)
+        two_prod_kernel(a, b)
     }
+}
+
+/// The quiet NaN returned when the arithmetic itself creates one.
+const CANONICAL_NAN: u64 = 0x7ff8_0000_0000_0000;
+
+/// `word`, with a NaN's bits taken from the contract: the first NaN among
+/// `inputs`, unchanged, or the canonical quiet NaN when none is. IEEE 754 leaves
+/// which payload survives an operation, and the NaN an invalid operation
+/// creates, to the implementation.
+#[inline]
+pub(crate) const fn defined_nan(word: f64, inputs: &[f64]) -> f64 {
+    if !word.is_nan() {
+        return word;
+    }
+    let mut i = 0;
+    while i < inputs.len() {
+        if inputs[i].is_nan() {
+            return inputs[i];
+        }
+        i += 1;
+    }
+    f64::from_bits(CANONICAL_NAN)
+}
+
+/// `(s, t)` with `s = RN(a + b)` and `s + t = a + b` exactly, for any `a` and
+/// `b` at most `2^1020` in magnitude, which excludes overflow
+/// (`two_sum_ieee`, `formal/binary64/IEEE64Eft.v`).
+///
+/// Knuth and Møller's 2Sum, operation for operation as Joldes, Muller and
+/// Popescu (2017) state it in Algorithm 2.
+///
+/// A NaN word of the result is `a` if `a` is NaN, else `b` if `b` is, else the
+/// canonical quiet NaN `7ff8000000000000`.
+#[must_use]
+#[inline]
+pub const fn two_sum(a: f64, b: f64) -> (f64, f64) {
+    let (x, y) = two_sum_kernel(a, b);
+    (defined_nan(x, &[a, b]), defined_nan(y, &[a, b]))
+}
+
+/// `(s, t)` with `s = RN(a + b)` and `s + t = a + b` exactly, provided
+/// `a = 0`, `|a| ≥ |b|`, or the exponent of `a` is at least that of `b`, and
+/// `|a|, |b| ≤ 2^1021`, which excludes overflow (`fast_two_sum_ieee`,
+/// `formal/binary64/IEEE64Eft.v`).
+///
+/// Dekker's Fast2Sum, as Joldes, Muller and Popescu (2017) state it in
+/// Algorithm 1. Outside its precondition `t` need not be the exact error; use
+/// [`two_sum`] there.
+///
+/// A NaN word of the result is `a` if `a` is NaN, else `b` if `b` is, else the
+/// canonical quiet NaN `7ff8000000000000`.
+#[must_use]
+#[inline]
+pub const fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
+    let (x, y) = fast_two_sum_kernel(a, b);
+    (defined_nan(x, &[a, b]), defined_nan(y, &[a, b]))
+}
+
+/// `(p, e)` with `p = RN(a · b)` and `p + e = a · b` exactly.
+///
+/// Veltkamp's algorithm for the exact product, as Dekker (1971) gives it at
+/// the end of §5, on Dekker's splitting. It needs no fused
+/// multiply-add, so the result is the same on every target.
+///
+/// # Domain
+///
+/// Exact when `a · b = 0` or `|a · b| ≥ 2^-969`, and `|a| ≤ 2^e_a`,
+/// `|b| ≤ 2^e_b` for some `e_a, e_b ≤ 994` with `e_a + e_b ≤ 1020`, which
+/// excludes overflow.
+///
+/// - **Underflow:** the condition is that of Flocq's `Dekker` theorem,
+///   instantiated for binary64 with ties-to-even in
+///   `formal/two-prod/TwoProdBinary64.v`. It covers subnormal operands.
+/// - **Overflow:** machine-checked in Flocq's IEEE 754 model (`two_prod_ieee`,
+///   `formal/binary64/IEEE64Eft.v`).
+///
+/// These conditions are sufficient, not necessary: they are the proof's
+/// hypotheses, not the boundary of exactness. Below `2^-969`, or beyond the
+/// magnitude limits, `p + e = a · b` is neither claimed nor ruled out; the result
+/// is whatever the arithmetic produces.
+///
+/// A NaN word of the result is `a` if `a` is NaN, else `b` if `b` is, else the
+/// canonical quiet NaN `7ff8000000000000`.
+#[must_use]
+#[inline]
+pub const fn two_prod(a: f64, b: f64) -> (f64, f64) {
+    let (x, y) = two_prod_kernel(a, b);
+    (defined_nan(x, &[a, b]), defined_nan(y, &[a, b]))
 }

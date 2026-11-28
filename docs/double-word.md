@@ -75,6 +75,27 @@ In particular, an earlier hand derivation of this domain included products in
 it isn't claimed. The proved domain admits subnormal operands, so they are
 covered.
 
+## Non-finite results
+
+The theorems and bounds here are statements about finite operations. The public
+`eft` functions and unchecked `DoubleWord` operations still return the same bits
+on every target when a result word is a NaN:
+
+- it is the first NaN among the operands' words, in argument order and high
+  before low, unchanged, signaling NaNs included;
+- with no NaN operand, the arithmetic created it (opposite infinities, zero times
+  infinity, or an overflowing step), and it is the canonical quiet NaN
+  `7ff8000000000000`.
+
+IEEE 754 leaves both choices to the implementation: which payload survives
+depends on operand order, which a compiler may change, and processors differ in
+the NaN an invalid operation creates. Words that are not NaN are unchanged.
+
+The rule lives in the public functions. Each wraps a crate-internal function that
+carries the unchanged operation sequence; the library's kernels, whose operands
+are proved finite, and the extraction cross-checks use those. Checked operations
+return only finite results.
+
 ## Double-word numbers
 
 A double-word number is an unevaluated sum `hi + lo` of binary64 numbers with

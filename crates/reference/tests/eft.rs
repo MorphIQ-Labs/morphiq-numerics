@@ -147,3 +147,58 @@ fn every_check_sees_an_inexact_sum_or_product() {
     assert_ne!(e, 0.0);
     assert_ne!(Exact::of(p), &Exact::of(0.1) * &Exact::of(0.3));
 }
+
+/// docs/double-word.md, "Non-finite results": a NaN word is the first NaN among
+/// the operands' words, or the canonical quiet NaN, on every target.
+#[test]
+fn nan_words_have_defined_bits() {
+    use morphiq_numerics::double_word::DoubleWord;
+
+    const CANONICAL: u64 = 0x7ff8_0000_0000_0000;
+    let a = f64::from_bits(0xffff_0101_0292_4925);
+    let b = f64::from_bits(0xffff_7fef_ffff_ffff);
+    let signaling = f64::from_bits(0x7ff0_0000_0000_0042);
+    let infinity = f64::INFINITY;
+    let values = [a, b, signaling, infinity, -infinity, f64::MAX, 0.0, 1.5];
+    let expected = |inputs: &[f64]| {
+        inputs
+            .iter()
+            .find(|v| v.is_nan())
+            .map_or(CANONICAL, |v| v.to_bits())
+    };
+    let check = |name: &str, got: [f64; 2], inputs: &[f64]| {
+        for word in got.into_iter().filter(|w| w.is_nan()) {
+            assert_eq!(word.to_bits(), expected(inputs), "{name} {inputs:?}");
+        }
+    };
+    let words = |z: DoubleWord| [z.hi(), z.lo()];
+    for x in values {
+        for y in values {
+            let pair = |(p, q): (f64, f64)| [p, q];
+            check("two_sum", pair(two_sum(x, y)), &[x, y]);
+            check("fast_two_sum", pair(fast_two_sum(x, y)), &[x, y]);
+            check("two_prod", pair(two_prod(x, y)), &[x, y]);
+            check("sum", words(DoubleWord::sum(x, y)), &[x, y]);
+            check("product", words(DoubleWord::product(x, y)), &[x, y]);
+            for z in values {
+                let w = DoubleWord::sum(x, y);
+                let single = [w.hi(), w.lo(), z];
+                check("add_f64", words(w.add_f64(z)), &single);
+                check("mul_f64", words(w.mul_f64(z)), &single);
+                check("div_f64", words(w.div_f64(z)), &single);
+                let v = DoubleWord::from_f64(z);
+                let both = [w.hi(), w.lo(), v.hi(), v.lo()];
+                check("add", words(w.add(v)), &both);
+                check("sub", words(w.sub(v)), &both);
+                check("mul", words(w.mul(v)), &both);
+                check("div", words(w.div(v)), &both);
+            }
+        }
+    }
+    // Both payload orders, a signaling NaN, and NaNs the arithmetic creates.
+    assert_eq!(two_sum(a, b).0.to_bits(), a.to_bits());
+    assert_eq!(two_sum(b, a).0.to_bits(), b.to_bits());
+    assert_eq!(two_prod(1.0, signaling).0.to_bits(), signaling.to_bits());
+    assert_eq!(two_sum(infinity, -infinity).0.to_bits(), CANONICAL);
+    assert_eq!(DoubleWord::product(0.0, infinity).hi().to_bits(), CANONICAL);
+}

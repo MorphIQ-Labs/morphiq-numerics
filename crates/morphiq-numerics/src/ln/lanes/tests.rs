@@ -124,7 +124,9 @@ impl WithSimd for FallbackValues<'_> {
                 let want = if !self.log1p {
                     Reduced::of(xi).fast_value()
                 } else if xi.abs() < crate::ln::TWO_M7 {
-                    crate::ln::ln_1p_double_word(crate::double_word::DoubleWord::from_f64(xi))
+                    crate::ln::ln_1p_double_word(crate::double_word::kernel::DoubleWord::from_f64(
+                        xi,
+                    ))
                 } else {
                     let (h, l) = crate::ln::split(xi);
                     Reduced::of(h).fast_value().add_f64(l / h)

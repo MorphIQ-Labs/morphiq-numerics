@@ -7,5 +7,5 @@
 -const SPLITTER: f64 = 134_217_729.0;
 +const SPLITTER: f64 = 134_217_728.0;
 
- /// `(s, t)` with `s = RN(a + b)` and `s + t = a + b` exactly, for any `a` and
- /// `b` at most `2^1020` in magnitude, which excludes overflow
+ /// The operation sequence of [`two_sum`], as the crate's kernels use it: a NaN
+ /// word's bits are whatever the arithmetic produces.

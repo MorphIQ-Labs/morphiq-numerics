@@ -1,6 +1,6 @@
 //! Extended-precision compositions from the original binary64 argument.
 use super::{Operation, tables};
-use crate::eft::two_prod;
+use crate::eft::two_prod_kernel as two_prod;
 use crate::q256::Q256;
 
 fn q(x: f64) -> Q256 {

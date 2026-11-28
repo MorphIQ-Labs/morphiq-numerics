@@ -219,6 +219,8 @@ and quotient bounds are checked by multiplying through.
 - `exp_split` meets `16u²` on its domain, with its stated value and exponent
   ranges, and returns `None` outside it.
 - The ULP utilities match the definitions from the binary64 encoding.
+- NaN result words of every `eft` and unchecked `DoubleWord` operation have the
+  documented bits.
 
 Its corpus format is up to sixteen records of four little-endian encodings. The
 retained `product-underflow-edge` input is a product below `2^-969` that rounds

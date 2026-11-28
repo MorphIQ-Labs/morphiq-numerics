@@ -4,7 +4,7 @@
 //! `formal/ln` transcribe this order, so no operation may be reordered or fused.
 
 use super::stage_tables::{B, EL, H, L0, L1, OFF, R, T};
-use crate::eft::two_prod;
+use crate::eft::two_prod_kernel as two_prod;
 
 /// `2^k` for `−1022 ≤ k ≤ 1023`, exactly.
 const fn pow2(k: i32) -> f64 {

@@ -2,7 +2,7 @@
 //! and their fast paths against their accurate paths (docs/log2.md).
 
 use super::{log2_accurate, log2_fast, log10_accurate, log10_fast};
-use crate::double_word::DoubleWord;
+use crate::double_word::kernel::DoubleWord;
 use crate::ln::{Reduced, decide};
 use crate::q128::Q128;
 use crate::random::SplitMix64;

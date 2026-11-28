@@ -18,7 +18,7 @@
 //! statistics with an explicit absolute error bound per readout. Its batch
 //! partition and merge order are part of its separate numerical contract.
 
-use crate::eft::{two_prod, two_sum};
+use crate::eft::{two_prod_kernel as two_prod, two_sum_kernel as two_sum};
 
 mod moments;
 pub use moments::{MomentEstimate, Moments2, MomentsError};
@@ -70,7 +70,7 @@ pub fn sum(x: &[f64]) -> f64 {
 
 /// The compensated sum: Ogita, Rump and Oishi's Algorithm 4.1 (Sum2), in
 /// which each rounding error of the plain sum is recovered exactly by
-/// [`two_sum`] and the errors are summed in working precision. Zero for an
+/// [`two_sum`](crate::eft::two_sum) and the errors are summed in working precision. Zero for an
 /// empty slice.
 ///
 /// `|sum2 − s| ≤ u·|s| + γ_{n−1}²·S` (their Proposition 4.5), also with
@@ -119,10 +119,10 @@ pub fn dot(x: &[f64], y: &[f64]) -> f64 {
 
 /// The compensated dot product: Ogita, Rump and Oishi's Algorithm 5.3
 /// (Dot2), in which each product's rounding error is recovered exactly by
-/// [`two_prod`] and each sum's by [`two_sum`]. Zero for empty slices.
+/// [`two_prod`](crate::eft::two_prod) and each sum's by [`two_sum`](crate::eft::two_sum). Zero for empty slices.
 ///
 /// `|dot2 − xᵀy| ≤ u·|xᵀy| + γ_n²·|x|ᵀ|y|` (their Proposition 5.5) when
-/// `n·u < 1`, every product `x[i]·y[i]` is within [`two_prod`]'s domain (zero
+/// `n·u < 1`, every product `x[i]·y[i]` is within [`two_prod`](crate::eft::two_prod)'s domain (zero
 /// or at least `2^-969` in magnitude), and no operation overflows.
 ///
 /// # Panics
