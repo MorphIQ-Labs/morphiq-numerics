@@ -10,6 +10,16 @@ is reserved for the first crates.io release
 
 ## [Unreleased]
 
+## [0.0.31](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.30...v0.0.31) - 2026-11-28
+
+### Added
+
+- *(formal)* machine-check the public exp entry ([#371](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/371))
+
+### Fixed
+
+- give reduce, eft and DoubleWord NaN results the same bits on every target ([#370](https://github.com/MorphIQ-Labs/morphiq-numerics/pull/370))
+
 ## [0.0.30](https://github.com/MorphIQ-Labs/morphiq-numerics/compare/v0.0.29...v0.0.30) - 2026-11-21
 
 ### Added
