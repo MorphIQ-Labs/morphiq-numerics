@@ -1,6 +1,6 @@
 //! Writes the cross-check corpus: each public double-word operation (including
-//! `exp_split`) and error-free transform, and `sqrt`, on reproducible inputs,
-//! with the library's results.
+//! `exp_split`) and error-free transform, `sqrt` and the slice reductions, on
+//! reproducible inputs, with the library's results.
 //!
 //! `scripts/check_formal.sh` runs the proved IEEE 754 definitions, extracted
 //! from Coq, on the same inputs and requires identical bits
@@ -9,12 +9,14 @@
 //! its Coq transcription must agree everywhere, not only where the bounds hold.
 //!
 //! Each line is `op in... : out...`, every value a binary64 as 16 hex digits.
+//! A reduction's inputs are its slice, or `x` followed by `y`.
 
 use std::io::{BufWriter, Write};
 
 use morphiq_numerics::double_word::DoubleWord;
 use morphiq_numerics::eft::{fast_two_sum, two_prod, two_sum};
 use morphiq_numerics::elementary::sqrt;
+use morphiq_numerics::reduce;
 use morphiq_numerics_reference::Words;
 
 /// Cases per operation.
@@ -101,6 +103,57 @@ fn exp_split_line(out: &mut impl Write, x: DoubleWord) {
     .expect("write");
 }
 
+/// One element of a reduction's slice. `class` selects the case's regime, so a
+/// whole slice can be ordinary, near overflow or underflow, or non-finite.
+fn element(words: &mut Words, class: u64) -> f64 {
+    match class {
+        // Magnitudes whose sums or products overflow.
+        0 => word(words, 500, 1023),
+        // Products at and below the underflow limits.
+        1 => word(words, -560, -400),
+        // Infinities and NaNs with payloads among ordinary terms.
+        2 if words.next_word().is_multiple_of(4) => {
+            let payload = words.next_word() & ((1 << 52) - 1);
+            let sign = words.next_word() & (1 << 63);
+            let payload = if words.next_word().is_multiple_of(3) {
+                0
+            } else {
+                payload
+            };
+            f64::from_bits(sign | (0x7ff << 52) | payload)
+        }
+        _ => word(words, -60, 60),
+    }
+}
+
+/// Every slice reduction on one pair of slices. Every other term of some cases
+/// nearly cancels the one before it.
+fn reduction_lines(out: &mut impl Write, words: &mut Words, n: usize) {
+    let class = words.next_word() % 6;
+    let mut x: Vec<f64> = (0..n).map(|_| element(words, class)).collect();
+    let y: Vec<f64> = (0..n).map(|_| element(words, class)).collect();
+    if class == 5 {
+        for i in (1..n).step_by(2) {
+            x[i] = -x[i - 1].next_up();
+        }
+    }
+    let mut emit = |op: &str, ins: &[&[f64]], result: f64| {
+        let ins: String = ins
+            .iter()
+            .flat_map(|s| s.iter())
+            .map(|&v| format!(" {}", hex(v)))
+            .collect();
+        writeln!(out, "{op}{ins} : {}", hex(result)).expect("write");
+    };
+    emit("sum", &[&x], reduce::sum(&x));
+    emit("sum2", &[&x], reduce::sum2(&x));
+    emit("dot", &[&x, &y], reduce::dot(&x, &y));
+    emit("dot2", &[&x, &y], reduce::dot2(&x, &y));
+    emit("sum_squares", &[&x], reduce::sum_squares(&x));
+    emit("sum_squares2", &[&x], reduce::sum_squares2(&x));
+    emit("max_abs", &[&x], reduce::max_abs(&x));
+}
+
 fn main() {
     let mut words = Words::new(0x0c0c_c705_5c4e_c401);
     let mut out = BufWriter::new(std::io::stdout().lock());
@@ -143,6 +196,15 @@ fn main() {
         -1454.999,
     ] {
         exp_split_line(&mut out, DoubleWord::from_f64(special));
+    }
+    // Every short length, the empty slice included, then longer ones.
+    for case in 0..CASES {
+        let n = if case % 40 == 39 {
+            33 + case % 97
+        } else {
+            case % 9
+        };
+        reduction_lines(&mut out, &mut words, n);
     }
     out.flush().expect("flush");
 }

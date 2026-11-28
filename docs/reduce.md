@@ -76,9 +76,8 @@ sum2 = fl(π_n + σ_n)
 
 **Bound** (Proposition 4.5): `|sum2 − s| ≤ u·|s| + γ_{n−1}²·S`, also with
 underflow, when `n·u < 1` and no operation overflows. The proof needs only that
-each `two_sum` is exact. `two_sum` is proved exact when both operands are at most
-`2^1020` in magnitude ([double-word.md](double-word.md)). Here the operands are
-the running sum and a term, so `S ≤ 2^1019` keeps every `two_sum` in its domain.
+each `two_sum` is exact, which holds whenever none of its operations overflows
+(`Reduce.two_sum_inv`).
 
 The bound says the result is as accurate as twice the working precision, then
 rounded. In relative terms: `|sum2 − s| / |s| ≤ u + γ_{n−1}²·cond`, with
@@ -154,9 +153,34 @@ the NaN an invalid operation creates. The rule is applied once, to a NaN result;
 
 ## What is checked, and how
 
-Not machine-checked: these bounds are the paper's propositions, and the
-derivation above for `dot`. The crate's own part, that `two_sum` and `two_prod`
-are exact on their domains, is machine-checked ([double-word.md](double-word.md)).
+**Machine-checked:** `formal/binary64/Reduce.v` transcribes the seven reductions
+and the NaN rule over IEEE 754 binary64, and proves for the transcription:
+
+| Theorem | States |
+|---|---|
+| `sum_bound` | `\|sum − s\| ≤ γ_{n−1}·S` |
+| `sum2_bound` | `\|sum2 − s\| ≤ u·\|s\| + γ_{n−1}²·S` |
+| `dot_bound`, `sum_squares_bound` | `\|dot − xᵀy\| ≤ γ_n·\|x\|ᵀ\|y\|` when each product is zero or at least `2^−1022` |
+| `dot2_bound`, `sum_squares2_bound` | `\|dot2 − xᵀy\| ≤ u·\|xᵀy\| + γ_n²·\|x\|ᵀ\|y\|` when each product is zero or at least `2^−969` |
+| `squares_abs` | for a sum of squares, `\|x\|ᵀ\|x\|` is the exact result |
+| `max_abs_exact`, `max_abs_nan` | `max_abs` is exact on finite inputs, and returns the first NaN otherwise |
+| `sum_nan`, `sum2_nan`, `dot_nan`, `dot2_nan` | with a NaN input, the result is the first one, unchanged |
+| `defined_created` | a NaN result with no NaN input is the canonical quiet NaN |
+
+**The hypotheses** are `n·u < 1`, the product floors above, equal lengths where a
+NaN theorem takes two slices, and a **finite result**. A finite result is how the
+theorems state "no operation overflows": an overflow or a non-finite operand
+never yields a finite value later, and the proofs recover every intermediate
+operation from it. No magnitude limit on the inputs is assumed.
+
+The arguments are those of the paper's propositions, in Coq's real numbers over
+Flocq's rounding model; `dot`'s is the derivation above.
+
+**Compared, not proved: the transcription.** The formal lane extracts it to OCaml
+and requires the same bits as the Rust, NaN results included, on the public
+cross-check corpus: 4,000 cases per function, of slice lengths 0 to 129, with
+ordinary, cancelling, overflowing, underflowing and non-finite inputs. The
+compiler and processor are assumed.
 
 `crates/reference/tests/reduce.rs` checks every bound in exact integer
 arithmetic, with the denominators of `γ` cleared:

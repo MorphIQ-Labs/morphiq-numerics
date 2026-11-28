@@ -121,3 +121,25 @@ Print Assumptions Tridiagonal.sign_continuants_positive.
 
 From Binary64 Require Import RelativeUlp.
 Print Assumptions RelativeUlp.relative_ulp_error.
+
+From Binary64 Require Reduce.
+Print Assumptions Reduce.sum_real.
+Print Assumptions Reduce.sum2_real.
+Print Assumptions Reduce.dot_real.
+Print Assumptions Reduce.dot2_real.
+Print Assumptions Reduce.two_sum_inv.
+Print Assumptions Reduce.two_prod_inv.
+Print Assumptions Reduce.sum_bound.
+Print Assumptions Reduce.sum2_bound.
+Print Assumptions Reduce.dot_bound.
+Print Assumptions Reduce.dot2_bound.
+Print Assumptions Reduce.sum_squares_bound.
+Print Assumptions Reduce.sum_squares2_bound.
+Print Assumptions Reduce.squares_abs.
+Print Assumptions Reduce.max_abs_exact.
+Print Assumptions Reduce.max_abs_nan.
+Print Assumptions Reduce.sum_nan.
+Print Assumptions Reduce.sum2_nan.
+Print Assumptions Reduce.dot_nan.
+Print Assumptions Reduce.dot2_nan.
+Print Assumptions Reduce.defined_created.
