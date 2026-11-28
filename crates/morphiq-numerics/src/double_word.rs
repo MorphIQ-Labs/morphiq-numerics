@@ -43,7 +43,7 @@
 //! in argument order and high before low, unchanged; with no NaN operand it is
 //! the canonical quiet NaN `7ff8000000000000`. Checked results are finite.
 
-use crate::eft::defined_nan;
+use crate::eft::defined_pair;
 
 mod checked;
 mod exp;
@@ -68,10 +68,13 @@ impl DoubleWord {
     /// A kernel result with each NaN word's bits taken from the contract.
     #[inline(always)]
     const fn defined(z: Kernel, inputs: &[f64]) -> Self {
-        Self(Kernel::from_words(
-            defined_nan(z.hi(), inputs),
-            defined_nan(z.lo(), inputs),
-        ))
+        // One test for both words; a NaN takes the rarely executed path.
+        let (hi, lo) = (z.hi(), z.lo());
+        if hi.is_nan() | lo.is_nan() {
+            let (hi, lo) = defined_pair(hi, lo, inputs);
+            return Self(Kernel::from_words(hi, lo));
+        }
+        Self(z)
     }
 
     /// `x` as a double-word number, `x + 0`.

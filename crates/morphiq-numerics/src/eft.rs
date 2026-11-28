@@ -94,6 +94,13 @@ pub(crate) fn two_prod_d(a: f64, b: f64) -> (f64, f64) {
 /// The quiet NaN returned when the arithmetic itself creates one.
 const CANONICAL_NAN: u64 = 0x7ff8_0000_0000_0000;
 
+/// Both words with [`defined_nan`] applied, out of line.
+#[cold]
+#[inline(never)]
+pub(crate) const fn defined_pair(x: f64, y: f64, inputs: &[f64]) -> (f64, f64) {
+    (defined_nan(x, inputs), defined_nan(y, inputs))
+}
+
 /// `word`, with a NaN's bits taken from the contract: the first NaN among
 /// `inputs`, unchanged, or the canonical quiet NaN when none is. IEEE 754 leaves
 /// which payload survives an operation, and the NaN an invalid operation
@@ -126,7 +133,11 @@ pub(crate) const fn defined_nan(word: f64, inputs: &[f64]) -> f64 {
 #[inline]
 pub const fn two_sum(a: f64, b: f64) -> (f64, f64) {
     let (x, y) = two_sum_kernel(a, b);
-    (defined_nan(x, &[a, b]), defined_nan(y, &[a, b]))
+    // One test for both words; a NaN takes the rarely executed path.
+    if x.is_nan() | y.is_nan() {
+        return defined_pair(x, y, &[a, b]);
+    }
+    (x, y)
 }
 
 /// `(s, t)` with `s = RN(a + b)` and `s + t = a + b` exactly, provided
@@ -144,7 +155,11 @@ pub const fn two_sum(a: f64, b: f64) -> (f64, f64) {
 #[inline]
 pub const fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
     let (x, y) = fast_two_sum_kernel(a, b);
-    (defined_nan(x, &[a, b]), defined_nan(y, &[a, b]))
+    // One test for both words; a NaN takes the rarely executed path.
+    if x.is_nan() | y.is_nan() {
+        return defined_pair(x, y, &[a, b]);
+    }
+    (x, y)
 }
 
 /// `(p, e)` with `p = RN(a · b)` and `p + e = a · b` exactly.
@@ -176,5 +191,9 @@ pub const fn fast_two_sum(a: f64, b: f64) -> (f64, f64) {
 #[inline]
 pub const fn two_prod(a: f64, b: f64) -> (f64, f64) {
     let (x, y) = two_prod_kernel(a, b);
-    (defined_nan(x, &[a, b]), defined_nan(y, &[a, b]))
+    // One test for both words; a NaN takes the rarely executed path.
+    if x.is_nan() | y.is_nan() {
+        return defined_pair(x, y, &[a, b]);
+    }
+    (x, y)
 }
