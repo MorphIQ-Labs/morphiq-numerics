@@ -13,14 +13,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  elementary:
-    name: elementary (${{ matrix.os }})
+  targets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      list: ${{ steps.list.outputs.list }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: list
+        run: |
+          targets="$(./scripts/check_fuzz.sh --list)"
+          echo "list=$(printf '%s\n' "$targets" | jq -Rsc 'split("\n")[:-1]')" >> "$GITHUB_OUTPUT"
+
+  campaign:
+    name: ${{ matrix.target }} (${{ matrix.os }})
+    needs: targets
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, macos-15]
+        target: ${{ fromJSON(needs.targets.outputs.list) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 300
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -36,13 +50,13 @@ jobs:
           ./scripts/check_fuzz_licenses.sh
       - name: Fuzz runner shell compatibility and failure propagation
         run: python3 -m unittest scripts.test_fuzz_runner
-      - name: Thirty minutes per target and feature mode
-        run: ./scripts/check_fuzz.sh 1800
+      - name: Thirty minutes per feature mode
+        run: ./scripts/check_fuzz.sh 1800 "${{ matrix.target }}"
       - name: Retain failures, logs and evolved corpora
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: elementary-fuzz-${{ matrix.os }}
+          name: fuzz-${{ matrix.target }}-${{ matrix.os }}
           path: |
             target/fuzz/logs/
             target/fuzz/artifacts/
